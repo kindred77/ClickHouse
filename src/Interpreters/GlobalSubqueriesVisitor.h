@@ -17,6 +17,7 @@
 #include <Interpreters/IdentifierSemantic.h>
 #include <Interpreters/Context.h>
 #include <Processors/Executors/PullingPipelineExecutor.h>
+#include <DataStreams/SquashingBlockInputStream.h>
 
 namespace DB
 {
@@ -141,14 +142,19 @@ public:
                 auto external_table = external_storage_holder->getTable();
                 auto table_out = external_table->write({}, external_table->getInMemoryMetadataPtr(), context);
                 auto io = interpreter->execute();
-                PullingPipelineExecutor executor(io.pipeline);
+                //PullingPipelineExecutor executor(io.pipeline);
 
-                table_out->writePrefix();
-                Block block;
-                while (executor.pull(block))
-                    table_out->write(block);
+                ////table_out->writePrefix();
+                //Block block;
+                //while (executor.pull(block))
+                    //table_out->write(block);
 
-                table_out->writeSuffix();
+                //table_out->writeSuffix();
+
+                BlockInputStreamPtr data = std::make_shared<SquashingBlockInputStream>(
+                        io.getInputStream(), context.getSettingsRef().min_insert_block_size_rows,
+                        context.getSettingsRef().min_insert_block_size_bytes);
+                copyData(*data, *table_out);
             }
             else
             {
