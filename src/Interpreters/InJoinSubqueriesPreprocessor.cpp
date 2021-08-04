@@ -130,7 +130,7 @@ public:
     {
         if (auto * function = node->as<ASTFunction>())
             visit(*function, node, data);
-        if (const auto * tables = node->as<ASTTablesInSelectQueryElement>())
+        if (auto * tables = node->as<ASTTablesInSelectQueryElement>())
             visit(*tables, node, data);
     }
 
@@ -168,7 +168,7 @@ private:
         }
     }
 
-    static void visit(const ASTTablesInSelectQueryElement & node, ASTPtr &, Data & data)
+    static void visit(ASTTablesInSelectQueryElement & node, ASTPtr &, Data & data)
     {
         if (!node.table_join || !node.table_expression)
             return;
@@ -176,7 +176,15 @@ private:
         ASTTableJoin * table_join = node.table_join->as<ASTTableJoin>();
         if (table_join->locality != ASTTableJoin::Locality::Global)
         {
-            if (auto & subquery = node.table_expression->as<ASTTableExpression>()->subquery)
+            if (node.table_expression->as<ASTTableExpression>()->database_and_table_name)
+            {
+                std::vector<ASTPtr> renamed;
+                NonGlobalTableVisitor::Data table_data{data.checker, data.context, renamed, nullptr, table_join};
+                NonGlobalTableVisitor(table_data).visit(node.table_expression);
+                if (!renamed.empty())
+                    data.renamed_tables.emplace_back(node.table_expression, std::move(renamed));
+            }
+            else if (auto & subquery = node.table_expression->as<ASTTableExpression>()->subquery)
             {
                 std::vector<ASTPtr> renamed;
                 NonGlobalTableVisitor::Data table_data{data.checker, data.context, renamed, nullptr, table_join};
