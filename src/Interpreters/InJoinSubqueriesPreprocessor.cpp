@@ -130,7 +130,7 @@ public:
     {
         if (auto * function = node->as<ASTFunction>())
             visit(*function, node, data);
-        if (auto * tables = node->as<ASTTablesInSelectQueryElement>())
+        if (const auto * tables = node->as<ASTTablesInSelectQueryElement>())
             visit(*tables, node, data);
     }
 
@@ -168,7 +168,7 @@ private:
         }
     }
 
-    static void visit(ASTTablesInSelectQueryElement & node, ASTPtr &, Data & data)
+    static void visit(const ASTTablesInSelectQueryElement & node, ASTPtr &, Data & data)
     {
         if (!node.table_join || !node.table_expression)
             return;
@@ -180,7 +180,7 @@ private:
             {
                 std::vector<ASTPtr> renamed;
                 NonGlobalTableVisitor::Data table_data{data.checker, data.context, renamed, nullptr, table_join};
-                NonGlobalTableVisitor(table_data).visit(node.table_expression);
+                NonGlobalTableVisitor(table_data).visit(const_cast<ASTPtr &>(node.table_expression));
                 if (!renamed.empty())
                     data.renamed_tables.emplace_back(node.table_expression, std::move(renamed));
             }
