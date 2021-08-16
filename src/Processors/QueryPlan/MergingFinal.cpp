@@ -6,6 +6,7 @@
 #include <Processors/Merges/ReplacingSortedTransform.h>
 #include <Processors/Merges/SummingSortedTransform.h>
 #include <Processors/Merges/VersionedCollapsingTransform.h>
+#include <Processors/Merges/PartialReplacingSortedTransform.h>
 #include <Processors/Transforms/AddingSelectorTransform.h>
 #include <Processors/Transforms/CopyTransform.h>
 #include <IO/Operators.h>
@@ -88,6 +89,10 @@ void MergingFinal::transformPipeline(QueryPipeline & pipeline)
                 return std::make_shared<VersionedCollapsingTransform>(header, num_outputs,
                            sort_description, merging_params.sign_column, max_block_size);
 
+            case MergeTreeData::MergingParams::PartialReplacing:
+                return std::make_shared<PartialReplacingSortedTransform>(header, num_outputs,
+                           sort_description, merging_params.part_cols_indexes_column, merging_params.primary_keys, merging_params.all_column_names, max_block_size);
+
             case MergeTreeData::MergingParams::Graphite:
                 throw Exception("GraphiteMergeTree doesn't support FINAL", ErrorCodes::LOGICAL_ERROR);
         }
@@ -104,12 +109,25 @@ void MergingFinal::transformPipeline(QueryPipeline & pipeline)
     ColumnNumbers key_columns;
     key_columns.reserve(sort_description.size());
 
-    for (auto & desc : sort_description)
+    if (merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
     {
-        if (!desc.column_name.empty())
-            key_columns.push_back(header.getPositionByName(desc.column_name));
-        else
-            key_columns.emplace_back(desc.column_number);
+        for (auto & column_name : merging_params.primary_keys)
+        {
+            if (!column_name.empty())
+                key_columns.push_back(header.getPositionByName(column_name));
+            else
+                throw Exception("PartialReplacingMergeTree need primary key column", ErrorCodes::LOGICAL_ERROR);
+        }
+    }
+    else
+    {
+        for (auto & desc : sort_description)
+        {
+            if (!desc.column_name.empty())
+                key_columns.push_back(header.getPositionByName(desc.column_name));
+            else
+                key_columns.emplace_back(desc.column_number);
+        }
     }
 
     pipeline.addSimpleTransform([&](const Block & stream_header)

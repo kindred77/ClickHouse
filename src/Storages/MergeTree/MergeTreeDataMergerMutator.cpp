@@ -20,6 +20,7 @@
 #include <Processors/Merges/GraphiteRollupSortedTransform.h>
 #include <Processors/Merges/AggregatingSortedTransform.h>
 #include <Processors/Merges/VersionedCollapsingTransform.h>
+#include <Processors/Merges/PartialReplacingSortedTransform.h>
 #include <Processors/Transforms/ExpressionTransform.h>
 #include <Processors/Transforms/MaterializingTransform.h>
 #include <Processors/Executors/PipelineExecutingBlockInputStream.h>
@@ -830,7 +831,6 @@ MergeTreeData::MutableDataPartPtr MergeTreeDataMergerMutator::mergePartsToTempor
                 return std::make_shared<ExpressionTransform>(header, metadata_snapshot->getSortingKey().expression);
             });
         }
-
         pipes.emplace_back(std::move(pipe));
     }
 
@@ -893,6 +893,12 @@ MergeTreeData::MutableDataPartPtr MergeTreeDataMergerMutator::mergePartsToTempor
             merged_transform = std::make_unique<VersionedCollapsingTransform>(
                 header, pipes.size(), sort_description, data.merging_params.sign_column,
                 merge_block_size, rows_sources_write_buf.get(), blocks_are_granules_size);
+            break;
+        case MergeTreeData::MergingParams::PartialReplacing:
+            merged_transform = std::make_unique<PartialReplacingSortedTransform>(
+                header, pipes.size(), sort_description, data.merging_params.part_cols_indexes_column,
+                data.merging_params.primary_keys, data.merging_params.all_column_names,
+                merge_block_size);
             break;
     }
 
