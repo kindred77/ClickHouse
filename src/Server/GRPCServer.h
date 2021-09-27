@@ -39,7 +39,7 @@ public:
     size_t currentThreads() const { return currentConnections(); }
 
 private:
-    using GRPCService = clickhouse::grpc::ClickHouse::AsyncService;
+    using GRPCService = clickhouse::grpc::ClickHouseService::AsyncService;
     class Runner;
 
     IServer & iserver;

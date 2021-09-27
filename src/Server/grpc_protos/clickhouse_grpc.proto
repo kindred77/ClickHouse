@@ -143,7 +143,7 @@ message Result {
    bool cancelled = 8;
 }
 
-service ClickHouse {
+service ClickHouseService {
    rpc ExecuteQuery(QueryInfo) returns (Result) {}
    rpc ExecuteQueryWithStreamInput(stream QueryInfo) returns (Result) {}
    rpc ExecuteQueryWithStreamOutput(QueryInfo) returns (stream Result) {}

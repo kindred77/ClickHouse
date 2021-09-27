@@ -31,7 +31,7 @@
 #include <grpc++/server_builder.h>
 
 
-using GRPCService = clickhouse::grpc::ClickHouse::AsyncService;
+using GRPCService = clickhouse::grpc::ClickHouseService::AsyncService;
 using GRPCQueryInfo = clickhouse::grpc::QueryInfo;
 using GRPCResult = clickhouse::grpc::Result;
 using GRPCException = clickhouse::grpc::Exception;
