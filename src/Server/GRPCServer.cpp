@@ -36,6 +36,11 @@ using GRPCQueryInfo = clickhouse::grpc::QueryInfo;
 using GRPCResult = clickhouse::grpc::Result;
 using GRPCException = clickhouse::grpc::Exception;
 using GRPCProgress = clickhouse::grpc::Progress;
+using GRPCQueryPlan = clickhouse::grpc::QueryPlan;
+using GRPCStep = clickhouse::grpc::Step;
+using GRPCStepType = clickhouse::grpc::StepType;
+using GRPCTableScanStep = clickhouse::grpc::TableScanStep;
+using GRPCFilterStep = clickhouse::grpc::FilterStep;
 
 namespace DB
 {
@@ -233,6 +238,7 @@ namespace
                            const CompletionCallback & callback) = 0;
 
         virtual void read(GRPCQueryInfo & query_info_, const CompletionCallback & callback) = 0;
+        virtual void readQueryPlan(GRPCQueryPlan & query_plan_, const CompletionCallback & callback) = 0;
         virtual void write(const GRPCResult & result, const CompletionCallback & callback) = 0;
         virtual void writeAndFinish(const GRPCResult & result, const grpc::Status & status, const CompletionCallback & callback) = 0;
 
@@ -264,10 +270,52 @@ namespace
 
     private:
         grpc::ServerAsyncReaderWriter<GRPCResult, GRPCQueryInfo> reader_writer{&grpc_context};
+        grpc::ServerAsyncReaderWriter<GRPCResult, GRPCQueryPlan> reader_writer_query_plan{&grpc_context};
         std::unordered_map<size_t, CompletionCallback> callbacks;
         size_t next_callback_id = 0;
         std::mutex mutex;
     };
+
+    /*class BaseResponderForQueryPlan : BaseResponder
+    {
+    public:
+        virtual ~BaseResponderForQueryPlan() = default;
+
+        virtual void start(GRPCService & grpc_service,
+                           grpc::ServerCompletionQueue & new_call_queue,
+                           grpc::ServerCompletionQueue & notification_queue,
+                           const CompletionCallback & callback) = 0;
+        virtual void readQueryPlan(GRPCQueryPlan & query_plan_, const CompletionCallback & callback) = 0;
+        virtual void write(const GRPCResult & result, const CompletionCallback & callback) = 0;
+        virtual void writeAndFinish(const GRPCResult & result, const grpc::Status & status, const CompletionCallback & callback) = 0;
+
+        Poco::Net::SocketAddress getClientAddress() const { String peer = grpc_context.peer(); return Poco::Net::SocketAddress{peer.substr(peer.find(':') + 1)}; }
+    protected:
+        CompletionCallback * getCallbackPtr(const CompletionCallback & callback)
+        {
+            std::lock_guard lock{mutex};
+            size_t callback_id = next_callback_id++;
+            auto & callback_in_map = callbacks[callback_id];
+            callback_in_map = [this, callback, callback_id](bool ok)
+            {
+                CompletionCallback callback_to_call;
+                {
+                    std::lock_guard lock2{mutex};
+                    callback_to_call = callback;
+                    callbacks.erase(callback_id);
+                }
+                callback_to_call(ok);
+            };
+            return &callback_in_map;
+        }
+
+        grpc::ServerContext grpc_context;
+    private:
+        grpc::ServerAsyncReaderWriter<GRPCResult, GRPCQueryPlan> reader_writer{&grpc_context};
+        std::unordered_map<size_t, CompletionCallback> callbacks;
+        size_t next_callback_id = 0;
+        std::mutex mutex;
+    };*/
 
     enum CallType
     {
@@ -275,6 +323,7 @@ namespace
         CALL_WITH_STREAM_INPUT,  /// ExecuteQueryWithStreamInput() call
         CALL_WITH_STREAM_OUTPUT, /// ExecuteQueryWithStreamOutput() call
         CALL_WITH_STREAM_IO,     /// ExecuteQueryWithStreamIO() call
+        CALL_QUERYPLAN,          /// ExecuteQueryPlan() call
         CALL_MAX,
     };
 
@@ -286,6 +335,7 @@ namespace
             case CALL_WITH_STREAM_INPUT: return "ExecuteQueryWithStreamInput()";
             case CALL_WITH_STREAM_OUTPUT: return "ExecuteQueryWithStreamOutput()";
             case CALL_WITH_STREAM_IO: return "ExecuteQueryWithStreamIO()";
+            case CALL_QUERYPLAN: return "ExecuteQueryPlan()";
             case CALL_MAX: break;
         }
         __builtin_unreachable();
@@ -325,6 +375,10 @@ namespace
             callback(true);
         }
 
+        void readQueryPlan([[maybe_unused]] GRPCQueryPlan & query_plan_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
+        }
+
         void write(const GRPCResult &, const CompletionCallback &) override
         {
             throw Exception("Responder<CALL_SIMPLE>::write() should not be called", ErrorCodes::LOGICAL_ERROR);
@@ -355,6 +409,10 @@ namespace
         void read(GRPCQueryInfo & query_info_, const CompletionCallback & callback) override
         {
             reader.Read(&query_info_, getCallbackPtr(callback));
+        }
+
+        void readQueryPlan([[maybe_unused]] GRPCQueryPlan & query_plan_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
         }
 
         void write(const GRPCResult &, const CompletionCallback &) override
@@ -392,6 +450,10 @@ namespace
             callback(true);
         }
 
+        void readQueryPlan([[maybe_unused]] GRPCQueryPlan & query_plan_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
+        }
+
         void write(const GRPCResult & result, const CompletionCallback & callback) override
         {
             writer.Write(result, getCallbackPtr(callback));
@@ -424,6 +486,10 @@ namespace
             reader_writer.Read(&query_info_, getCallbackPtr(callback));
         }
 
+        void readQueryPlan([[maybe_unused]] GRPCQueryPlan & query_plan_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
+        }
+
         void write(const GRPCResult & result, const CompletionCallback & callback) override
         {
             reader_writer.Write(result, getCallbackPtr(callback));
@@ -438,6 +504,46 @@ namespace
         grpc::ServerAsyncReaderWriter<GRPCResult, GRPCQueryInfo> reader_writer{&grpc_context};
     };
 
+    template<>
+    class Responder<CALL_QUERYPLAN> : public BaseResponder
+    {
+    public:
+        void start(GRPCService & grpc_service,
+                  grpc::ServerCompletionQueue & new_call_queue,
+                  grpc::ServerCompletionQueue & notification_queue,
+                  const CompletionCallback & callback) override
+        {
+            grpc_service.RequestExecuteQueryPlan(&grpc_context, &query_plan.emplace(), &response_writer, &new_call_queue, &notification_queue, getCallbackPtr(callback));
+        }
+
+        void read([[maybe_unused]] GRPCQueryInfo & query_info_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
+        }
+
+        void readQueryPlan(GRPCQueryPlan & query_plan_, const CompletionCallback & callback) override
+        {
+            if (!query_plan.has_value())
+                callback(false);
+            query_plan_ = std::move(query_plan).value();
+            query_plan.reset();
+            callback(true);
+        }
+
+        void write(const GRPCResult &, const CompletionCallback &) override
+        {
+            throw Exception("Responder<CALL_QUERYPLAN>::write() should not be called", ErrorCodes::LOGICAL_ERROR);
+        }
+
+        void writeAndFinish(const GRPCResult & result, const grpc::Status & status, const CompletionCallback & callback) override
+        {
+            response_writer.Finish(result, status, getCallbackPtr(callback));
+        }
+
+    private:
+        grpc::ServerAsyncResponseWriter<GRPCResult> response_writer{&grpc_context};
+        std::optional<GRPCQueryPlan> query_plan;
+    };
+
     std::unique_ptr<BaseResponder> makeResponder(CallType call_type)
     {
         switch (call_type)
@@ -446,6 +552,7 @@ namespace
             case CALL_WITH_STREAM_INPUT: return std::make_unique<Responder<CALL_WITH_STREAM_INPUT>>();
             case CALL_WITH_STREAM_OUTPUT: return std::make_unique<Responder<CALL_WITH_STREAM_OUTPUT>>();
             case CALL_WITH_STREAM_IO: return std::make_unique<Responder<CALL_WITH_STREAM_IO>>();
+            case CALL_QUERYPLAN: return std::make_unique<Responder<CALL_QUERYPLAN>>();
             case CALL_MAX: break;
         }
         __builtin_unreachable();
@@ -487,8 +594,12 @@ namespace
     private:
         void run();
 
+        void runQueryPlan();
+
         void receiveQuery();
+        void receiveQueryPlan();
         void executeQuery();
+        void executeQueryPlan();
 
         void processInput();
         void initializeBlockInputStream(const Block & header);
@@ -498,11 +609,13 @@ namespace
         void generateOutputWithProcessors();
 
         void finishQuery();
+        void finishQueryPlan();
         void onException(const Exception & exception);
         void onFatalError();
         void close();
 
         void readQueryInfo();
+        void readQueryPlan();
         void throwIfFailedToReadQueryInfo();
         bool isQueryCancelled();
 
@@ -538,6 +651,7 @@ namespace
         InternalTextLogsQueuePtr logs_queue;
 
         GRPCQueryInfo query_info; /// We reuse the same messages multiple times.
+        GRPCQueryPlan query_plan;
         GRPCResult result;
 
         bool initial_query_info_read = false;
@@ -561,6 +675,7 @@ namespace
         std::atomic<bool> reading_query_info = false;
         std::atomic<bool> failed_to_read_query_info = false;
         GRPCQueryInfo next_query_info_while_reading;
+        GRPCQueryPlan next_query_plan_while_reading;
         std::atomic<bool> want_to_cancel = false;
         std::atomic<bool> check_query_info_contains_cancel_only = false;
         std::atomic<bool> sending_result = false;
@@ -589,7 +704,14 @@ namespace
         {
             try
             {
-                run();
+                if(call_type == CallType::CALL_QUERYPLAN)
+                {
+                    runQueryPlan();
+                }
+                else
+                {
+                    run();
+                }
             }
             catch (...)
             {
@@ -624,6 +746,30 @@ namespace
         }
     }
 
+    void Call::runQueryPlan()
+    {
+        try
+        {
+            receiveQueryPlan();
+            executeQueryPlan();
+            //processInput();
+            //generateOutput();
+            finishQueryPlan();
+        }
+        catch (Exception & exception)
+        {
+            onException(exception);
+        }
+        catch (Poco::Exception & exception)
+        {
+            onException(Exception{Exception::CreateFromPocoTag{}, exception});
+        }
+        catch (std::exception & exception)
+        {
+            onException(Exception{Exception::CreateFromSTDTag{}, exception});
+        }
+    }
+
     void Call::receiveQuery()
     {
         LOG_INFO(log, "Handling call {}", getCallName(call_type));
@@ -634,6 +780,18 @@ namespace
             throw Exception("Initial query info cannot set the 'cancel' field", ErrorCodes::INVALID_GRPC_QUERY_INFO);
 
         LOG_DEBUG(log, "Received initial QueryInfo: {}", getQueryDescription(query_info));
+    }
+
+    void Call::receiveQueryPlan()
+    {
+        LOG_INFO(log, "Handling call {}", getCallName(call_type));
+
+        readQueryPlan();
+
+        if (query_plan.cancel())
+            throw Exception("Initial query plan cannot set the 'cancel' field", ErrorCodes::INVALID_GRPC_QUERY_INFO);
+
+        //LOG_DEBUG(log, "Received initial QueryPlan: {}", getQueryDescription(query_info));
     }
 
     void Call::executeQuery()
@@ -776,6 +934,47 @@ namespace
         }
         String query(begin, query_end);
         io = ::DB::executeQuery(query, *query_context, false, QueryProcessingStage::Complete, true, true);
+    }
+
+    void Call::executeQueryPlan()
+    {
+        auto print_step = [this](GRPCStep step, const String addMsg)
+        {
+            if(step.type() == GRPCStepType::TABLESCAN)
+            {
+                GRPCTableScanStep table_scan_step = GRPCTableScanStep::default_instance();
+                if(table_scan_step.ParseFromString(step.data()))
+                {
+                    LOG_INFO(log, "id: {}------{}-----tablescan---table name: {}", step.id(), addMsg, table_scan_step.table_name());
+                }
+                else
+                {
+                    LOG_INFO(log, "id: {}------{}-----tablescan---could not parse from data", step.id(), addMsg);
+                }
+            }
+            else if(step.type() == GRPCStepType::FILTER)
+            {
+                GRPCFilterStep filter_step = GRPCFilterStep::default_instance();
+                if(filter_step.ParseFromString(step.data()))
+                {
+                    LOG_INFO(log, "id: {}------{}-----filter----{}", step.id(), addMsg, filter_step.filters(0));
+                }
+                else
+                {
+                    LOG_INFO(log, "id: {}------{}-----filter---could not parse from data", step.id(), addMsg);
+                }
+            }
+            else
+            {
+                LOG_INFO(log, "------{}-----unknown step type: {}", addMsg, step.type());
+            }
+        };
+        LOG_INFO(log, "---------------leaf step id: {}", query_plan.leavesstepids(0));
+        const GRPCStep & leaf_step = query_plan.steps().at(query_plan.leavesstepids(0));
+        print_step(leaf_step, "leaf step");
+        LOG_INFO(log, "---------------parent step id: {}", leaf_step.parentid());
+        const GRPCStep & parent_step = query_plan.steps().at(leaf_step.parentid());
+        print_step(parent_step, "parent step");
     }
 
     void Call::processInput()
@@ -1144,6 +1343,11 @@ namespace
             static_cast<double>(waited_for_client_writing) / 1000000000ULL);
     }
 
+    void Call::finishQueryPlan()
+    {
+
+    }
+
     void Call::onException(const Exception & exception)
     {
         io.onException();
@@ -1252,6 +1456,67 @@ namespace
             }
             throwIfFailedToReadQueryInfo();
             query_info = std::move(next_query_info_while_reading);
+            initial_query_info_read = true;
+        };
+
+        if (!initial_query_info_read)
+        {
+            /// Initial query info hasn't been read yet, so we're going to read it now.
+            start_reading();
+        }
+
+        /// Maybe it's reading a query info right now. Let it finish.
+        finish_reading();
+
+        if (isInputStreaming(call_type))
+        {
+            /// Next query info can contain more input data. Now we start reading a next query info,
+            /// so another call of readQueryInfo() in the future will probably be able to take it.
+            start_reading();
+        }
+    }
+
+    void Call::readQueryPlan()
+    {
+        auto start_reading = [&]
+        {
+            assert(!reading_query_info);
+            reading_query_info = true;
+            responder->readQueryPlan(next_query_plan_while_reading, [this](bool ok)
+            {
+                /// Called on queue_thread.
+                if (ok)
+                {
+                    const auto & nqi = next_query_plan_while_reading;
+                    if (check_query_info_contains_cancel_only)
+                    {
+                        LOG_WARNING(log, "Cannot add extra information to a query which is already executing. Only the 'cancel' field can be set");
+                    }
+                    if (nqi.cancel())
+                        want_to_cancel = true;
+                }
+                else
+                {
+                    /// We cannot throw an exception right here because this code is executed
+                    /// on queue_thread.
+                    failed_to_read_query_info = true;
+                }
+                reading_query_info = false;
+                read_finished.notify_one();
+            });
+        };
+
+        auto finish_reading = [&]
+        {
+            if (reading_query_info)
+            {
+                Stopwatch client_writing_watch;
+                std::unique_lock lock{dummy_mutex};
+                read_finished.wait(lock, [this] { return !reading_query_info; });
+                waited_for_client_writing += client_writing_watch.elapsedNanoseconds();
+            }
+            throwIfFailedToReadQueryInfo();
+            query_plan = std::move(next_query_plan_while_reading);
             initial_query_info_read = true;
         };
 

@@ -143,9 +143,49 @@ message Result {
    bool cancelled = 8;
 }
 
+//for calcite query step
+//********table scan*************start
+message TableScanStep {
+    string table_name = 1;
+    repeated string required_columns = 2;
+    repeated string filters = 3;
+}
+//********table scan*************end
+
+//********filter*************start
+message FilterStep {
+    repeated string filters = 1;
+}
+//********filter*************end
+
+enum StepType {
+   TABLESCAN = 0;
+   FILTER = 1;
+   PROJECT = 2;
+   SORT = 3;
+   AGG = 4;
+}
+
+message Step {
+    int32 id = 1;
+    StepType type = 2;
+    bytes data = 3;
+    int32 parentId = 4;
+}
+
+//for calcite query plan
+message QueryPlan {
+    string query_plan_id = 1;
+    bool cancel = 2;
+    repeated int32 leavesStepIds = 3;
+    map<int32, Step> steps = 4;
+}
+
 service ClickHouseService {
    rpc ExecuteQuery(QueryInfo) returns (Result) {}
    rpc ExecuteQueryWithStreamInput(stream QueryInfo) returns (Result) {}
    rpc ExecuteQueryWithStreamOutput(QueryInfo) returns (stream Result) {}
    rpc ExecuteQueryWithStreamIO(stream QueryInfo) returns (stream Result) {}
+   //for calcite query
+   rpc ExecuteQueryPlan(QueryPlan) returns (Result) {}
 }
