@@ -5,13 +5,20 @@
 #include <Columns/ColumnsNumber.h>
 #include <Common/CurrentThread.h>
 #include <Common/SettingsChanges.h>
-#include <Common/setThreadName.h>
 #include <DataStreams/AddingDefaultsBlockInputStream.h>
 #include <DataStreams/AsynchronousBlockInputStream.h>
+#include <DataStreams/SizeLimits.h>
+#include <DataTypes/DataTypeString.h>
 #include <DataTypes/DataTypeFactory.h>
 #include <Interpreters/Context.h>
 #include <Interpreters/InternalTextLogsQueue.h>
 #include <Interpreters/executeQuery.h>
+//#include <Interpreters/ActionsVisitor.h>
+#include <Interpreters/PreparedSets.h>
+#include <Interpreters/SubqueryForSet.h>
+#include <Interpreters/TreeRewriter.h>
+#include <Interpreters/ExpressionAnalyzer.h>
+#include <Interpreters/ExpressionActions.h>
 #include <IO/ConcatReadBuffer.h>
 #include <IO/ReadBufferFromString.h>
 #include <IO/ReadHelpers.h>
@@ -20,23 +27,19 @@
 #include <Parsers/ASTInsertQuery.h>
 #include <Parsers/ASTQueryWithOutput.h>
 #include <Parsers/ParserQuery.h>
+#include <Parsers/ASTFunction.h>
+#include <Parsers/ExpressionListParsers.h>
 #include <Processors/Executors/PullingAsyncPipelineExecutor.h>
 #include <Server/IServer.h>
+#include <Server/GRPCForQueryPlan.h>
 #include <Storages/IStorage.h>
 #include <Poco/FileStream.h>
 #include <Poco/StreamCopier.h>
 #include <Poco/Util/LayeredConfiguration.h>
-#include <common/range.h>
+#include <ext/range.h>
 #include <grpc++/security/server_credentials.h>
 #include <grpc++/server.h>
 #include <grpc++/server_builder.h>
-
-
-using GRPCService = clickhouse::grpc::ClickHouse::AsyncService;
-using GRPCQueryInfo = clickhouse::grpc::QueryInfo;
-using GRPCResult = clickhouse::grpc::Result;
-using GRPCException = clickhouse::grpc::Exception;
-using GRPCProgress = clickhouse::grpc::Progress;
 
 namespace DB
 {
@@ -220,65 +223,6 @@ namespace
         return str;
     }
 
-    using CompletionCallback = std::function<void(bool)>;
-
-    /// Requests a connection and provides low-level interface for reading and writing.
-    class BaseResponder
-    {
-    public:
-        virtual ~BaseResponder() = default;
-
-        virtual void start(GRPCService & grpc_service,
-                           grpc::ServerCompletionQueue & new_call_queue,
-                           grpc::ServerCompletionQueue & notification_queue,
-                           const CompletionCallback & callback) = 0;
-
-        virtual void read(GRPCQueryInfo & query_info_, const CompletionCallback & callback) = 0;
-        virtual void write(const GRPCResult & result, const CompletionCallback & callback) = 0;
-        virtual void writeAndFinish(const GRPCResult & result, const grpc::Status & status, const CompletionCallback & callback) = 0;
-
-        Poco::Net::SocketAddress getClientAddress() const { String peer = grpc_context.peer(); return Poco::Net::SocketAddress{peer.substr(peer.find(':') + 1)}; }
-
-    protected:
-        CompletionCallback * getCallbackPtr(const CompletionCallback & callback)
-        {
-            /// It would be better to pass callbacks to gRPC calls.
-            /// However gRPC calls can be tagged with `void *` tags only.
-            /// The map `callbacks` here is used to keep callbacks until they're called.
-            std::lock_guard lock{mutex};
-            size_t callback_id = next_callback_id++;
-            auto & callback_in_map = callbacks[callback_id];
-            callback_in_map = [this, callback, callback_id](bool ok)
-            {
-                CompletionCallback callback_to_call;
-                {
-                    std::lock_guard lock2{mutex};
-                    callback_to_call = callback;
-                    callbacks.erase(callback_id);
-                }
-                callback_to_call(ok);
-            };
-            return &callback_in_map;
-        }
-
-        grpc::ServerContext grpc_context;
-
-    private:
-        grpc::ServerAsyncReaderWriter<GRPCResult, GRPCQueryInfo> reader_writer{&grpc_context};
-        std::unordered_map<size_t, CompletionCallback> callbacks;
-        size_t next_callback_id = 0;
-        std::mutex mutex;
-    };
-
-    enum CallType
-    {
-        CALL_SIMPLE,             /// ExecuteQuery() call
-        CALL_WITH_STREAM_INPUT,  /// ExecuteQueryWithStreamInput() call
-        CALL_WITH_STREAM_OUTPUT, /// ExecuteQueryWithStreamOutput() call
-        CALL_WITH_STREAM_IO,     /// ExecuteQueryWithStreamIO() call
-        CALL_MAX,
-    };
-
     const char * getCallName(CallType call_type)
     {
         switch (call_type)
@@ -287,6 +231,7 @@ namespace
             case CALL_WITH_STREAM_INPUT: return "ExecuteQueryWithStreamInput()";
             case CALL_WITH_STREAM_OUTPUT: return "ExecuteQueryWithStreamOutput()";
             case CALL_WITH_STREAM_IO: return "ExecuteQueryWithStreamIO()";
+            case CALL_QUERYPLAN: return "ExecuteQueryPlan()";
             case CALL_MAX: break;
         }
         __builtin_unreachable();
@@ -301,9 +246,6 @@ namespace
     {
         return (call_type == CALL_WITH_STREAM_OUTPUT) || (call_type == CALL_WITH_STREAM_IO);
     }
-
-    template <enum CallType call_type>
-    class Responder;
 
     template<>
     class Responder<CALL_SIMPLE> : public BaseResponder
@@ -324,6 +266,10 @@ namespace
             query_info_ = std::move(query_info).value();
             query_info.reset();
             callback(true);
+        }
+
+        void readQueryPlan([[maybe_unused]] GRPCQueryPlan & query_plan_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
         }
 
         void write(const GRPCResult &, const CompletionCallback &) override
@@ -356,6 +302,10 @@ namespace
         void read(GRPCQueryInfo & query_info_, const CompletionCallback & callback) override
         {
             reader.Read(&query_info_, getCallbackPtr(callback));
+        }
+
+        void readQueryPlan([[maybe_unused]] GRPCQueryPlan & query_plan_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
         }
 
         void write(const GRPCResult &, const CompletionCallback &) override
@@ -393,6 +343,10 @@ namespace
             callback(true);
         }
 
+        void readQueryPlan([[maybe_unused]] GRPCQueryPlan & query_plan_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
+        }
+
         void write(const GRPCResult & result, const CompletionCallback & callback) override
         {
             writer.Write(result, getCallbackPtr(callback));
@@ -425,6 +379,10 @@ namespace
             reader_writer.Read(&query_info_, getCallbackPtr(callback));
         }
 
+        void readQueryPlan([[maybe_unused]] GRPCQueryPlan & query_plan_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
+        }
+
         void write(const GRPCResult & result, const CompletionCallback & callback) override
         {
             reader_writer.Write(result, getCallbackPtr(callback));
@@ -439,6 +397,46 @@ namespace
         grpc::ServerAsyncReaderWriter<GRPCResult, GRPCQueryInfo> reader_writer{&grpc_context};
     };
 
+    template<>
+    class Responder<CALL_QUERYPLAN> : public BaseResponder
+    {
+    public:
+        void start(GRPCService & grpc_service,
+                  grpc::ServerCompletionQueue & new_call_queue,
+                  grpc::ServerCompletionQueue & notification_queue,
+                  const CompletionCallback & callback) override
+        {
+            grpc_service.RequestExecuteQueryPlan(&grpc_context, &query_plan.emplace(), &response_writer, &new_call_queue, &notification_queue, getCallbackPtr(callback));
+        }
+
+        void read([[maybe_unused]] GRPCQueryInfo & query_info_, [[maybe_unused]] const CompletionCallback & callback) override
+        {
+        }
+
+        void readQueryPlan(GRPCQueryPlan & query_plan_, const CompletionCallback & callback) override
+        {
+            if (!query_plan.has_value())
+                callback(false);
+            query_plan_ = std::move(query_plan).value();
+            query_plan.reset();
+            callback(true);
+        }
+
+        void write(const GRPCResult &, const CompletionCallback &) override
+        {
+            throw Exception("Responder<CALL_QUERYPLAN>::write() should not be called", ErrorCodes::LOGICAL_ERROR);
+        }
+
+        void writeAndFinish(const GRPCResult & result, const grpc::Status & status, const CompletionCallback & callback) override
+        {
+            response_writer.Finish(result, status, getCallbackPtr(callback));
+        }
+
+    private:
+        grpc::ServerAsyncResponseWriter<GRPCResult> response_writer{&grpc_context};
+        std::optional<GRPCQueryPlan> query_plan;
+    };
+
     std::unique_ptr<BaseResponder> makeResponder(CallType call_type)
     {
         switch (call_type)
@@ -447,6 +445,7 @@ namespace
             case CALL_WITH_STREAM_INPUT: return std::make_unique<Responder<CALL_WITH_STREAM_INPUT>>();
             case CALL_WITH_STREAM_OUTPUT: return std::make_unique<Responder<CALL_WITH_STREAM_OUTPUT>>();
             case CALL_WITH_STREAM_IO: return std::make_unique<Responder<CALL_WITH_STREAM_IO>>();
+            case CALL_QUERYPLAN: return std::make_unique<Responder<CALL_QUERYPLAN>>();
             case CALL_MAX: break;
         }
         __builtin_unreachable();
@@ -476,40 +475,6 @@ namespace
     };
 
 
-    /// A boolean state protected by mutex able to wait until other thread sets it to a specific value.
-    class BoolState
-    {
-    public:
-        explicit BoolState(bool initial_value) : value(initial_value) {}
-
-        bool get() const
-        {
-            std::lock_guard lock{mutex};
-            return value;
-        }
-
-        void set(bool new_value)
-        {
-            std::lock_guard lock{mutex};
-            if (value == new_value)
-                return;
-            value = new_value;
-            changed.notify_all();
-        }
-
-        void wait(bool wanted_value) const
-        {
-            std::unique_lock lock{mutex};
-            changed.wait(lock, [this, wanted_value]() { return value == wanted_value; });
-        }
-
-    private:
-        bool value;
-        mutable std::mutex mutex;
-        mutable std::condition_variable changed;
-    };
-
-
     /// Handles a connection after a responder is started (i.e. after getting a new call).
     class Call
     {
@@ -522,8 +487,12 @@ namespace
     private:
         void run();
 
+        void runQueryPlan();
+
         void receiveQuery();
+        void receiveQueryPlan();
         void executeQuery();
+        void executeQueryPlan();
 
         void processInput();
         void initializeBlockInputStream(const Block & header);
@@ -533,11 +502,13 @@ namespace
         void generateOutputWithProcessors();
 
         void finishQuery();
+        void finishQueryPlan();
         void onException(const Exception & exception);
         void onFatalError();
         void close();
 
         void readQueryInfo();
+        void readQueryPlan();
         void throwIfFailedToReadQueryInfo();
         bool isQueryCancelled();
 
@@ -556,7 +527,7 @@ namespace
         Poco::Logger * log = nullptr;
 
         std::shared_ptr<NamedSession> session;
-        ContextMutablePtr query_context;
+        std::optional<Context> query_context;
         std::optional<CurrentThread::QueryScope> query_scope;
         String query_text;
         ASTPtr ast;
@@ -573,6 +544,7 @@ namespace
         InternalTextLogsQueuePtr logs_queue;
 
         GRPCQueryInfo query_info; /// We reuse the same messages multiple times.
+        GRPCQueryPlan query_plan;
         GRPCResult result;
 
         bool initial_query_info_read = false;
@@ -593,15 +565,19 @@ namespace
         UInt64 waited_for_client_writing = 0;
 
         /// The following fields are accessed both from call_thread and queue_thread.
-        BoolState reading_query_info{false};
+        std::atomic<bool> reading_query_info = false;
         std::atomic<bool> failed_to_read_query_info = false;
         GRPCQueryInfo next_query_info_while_reading;
+        GRPCQueryPlan next_query_plan_while_reading;
         std::atomic<bool> want_to_cancel = false;
         std::atomic<bool> check_query_info_contains_cancel_only = false;
-        BoolState sending_result{false};
+        std::atomic<bool> sending_result = false;
         std::atomic<bool> failed_to_send_result = false;
 
         ThreadFromGlobalPool call_thread;
+        std::condition_variable read_finished;
+        std::condition_variable write_finished;
+        std::mutex dummy_mutex; /// Doesn't protect anything.
     };
 
     Call::Call(CallType call_type_, std::unique_ptr<BaseResponder> responder_, IServer & iserver_, Poco::Logger * log_)
@@ -621,7 +597,14 @@ namespace
         {
             try
             {
-                run();
+                if(call_type == CallType::CALL_QUERYPLAN)
+                {
+                    runQueryPlan();
+                }
+                else
+                {
+                    run();
+                }
             }
             catch (...)
             {
@@ -636,12 +619,35 @@ namespace
     {
         try
         {
-            setThreadName("GRPCServerCall");
             receiveQuery();
             executeQuery();
             processInput();
             generateOutput();
             finishQuery();
+        }
+        catch (Exception & exception)
+        {
+            onException(exception);
+        }
+        catch (Poco::Exception & exception)
+        {
+            onException(Exception{Exception::CreateFromPocoTag{}, exception});
+        }
+        catch (std::exception & exception)
+        {
+            onException(Exception{Exception::CreateFromSTDTag{}, exception});
+        }
+    }
+
+    void Call::runQueryPlan()
+    {
+        try
+        {
+            receiveQueryPlan();
+            executeQueryPlan();
+            //processInput();
+            //generateOutput();
+            finishQueryPlan();
         }
         catch (Exception & exception)
         {
@@ -669,6 +675,18 @@ namespace
         LOG_DEBUG(log, "Received initial QueryInfo: {}", getQueryDescription(query_info));
     }
 
+    void Call::receiveQueryPlan()
+    {
+        LOG_INFO(log, "Handling call {}", getCallName(call_type));
+
+        readQueryPlan();
+
+        if (query_plan.cancel())
+            throw Exception("Initial query plan cannot set the 'cancel' field", ErrorCodes::INVALID_GRPC_QUERY_INFO);
+
+        //LOG_DEBUG(log, "Received initial QueryPlan: {}", getQueryDescription(query_info));
+    }
+
     void Call::executeQuery()
     {
         /// Retrieve user credentials.
@@ -684,7 +702,7 @@ namespace
         }
 
         /// Create context.
-        query_context = Context::createCopy(iserver.context());
+        query_context.emplace(iserver.context());
 
         /// Authentication.
         query_context->setUser(user, password, user_address);
@@ -698,11 +716,11 @@ namespace
         {
             session = query_context->acquireNamedSession(
                 query_info.session_id(), getSessionTimeout(query_info, iserver.config()), query_info.session_check());
-            query_context = Context::createCopy(session->context);
+            query_context = session->context;
             query_context->setSessionContext(session->context);
         }
 
-        query_scope.emplace(query_context);
+        query_scope.emplace(*query_context);
 
         /// Set client info.
         ClientInfo & client_info = query_context->getClientInfo();
@@ -774,26 +792,26 @@ namespace
             output_format = query_context->getDefaultFormat();
 
         /// Set callback to create and fill external tables
-        query_context->setExternalTablesInitializer([this] (ContextPtr context)
+        query_context->setExternalTablesInitializer([this] (Context & context)
         {
-            if (context != query_context)
+            if (&context != &*query_context)
                 throw Exception("Unexpected context in external tables initializer", ErrorCodes::LOGICAL_ERROR);
             createExternalTables();
         });
 
         /// Set callbacks to execute function input().
-        query_context->setInputInitializer([this] (ContextPtr context, const StoragePtr & input_storage)
+        query_context->setInputInitializer([this] (Context & context, const StoragePtr & input_storage)
         {
-            if (context != query_context)
+            if (&context != &query_context.value())
                 throw Exception("Unexpected context in Input initializer", ErrorCodes::LOGICAL_ERROR);
             input_function_is_used = true;
             initializeBlockInputStream(input_storage->getInMemoryMetadataPtr()->getSampleBlock());
             block_input_stream->readPrefix();
         });
 
-        query_context->setInputBlocksReaderCallback([this](ContextPtr context) -> Block
+        query_context->setInputBlocksReaderCallback([this](Context & context) -> Block
         {
-            if (context != query_context)
+            if (&context != &query_context.value())
                 throw Exception("Unexpected context in InputBlocksReader", ErrorCodes::LOGICAL_ERROR);
             auto block = block_input_stream->read();
             if (!block)
@@ -808,13 +826,167 @@ namespace
             query_end = insert_query->data;
         }
         String query(begin, query_end);
-        io = ::DB::executeQuery(query, query_context, false, QueryProcessingStage::Complete, true, true);
+        io = ::DB::executeQuery(query, *query_context, false, QueryProcessingStage::Complete, true, true);
+    }
+
+    void Call::executeQueryPlan()
+    {
+        auto print_step = [this](GRPCStep step, const String addMsg)
+        {
+            if(step.type() == GRPCStepType::TABLESCAN)
+            {
+                GRPCTableScanStep table_scan_step = GRPCTableScanStep::default_instance();
+                if(table_scan_step.ParseFromString(step.data()))
+                {
+                    LOG_INFO(log, "id: {}------{}-----tablescan---table name: {}", step.id(), addMsg, table_scan_step.table_name());
+                }
+                else
+                {
+                    LOG_INFO(log, "id: {}------{}-----tablescan---could not parse from data", step.id(), addMsg);
+                }
+            }
+            else if(step.type() == GRPCStepType::FILTER)
+            {
+                GRPCFilterStep filter_step = GRPCFilterStep::default_instance();
+                if(filter_step.ParseFromString(step.data()))
+                {
+                    LOG_INFO(log, "id: {}------{}-----filter----{}", step.id(), addMsg, filter_step.filters(0));
+                    const Settings & settings = query_context->getSettingsRef();
+
+                    std::string filter_text = std::move(filter_step.filters(0));
+                    //const char * begin = filter_text.data();
+                    //const char * end = begin + filter_text.size();
+                    ParserExpressionWithOptionalAlias parser(false);
+                    //ASTPtr filter_ast = parseQuery(parser, begin, end, "", settings.max_query_size, settings.max_parser_depth);
+                    ASTPtr filter_ast = parseQuery(parser, filter_text, 0, settings.max_parser_depth);
+
+                    LOG_INFO(log, "------------filter_ast id: {}----{}", filter_ast->getID(), filter_ast->getColumnName());
+                    /// Choose input format.
+                    auto * function_ast = filter_ast->as<ASTFunction>();
+                    if(function_ast)
+                    {
+                        LOG_INFO(log, "------------get function_ast");
+                    }
+                    else
+                    {
+                        LOG_INFO(log, "------------do not get function_ast");
+                    }
+
+                    Block test_block = {ColumnWithTypeAndName(ColumnString::create(), std::make_shared<DataTypeString>(), "$1"),
+                            ColumnWithTypeAndName(ColumnString::create(), std::make_shared<DataTypeString>(), "a"),
+                            ColumnWithTypeAndName(ColumnString::create(), std::make_shared<DataTypeString>(), "b")};
+                    MutableColumns columns = test_block.mutateColumns();
+                    columns[0]->insert("a1");
+                    columns[0]->insert("a2");
+                    columns[1]->insert("b1");
+                    columns[1]->insert("b2");
+                    columns[2]->insert("c1");
+                    columns[2]->insert("c2");
+
+                    test_block.setColumns(std::move(columns));
+
+//                    auto actions = std::make_shared<ActionsDAG>(test_block.getColumnsWithTypeAndName());
+//                    PreparedSets prepared_sets;
+//                    SubqueriesForSets subquery_for_sets;
+//                    ActionsVisitor::Data visitor_data(*query_context, SizeLimits{}, 1, {}, std::move(actions), prepared_sets, subquery_for_sets, true, true, true, false);
+//                    ActionsVisitor(visitor_data).visit(filter_ast);
+//                    actions = visitor_data.getActions();
+//                    auto expression_actions = std::make_shared<ExpressionActions>(actions);
+
+                    auto context = iserver.context();
+                    SettingsChanges settings_changes;
+                    settings_changes.push_back({"max_ast_depth", 1000});
+                    context.checkSettingsConstraints(settings_changes);
+                    context.applySettingsChanges(settings_changes);
+                    auto syntax_reulst = TreeRewriter(context).analyze(filter_ast, test_block.getNamesAndTypesList());
+                    ExpressionAnalyzer analyzer(filter_ast, syntax_reulst, context);
+                    auto expression_actions = analyzer.getActions(false, true);//, CompileExpressions::yes);
+
+
+                    LOG_INFO(log, "------------------expression_actions:{}---", expression_actions->dumpActions());
+
+
+
+                    LOG_INFO(log, "------------before execute---------------");
+                    for(auto col : test_block)
+                    {
+                        //LOG_INFO(log, "------------column {}------------start----{}", col.name, (col.column?col.column->size()+"":""));
+                        LOG_INFO(log, "column name------------{}------------start", col.name);
+                        if(col.column == nullptr)
+                        {
+                            LOG_INFO(log, "------col.column is null");
+                        }
+                        else
+                        {
+                            LOG_INFO(log, "------col.column is not null-----size: {}", col.column->size());
+                        }
+                        if(col.column && col.column->size() > 0)
+                        {
+                            LOG_INFO(log, "size----{}", col.column->size());
+                            for(auto i : ext::range(col.column->size()))
+                            {
+                                LOG_INFO(log, "i----{}", i);
+                                LOG_INFO(log, "data----{}", col.column->getDataAt(i));
+                            }
+                        }
+
+                        LOG_INFO(log, "column name------------{}------------end", col.name);
+                    }
+
+                    expression_actions->execute(test_block);
+
+                    LOG_INFO(log, "------------after execute---------------");
+                    for(auto col : test_block)
+                    {
+                        //LOG_INFO(log, "------------column {}------------start----{}", col.name, (col.column?col.column->size()+"":""));
+                        LOG_INFO(log, "column name------------{}------------start", col.name);
+                        if(col.column == nullptr)
+                        {
+                            LOG_INFO(log, "------col.column is null");
+                        }
+                        else
+                        {
+                            LOG_INFO(log, "------col.column is not null-----size: {}", col.column->size());
+                        }
+                        if(col.column && col.column->size() > 0)
+                        {
+                            LOG_INFO(log, "size----{}", col.column->size());
+                            for(auto i : ext::range(col.column->size()))
+                            {
+                                LOG_INFO(log, "i----{}", i);
+                                LOG_INFO(log, "data----{}", col.column->getDataAt(i));
+                            }
+                        }
+
+                        LOG_INFO(log, "column name------------{}------------end", col.name);
+                    }
+
+
+                }
+                else
+                {
+                    LOG_INFO(log, "id: {}------{}-----filter---could not parse from data", step.id(), addMsg);
+                }
+            }
+            else
+            {
+                LOG_INFO(log, "------{}-----unknown step type: {}", addMsg, step.type());
+            }
+        };
+        LOG_INFO(log, "---------------leaf step id: {}", query_plan.leavesstepids(0));
+        const GRPCStep & leaf_step = query_plan.steps().at(query_plan.leavesstepids(0));
+        print_step(leaf_step, "leaf step");
+        LOG_INFO(log, "---------------parent step id: {}", leaf_step.parentid());
+        const GRPCStep & parent_step = query_plan.steps().at(leaf_step.parentid());
+        print_step(parent_step, "parent step");
     }
 
     void Call::processInput()
     {
         if (!io.out)
             return;
+
+        initializeBlockInputStream(io.out->getHeader());
 
         bool has_data_to_insert = (insert_query && insert_query->data)
                                   || !query_info.input_data().empty() || query_info.next_query_info();
@@ -825,10 +997,6 @@ namespace
             else
                 throw Exception("No data to insert", ErrorCodes::NO_DATA_TO_INSERT);
         }
-
-        /// This is significant, because parallel parsing may be used.
-        /// So we mustn't touch the input stream from other thread.
-        initializeBlockInputStream(io.out->getHeader());
 
         block_input_stream->readPrefix();
         io.out->writePrefix();
@@ -911,10 +1079,10 @@ namespace
                 auto table_id = query_context->resolveStorageID(insert_query->table_id, Context::ResolveOrdinary);
                 if (query_context->getSettingsRef().input_format_defaults_for_omitted_fields && table_id)
                 {
-                    StoragePtr storage = DatabaseCatalog::instance().getTable(table_id, query_context);
+                    StoragePtr storage = DatabaseCatalog::instance().getTable(table_id, *query_context);
                     const auto & columns = storage->getInMemoryMetadataPtr()->getColumns();
                     if (!columns.empty())
-                        block_input_stream = std::make_shared<AddingDefaultsBlockInputStream>(block_input_stream, columns, query_context);
+                        block_input_stream = std::make_shared<AddingDefaultsBlockInputStream>(block_input_stream, columns, *query_context);
                 }
             }
         }
@@ -936,12 +1104,12 @@ namespace
                 StoragePtr storage;
                 if (auto resolved = query_context->tryResolveStorageID(temporary_id, Context::ResolveExternal))
                 {
-                    storage = DatabaseCatalog::instance().getTable(resolved, query_context);
+                    storage = DatabaseCatalog::instance().getTable(resolved, *query_context);
                 }
                 else
                 {
                     NamesAndTypesList columns;
-                    for (size_t column_idx : collections::range(external_table.columns_size()))
+                    for (size_t column_idx : ext::range(external_table.columns_size()))
                     {
                         const auto & name_and_type = external_table.columns(column_idx);
                         NameAndTypePair column;
@@ -951,7 +1119,7 @@ namespace
                         column.type = DataTypeFactory::instance().get(name_and_type.type());
                         columns.emplace_back(std::move(column));
                     }
-                    auto temporary_table = TemporaryTableHolder(query_context, ColumnsDescription{columns}, {});
+                    auto temporary_table = TemporaryTableHolder(*query_context, ColumnsDescription{columns}, {});
                     storage = temporary_table.getTable();
                     query_context->addExternalTable(temporary_id.table_name, std::move(temporary_table));
                 }
@@ -960,17 +1128,17 @@ namespace
                 {
                     /// The data will be written directly to the table.
                     auto metadata_snapshot = storage->getInMemoryMetadataPtr();
-                    auto out_stream = storage->write(ASTPtr(), metadata_snapshot, query_context);
+                    auto out_stream = storage->write(ASTPtr(), metadata_snapshot, *query_context);
                     ReadBufferFromMemory data(external_table.data().data(), external_table.data().size());
                     String format = external_table.format();
                     if (format.empty())
                         format = "TabSeparated";
-                    ContextMutablePtr external_table_context = query_context;
-                    ContextMutablePtr temp_context;
+                    Context * external_table_context = &*query_context;
+                    std::optional<Context> temp_context;
                     if (!external_table.settings().empty())
                     {
-                        temp_context = Context::createCopy(query_context);
-                        external_table_context = temp_context;
+                        temp_context = *query_context;
+                        external_table_context = &*temp_context;
                         SettingsChanges settings_changes;
                         for (const auto & [key, value] : external_table.settings())
                             settings_changes.push_back({key, value});
@@ -1179,6 +1347,11 @@ namespace
             static_cast<double>(waited_for_client_writing) / 1000000000ULL);
     }
 
+    void Call::finishQueryPlan()
+    {
+
+    }
+
     void Call::onException(const Exception & exception)
     {
         io.onException();
@@ -1245,7 +1418,8 @@ namespace
     {
         auto start_reading = [&]
         {
-            reading_query_info.set(true);
+            assert(!reading_query_info);
+            reading_query_info = true;
             responder->read(next_query_info_while_reading, [this](bool ok)
             {
                 /// Called on queue_thread.
@@ -1270,20 +1444,83 @@ namespace
                     /// on queue_thread.
                     failed_to_read_query_info = true;
                 }
-                reading_query_info.set(false);
+                reading_query_info = false;
+                read_finished.notify_one();
             });
         };
 
         auto finish_reading = [&]
         {
-            if (reading_query_info.get())
+            if (reading_query_info)
             {
                 Stopwatch client_writing_watch;
-                reading_query_info.wait(false);
+                std::unique_lock lock{dummy_mutex};
+                read_finished.wait(lock, [this] { return !reading_query_info; });
                 waited_for_client_writing += client_writing_watch.elapsedNanoseconds();
             }
             throwIfFailedToReadQueryInfo();
             query_info = std::move(next_query_info_while_reading);
+            initial_query_info_read = true;
+        };
+
+        if (!initial_query_info_read)
+        {
+            /// Initial query info hasn't been read yet, so we're going to read it now.
+            start_reading();
+        }
+
+        /// Maybe it's reading a query info right now. Let it finish.
+        finish_reading();
+
+        if (isInputStreaming(call_type))
+        {
+            /// Next query info can contain more input data. Now we start reading a next query info,
+            /// so another call of readQueryInfo() in the future will probably be able to take it.
+            start_reading();
+        }
+    }
+
+    void Call::readQueryPlan()
+    {
+        auto start_reading = [&]
+        {
+            assert(!reading_query_info);
+            reading_query_info = true;
+            responder->readQueryPlan(next_query_plan_while_reading, [this](bool ok)
+            {
+                /// Called on queue_thread.
+                if (ok)
+                {
+                    const auto & nqi = next_query_plan_while_reading;
+                    if (check_query_info_contains_cancel_only)
+                    {
+                        LOG_WARNING(log, "Cannot add extra information to a query which is already executing. Only the 'cancel' field can be set");
+                    }
+                    if (nqi.cancel())
+                        want_to_cancel = true;
+                }
+                else
+                {
+                    /// We cannot throw an exception right here because this code is executed
+                    /// on queue_thread.
+                    failed_to_read_query_info = true;
+                }
+                reading_query_info = false;
+                read_finished.notify_one();
+            });
+        };
+
+        auto finish_reading = [&]
+        {
+            if (reading_query_info)
+            {
+                Stopwatch client_writing_watch;
+                std::unique_lock lock{dummy_mutex};
+                read_finished.wait(lock, [this] { return !reading_query_info; });
+                waited_for_client_writing += client_writing_watch.elapsedNanoseconds();
+            }
+            throwIfFailedToReadQueryInfo();
+            query_plan = std::move(next_query_plan_while_reading);
             initial_query_info_read = true;
         };
 
@@ -1442,10 +1679,11 @@ namespace
 
         /// Wait for previous write to finish.
         /// (gRPC doesn't allow to start sending another result while the previous is still being sending.)
-        if (sending_result.get())
+        if (sending_result)
         {
             Stopwatch client_reading_watch;
-            sending_result.wait(false);
+            std::unique_lock lock{dummy_mutex};
+            write_finished.wait(lock, [this] { return !sending_result; });
             waited_for_client_reading += client_reading_watch.elapsedNanoseconds();
         }
         throwIfFailedToSendResult();
@@ -1456,13 +1694,14 @@ namespace
         if (write_buffer)
             write_buffer->finalize();
 
-        sending_result.set(true);
+        sending_result = true;
         auto callback = [this](bool ok)
         {
             /// Called on queue_thread.
             if (!ok)
                 failed_to_send_result = true;
-            sending_result.set(false);
+            sending_result = false;
+            write_finished.notify_one();
         };
 
         Stopwatch client_reading_final_watch;
@@ -1482,7 +1721,8 @@ namespace
         if (send_final_message)
         {
             /// Wait until the result is actually sent.
-            sending_result.wait(false);
+            std::unique_lock lock{dummy_mutex};
+            write_finished.wait(lock, [this] { return !sending_result; });
             waited_for_client_reading += client_reading_final_watch.elapsedNanoseconds();
             throwIfFailedToSendResult();
             LOG_TRACE(log, "Final result has been sent to the client");
@@ -1551,7 +1791,7 @@ private:
     {
         std::lock_guard lock{mutex};
         responders_for_new_calls.resize(CALL_MAX);
-        for (CallType call_type : collections::range(CALL_MAX))
+        for (CallType call_type : ext::range(CALL_MAX))
             makeResponderForNewCall(call_type);
     }
 
@@ -1593,7 +1833,7 @@ private:
     {
         /// Called on call_thread. That's why we can't destroy the `call` right now
         /// (thread can't join to itself). Thus here we only move the `call` from
-        /// `current_calls` to `finished_calls` and run() will actually destroy the `call`.
+        /// `current_call` to `finished_calls` and run() will actually destroy the `call`.
         std::lock_guard lock{mutex};
         auto it = current_calls.find(call);
         finished_calls.push_back(std::move(it->second));
@@ -1602,7 +1842,6 @@ private:
 
     void run()
     {
-        setThreadName("GRPCServerQueue");
         while (true)
         {
             {
