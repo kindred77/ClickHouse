@@ -33,16 +33,6 @@ class IServer;
 
 namespace
 {
-enum CallType
-{
-    CALL_SIMPLE,             /// ExecuteQuery() call
-    CALL_WITH_STREAM_INPUT,  /// ExecuteQueryWithStreamInput() call
-    CALL_WITH_STREAM_OUTPUT, /// ExecuteQueryWithStreamOutput() call
-    CALL_WITH_STREAM_IO,     /// ExecuteQueryWithStreamIO() call
-    CALL_QUERYPLAN,          /// ExecuteQueryPlan() call
-    CALL_MAX,
-};
-
 using CompletionCallback = std::function<void(bool)>;
 
 /// Requests a connection and provides low-level interface for reading and writing.
@@ -61,7 +51,7 @@ public:
     virtual void write(const GRPCResult & result, const CompletionCallback & callback) = 0;
     virtual void writeAndFinish(const GRPCResult & result, const grpc::Status & status, const CompletionCallback & callback) = 0;
 
-    Poco::Net::SocketAddress getClientAddress() const { auto peer = grpc_context.peer(); return Poco::Net::SocketAddress{peer.substr(peer.find(':') + 1)}; }
+    Poco::Net::SocketAddress getClientAddress() const { std::string peer = grpc_context.peer(); return Poco::Net::SocketAddress{peer.substr(peer.find(':') + 1)}; }
 
 protected:
     CompletionCallback * getCallbackPtr(const CompletionCallback & callback)
@@ -93,6 +83,16 @@ private:
     std::unordered_map<size_t, CompletionCallback> callbacks;
     size_t next_callback_id = 0;
     std::mutex mutex;
+};
+
+enum CallType
+{
+    CALL_SIMPLE,             /// ExecuteQuery() call
+    CALL_WITH_STREAM_INPUT,  /// ExecuteQueryWithStreamInput() call
+    CALL_WITH_STREAM_OUTPUT, /// ExecuteQueryWithStreamOutput() call
+    CALL_WITH_STREAM_IO,     /// ExecuteQueryWithStreamIO() call
+    CALL_QUERYPLAN,          /// ExecuteQueryPlan() call
+    CALL_MAX,
 };
 
 template <enum CallType call_type>
