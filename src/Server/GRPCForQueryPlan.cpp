@@ -34,11 +34,7 @@ void GRPCDoTableScan([[maybe_unused]] ContextMutablePtr& query_context, [[maybe_
 
     StoragePtr storage = DatabaseCatalog::instance().getTable(table_id, query_context);
     StorageMetadataPtr meta_data = storage->getInMemoryMetadataPtr();
-    Names required_columns;
-    for(const auto & col_name : table_scan_step.required_columns())
-    {
-        required_columns.emplace(col_name);
-    }
+    Names required_columns(table_scan_step.required_columns().begin(), table_scan_step.required_columns().end());
     storage->read(query_plan, required_columns, meta_data, query_info, query_context, QueryProcessingStage::FetchColumns, settings.max_block_size, 8);
 }
 
