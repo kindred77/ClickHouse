@@ -6,17 +6,15 @@
 #include <Common/CurrentThread.h>
 #include <Common/SettingsChanges.h>
 #include <Common/setThreadName.h>
+#include <common/range.h>
 #include <DataStreams/AddingDefaultsBlockInputStream.h>
 #include <DataStreams/AsynchronousBlockInputStream.h>
 #include <DataTypes/DataTypeString.h>
 #include <DataTypes/DataTypeFactory.h>
+#include <DataTypes/DataTypesNumber.h>
 #include <Interpreters/Context.h>
 #include <Interpreters/InternalTextLogsQueue.h>
 #include <Interpreters/executeQuery.h>
-#include <Interpreters/TreeRewriter.h>
-#include <Interpreters/ExpressionAnalyzer.h>
-#include <Interpreters/ExpressionActions.h>
-#include <IO/ConcatReadBuffer.h>
 #include <IO/ReadBufferFromString.h>
 #include <IO/ReadHelpers.h>
 #include <Parsers/parseQuery.h>
@@ -25,14 +23,13 @@
 #include <Parsers/ASTQueryWithOutput.h>
 #include <Parsers/ParserQuery.h>
 #include <Parsers/ASTFunction.h>
-#include <Parsers/ExpressionListParsers.h>
 #include <Processors/Executors/PullingAsyncPipelineExecutor.h>
 #include <Server/IServer.h>
+#include <Server/GRPCForQueryPlan.h>
 #include <Storages/IStorage.h>
 #include <Poco/FileStream.h>
 #include <Poco/StreamCopier.h>
 #include <Poco/Util/LayeredConfiguration.h>
-#include <common/range.h>
 #include <grpc++/security/server_credentials.h>
 #include <grpc++/server.h>
 #include <grpc++/server_builder.h>
@@ -879,122 +876,8 @@ namespace
                 GRPCFilterStep filter_step = GRPCFilterStep::default_instance();
                 if(filter_step.ParseFromString(step.data()))
                 {
-                    LOG_INFO(log, "id: {}------{}-----filter----{}", step.id(), addMsg, filter_step.filters(0));
-                    const Settings & settings = query_context->getSettingsRef();
-                    LOG_INFO(log, "------------00000000000000---------------");
-                    std::string filter_text = std::move(filter_step.filters(0));
-                    LOG_INFO(log, "------------1111111111111111111---------------");
-                    const char * begin = filter_text.data();
-                    const char * end = begin + filter_text.size();
-                    ParserExpressionWithOptionalAlias parser(false);
-                    LOG_INFO(log, "------------2222222222222222---------------");
-                    LOG_INFO(log, "------------2222222222222222aaaaaaaaaa---------------{}----{}", settings.max_query_size, settings.max_parser_depth);
-                    ASTPtr filter_ast = parseQuery(parser, begin, end, "", settings.max_query_size, settings.max_parser_depth);
-                    //ASTPtr filter_ast = parseQuery(parser, filter_text, 0, settings.max_parser_depth);
-                    LOG_INFO(log, "------------33333333333333333---------------");
 
-                    LOG_INFO(log, "------------filter_ast id: {}----{}", filter_ast->getID(), filter_ast->getColumnName());
-                    /// Choose input format.
-                    auto * function_ast = filter_ast->as<ASTFunction>();
-                    if(function_ast)
-                    {
-                        LOG_INFO(log, "------------get function_ast");
-                    }
-                    else
-                    {
-                        LOG_INFO(log, "------------do not get function_ast");
-                    }
-
-                    Block test_block = {ColumnWithTypeAndName(ColumnString::create(), std::make_shared<DataTypeString>(), "$1"),
-                            ColumnWithTypeAndName(ColumnString::create(), std::make_shared<DataTypeString>(), "a"),
-                            ColumnWithTypeAndName(ColumnString::create(), std::make_shared<DataTypeString>(), "b")};
-                    MutableColumns columns = test_block.mutateColumns();
-                    columns[0]->insert("a1");
-                    columns[0]->insert("a2");
-                    columns[1]->insert("b1");
-                    columns[1]->insert("b2");
-                    columns[2]->insert("c1");
-                    columns[2]->insert("c2");
-
-                    test_block.setColumns(std::move(columns));
-
-//                    auto actions = std::make_shared<ActionsDAG>(test_block.getColumnsWithTypeAndName());
-//                    PreparedSets prepared_sets;
-//                    SubqueriesForSets subquery_for_sets;
-//                    ActionsVisitor::Data visitor_data(*query_context, SizeLimits{}, 1, {}, std::move(actions), prepared_sets, subquery_for_sets, true, true, true, false);
-//                    ActionsVisitor(visitor_data).visit(filter_ast);
-//                    actions = visitor_data.getActions();
-//                    auto expression_actions = std::make_shared<ExpressionActions>(actions);
-
-                    auto context = iserver.context();
-                    SettingsChanges settings_changes;
-                    settings_changes.push_back({"max_ast_depth", 1000});
-                    context->checkSettingsConstraints(settings_changes);
-                    context->applySettingsChanges(settings_changes);
-                    auto syntax_reulst = TreeRewriter(context).analyze(filter_ast, test_block.getNamesAndTypesList());
-                    ExpressionAnalyzer analyzer(filter_ast, syntax_reulst, context);
-                    auto expression_actions = analyzer.getActions(false, true);//, CompileExpressions::yes);
-
-
-                    LOG_INFO(log, "------------------expression_actions:{}---", expression_actions->dumpActions());
-
-
-
-                    LOG_INFO(log, "------------before execute---------------");
-                    for(auto col : test_block)
-                    {
-                        //LOG_INFO(log, "------------column {}------------start----{}", col.name, (col.column?col.column->size()+"":""));
-                        LOG_INFO(log, "column name------------{}------------start", col.name);
-                        if(col.column == nullptr)
-                        {
-                            LOG_INFO(log, "------col.column is null");
-                        }
-                        else
-                        {
-                            LOG_INFO(log, "------col.column is not null-----size: {}", col.column->size());
-                        }
-                        if(col.column && col.column->size() > 0)
-                        {
-                            LOG_INFO(log, "size----{}", col.column->size());
-                            for(auto i : collections::range(col.column->size()))
-                            {
-                                LOG_INFO(log, "i----{}", i);
-                                LOG_INFO(log, "data----{}", col.column->getDataAt(i));
-                            }
-                        }
-
-                        LOG_INFO(log, "column name------------{}------------end", col.name);
-                    }
-
-                    expression_actions->execute(test_block);
-
-                    LOG_INFO(log, "------------after execute---------------");
-                    for(auto col : test_block)
-                    {
-                        //LOG_INFO(log, "------------column {}------------start----{}", col.name, (col.column?col.column->size()+"":""));
-                        LOG_INFO(log, "column name------------{}------------start", col.name);
-                        if(col.column == nullptr)
-                        {
-                            LOG_INFO(log, "------col.column is null");
-                        }
-                        else
-                        {
-                            LOG_INFO(log, "------col.column is not null-----size: {}", col.column->size());
-                        }
-                        if(col.column && col.column->size() > 0)
-                        {
-                            LOG_INFO(log, "size----{}", col.column->size());
-                            for(auto i : collections::range(col.column->size()))
-                            {
-                                LOG_INFO(log, "i----{}", i);
-                                LOG_INFO(log, "data----{}", col.column->getDataAt(i));
-                            }
-                        }
-
-                        LOG_INFO(log, "column name------------{}------------end", col.name);
-                    }
-
-
+                    TestExpressionActions(query_context, log, std::move(filter_step.filters(0)));
                 }
                 else
                 {
