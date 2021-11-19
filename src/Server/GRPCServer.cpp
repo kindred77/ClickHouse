@@ -24,6 +24,8 @@
 #include <Parsers/ParserQuery.h>
 #include <Parsers/ASTFunction.h>
 #include <Processors/Executors/PullingAsyncPipelineExecutor.h>
+#include <Processors/QueryPlan/Optimizations/QueryPlanOptimizationSettings.h>
+#include <Processors/QueryPlan/BuildQueryPipelineSettings.h>
 #include <Server/IServer.h>
 #include <Server/GRPCForQueryPlan.h>
 #include <Storages/IStorage.h>
@@ -670,7 +672,7 @@ namespace
             receiveQueryPlan();
             executeQueryPlan();
             //processInput();
-            //generateOutput();
+            generateOutput();
             finishQueryPlan();
         }
         catch (Exception & exception)
@@ -856,19 +858,30 @@ namespace
     void Call::executeQueryPlan()
     {
         query_context = Context::createCopy(iserver.context());
+        QueryPlan query_plan_exe;
 
-        auto print_step = [this](GRPCStep step, const String addMsg)
+        auto generate_query_plan = [this](QueryPlan& query_plan_res)
         {
+            LOG_INFO(log, "---------------leaf step id: {}", query_plan.leavesstepids(0));
+            const GRPCStep & step = query_plan.steps().at(query_plan.leavesstepids(0));
+            //LOG_INFO(log, "---------------parent step id: {}", leaf_step.parentid());
+            //const GRPCStep & parent_step = query_plan.steps().at(leaf_step.parentid());
+
             if(step.type() == GRPCStepType::TABLESCAN)
             {
                 GRPCTableScanStep table_scan_step = GRPCTableScanStep::default_instance();
                 if(table_scan_step.ParseFromString(step.data()))
                 {
-                    LOG_INFO(log, "id: {}------{}-----tablescan---table name: {}", step.id(), addMsg, table_scan_step.table_name());
+                    LOG_INFO(log, "id: {}---------tablescan---db name: {}, table name: {}", step.id(), table_scan_step.db_name(), table_scan_step.table_name());
+                    //QueryPlan query_plan;
+                    GRPCDoTableScan(query_context, query_plan_res, table_scan_step);
+                    io.pipeline = std::move(*query_plan_res.buildQueryPipeline(
+                            QueryPlanOptimizationSettings::fromContext(query_context), BuildQueryPipelineSettings::fromContext(query_context)));
+                    //io.pipeline = std::move(*query_plan.buildQueryPipeline(QueryPlanOptimizationSettings::fromContext(query_context), BuildQueryPipelineSettings::fromContext(query_context)));
                 }
                 else
                 {
-                    LOG_INFO(log, "id: {}------{}-----tablescan---could not parse from data", step.id(), addMsg);
+                    LOG_INFO(log, "id: {}----------tablescan---could not parse from data", step.id());
                 }
             }
             else if(step.type() == GRPCStepType::FILTER)
@@ -881,20 +894,16 @@ namespace
                 }
                 else
                 {
-                    LOG_INFO(log, "id: {}------{}-----filter---could not parse from data", step.id(), addMsg);
+                    LOG_INFO(log, "id: {}----------filter---could not parse from data", step.id());
                 }
             }
             else
             {
-                LOG_INFO(log, "------{}-----unknown step type: {}", addMsg, step.type());
+                LOG_INFO(log, "------unknown step type: {}", step.type());
             }
         };
-        LOG_INFO(log, "---------------leaf step id: {}", query_plan.leavesstepids(0));
-        const GRPCStep & leaf_step = query_plan.steps().at(query_plan.leavesstepids(0));
-        print_step(leaf_step, "leaf step");
-        LOG_INFO(log, "---------------parent step id: {}", leaf_step.parentid());
-        const GRPCStep & parent_step = query_plan.steps().at(leaf_step.parentid());
-        print_step(parent_step, "parent step");
+
+        generate_query_plan(query_plan_exe);
     }
 
     void Call::processInput()

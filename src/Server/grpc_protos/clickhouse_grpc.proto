@@ -146,9 +146,10 @@ message Result {
 //for calcite query step
 //********table scan*************start
 message TableScanStep {
-    string table_name = 1;
-    repeated string required_columns = 2;
-    repeated string filters = 3;
+    string db_name = 1;
+    string table_name = 2;
+    repeated string required_columns = 3;
+    repeated string filters = 4;
 }
 //********table scan*************end
 

@@ -7,14 +7,39 @@
 #include <Interpreters/TreeRewriter.h>
 #include <Interpreters/ExpressionAnalyzer.h>
 #include <Interpreters/ExpressionActions.h>
+#include <Storages/SelectQueryInfo.h>
 #include "clickhouse_grpc.grpc.pb.h"
 #include <Processors/QueryPlan/ReadFromMergeTree.h>
 
 namespace DB
 {
+namespace ErrorCodes
+{
+    extern const int UNKNOWN_DATABASE;
+    extern const int UNKNOWN_TABLE;
+}
+
 void GRPCDoTableScan([[maybe_unused]] ContextMutablePtr& query_context, [[maybe_unused]] QueryPlan & query_plan, [[maybe_unused]] GRPCTableScanStep table_scan_step)
 {
+    const Settings & settings = query_context->getSettingsRef();
 
+    if (!DatabaseCatalog::instance().isDatabaseExist(table_scan_step.db_name()))
+        throw Exception("Database " + table_scan_step.db_name() + " doesn't exist", ErrorCodes::UNKNOWN_DATABASE);
+
+    SelectQueryInfo query_info;
+    StorageID table_id(table_scan_step.db_name(), table_scan_step.table_name());
+
+    if (!DatabaseCatalog::instance().isTableExist(table_id, query_context))
+        throw Exception("Table " + table_scan_step.table_name() + " doesn't exist", ErrorCodes::UNKNOWN_TABLE);
+
+    StoragePtr storage = DatabaseCatalog::instance().getTable(table_id, query_context);
+    StorageMetadataPtr meta_data = storage->getInMemoryMetadataPtr();
+    Names required_columns;
+    for(const auto & col_name : table_scan_step.required_columns())
+    {
+        required_columns.emplace(col_name);
+    }
+    storage->read(query_plan, required_columns, meta_data, query_info, query_context, QueryProcessingStage::FetchColumns, settings.max_block_size, 8);
 }
 
 void GRPCDoFilter([[maybe_unused]] ContextMutablePtr& query_context, [[maybe_unused]] QueryPlan & query_plan, [[maybe_unused]] GRPCFilterStep filter_step)
