@@ -27,7 +27,7 @@
 #include <Processors/QueryPlan/Optimizations/QueryPlanOptimizationSettings.h>
 #include <Processors/QueryPlan/BuildQueryPipelineSettings.h>
 #include <Server/IServer.h>
-#include <Server/GRPCForQueryPlan.h>
+#include <Server/calcite/GRPCForQueryPlan.h>
 #include <Storages/IStorage.h>
 #include <Poco/FileStream.h>
 #include <Poco/StreamCopier.h>
@@ -872,12 +872,14 @@ namespace
                 GRPCTableScanStep table_scan_step = GRPCTableScanStep::default_instance();
                 if(table_scan_step.ParseFromString(step.data()))
                 {
-                    LOG_INFO(log, "id: {}---------tablescan---db name: {}, table name: {}", step.id(), table_scan_step.db_name(), table_scan_step.table_name());
+                    LOG_INFO(log, "id: {}---------tablescan---table name: {}", step.id(), table_scan_step.table_name());
                     //QueryPlan query_plan;
-                    GRPCDoTableScan(query_context, query_plan_res, table_scan_step);
+                    doTableScanForGRPC(query_context, query_plan_res, table_scan_step);
+                    LOG_INFO(log, "-----------666666-------");
                     io.pipeline = std::move(*query_plan_res.buildQueryPipeline(
                             QueryPlanOptimizationSettings::fromContext(query_context), BuildQueryPipelineSettings::fromContext(query_context)));
                     //io.pipeline = std::move(*query_plan.buildQueryPipeline(QueryPlanOptimizationSettings::fromContext(query_context), BuildQueryPipelineSettings::fromContext(query_context)));
+                    LOG_INFO(log, "-----------777777-------");
                 }
                 else
                 {
@@ -890,7 +892,7 @@ namespace
                 if(filter_step.ParseFromString(step.data()))
                 {
 
-                    TestExpressionActions(query_context, log, std::move(filter_step.filters(0)));
+                    testExpressionActions(query_context, log, std::move(filter_step.filter()));
                 }
                 else
                 {

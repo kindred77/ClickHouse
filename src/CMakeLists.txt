@@ -209,6 +209,14 @@ add_object_library(clickhouse_processors_merges_algorithms Processors/Merges/Alg
 add_object_library(clickhouse_processors_queryplan Processors/QueryPlan)
 add_object_library(clickhouse_processors_queryplan_optimizations Processors/QueryPlan/Optimizations)
 
+if (USE_GRPC)
+    add_object_library(clickhouse_server_grpc_calcite Server/calcite)
+endif()
+
+if (FOR_CALCITE)
+    add_object_library(clickhouse_processors_queryplan_forcalcite Processors/QueryPlan/ForCalcite)
+endif()
+
 if (USE_NURAFT)
     add_object_library(clickhouse_coordination Coordination)
 endif()
