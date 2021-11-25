@@ -9,6 +9,7 @@ namespace DB
 using PartitionIdToMaxBlock = std::unordered_map<String, Int64>;
 
 class Pipe;
+extern MergeTreeReaderSettings getMergeTreeReaderSettings(const ContextPtr & context);
 
 class TableScan final : public ISourceStep
 {

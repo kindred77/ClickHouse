@@ -13,9 +13,12 @@
 #include <Interpreters/ExpressionActions.h>
 #include <Interpreters/InterpreterFactory.h>
 #include <Interpreters/InterpreterSelectQuery.h>
+#include <Storages/StorageMergeTree.h>
 #include <Storages/SelectQueryInfo.h>
+#include <Storages/MergeTree/MergeTreeSelectProcessor.h>
+#include <Storages/MergeTree/MergeTreeDataSelectExecutor.h>
+#include <Processors/QueryPlan/ForCalcite/TableScan.h>
 #include "clickhouse_grpc.grpc.pb.h"
-#include <Processors/QueryPlan/ReadFromMergeTree.h>
 
 namespace DB
 {
@@ -23,6 +26,125 @@ namespace ErrorCodes
 {
     extern const int UNKNOWN_DATABASE;
     extern const int UNKNOWN_TABLE;
+    extern const int INDEX_NOT_USED;
+}
+
+static TableScan::AnalysisResult selectRangesToRead(
+        const StorageMergeTree & storage,
+        ContextPtr context,
+        Names real_column_names,
+        const size_t requested_num_streams,
+        SelectQueryInfo query_info,
+        Poco::Logger * log,
+        std::shared_ptr<PartitionIdToMaxBlock> max_block_numbers_to_read = nullptr,
+        const bool sample_factor_column_queried = false)
+{
+    TableScan::AnalysisResult result;
+    const auto & settings = context->getSettingsRef();
+    StorageMetadataPtr metadata_snapshot = storage.getInMemoryMetadataPtr();
+    MergeTreeData::DataPartsVector parts = storage.getDataPartsVector();
+    MergeTreeReaderSettings reader_settings = getMergeTreeReaderSettings(context);
+
+    size_t total_parts = parts.size();
+
+    auto part_values = MergeTreeDataSelectExecutor::filterPartsByVirtualColumns(storage, parts, query_info.query, context);
+    if (part_values && part_values->empty())
+        return result;
+
+    result.column_names_to_read = real_column_names;
+
+    /// If there are only virtual columns in the query, you must request at least one non-virtual one.
+    if (result.column_names_to_read.empty())
+    {
+        NamesAndTypesList available_real_columns = metadata_snapshot->getColumns().getAllPhysical();
+        result.column_names_to_read.push_back(ExpressionActions::getSmallestColumn(available_real_columns));
+    }
+
+    metadata_snapshot->check(result.column_names_to_read, storage.getVirtuals(), storage.getStorageID());
+
+    // Build and check if primary key is used when necessary
+    const auto & primary_key = metadata_snapshot->getPrimaryKey();
+    Names primary_key_columns = primary_key.column_names;
+    KeyCondition key_condition(query_info, context, primary_key_columns, primary_key.expression);
+
+    if (settings.force_primary_key && key_condition.alwaysUnknownOrTrue())
+    {
+        throw Exception(
+            ErrorCodes::INDEX_NOT_USED,
+            "Primary key ({}) is not used and setting 'force_primary_key' is set.",
+            fmt::join(primary_key_columns, ", "));
+    }
+    LOG_DEBUG(log, "Key condition: {}", key_condition.toString());
+
+    const auto & select = query_info.query->as<ASTSelectQuery &>();
+
+    MergeTreeDataSelectExecutor::filterPartsByPartition(
+        parts, part_values, metadata_snapshot, storage, query_info, context,
+        max_block_numbers_to_read.get(), log, result.index_stats);
+
+    result.sampling = MergeTreeDataSelectExecutor::getSampling(
+        select, metadata_snapshot->getColumns().getAllPhysical(), parts, key_condition,
+        storage, metadata_snapshot, context, sample_factor_column_queried, log);
+
+    if (result.sampling.read_nothing)
+        return result;
+
+    size_t total_marks_pk = 0;
+    for (const auto & part : parts)
+        total_marks_pk += part->index_granularity.getMarksCountWithoutFinal();
+
+    size_t parts_before_pk = parts.size();
+
+    result.parts_with_ranges = MergeTreeDataSelectExecutor::filterPartsByPrimaryKeyAndSkipIndexes(
+        std::move(parts),
+        metadata_snapshot,
+        query_info,
+        context,
+        key_condition,
+        reader_settings,
+        log,
+        requested_num_streams,
+        result.index_stats,
+        true);
+
+    size_t sum_marks_pk = total_marks_pk;
+    for (const auto & stat : result.index_stats)
+        if (stat.type == ReadFromMergeTree::IndexType::PrimaryKey)
+            sum_marks_pk = stat.num_granules_after;
+
+    size_t sum_marks = 0;
+    size_t sum_ranges = 0;
+
+    for (const auto & part : result.parts_with_ranges)
+    {
+        sum_ranges += part.ranges.size();
+        sum_marks += part.getMarksCount();
+    }
+
+    LOG_DEBUG(
+        log,
+        "Selected {}/{} parts by partition key, {} parts by primary key, {}/{} marks by primary key, {} marks to read from {} ranges",
+        parts_before_pk,
+        total_parts,
+        result.parts_with_ranges.size(),
+        sum_marks_pk,
+        total_marks_pk,
+        sum_marks,
+        sum_ranges);
+
+    //ProfileEvents::increment(ProfileEvents::SelectedParts, result.parts_with_ranges.size());
+    //ProfileEvents::increment(ProfileEvents::SelectedRanges, sum_ranges);
+    //ProfileEvents::increment(ProfileEvents::SelectedMarks, sum_marks);
+
+    const auto & input_order_info = query_info.input_order_info
+        ? query_info.input_order_info
+        : (query_info.projection ? query_info.projection->input_order_info : nullptr);
+
+    if ((settings.optimize_read_in_order || settings.optimize_aggregation_in_order) && input_order_info)
+        result.read_type = (input_order_info->direction > 0) ? ReadFromMergeTree::ReadType::InOrder
+                                                             : ReadFromMergeTree::ReadType::InReverseOrder;
+
+    return result;
 }
 
 void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[maybe_unused]] QueryPlan & query_plan, [[maybe_unused]] GRPCTableScanStep table_scan_step)
@@ -30,32 +152,42 @@ void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[may
     Poco::Logger * log = &Poco::Logger::get("GRPCForQueryPlan");
     const Settings & settings = query_context->getSettingsRef();
 
-
-
-    //if (!DatabaseCatalog::instance().isDatabaseExist(table_scan_step.db_name()))
-        //throw Exception("Database " + table_scan_step.db_name() + " doesn't exist", ErrorCodes::UNKNOWN_DATABASE);
-
-    LOG_INFO(log, "-----------000000-------");
-    const char * begin_filter = table_scan_step.filter().data();
-    const char * end_filter = begin_filter + table_scan_step.filter().size();
-    ParserExpressionWithOptionalAlias parser_filter(false);
-    LOG_INFO(log, "-----------111111-------");
     auto select_ast_ptr = std::make_shared<ASTSelectQuery>();
-    select_ast_ptr->setExpression(ASTSelectQuery::Expression::WHERE, parseQuery(parser_filter, begin_filter, end_filter, "", settings.max_query_size, settings.max_parser_depth));
 
     const char * begin_proj = table_scan_step.projection().data();
     const char * end_proj = begin_proj + table_scan_step.projection().size();
     ParserNotEmptyExpressionList parser_proj(true);
-    select_ast_ptr->setExpression(ASTSelectQuery::Expression::SELECT, parseQuery(parser_proj, begin_proj, end_proj, "", settings.max_query_size, settings.max_parser_depth));
-    LOG_INFO(log, "-----------222222-------");
+    ASTPtr proj_ast = parseQuery(parser_proj, begin_proj, end_proj, "", settings.max_query_size, settings.max_parser_depth);
+//    select_ast_ptr->setExpression(ASTSelectQuery::Expression::SELECT,
+//            parseQuery(parser_proj,
+//                    begin_proj,
+//                    end_proj, "",
+//                    settings.max_query_size,
+//                    settings.max_parser_depth));
+
+    const char * begin_filter = table_scan_step.filter().data();
+    const char * end_filter = begin_filter + table_scan_step.filter().size();
+    ParserExpressionWithOptionalAlias parser_filter(false);
+    ASTPtr filter_ast = parseQuery(parser_filter, begin_filter, end_filter, "", settings.max_query_size, settings.max_parser_depth);
+    select_ast_ptr->setExpression(ASTSelectQuery::Expression::PREWHERE,
+            parseQuery(parser_filter,
+                    begin_filter,
+                    end_filter, "",
+                    settings.max_query_size,
+                    settings.max_parser_depth));
 
     const char * begin_tables = table_scan_step.table_name().data();
     const char * end_tables = begin_tables + table_scan_step.table_name().size();
     ParserTablesInSelectQuery parser_tables;
-    select_ast_ptr->setExpression(ASTSelectQuery::Expression::TABLES, parseQuery(parser_tables, begin_tables, end_tables, "", settings.max_query_size, settings.max_parser_depth));
-    //OG_INFO(log, "-----------222222aaaa-------{}", query_ast_ptr->getExpression(ASTSelectQuery::Expression::TABLES));
+    ASTPtr table_ast = parseQuery(parser_tables, begin_tables, end_tables, "", settings.max_query_size, settings.max_parser_depth);
+//    select_ast_ptr->setExpression(ASTSelectQuery::Expression::TABLES,
+//            parseQuery(parser_tables,
+//                    begin_tables,
+//                    begin_tables, "",
+//                    settings.max_query_size,
+//                    settings.max_parser_depth));
 
-    auto tables_in_select_query = select_ast_ptr->tables()->as<ASTTablesInSelectQuery>();
+    auto tables_in_select_query = table_ast->as<ASTTablesInSelectQuery>();
     StorageID table_id = StorageID::createEmpty();
     if(!tables_in_select_query->children.empty())
     {
@@ -83,35 +215,110 @@ void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[may
     if (!DatabaseCatalog::instance().isDatabaseExist(table_id.getDatabaseName()))
         throw Exception("Database " + table_id.getDatabaseName() + " doesn't exist", ErrorCodes::UNKNOWN_DATABASE);
 
-    WriteBufferFromOwnString write_buf;
-    formatAST(*select_ast_ptr, write_buf, false, false);
-    //query_ast_ptr->format(FormatSettings(write_buf, true));
-    LOG_INFO(log, "-----------222222ccc-------{}", write_buf.str());
-
-    SelectQueryInfo query_info;
-    query_info.query = select_ast_ptr;
-    //auto analyzer_result = TreeRewriterResult{.required_source_columns={}};
-    //query_info.syntax_analyzer_result = std::make_shared<const TreeRewriterResult>(analyzer_result);
-    //StorageID table_id(table_scan_step.db_name(), table_scan_step.table_name());
-
     if (!DatabaseCatalog::instance().isTableExist(table_id, query_context))
         throw Exception("Table " + table_id.getTableName() + " doesn't exist", ErrorCodes::UNKNOWN_TABLE);
-    LOG_INFO(log, "-----------333333-------");
-    //StoragePtr storage = DatabaseCatalog::instance().getTable(table_id, query_context);
-    //StorageMetadataPtr meta_data = storage->getInMemoryMetadataPtr();
-    LOG_INFO(log, "-----------444444-------");
-    //Names required_columns(table_scan_step.required_columns().begin(), table_scan_step.required_columns().end());
-    //storage->read(query_plan, required_columns, meta_data, query_info, query_context, QueryProcessingStage::FetchColumns, settings.max_block_size, 8);
-    //io = ::DB::executeQuery(write_buf.str(), query_context, false, QueryProcessingStage::Complete, true, true);
-    ASTPtr query_ast = std::move(select_ast_ptr);
-    auto interpreter = InterpreterFactory::get(query_ast, query_context, SelectQueryOptions(QueryProcessingStage::Complete));
-    if(auto * select_interpreter = typeid_cast<InterpreterSelectQuery *>(&*interpreter))
+
+    const StorageMergeTree * mergetree_storage = dynamic_cast<StorageMergeTree *>(DatabaseCatalog::instance().getTable(table_id, query_context).get());
+    if(!mergetree_storage)
     {
-        select_interpreter->buildQueryPlan(query_plan);
+        throw Exception("Support MergeTree table only.", ErrorCodes::UNKNOWN_TABLE);
     }
 
-    LOG_INFO(log, "-----------555555-------");
+    StorageMetadataPtr metadata_snapshot = mergetree_storage->getInMemoryMetadataPtr();
+
+    auto proj_analyzer_result = TreeRewriterResult(metadata_snapshot->getSampleBlock().getNamesAndTypesList());
+    proj_analyzer_result.collectUsedColumns(proj_ast, false);
+    Names real_column_names = proj_analyzer_result.required_source_columns.getNames();
+    for(auto col_name : real_column_names)
+    {
+        LOG_INFO(log, "-----------3333-------{}", col_name);
+    }
+
+    //ASTPtr query_ast = std::move(select_ast_ptr);
+    SelectQueryInfo query_info;
+    //query_info.query = select_ast_ptr;
+    query_info.query = filter_ast;
+    query_info.syntax_analyzer_result = TreeRewriter(query_context)
+            .analyze(select_ast_ptr->refPrewhere(), metadata_snapshot->getSampleBlock().getNamesAndTypesList());
+
+
+
+    TableScan::AnalysisResult analysis_result = selectRangesToRead(
+            *mergetree_storage,
+            query_context,
+            real_column_names,
+            settings.max_threads,
+            query_info,log);
+
+    //auto table_scan_step = std::make_unique<TableScan>(analysis_result,);
 }
+
+//void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[maybe_unused]] QueryPlan & query_plan, [[maybe_unused]] GRPCTableScanStep table_scan_step)
+//{
+//    Poco::Logger * log = &Poco::Logger::get("GRPCForQueryPlan");
+//    const Settings & settings = query_context->getSettingsRef();
+//
+//    const char * begin_filter = table_scan_step.filter().data();
+//    const char * end_filter = begin_filter + table_scan_step.filter().size();
+//    ParserExpressionWithOptionalAlias parser_filter(false);
+//    auto select_ast_ptr = std::make_shared<ASTSelectQuery>();
+//    select_ast_ptr->setExpression(ASTSelectQuery::Expression::WHERE, parseQuery(parser_filter, begin_filter, end_filter, "", settings.max_query_size, settings.max_parser_depth));
+//
+//    const char * begin_proj = table_scan_step.projection().data();
+//    const char * end_proj = begin_proj + table_scan_step.projection().size();
+//    ParserNotEmptyExpressionList parser_proj(true);
+//    select_ast_ptr->setExpression(ASTSelectQuery::Expression::SELECT, parseQuery(parser_proj, begin_proj, end_proj, "", settings.max_query_size, settings.max_parser_depth));
+//
+//    const char * begin_tables = table_scan_step.table_name().data();
+//    const char * end_tables = begin_tables + table_scan_step.table_name().size();
+//    ParserTablesInSelectQuery parser_tables;
+//    select_ast_ptr->setExpression(ASTSelectQuery::Expression::TABLES, parseQuery(parser_tables, begin_tables, end_tables, "", settings.max_query_size, settings.max_parser_depth));
+//
+//    auto tables_in_select_query = select_ast_ptr->tables()->as<ASTTablesInSelectQuery>();
+//    StorageID table_id = StorageID::createEmpty();
+//    if(!tables_in_select_query->children.empty())
+//    {
+//        auto tables_element = tables_in_select_query->children[0]->as<ASTTablesInSelectQueryElement>();
+//        if(tables_element->table_expression)
+//        {
+//            auto table_expression = tables_element->table_expression->as<ASTTableExpression>();
+//            if(table_expression && table_expression->database_and_table_name)
+//            {
+//                auto db_and_table_name = table_expression->database_and_table_name->as<ASTTableIdentifier>();
+//                if(db_and_table_name)
+//                {
+//                    table_id = StorageID(*db_and_table_name);
+//                    LOG_INFO(log, "-----------222222bbb-------{}----{}", db_and_table_name->getTableId().database_name, db_and_table_name->getTableId().table_name);
+//                }
+//            }
+//        }
+//    }
+//
+//    if(table_id.empty())
+//    {
+//        throw Exception("Can not get table name.", ErrorCodes::UNKNOWN_TABLE);
+//    }
+//
+//    if (!DatabaseCatalog::instance().isDatabaseExist(table_id.getDatabaseName()))
+//        throw Exception("Database " + table_id.getDatabaseName() + " doesn't exist", ErrorCodes::UNKNOWN_DATABASE);
+//
+//    WriteBufferFromOwnString write_buf;
+//    formatAST(*select_ast_ptr, write_buf, false, false);
+//    LOG_INFO(log, "-----------222222ccc-------{}", write_buf.str());
+//
+//    SelectQueryInfo query_info;
+//    query_info.query = select_ast_ptr;
+//
+//    if (!DatabaseCatalog::instance().isTableExist(table_id, query_context))
+//        throw Exception("Table " + table_id.getTableName() + " doesn't exist", ErrorCodes::UNKNOWN_TABLE);
+//
+//    ASTPtr query_ast = std::move(select_ast_ptr);
+//    auto interpreter = InterpreterFactory::get(query_ast, query_context, SelectQueryOptions(QueryProcessingStage::Complete));
+//    if(auto * select_interpreter = typeid_cast<InterpreterSelectQuery *>(&*interpreter))
+//    {
+//        select_interpreter->buildQueryPlan(query_plan);
+//    }
+//}
 
 void doFilterForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[maybe_unused]] QueryPlan & query_plan, [[maybe_unused]] GRPCFilterStep filter_step)
 {
