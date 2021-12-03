@@ -892,7 +892,8 @@ namespace
                 if(filter_step.ParseFromString(step.data()))
                 {
 
-                    testExpressionActions(query_context, log, std::move(filter_step.filter()));
+                    //testExpressionActions(query_context, log, std::move(filter_step.filter()));
+                    testRestoreQualifiedNamesVisitor(query_context, log, std::move(filter_step.filter()));
                 }
                 else
                 {

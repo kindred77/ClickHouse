@@ -18,4 +18,6 @@ Block createTestBlock();
 
 void dumpBlock(Poco::Logger * log, Block block);
 
+void testRestoreQualifiedNamesVisitor(ContextMutablePtr& query_context, Poco::Logger * log, std::string query_text);
+
 }

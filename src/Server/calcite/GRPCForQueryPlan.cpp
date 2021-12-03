@@ -4,6 +4,7 @@
 #include <Common/typeid_cast.h>
 #include <Parsers/parseQuery.h>
 #include <Parsers/ParserQuery.h>
+#include <Parsers/ParserSelectQuery.h>
 #include <Parsers/ExpressionListParsers.h>
 #include <Parsers/ParserTablesInSelectQuery.h>
 #include <Parsers/formatAST.h>
@@ -13,6 +14,8 @@
 #include <Interpreters/ExpressionActions.h>
 #include <Interpreters/InterpreterFactory.h>
 #include <Interpreters/InterpreterSelectQuery.h>
+#include <Interpreters/TranslateQualifiedNamesVisitor.h>
+#include <Interpreters/getTableExpressions.h>
 #include <Storages/StorageMergeTree.h>
 #include <Storages/SelectQueryInfo.h>
 #include <Storages/MergeTree/MergeTreeSelectProcessor.h>
@@ -158,12 +161,12 @@ void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[may
     const char * end_proj = begin_proj + table_scan_step.projection().size();
     ParserNotEmptyExpressionList parser_proj(true);
     ASTPtr proj_ast = parseQuery(parser_proj, begin_proj, end_proj, "", settings.max_query_size, settings.max_parser_depth);
-//    select_ast_ptr->setExpression(ASTSelectQuery::Expression::SELECT,
-//            parseQuery(parser_proj,
-//                    begin_proj,
-//                    end_proj, "",
-//                    settings.max_query_size,
-//                    settings.max_parser_depth));
+    select_ast_ptr->setExpression(ASTSelectQuery::Expression::SELECT,
+            parseQuery(parser_proj,
+                    begin_proj,
+                    end_proj, "",
+                    settings.max_query_size,
+                    settings.max_parser_depth));
 
     const char * begin_filter = table_scan_step.filter().data();
     const char * end_filter = begin_filter + table_scan_step.filter().size();
@@ -180,12 +183,12 @@ void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[may
     const char * end_tables = begin_tables + table_scan_step.table_name().size();
     ParserTablesInSelectQuery parser_tables;
     ASTPtr table_ast = parseQuery(parser_tables, begin_tables, end_tables, "", settings.max_query_size, settings.max_parser_depth);
-//    select_ast_ptr->setExpression(ASTSelectQuery::Expression::TABLES,
-//            parseQuery(parser_tables,
-//                    begin_tables,
-//                    begin_tables, "",
-//                    settings.max_query_size,
-//                    settings.max_parser_depth));
+    select_ast_ptr->setExpression(ASTSelectQuery::Expression::TABLES,
+            parseQuery(parser_tables,
+                    begin_tables,
+                    end_tables, "",
+                    settings.max_query_size,
+                    settings.max_parser_depth));
 
     auto tables_in_select_query = table_ast->as<ASTTablesInSelectQuery>();
     StorageID table_id = StorageID::createEmpty();
@@ -218,7 +221,8 @@ void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[may
     if (!DatabaseCatalog::instance().isTableExist(table_id, query_context))
         throw Exception("Table " + table_id.getTableName() + " doesn't exist", ErrorCodes::UNKNOWN_TABLE);
 
-    const StorageMergeTree * mergetree_storage = dynamic_cast<StorageMergeTree *>(DatabaseCatalog::instance().getTable(table_id, query_context).get());
+    StoragePtr storage = DatabaseCatalog::instance().getTable(table_id, query_context);
+    StorageMergeTree * mergetree_storage = dynamic_cast<StorageMergeTree *>(storage.get());
     if(!mergetree_storage)
     {
         throw Exception("Support MergeTree table only.", ErrorCodes::UNKNOWN_TABLE);
@@ -234,12 +238,16 @@ void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[may
         LOG_INFO(log, "-----------3333-------{}", col_name);
     }
 
-    //ASTPtr query_ast = std::move(select_ast_ptr);
+    WriteBufferFromOwnString write_buf;
+    formatAST(*select_ast_ptr, write_buf, false, false);
+    LOG_INFO(log, "-----query is : {}", write_buf.str());
+
+    ASTPtr query_ast = std::move(select_ast_ptr);
     SelectQueryInfo query_info;
     //query_info.query = select_ast_ptr;
-    query_info.query = filter_ast;
+    query_info.query = select_ast_ptr;
     query_info.syntax_analyzer_result = TreeRewriter(query_context)
-            .analyze(select_ast_ptr->refPrewhere(), metadata_snapshot->getSampleBlock().getNamesAndTypesList());
+            .analyzeSelect(query_ast, TreeRewriterResult({}, storage, metadata_snapshot));
 
 
 
@@ -429,6 +437,28 @@ void testConstExpressionActions(ContextMutablePtr& query_context, Poco::Logger *
     auto expression_actions_test = analyzer_test.getConstActions();
     expression_actions_test->execute(result_test);
     dumpBlock(log, result_test);
+}
+
+void testRestoreQualifiedNamesVisitor(ContextMutablePtr& query_context, Poco::Logger * log, std::string query_text)
+{
+    const Settings & settings = query_context->getSettingsRef();
+
+    //std::string sql_test = "select t.a,t.b,concat(1+2,t.c) from local.test t";
+    const char * begin_test = query_text.data();
+    const char * end_test = begin_test + query_text.size();
+    ParserSelectQuery parser_test;
+    ASTPtr query_ast_test = parseQuery(parser_test, begin_test, end_test, "", settings.max_query_size, settings.max_parser_depth);
+
+    RestoreQualifiedNamesVisitor::Data data;
+    data.distributed_table = DatabaseAndTableWithAlias(*getTableExpression(query_ast_test->as<ASTSelectQuery&>(), 0));
+    data.remote_table.database = "remote_db";
+    data.remote_table.table = "remove_table";
+    data.rename = true;
+    RestoreQualifiedNamesVisitor(data).visit(query_ast_test);
+
+    WriteBufferFromOwnString write_buf;
+    formatAST(*query_ast_test, write_buf, false, false);
+    LOG_INFO(log, "-----query after rewrite is : {}", write_buf.str());
 }
 
 }
