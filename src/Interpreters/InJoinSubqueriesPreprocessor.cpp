@@ -145,7 +145,7 @@ public:
     {
         if (auto * function = node->as<ASTFunction>())
             visit(*function, node, data);
-        if (const auto * tables = node->as<ASTTablesInSelectQueryElement>())
+        if (auto * tables = node->as<ASTTablesInSelectQueryElement>())
             visit(*tables, node, data);
     }
 
@@ -191,13 +191,24 @@ private:
         ASTTableJoin * table_join = node.table_join->as<ASTTableJoin>();
         if (table_join->locality != ASTTableJoin::Locality::Global)
         {
-            if (auto & subquery = node.table_expression->as<ASTTableExpression>()->subquery)
+            //rename distributed table name in subquery and table expression
+            if (node.table_expression->as<ASTTableExpression>()->subquery
+                    || node.table_expression->as<ASTTableExpression>()->database_and_table_name)
             {
                 std::vector<ASTPtr> renamed;
                 NonGlobalTableVisitor::Data table_data(data.getContext(), data.checker, renamed, nullptr, table_join);
-                NonGlobalTableVisitor(table_data).visit(subquery);
-                if (!renamed.empty()) //-V547
-                    data.renamed_tables.emplace_back(subquery, std::move(renamed));
+                if (auto & subquery = node.table_expression->as<ASTTableExpression>()->subquery)
+                {
+                    NonGlobalTableVisitor(table_data).visit(subquery);
+                    if (!renamed.empty()) //-V547
+                        data.renamed_tables.emplace_back(subquery, std::move(renamed));
+                }
+                else
+                {
+                    NonGlobalTableVisitor(table_data).visit(node.table_expression);
+                    if (!renamed.empty())
+                        data.renamed_tables.emplace_back(node.table_expression, std::move(renamed));
+                }
             }
         }
     }
