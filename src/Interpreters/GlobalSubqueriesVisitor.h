@@ -17,6 +17,7 @@
 #include <Parsers/IAST.h>
 #include <Processors/Executors/PullingAsyncPipelineExecutor.h>
 #include <Common/typeid_cast.h>
+#include <DataStreams/SquashingBlockInputStream.h>
 
 namespace DB
 {
@@ -150,18 +151,11 @@ public:
                 auto external_table = external_storage_holder->getTable();
                 auto table_out = external_table->write({}, external_table->getInMemoryMetadataPtr(), getContext());
                 auto io = interpreter->execute();
-                PullingAsyncPipelineExecutor executor(io.pipeline);
-
-                table_out->writePrefix();
-                Block block;
-                while (executor.pull(block))
-                {
-                    if (block)
-                        table_out->write(block);
-                    block.clear();
-                }
-
-                table_out->writeSuffix();
+                //squashing blocks
+                BlockInputStreamPtr data = std::make_shared<SquashingBlockInputStream>(
+                        io.getInputStream(), getContext()->getSettingsRef().min_insert_block_size_rows,
+                        getContext()->getSettingsRef().min_insert_block_size_bytes);
+                copyData(*data, *table_out);
             }
             else
             {
