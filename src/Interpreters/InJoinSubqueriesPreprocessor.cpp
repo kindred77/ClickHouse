@@ -183,7 +183,7 @@ private:
         }
     }
 
-    static void visit(const ASTTablesInSelectQueryElement & node, ASTPtr &, Data & data)
+    static void visit(ASTTablesInSelectQueryElement & node, ASTPtr &, Data & data)
     {
         if (!node.table_join || !node.table_expression)
             return;
