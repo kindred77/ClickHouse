@@ -9,6 +9,7 @@
 #include <Parsers/ParserTablesInSelectQuery.h>
 #include <Parsers/formatAST.h>
 #include <Parsers/ASTTablesInSelectQuery.h>
+#include <DataTypes/DataTypeTuple.h>
 #include <Interpreters/TreeRewriter.h>
 #include <Interpreters/ExpressionAnalyzer.h>
 #include <Interpreters/ExpressionActions.h>
@@ -30,6 +31,7 @@ namespace ErrorCodes
     extern const int UNKNOWN_DATABASE;
     extern const int UNKNOWN_TABLE;
     extern const int INDEX_NOT_USED;
+    extern const int NO_SUCH_COLUMN_IN_TABLE;
 }
 
 static TableScan::AnalysisResult selectRangesToRead(
@@ -150,7 +152,58 @@ static TableScan::AnalysisResult selectRangesToRead(
     return result;
 }
 
-void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[maybe_unused]] QueryPlan & query_plan, [[maybe_unused]] GRPCTableScanStep table_scan_step)
+static void selectColumnNames(
+    const Names & column_names_to_return,
+    const MergeTreeData & data,
+    Names & real_column_names,
+    Names & virt_column_names,
+    bool & sample_factor_column_queried)
+{
+    sample_factor_column_queried = false;
+
+    for (const String & name : column_names_to_return)
+    {
+        if (name == "_part")
+        {
+            virt_column_names.push_back(name);
+        }
+        else if (name == "_part_index")
+        {
+            virt_column_names.push_back(name);
+        }
+        else if (name == "_partition_id")
+        {
+            virt_column_names.push_back(name);
+        }
+        else if (name == "_part_uuid")
+        {
+            virt_column_names.push_back(name);
+        }
+        else if (name == "_partition_value")
+        {
+            if (!typeid_cast<const DataTypeTuple *>(data.getPartitionValueType().get()))
+            {
+                throw Exception(
+                    ErrorCodes::NO_SUCH_COLUMN_IN_TABLE,
+                    "Missing column `_partition_value` because there is no partition column in table {}",
+                    data.getStorageID().getTableName());
+            }
+
+            virt_column_names.push_back(name);
+        }
+        else if (name == "_sample_factor")
+        {
+            sample_factor_column_queried = true;
+            virt_column_names.push_back(name);
+        }
+        else
+        {
+            real_column_names.push_back(name);
+        }
+    }
+}
+
+void doTableScanForGRPC(ContextMutablePtr& query_context, QueryPlan & query_plan, GRPCTableScanStep table_scan_step)
 {
     Poco::Logger * log = &Poco::Logger::get("GRPCForQueryPlan");
     const Settings & settings = query_context->getSettingsRef();
@@ -168,14 +221,25 @@ void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[may
                     settings.max_query_size,
                     settings.max_parser_depth));
 
-    const char * begin_filter = table_scan_step.filter().data();
-    const char * end_filter = begin_filter + table_scan_step.filter().size();
-    ParserExpressionWithOptionalAlias parser_filter(false);
-    ASTPtr filter_ast = parseQuery(parser_filter, begin_filter, end_filter, "", settings.max_query_size, settings.max_parser_depth);
+//    const char * begin_filter = table_scan_step.filter().data();
+//    const char * end_filter = begin_filter + table_scan_step.filter().size();
+//    ParserExpressionWithOptionalAlias parser_filter(false);
+//    ASTPtr filter_ast = parseQuery(parser_filter, begin_filter, end_filter, "", settings.max_query_size, settings.max_parser_depth);
+//    select_ast_ptr->setExpression(ASTSelectQuery::Expression::WHERE,
+//            parseQuery(parser_filter,
+//                    begin_filter,
+//                    end_filter, "",
+//                    settings.max_query_size,
+//                    settings.max_parser_depth));
+
+    const char * begin_prewhere = table_scan_step.filter().data();
+    const char * end_prewhere = begin_prewhere + table_scan_step.filter().size();
+    ParserExpressionWithOptionalAlias parser_prewhere(false);
+    ASTPtr prewhere_ast = parseQuery(parser_prewhere, begin_prewhere, end_prewhere, "", settings.max_query_size, settings.max_parser_depth);
     select_ast_ptr->setExpression(ASTSelectQuery::Expression::PREWHERE,
-            parseQuery(parser_filter,
-                    begin_filter,
-                    end_filter, "",
+            parseQuery(parser_prewhere,
+                    begin_prewhere,
+                    end_prewhere, "",
                     settings.max_query_size,
                     settings.max_parser_depth));
 
@@ -232,33 +296,57 @@ void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[may
 
     auto proj_analyzer_result = TreeRewriterResult(metadata_snapshot->getSampleBlock().getNamesAndTypesList());
     proj_analyzer_result.collectUsedColumns(proj_ast, false);
-    Names real_column_names = proj_analyzer_result.required_source_columns.getNames();
-    for(auto col_name : real_column_names)
+    Names req_column_names = proj_analyzer_result.required_source_columns.getNames();
+    for(auto col_name : req_column_names)
     {
         LOG_INFO(log, "-----------3333-------{}", col_name);
     }
+    ASTPtr query_ast = std::move(select_ast_ptr);
 
     WriteBufferFromOwnString write_buf;
-    formatAST(*select_ast_ptr, write_buf, false, false);
+    formatAST(*query_ast, write_buf, false, false);
     LOG_INFO(log, "-----query is : {}", write_buf.str());
 
-    ASTPtr query_ast = std::move(select_ast_ptr);
     SelectQueryInfo query_info;
     //query_info.query = select_ast_ptr;
-    query_info.query = select_ast_ptr;
+    query_info.query = query_ast;
     query_info.syntax_analyzer_result = TreeRewriter(query_context)
             .analyzeSelect(query_ast, TreeRewriterResult({}, storage, metadata_snapshot));
 
+    SettingsChanges settings_changes;
+    settings_changes.push_back({"max_ast_depth", 1000});
+    query_context->checkSettingsConstraints(settings_changes);
+    query_context->applySettingsChanges(settings_changes);
+
+    auto syntax_reulst = TreeRewriter(query_context).analyze(prewhere_ast, metadata_snapshot->getSampleBlock().getNamesAndTypesList());
+    ExpressionAnalyzer analyzer(prewhere_ast, syntax_reulst, query_context);
+    //auto expression_actions = analyzer.getActions(false, true);
+
+    query_info.prewhere_info = std::make_shared<PrewhereInfo>(analyzer.getActionsDAG(false), prewhere_ast->getColumnName());
+
+    Names real_column_names;
+    Names virt_column_names;
+    bool sample_factor_column_queried = false;
+    selectColumnNames(req_column_names, *mergetree_storage,
+            real_column_names, virt_column_names, sample_factor_column_queried);
 
 
     TableScan::AnalysisResult analysis_result = selectRangesToRead(
-            *mergetree_storage,
-            query_context,
-            real_column_names,
-            settings.max_threads,
-            query_info,log);
+            *mergetree_storage, query_context, real_column_names,
+            settings.max_threads, query_info,log);
 
-    //auto table_scan_step = std::make_unique<TableScan>(analysis_result,);
+    auto table_scan = std::make_unique<TableScan>(
+            analysis_result,
+            MergeTreeBaseSelectProcessor::transformHeader(
+                    metadata_snapshot->getSampleBlockForColumns(real_column_names, storage->getVirtuals(), table_id),
+                    query_info.prewhere_info, mergetree_storage->getPartitionValueType(),
+                    virt_column_names),
+            virt_column_names, false, nullptr,
+            query_info.prewhere_info, *mergetree_storage, metadata_snapshot,
+            metadata_snapshot, query_context, settings.max_block_size,
+            8, false, nullptr, log);
+
+    query_plan.addStep(std::move(table_scan));
 }
 
 //void doTableScanForGRPC([[maybe_unused]] ContextMutablePtr& query_context, [[maybe_unused]] QueryPlan & query_plan, [[maybe_unused]] GRPCTableScanStep table_scan_step)

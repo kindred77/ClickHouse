@@ -907,6 +907,8 @@ namespace
         };
 
         generate_query_plan(query_plan_exe);
+
+        output_format = query_context->getDefaultFormat();
     }
 
     void Call::processInput()
@@ -1196,7 +1198,9 @@ namespace
     void Call::generateOutputWithProcessors()
     {
         if (!io.pipeline.initialized())
+        {
             return;
+        }
 
         auto executor = std::make_shared<PullingAsyncPipelineExecutor>(io.pipeline);
         write_buffer.emplace(*result.mutable_output());
@@ -1222,14 +1226,17 @@ namespace
         while (check_for_cancel())
         {
             if (!executor->pull(block, interactive_delay / 1000))
+            {
                 break;
-
+            }
             throwIfFailedToSendResult();
             if (!check_for_cancel())
                 break;
 
             if (block && !io.null_format)
+            {
                 block_output_stream->write(block);
+            }
 
             if (after_send_progress.elapsedMicroseconds() >= interactive_delay)
             {
@@ -1241,7 +1248,9 @@ namespace
 
             bool has_output = write_buffer->offset();
             if (has_output || result.has_progress() || result.logs_size())
+            {
                 sendResult();
+            }
 
             throwIfFailedToSendResult();
             if (!check_for_cancel())
@@ -1279,7 +1288,21 @@ namespace
 
     void Call::finishQueryPlan()
     {
+        finalize = true;
+        //io.onFinish();
+        addProgressToResult();
+        query_scope->logPeakMemoryUsage();
+        addLogsToResult();
+        sendResult();
+        close();
 
+        LOG_INFO(
+                log,
+                "Finished call {} in {} secs. (including reading by client: {}, writing by client: {})",
+                getCallName(call_type),
+                query_time.elapsedSeconds(),
+                static_cast<double>(waited_for_client_reading) / 1000000000ULL,
+                static_cast<double>(waited_for_client_writing) / 1000000000ULL);
     }
 
     void Call::onException(const Exception & exception)
