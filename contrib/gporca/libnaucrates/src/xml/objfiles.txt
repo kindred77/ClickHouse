@@ -1,0 +1,1 @@
+src/backend/gporca/libnaucrates/src/xml/CDXLMemoryManager.o src/backend/gporca/libnaucrates/src/xml/CDXLSections.o src/backend/gporca/libnaucrates/src/xml/CXMLSerializer.o src/backend/gporca/libnaucrates/src/xml/dxltokens.o

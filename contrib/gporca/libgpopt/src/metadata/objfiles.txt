@@ -1,0 +1,1 @@
+src/backend/gporca/libgpopt/src/metadata/CColumnDescriptor.o src/backend/gporca/libgpopt/src/metadata/CIndexDescriptor.o src/backend/gporca/libgpopt/src/metadata/CName.o src/backend/gporca/libgpopt/src/metadata/CPartConstraint.o src/backend/gporca/libgpopt/src/metadata/CTableDescriptor.o

@@ -1,0 +1,1 @@
+src/backend/gporca/libgpopt/src/translate//CTranslatorDXLToExpr.o src/backend/gporca/libgpopt/src/translate//CTranslatorDXLToExprUtils.o src/backend/gporca/libgpopt/src/translate//CTranslatorExprToDXL.o src/backend/gporca/libgpopt/src/translate//CTranslatorExprToDXLUtils.o

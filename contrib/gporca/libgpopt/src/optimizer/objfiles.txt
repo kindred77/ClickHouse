@@ -1,0 +1,1 @@
+src/backend/gporca/libgpopt/src/optimizer/COptimizer.o src/backend/gporca/libgpopt/src/optimizer/COptimizerConfig.o
