@@ -322,6 +322,11 @@ if (USE_KRB5)
     dbms_target_link_libraries(PRIVATE ${KRB5_LIBRARY})
 endif()
 
+if (USE_GPORCA)
+    dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_INCLUDE_DIR})
+    dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY})
+endif()
+
 if (USE_NURAFT)
     dbms_target_link_libraries(PUBLIC ${NURAFT_LIBRARY})
 endif()

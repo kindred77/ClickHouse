@@ -7,12 +7,23 @@
 
 #include "TranslatorQueryToDXL.h"
 
-TranslatorQueryToDXL::TranslatorQueryToDXL() {
-    // TODO Auto-generated constructor stub
+namespace DB
+{
+
+TranslatorQueryToDXL::TranslatorQueryToDXL(
+    gpopt::CMDAccessor * metadata_accessor_,
+    ASTPtr select_query_)
+    : metadata_accessor(std::move(metadata_accessor_))
+    , select_query(select_query_)
+    , log(&Poco::Logger::get("TranslatorQueryToDXL"))
+{
+    LOG_TRACE(log, "----0000----");
+}
+
+TranslatorQueryToDXL::~TranslatorQueryToDXL()
+{
 
 }
 
-TranslatorQueryToDXL::~TranslatorQueryToDXL() {
-    // TODO Auto-generated destructor stub
 }
 
