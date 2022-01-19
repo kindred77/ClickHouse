@@ -1,1 +1,0 @@
-src/backend/gporca/libgpos/src/memory/CAutoMemoryPool.o src/backend/gporca/libgpos/src/memory/CCacheFactory.o src/backend/gporca/libgpos/src/memory/CMemoryPool.o src/backend/gporca/libgpos/src/memory/CMemoryPoolManager.o src/backend/gporca/libgpos/src/memory/CMemoryPoolTracker.o src/backend/gporca/libgpos/src/memory/CMemoryVisitorPrint.o

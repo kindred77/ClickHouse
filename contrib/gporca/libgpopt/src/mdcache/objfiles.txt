@@ -1,1 +1,0 @@
-src/backend/gporca/libgpopt/src/mdcache//CMDAccessor.o src/backend/gporca/libgpopt/src/mdcache//CMDAccessorUtils.o src/backend/gporca/libgpopt/src/mdcache//CMDCache.o src/backend/gporca/libgpopt/src/mdcache//CMDKey.o

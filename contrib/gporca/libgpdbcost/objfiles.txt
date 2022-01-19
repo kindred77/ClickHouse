@@ -1,2 +1,0 @@
-src/backend/gporca/libgpdbcost/src/CCostModelGPDB.o src/backend/gporca/libgpdbcost/src/CCostModelParamsGPDB.o src/backend/gporca/libgpdbcost/src/ICostModel.o
-
