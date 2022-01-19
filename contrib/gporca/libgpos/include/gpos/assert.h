@@ -22,10 +22,7 @@
 #ifndef GPOS_assert_H
 #define GPOS_assert_H
 
-#ifndef USE_CMAKE
-#include "pg_config.h"
-#endif
-
+#include "gpos/config.h"
 
 // retail assert; available in all builds
 #define GPOS_RTL_ASSERT(x)                                                 \

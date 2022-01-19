@@ -65,9 +65,6 @@ public:
 								 CWStringDynamic *pstrEncodedValue,
 								 CDouble value);
 
-	// helper function to generate a point of double datatype
-	static CPoint *PpointDouble(CMemoryPool *mp, OID oid, CDouble value);
-
 	// helper method to print statistics object
 	static void PrintStats(CMemoryPool *mp, const CStatistics *stats);
 

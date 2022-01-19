@@ -13,7 +13,6 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CPatternLeaf.h"
 #include "gpopt/xforms/CXformImplementation.h"
 #include "gpopt/xforms/CXformUtils.h"
 
@@ -58,7 +57,6 @@ public:
 	{
 	}
 
-	// compute xform promise for a given expression handle
 	virtual EXformPromise
 	Exfp(CExpressionHandle &exprhdl) const
 	{

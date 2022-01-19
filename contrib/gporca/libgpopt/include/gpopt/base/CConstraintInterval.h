@@ -170,7 +170,7 @@ public:
 	virtual BOOL
 	FConstraintOnSegmentId() const
 	{
-		return m_pcr->IsSystemCol() &&
+		return m_pcr->FSystemCol() &&
 			   m_pcr->Name().Equals(
 				   CDXLTokens::GetDXLTokenStr(EdxltokenGpSegmentIdColName));
 	}

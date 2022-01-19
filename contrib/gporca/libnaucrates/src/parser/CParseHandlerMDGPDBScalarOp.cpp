@@ -46,8 +46,6 @@ CParseHandlerMDGPDBScalarOp::CParseHandlerMDGPDBScalarOp(
 	  m_mdid_inverse_opr(NULL),
 	  m_comparision_type(IMDType::EcmptOther),
 	  m_returns_null_on_null_input(false),
-	  m_mdid_hash_opfamily(NULL),
-	  m_mdid_legacy_hash_opfamily(NULL),
 	  m_is_ndv_preserving(false)
 {
 }
@@ -196,32 +194,6 @@ CParseHandlerMDGPDBScalarOp::StartElement(const XMLCh *const element_uri,
 		opfamilies_list_parse_handler->startElement(
 			element_uri, element_local_name, element_qname, attrs);
 	}
-	else if (0 ==
-			 XMLString::compareString(
-				 CDXLTokens::XmlstrToken(EdxltokenGPDBScalarOpHashOpfamily),
-				 element_local_name))
-	{
-		// parse inverse operator id
-		GPOS_ASSERT(NULL != m_mdname);
-
-		m_mdid_hash_opfamily =
-			CDXLOperatorFactory::ExtractConvertAttrValueToMdId(
-				m_parse_handler_mgr->GetDXLMemoryManager(), attrs,
-				EdxltokenMdid, EdxltokenGPDBScalarOpHashOpfamily);
-	}
-	else if (0 == XMLString::compareString(
-					  CDXLTokens::XmlstrToken(
-						  EdxltokenGPDBScalarOpLegacyHashOpfamily),
-					  element_local_name))
-	{
-		// parse inverse operator id
-		GPOS_ASSERT(NULL != m_mdname);
-
-		m_mdid_legacy_hash_opfamily =
-			CDXLOperatorFactory::ExtractConvertAttrValueToMdId(
-				m_parse_handler_mgr->GetDXLMemoryManager(), attrs,
-				EdxltokenMdid, EdxltokenGPDBScalarOpLegacyHashOpfamily);
-	}
 	else
 	{
 		CWStringDynamic *str = CDXLUtils::CreateDynamicStringFromXMLChArray(
@@ -272,8 +244,7 @@ CParseHandlerMDGPDBScalarOp::EndElement(const XMLCh *const,	 // element_uri,
 							m_mdid_type_right, m_mdid_type_result, m_func_mdid,
 							m_mdid_commute_opr, m_mdid_inverse_opr,
 							m_comparision_type, m_returns_null_on_null_input,
-							mdid_opfamilies_array, m_mdid_hash_opfamily,
-							m_mdid_legacy_hash_opfamily, m_is_ndv_preserving);
+							m_is_ndv_preserving, mdid_opfamilies_array);
 
 		// deactivate handler
 		m_parse_handler_mgr->DeactivateHandler();
@@ -316,13 +287,6 @@ CParseHandlerMDGPDBScalarOp::IsSupportedChildElem(const XMLCh *const xml_str)
 					 xml_str) ||
 			0 == XMLString::compareString(
 					 CDXLTokens::XmlstrToken(EdxltokenGPDBScalarOpInverseOpId),
-					 xml_str) ||
-			0 == XMLString::compareString(
-					 CDXLTokens::XmlstrToken(EdxltokenGPDBScalarOpHashOpfamily),
-					 xml_str) ||
-			0 == XMLString::compareString(
-					 CDXLTokens::XmlstrToken(
-						 EdxltokenGPDBScalarOpLegacyHashOpfamily),
 					 xml_str));
 }
 

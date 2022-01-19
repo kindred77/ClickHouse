@@ -36,8 +36,7 @@ private:
 
 public:
 	// ctor
-	explicit CLogicalInnerJoin(
-		CMemoryPool *mp, CXform::EXformId origin_xform = CXform::ExfSentinel);
+	explicit CLogicalInnerJoin(CMemoryPool *mp);
 
 	// dtor
 	virtual ~CLogicalInnerJoin()

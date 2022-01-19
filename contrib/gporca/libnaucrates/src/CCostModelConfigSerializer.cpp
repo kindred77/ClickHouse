@@ -15,6 +15,11 @@ using gpos::CAutoRef;
 void
 CCostModelConfigSerializer::Serialize(CXMLSerializer &xml_serializer) const
 {
+	if (ICostModel::EcmtGPDBLegacy == m_cost_model->Ecmt())
+	{
+		return;
+	}
+
 	xml_serializer.OpenElement(
 		CDXLTokens::GetDXLTokenStr(EdxltokenNamespacePrefix),
 		CDXLTokens::GetDXLTokenStr(EdxltokenCostModelConfig));

@@ -15,10 +15,7 @@
 #include "gpos/base.h"
 
 #include "gpopt/exception.h"
-#include "gpopt/operators/CLogicalDifference.h"
-#include "gpopt/operators/CLogicalLeftAntiSemiJoin.h"
-#include "gpopt/operators/CPatternMultiLeaf.h"
-#include "gpopt/operators/CScalarProjectList.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 using namespace gpopt;

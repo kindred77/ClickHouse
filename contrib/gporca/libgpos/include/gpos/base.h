@@ -18,6 +18,7 @@
 #include "gpos/error/IErrorContext.h"
 #include "gpos/error/ILogger.h"
 #include "gpos/memory/CMemoryPool.h"
+#include "gpos/task/ITask.h"
 #include "gpos/types.h"
 
 #endif	// GPOS_base_H

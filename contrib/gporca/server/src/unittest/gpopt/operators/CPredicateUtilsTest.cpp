@@ -10,8 +10,6 @@
 //---------------------------------------------------------------------------
 #include "unittest/gpopt/operators/CPredicateUtilsTest.h"
 
-#include "gpos/error/CAutoTrace.h"
-
 #include "gpopt/base/CColRefSetIter.h"
 #include "gpopt/base/CUtils.h"
 #include "gpopt/eval/CConstExprEvaluatorDefault.h"

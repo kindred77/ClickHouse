@@ -30,8 +30,7 @@ CMDRelationCtasGPDB::CMDRelationCtasGPDB(
 	CMemoryPool *mp, IMDId *mdid, CMDName *mdname_schema, CMDName *mdname,
 	BOOL fTemporary, BOOL fHasOids, Erelstoragetype rel_storage_type,
 	Ereldistrpolicy rel_distr_policy, CMDColumnArray *mdcol_array,
-	ULongPtrArray *distr_col_array, IMdIdArray *distr_opfamiles,
-	IMdIdArray *distr_opclasses, ULongPtr2dArray *keyset_array,
+	ULongPtrArray *distr_col_array, ULongPtr2dArray *keyset_array,
 	CDXLCtasStorageOptions *dxl_ctas_storage_options,
 	IntPtrArray *vartypemod_array)
 	: m_mp(mp),
@@ -44,8 +43,6 @@ CMDRelationCtasGPDB::CMDRelationCtasGPDB(
 	  m_rel_distr_policy(rel_distr_policy),
 	  m_md_col_array(mdcol_array),
 	  m_distr_col_array(distr_col_array),
-	  m_distr_opfamilies(distr_opfamiles),
-	  m_distr_opclasses(distr_opclasses),
 	  m_keyset_array(keyset_array),
 	  m_system_columns(0),
 	  m_nondrop_col_pos_array(NULL),
@@ -111,8 +108,6 @@ CMDRelationCtasGPDB::~CMDRelationCtasGPDB()
 	CRefCount::SafeRelease(m_nondrop_col_pos_array);
 	m_dxl_ctas_storage_option->Release();
 	m_vartypemod_array->Release();
-	m_distr_opfamilies->Release();
-	m_distr_opclasses->Release();
 }
 
 //---------------------------------------------------------------------------
@@ -272,19 +267,6 @@ CMDRelationCtasGPDB::GetDistrColAt(ULONG pos) const
 	return GetMdCol(distr_key_pos);
 }
 
-IMDId *
-CMDRelationCtasGPDB::GetDistrOpfamilyAt(ULONG pos) const
-{
-	if (m_distr_opfamilies == NULL)
-	{
-		GPOS_RAISE(CException::ExmaInvalid, CException::ExmiInvalid,
-				   GPOS_WSZ_LIT("GetDistrOpfamilyAt() returning NULL."));
-	}
-
-	GPOS_ASSERT(pos < m_distr_opfamilies->Size());
-	return (*m_distr_opfamilies)[pos];
-}
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CMDRelationCtasGPDB::Serialize
@@ -360,18 +342,6 @@ CMDRelationCtasGPDB::Serialize(CXMLSerializer *xml_serializer) const
 		CDXLTokens::GetDXLTokenStr(EdxltokenColumns));
 
 	m_dxl_ctas_storage_option->Serialize(xml_serializer);
-
-	// serialize distribution opfamilies
-
-	SerializeMDIdList(xml_serializer, m_distr_opfamilies,
-					  CDXLTokens::GetDXLTokenStr(EdxltokenRelDistrOpfamilies),
-					  CDXLTokens::GetDXLTokenStr(EdxltokenRelDistrOpfamily));
-
-	SerializeMDIdList(xml_serializer, m_distr_opclasses,
-					  CDXLTokens::GetDXLTokenStr(EdxltokenRelDistrOpclasses),
-					  CDXLTokens::GetDXLTokenStr(EdxltokenRelDistrOpclass));
-
-
 	xml_serializer->CloseElement(
 		CDXLTokens::GetDXLTokenStr(EdxltokenNamespacePrefix),
 		CDXLTokens::GetDXLTokenStr(EdxltokenRelationCTAS));

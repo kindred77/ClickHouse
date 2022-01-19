@@ -53,12 +53,6 @@ public:
 
 	CBitSet *GetAdjacentComponentsToJoinCandidate();
 
-	virtual CXform::EXformId
-	EOriginXForm() const
-	{
-		return CXform::ExfExpandNAryJoinGreedy;
-	}
-
 };	// class CJoinOrderGreedy
 
 }  // namespace gpopt

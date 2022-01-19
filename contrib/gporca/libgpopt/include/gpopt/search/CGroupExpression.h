@@ -12,11 +12,14 @@
 #define GPOPT_CGroupExpression_H
 
 #include "gpos/base.h"
+#include "gpos/common/CDynamicPtrArray.h"
+#include "gpos/common/CList.h"
 #include "gpos/common/CRefCount.h"
 
 #include "gpopt/base/CCostContext.h"
 #include "gpopt/engine/CPartialPlan.h"
 #include "gpopt/operators/COperator.h"
+#include "gpopt/search/CBinding.h"
 #include "gpopt/search/CGroup.h"
 #include "gpopt/xforms/CXform.h"
 
@@ -34,8 +37,7 @@ using namespace gpos;
 //		Expression representation inside Memo structure
 //
 //---------------------------------------------------------------------------
-class CGroupExpression : public CRefCount,
-						 public DbgPrintMixin<CGroupExpression>
+class CGroupExpression : public CRefCount
 {
 public:
 #ifdef GPOS_DEBUG
@@ -72,6 +74,9 @@ public:
 		ShtCC;
 
 private:
+	// memory pool
+	CMemoryPool *m_mp;
+
 	// definition of context hash table accessor
 	typedef CSyncHashtableAccessByKey<CCostContext,	 // entry
 									  OPTCTXT_PTR>
@@ -180,7 +185,8 @@ private:
 
 	//private dummy ctor; used for creating invalid gexpr
 	CGroupExpression()
-		: m_id(GPOPT_INVALID_GEXPR_ID),
+		: m_mp(NULL),
+		  m_id(GPOPT_INVALID_GEXPR_ID),
 		  m_pop(NULL),
 		  m_pdrgpgroup(NULL),
 		  m_pdrgpgroupSorted(NULL),

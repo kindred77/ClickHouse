@@ -18,8 +18,6 @@
 using namespace gpopt;
 using namespace gpmd;
 
-FORCE_GENERATE_DBGSTR(CColumnDescriptor);
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CColumnDescriptor::CColumnDescriptor
@@ -36,8 +34,7 @@ CColumnDescriptor::CColumnDescriptor(CMemoryPool *mp, const IMDType *pmdtype,
 	  m_name(mp, name),
 	  m_iAttno(attno),
 	  m_is_nullable(is_nullable),
-	  m_width(ulWidth),
-	  m_is_dist_col(false)
+	  m_width(ulWidth)
 {
 	GPOS_ASSERT(NULL != pmdtype);
 	GPOS_ASSERT(pmdtype->MDId()->IsValid());
@@ -73,6 +70,5 @@ CColumnDescriptor::OsPrint(IOstream &os) const
 {
 	return m_name.OsPrint(os);
 }
-
 
 // EOF

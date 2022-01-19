@@ -29,9 +29,8 @@ using namespace gpopt;
 //		ctor
 //
 //---------------------------------------------------------------------------
-CLogicalLeftAntiSemiJoin::CLogicalLeftAntiSemiJoin(
-	CMemoryPool *mp, CXform::EXformId origin_xform)
-	: CLogicalJoin(mp, origin_xform)
+CLogicalLeftAntiSemiJoin::CLogicalLeftAntiSemiJoin(CMemoryPool *mp)
+	: CLogicalJoin(mp)
 {
 	GPOS_ASSERT(NULL != mp);
 }

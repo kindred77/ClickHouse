@@ -21,6 +21,7 @@
 #include "naucrates/dxl/operators/CDXLDatumStatsLintMappable.h"
 #include "naucrates/dxl/operators/CDXLScalarConstValue.h"
 #include "naucrates/dxl/xml/CXMLSerializer.h"
+#include "naucrates/md/CGPDBTypeHelper.h"
 #include "naucrates/statistics/CStatsPredUtils.h"
 
 using namespace gpnaucrates;
@@ -46,7 +47,6 @@ using namespace gpmd;
 CMDTypeGenericGPDB::CMDTypeGenericGPDB(
 	CMemoryPool *mp, IMDId *mdid, CMDName *mdname, BOOL is_redistributable,
 	BOOL is_fixed_length, ULONG length, BOOL is_passed_by_value,
-	IMDId *mdid_distr_opfamily, IMDId *mdid_legacy_distr_opfamily,
 	IMDId *mdid_op_eq, IMDId *mdid_op_neq, IMDId *mdid_op_lt,
 	IMDId *mdid_op_leq, IMDId *mdid_op_gt, IMDId *mdid_op_geq,
 	IMDId *mdid_op_cmp, IMDId *mdid_op_min, IMDId *mdid_op_max,
@@ -61,8 +61,6 @@ CMDTypeGenericGPDB::CMDTypeGenericGPDB(
 	  m_is_fixed_length(is_fixed_length),
 	  m_length(length),
 	  m_is_passed_by_value(is_passed_by_value),
-	  m_distr_opfamily(mdid_distr_opfamily),
-	  m_legacy_distr_opfamily(mdid_legacy_distr_opfamily),
 	  m_mdid_op_eq(mdid_op_eq),
 	  m_mdid_op_neq(mdid_op_neq),
 	  m_mdid_op_lt(mdid_op_lt),
@@ -106,8 +104,6 @@ CMDTypeGenericGPDB::CMDTypeGenericGPDB(
 CMDTypeGenericGPDB::~CMDTypeGenericGPDB()
 {
 	m_mdid->Release();
-	CRefCount::SafeRelease(m_distr_opfamily);
-	CRefCount::SafeRelease(m_legacy_distr_opfamily);
 	m_mdid_op_eq->Release();
 	m_mdid_op_neq->Release();
 	m_mdid_op_lt->Release();
@@ -474,20 +470,7 @@ CMDTypeGenericGPDB::HasByte2IntMapping(const IMDType *mdtype)
 {
 	IMDId *mdid = mdtype->MDId();
 	return mdtype->IsTextRelated() || mdid->Equals(&CMDIdGPDB::m_mdid_uuid) ||
-		   mdid->Equals(&CMDIdGPDB::m_mdid_cash) ||
-		   IsTimeRelatedTypeMappableToLint(mdid);
-}
-
-IDatum *
-CMDTypeGenericGPDB::CreateGenericNullDatum(CMemoryPool *mp,
-										   INT type_modifier) const
-{
-	return GPOS_NEW(mp) CDatumGenericGPDB(mp, MDId(), type_modifier,
-										  NULL,	 // source value buffer
-										  0,	 // source value buffer length
-										  true,	 // is NULL
-										  0,	 // LINT mapping for stats
-										  0.0);	 // CDouble mapping for stats
+		   mdid->Equals(&CMDIdGPDB::m_mdid_cash);
 }
 
 //---------------------------------------------------------------------------
@@ -503,8 +486,7 @@ CMDTypeGenericGPDB::HasByte2DoubleMapping(const IMDId *mdid)
 {
 	return mdid->Equals(&CMDIdGPDB::m_mdid_numeric) ||
 		   mdid->Equals(&CMDIdGPDB::m_mdid_float4) ||
-		   mdid->Equals(&CMDIdGPDB::m_mdid_float8) ||
-		   IsTimeRelatedTypeMappableToDouble(mdid) ||
+		   mdid->Equals(&CMDIdGPDB::m_mdid_float8) || IsTimeRelatedType(mdid) ||
 		   IsNetworkRelatedType(mdid);
 }
 
@@ -542,33 +524,6 @@ CMDTypeGenericGPDB::IsNetworkRelatedType(const IMDId *mdid)
 	return mdid->Equals(&CMDIdGPDB::m_mdid_inet) ||
 		   mdid->Equals(&CMDIdGPDB::m_mdid_cidr) ||
 		   mdid->Equals(&CMDIdGPDB::m_mdid_macaddr);
-}
-
-IMDId *
-CMDTypeGenericGPDB::GetDistrOpfamilyMdid() const
-{
-	if (GPOS_FTRACE(EopttraceUseLegacyOpfamilies))
-	{
-		return m_legacy_distr_opfamily;
-	}
-	else
-	{
-		return m_distr_opfamily;
-	}
-}
-
-BOOL
-CMDTypeGenericGPDB::IsRedistributable() const
-{
-	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution) &&
-		GPOS_FTRACE(EopttraceUseLegacyOpfamilies))
-	{
-		return (NULL != m_legacy_distr_opfamily);
-	}
-	// If EopttraceConsiderOpfamiliesForDistribution is set, m_is_redistributable
-	// is redundant. It's still used here for MDP tests where the traceflag is
-	// unset and/or opfamilies are not available for all types.
-	return m_is_redistributable;
 }
 
 #ifdef GPOS_DEBUG

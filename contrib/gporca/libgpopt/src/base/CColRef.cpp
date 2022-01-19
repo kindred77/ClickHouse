@@ -93,8 +93,6 @@ CColRef::HashValue(const CColRef *colref)
 }
 
 
-FORCE_GENERATE_DBGSTR(gpopt::CColRef);
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CColRef::OsPrint
@@ -178,3 +176,15 @@ CColRef::Equals(const CColRef2dArray *pdrgdrgpcr1,
 
 	return true;
 }
+
+#ifdef GPOS_DEBUG
+void
+CColRef::DbgPrint() const
+{
+	CMemoryPool *pmp = COptCtxt::PoctxtFromTLS()->Pmp();
+	CAutoTrace at(pmp);
+	(void) this->OsPrint(at.Os());
+}
+#endif	// GPOS_DEBUG
+
+// EOF

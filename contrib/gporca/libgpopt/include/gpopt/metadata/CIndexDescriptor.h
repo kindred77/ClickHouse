@@ -33,8 +33,7 @@ using namespace gpmd;
 //		Base class for index descriptor
 //
 //---------------------------------------------------------------------------
-class CIndexDescriptor : public CRefCount,
-						 public DbgPrintMixin<CIndexDescriptor>
+class CIndexDescriptor : public CRefCount
 {
 private:
 	// mdid of the index
@@ -114,8 +113,6 @@ public:
 	{
 		return m_index_type;
 	}
-
-	BOOL SupportsIndexOnlyScan() const;
 
 	// create an index descriptor
 	static CIndexDescriptor *Pindexdesc(CMemoryPool *mp,

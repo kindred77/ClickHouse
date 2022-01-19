@@ -20,7 +20,11 @@ using namespace gpos;
 
 // initialization of static members
 CLoggerSyslog CLoggerSyslog::m_alert_logger(NULL /*szName*/,
-											LOG_PERROR | LOG_CONS, LOG_ALERT);
+#ifndef GPOS_SunOS
+											LOG_PERROR |
+#endif	// GPOS_SunOS
+												LOG_CONS,
+											LOG_ALERT);
 
 
 //---------------------------------------------------------------------------

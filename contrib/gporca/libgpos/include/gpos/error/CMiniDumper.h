@@ -12,7 +12,6 @@
 #define GPOS_CMiniDumper_H
 
 #include "gpos/base.h"
-#include "gpos/common/CStackObject.h"
 #include "gpos/io/COstream.h"
 
 namespace gpos

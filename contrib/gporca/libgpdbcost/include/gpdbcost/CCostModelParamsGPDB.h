@@ -32,8 +32,7 @@ using namespace gpos;
 //		Parameters in GPDB cost model
 //
 //---------------------------------------------------------------------------
-class CCostModelParamsGPDB : public ICostModelParams,
-							 public DbgPrintMixin<CCostModelParamsGPDB>
+class CCostModelParamsGPDB : public ICostModelParams
 {
 public:
 	// enumeration of cost model params

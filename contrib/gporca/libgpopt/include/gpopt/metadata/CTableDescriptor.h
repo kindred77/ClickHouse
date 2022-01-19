@@ -41,8 +41,7 @@ typedef CDynamicPtrArray<CBitSet, CleanupRelease> CBitSetArray;
 //		metadata abstraction for tables
 //
 //---------------------------------------------------------------------------
-class CTableDescriptor : public CRefCount,
-						 public DbgPrintMixin<CTableDescriptor>
+class CTableDescriptor : public CRefCount
 {
 private:
 	// memory pool
@@ -65,9 +64,6 @@ private:
 
 	// distribution columns for hash distribution
 	CColumnDescriptorArray *m_pdrgpcoldescDist;
-
-	// Opfamily used for hash distribution
-	IMdIdArray *m_distr_opfamilies;
 
 	// if true, we need to consider a hash distributed table as random
 	// there are two possible scenarios:
@@ -112,7 +108,7 @@ public:
 	void AddColumn(CColumnDescriptor *);
 
 	// add the column at the specified position to the list of distribution columns
-	void AddDistributionColumn(ULONG ulPos, IMDId *opfamily);
+	void AddDistributionColumn(ULONG ulPos);
 
 	// add the column at the specified position to the list of partition columns
 	void AddPartitionColumn(ULONG ulPos);
@@ -160,13 +156,6 @@ public:
 	PdrgpcoldescDist() const
 	{
 		return m_pdrgpcoldescDist;
-	}
-
-	// distribution column descriptors accessor
-	const IMdIdArray *
-	DistrOpfamilies() const
-	{
-		return m_distr_opfamilies;
 	}
 
 	// partition column indexes accessor

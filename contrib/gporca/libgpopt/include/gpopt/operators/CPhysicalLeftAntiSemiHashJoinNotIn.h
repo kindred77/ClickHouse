@@ -34,11 +34,9 @@ private:
 
 public:
 	// ctor
-	CPhysicalLeftAntiSemiHashJoinNotIn(
-		CMemoryPool *mp, CExpressionArray *pdrgpexprOuterKeys,
-		CExpressionArray *pdrgpexprInnerKeys,
-		IMdIdArray *hash_opfamilies = NULL,
-		CXform::EXformId origin_xform = CXform::ExfSentinel);
+	CPhysicalLeftAntiSemiHashJoinNotIn(CMemoryPool *mp,
+									   CExpressionArray *pdrgpexprOuterKeys,
+									   CExpressionArray *pdrgpexprInnerKeys);
 
 	// ident accessors
 	virtual EOperatorId
@@ -65,11 +63,6 @@ public:
 										   ULONG child_index,
 										   CDrvdPropArray *pdrgpdpCtxt,
 										   ULONG ulOptReq) const;
-
-	virtual CEnfdDistribution *Ped(CMemoryPool *mp, CExpressionHandle &exprhdl,
-								   CReqdPropPlan *prppInput, ULONG child_index,
-								   CDrvdPropArray *pdrgpdpCtxt,
-								   ULONG ulDistrReq);
 
 	//-------------------------------------------------------------------------------------
 	//-------------------------------------------------------------------------------------

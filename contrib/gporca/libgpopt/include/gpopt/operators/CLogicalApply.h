@@ -14,7 +14,6 @@
 #include "gpos/base.h"
 
 #include "gpopt/operators/CLogical.h"
-#include "naucrates/statistics/CStatistics.h"
 
 namespace gpopt
 {
@@ -96,7 +95,7 @@ public:
 	virtual CFunctionProp *
 	DeriveFunctionProperties(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 	{
-		return PfpDeriveFromScalar(mp, exprhdl);
+		return PfpDeriveFromScalar(mp, exprhdl, 2 /*ulScalarIndex*/);
 	}
 
 	//-------------------------------------------------------------------------------------

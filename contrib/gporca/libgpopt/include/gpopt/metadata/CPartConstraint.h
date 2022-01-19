@@ -46,7 +46,7 @@ typedef CHashMapIter<ULONG, CPartConstraint, gpos::HashValue<ULONG>,
 //		metadata abstraction for tables
 //
 //---------------------------------------------------------------------------
-class CPartConstraint : public CRefCount, public DbgPrintMixin<CPartConstraint>
+class CPartConstraint : public CRefCount
 {
 private:
 	// constraints for different levels

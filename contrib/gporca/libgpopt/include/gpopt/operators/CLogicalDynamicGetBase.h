@@ -88,8 +88,7 @@ public:
 						   CPartConstraint *ppartcnstrRel);
 
 	CLogicalDynamicGetBase(CMemoryPool *mp, const CName *pnameAlias,
-						   CTableDescriptor *ptabdesc, ULONG scan_id,
-						   CColRefArray *pdrgpcrOutput);
+						   CTableDescriptor *ptabdesc, ULONG scan_id);
 
 	// dtor
 	virtual ~CLogicalDynamicGetBase();

@@ -13,6 +13,7 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/ops.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "naucrates/statistics/CFilterStatsProcessor.h"
 #include "naucrates/statistics/CJoinStatsProcessor.h"

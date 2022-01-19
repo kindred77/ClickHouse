@@ -13,7 +13,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalTVF.h"
+#include "gpopt/operators/ops.h"
 
 using namespace gpopt;
 

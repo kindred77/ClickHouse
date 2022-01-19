@@ -13,7 +13,8 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/base/CDistributionSpecRandom.h"
+#include "gpopt/base/CDistributionSpecExternal.h"
+#include "gpopt/base/CUtils.h"
 #include "gpopt/metadata/CName.h"
 #include "gpopt/metadata/CTableDescriptor.h"
 #include "gpopt/operators/CExpressionHandle.h"
@@ -47,7 +48,7 @@ CPhysicalExternalScan::CPhysicalExternalScan(CMemoryPool *mp,
 		m_pds->Release();
 	}
 
-	m_pds = GPOS_NEW(mp) CDistributionSpecRandom();
+	m_pds = GPOS_NEW(mp) CDistributionSpecExternal();
 }
 
 //---------------------------------------------------------------------------

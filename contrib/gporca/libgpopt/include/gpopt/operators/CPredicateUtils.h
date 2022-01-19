@@ -114,10 +114,9 @@ public:
 	// is the given expression a scalar comparison
 	static BOOL FComparison(CExpression *pexpr);
 
-	// is the given expression a disjunction of equality comparisons
-	static BOOL FDisjunctionOfIdentEqComparisons(CMemoryPool *mp,
-												 CExpression *pexpr,
-												 CColRef *colref);
+	// is the given expression a conjunction of equality comparisons
+	static BOOL FConjunctionOfEqComparisons(CMemoryPool *mp,
+											CExpression *pexpr);
 
 	// is the given expression a comparison of the given type
 	static BOOL FComparison(CExpression *pexpr, IMDType::ECmpType cmp_type);
@@ -329,14 +328,12 @@ public:
 	static BOOL IsDisjunctionOfRangeComparison(CMemoryPool *mp,
 											   CExpression *pexpr,
 											   CColRef *colref,
-											   CColRefSet *pcrsAllowedRefs,
-											   BOOL allowNotEqualPreds);
+											   CColRefSet *pcrsAllowedRefs);
 
 	// check if the given comparison type is one of the range comparisons, i.e.
 	// LT, GT, LEq, GEq, Eq
 	static BOOL FRangeComparison(CExpression *expr, CColRef *colref,
-								 CColRefSet *pcrsAllowedRefs,
-								 BOOL allowNotEqualPreds);
+								 CColRefSet *pcrsAllowedRefs);
 
 	// create disjunction
 	static CExpression *PexprDisjunction(CMemoryPool *mp,
@@ -345,8 +342,7 @@ public:
 	// find a predicate that can be used for partition pruning with the given part key
 	static CExpression *PexprPartPruningPredicate(
 		CMemoryPool *mp, const CExpressionArray *pdrgpexpr, CColRef *pcrPartKey,
-		CExpression *pexprCol, CColRefSet *pcrsAllowedRefs,
-		BOOL allowNotEqualPreds);
+		CExpression *pexprCol, CColRefSet *pcrsAllowedRefs);
 
 	// append the conjuncts from the given expression to the given array, removing
 	// any duplicates, and return the resulting array
@@ -357,7 +353,7 @@ public:
 	static CExpression *PexprExtractPredicatesOnPartKeys(
 		CMemoryPool *mp, CExpression *pexprScalar,
 		CColRef2dArray *pdrgpdrgpcrPartKeys, CColRefSet *pcrsAllowedRefs,
-		BOOL fUseConstraints, const IMDRelation *pmdrel = NULL);
+		BOOL fUseConstraints);
 
 	// extract the constraint on the given column and return the corresponding
 	// scalar expression

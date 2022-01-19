@@ -15,11 +15,9 @@
 #include "gpos/memory/CAutoMemoryPool.h"
 
 #include "gpopt/base/CUtils.h"
-#include "gpopt/operators/CLogicalInnerJoin.h"
-#include "gpopt/operators/CLogicalNAryJoin.h"
 #include "gpopt/operators/CNormalizer.h"
-#include "gpopt/operators/CPatternMultiLeaf.h"
 #include "gpopt/operators/CPredicateUtils.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CJoinOrder.h"
 #include "gpopt/xforms/CXformUtils.h"
 

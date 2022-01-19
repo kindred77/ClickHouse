@@ -16,15 +16,8 @@
 #include "gpopt/base/CCastUtils.h"
 #include "gpopt/base/CColRef.h"
 #include "gpopt/base/CUtils.h"
-#include "gpopt/operators/CLogicalDML.h"
-#include "gpopt/operators/CLogicalDynamicIndexGet.h"
-#include "gpopt/operators/CLogicalIndexGet.h"
-#include "gpopt/operators/CLogicalJoin.h"
-#include "gpopt/operators/CPhysicalJoin.h"
-#include "gpopt/operators/CPredicateUtils.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXform.h"
-#include "naucrates/md/IMDIndex.h"
-#include "naucrates/md/IMDScalarOp.h"
 
 namespace gpopt
 {
@@ -184,14 +177,12 @@ private:
 	// lookup join keys in scalar child group
 	static void LookupJoinKeys(CMemoryPool *mp, CExpression *pexpr,
 							   CExpressionArray **ppdrgpexprOuter,
-							   CExpressionArray **ppdrgpexprInner,
-							   IMdIdArray **join_opfamilies);
+							   CExpressionArray **ppdrgpexprInner);
 
 	// cache join keys on scalar child group
 	static void CacheJoinKeys(CExpression *pexpr,
 							  CExpressionArray *pdrgpexprOuter,
-							  CExpressionArray *pdrgpexprInner,
-							  IMdIdArray *join_opfamilies);
+							  CExpressionArray *pdrgpexprInner);
 
 	// helper to extract equality from a given expression
 	static BOOL FExtractEquality(
@@ -217,7 +208,6 @@ private:
 											  CExpression *pexprJoin,
 											  CExpressionArray *pdrgpexprOuter,
 											  CExpressionArray *pdrgpexprInner,
-											  IMdIdArray *join_opfamilies,
 											  CXformResult *pxfres);
 
 	// helper for transforming SubqueryAll into aggregate subquery
@@ -333,6 +323,11 @@ private:
 	static void ComputeBitmapTableScanResidualPredicate(
 		CMemoryPool *mp, BOOL fConjunction, CExpression *pexprOriginalPred,
 		CExpression **ppexprResidual, CExpressionArray *pdrgpexprResidualNew);
+
+	// compute a disjunction of two part constraints
+	static CPartConstraint *PpartcnstrDisjunction(
+		CMemoryPool *mp, CPartConstraint *ppartcnstrOld,
+		CPartConstraint *ppartcnstrNew);
 
 	// construct a bitmap index path expression for the given predicate coming
 	// from a condition without outer references
@@ -638,11 +633,6 @@ public:
 	static CExpression *PexprSelect2BitmapBoolOp(CMemoryPool *mp,
 												 CExpression *pexpr);
 
-	// compute a disjunction of two part constraints
-	static CPartConstraint *PpartcnstrDisjunction(
-		CMemoryPool *mp, CPartConstraint *ppartcnstrOld,
-		CPartConstraint *ppartcnstrNew);
-
 	// find a set of partial index combinations
 	static SPartDynamicIndexGetInfoArrays *PdrgpdrgppartdigCandidates(
 		CMemoryPool *mp, CMDAccessor *md_accessor,
@@ -735,10 +725,6 @@ public:
 									  CExpression **ppexprBitmap,
 									  CExpression **ppexprRecheck);
 
-	static CExpression *AddALinearStackOfUnaryExpressions(
-		CMemoryPool *mp, CExpression *lowerPartOfExpr, CExpression *topOfStack,
-		CExpression *exclusiveBottomOfStack);
-
 };	// class CXformUtils
 
 
@@ -795,7 +781,6 @@ CXformUtils::AddHashOrMergeJoinAlternative(CMemoryPool *mp,
 										   CExpression *pexprJoin,
 										   CExpressionArray *pdrgpexprOuter,
 										   CExpressionArray *pdrgpexprInner,
-										   IMdIdArray *opfamilies,
 										   CXformResult *pxfres)
 {
 	GPOS_ASSERT(CUtils::FLogicalJoin(pexprJoin->Pop()));
@@ -808,11 +793,9 @@ CXformUtils::AddHashOrMergeJoinAlternative(CMemoryPool *mp,
 	{
 		(*pexprJoin)[ul]->AddRef();
 	}
-	CLogicalJoin *popLogicalJoin = CLogicalJoin::PopConvert(pexprJoin->Pop());
-	T *op = GPOS_NEW(mp) T(mp, pdrgpexprOuter, pdrgpexprInner, opfamilies,
-						   popLogicalJoin->OriginXform());
 	CExpression *pexprResult = GPOS_NEW(mp)
-		CExpression(mp, op, (*pexprJoin)[0], (*pexprJoin)[1], (*pexprJoin)[2]);
+		CExpression(mp, GPOS_NEW(mp) T(mp, pdrgpexprOuter, pdrgpexprInner),
+					(*pexprJoin)[0], (*pexprJoin)[1], (*pexprJoin)[2]);
 	pxfres->Add(pexprResult);
 }
 
@@ -841,11 +824,9 @@ CXformUtils::ImplementHashJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 	CMemoryPool *mp = pxfctxt->Pmp();
 	CExpressionArray *pdrgpexprOuter = NULL;
 	CExpressionArray *pdrgpexprInner = NULL;
-	IMdIdArray *join_opfamilies = NULL;
 
 	// check if we have already computed hash join keys for the scalar child
-	LookupJoinKeys(mp, pexpr, &pdrgpexprOuter, &pdrgpexprInner,
-				   &join_opfamilies);
+	LookupJoinKeys(mp, pexpr, &pdrgpexprOuter, &pdrgpexprInner);
 	if (NULL != pdrgpexprOuter)
 	{
 		GPOS_ASSERT(NULL != pdrgpexprInner);
@@ -857,14 +838,12 @@ CXformUtils::ImplementHashJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 			// no reason to try to do the same again
 			pdrgpexprOuter->Release();
 			pdrgpexprInner->Release();
-			CRefCount::SafeRelease(join_opfamilies);
 		}
 		else
 		{
 			// we have computed hash join keys on scalar child before, reuse them
 			AddHashOrMergeJoinAlternative<T>(mp, pexpr, pdrgpexprOuter,
-											 pdrgpexprInner, join_opfamilies,
-											 pxfres);
+											 pdrgpexprInner, pxfres);
 		}
 
 		return;
@@ -878,11 +857,6 @@ CXformUtils::ImplementHashJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 	// output from inner or outer child
 	pdrgpexprOuter = GPOS_NEW(mp) CExpressionArray(mp);
 	pdrgpexprInner = GPOS_NEW(mp) CExpressionArray(mp);
-
-	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-	{
-		join_opfamilies = GPOS_NEW(mp) IMdIdArray(mp);
-	}
 
 	CExpressionArray *pdrgpexpr =
 		CCastUtils::PdrgpexprCastEquality(mp, pexprScalar);
@@ -904,21 +878,9 @@ CXformUtils::ImplementHashJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 			pexprPredOuter->AddRef();
 			pdrgpexprOuter->Append(pexprPredOuter);
 			pdrgpexprInner->Append(pexprPredInner);
-
-			if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-			{
-				CMDAccessor *mda = COptCtxt::PoctxtFromTLS()->Pmda();
-				IMDId *hash_opfamily =
-					mda->RetrieveScOp(mdid_scop)->HashOpfamilyMdid();
-				GPOS_ASSERT(NULL != hash_opfamily && hash_opfamily->IsValid());
-				hash_opfamily->AddRef();
-				join_opfamilies->Append(hash_opfamily);
-			}
 		}
 	}
 	GPOS_ASSERT(pdrgpexprInner->Size() == pdrgpexprOuter->Size());
-	GPOS_ASSERT_IMP(GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution),
-					pdrgpexprInner->Size() == join_opfamilies->Size());
 
 	// construct new HashJoin expression using explicit casting, if needed
 	pexpr->Pop()->AddRef();
@@ -929,21 +891,19 @@ CXformUtils::ImplementHashJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 					CPredicateUtils::PexprConjunction(mp, pdrgpexpr));
 
 	// cache hash join keys on scalar child group
-	CacheJoinKeys(pexprResult, pdrgpexprOuter, pdrgpexprInner, join_opfamilies);
+	CacheJoinKeys(pexprResult, pdrgpexprOuter, pdrgpexprInner);
 
 	// Add an alternative only if we found at least one hash-joinable predicate
 	if (0 != pdrgpexprOuter->Size())
 	{
 		AddHashOrMergeJoinAlternative<T>(mp, pexprResult, pdrgpexprOuter,
-										 pdrgpexprInner, join_opfamilies,
-										 pxfres);
+										 pdrgpexprInner, pxfres);
 	}
 	else
 	{
 		// clean up
 		pdrgpexprOuter->Release();
 		pdrgpexprInner->Release();
-		CRefCount::SafeRelease(join_opfamilies);
 	}
 
 	pexprResult->Release();
@@ -965,11 +925,9 @@ CXformUtils::ImplementMergeJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 	CMemoryPool *mp = pxfctxt->Pmp();
 	CExpressionArray *pdrgpexprOuter = NULL;
 	CExpressionArray *pdrgpexprInner = NULL;
-	IMdIdArray *join_opfamilies = NULL;
 
 	// check if we have already computed join keys for the scalar child
-	LookupJoinKeys(mp, pexpr, &pdrgpexprOuter, &pdrgpexprInner,
-				   &join_opfamilies);
+	LookupJoinKeys(mp, pexpr, &pdrgpexprOuter, &pdrgpexprInner);
 	if (NULL != pdrgpexprOuter)
 	{
 		GPOS_ASSERT(NULL != pdrgpexprInner);
@@ -981,14 +939,12 @@ CXformUtils::ImplementMergeJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 			// no reason to try to do the same again
 			pdrgpexprOuter->Release();
 			pdrgpexprInner->Release();
-			CRefCount::SafeRelease(join_opfamilies);
 		}
 		else
 		{
 			// we have computed join keys on scalar child before, reuse them
 			AddHashOrMergeJoinAlternative<T>(mp, pexpr, pdrgpexprOuter,
-											 pdrgpexprInner, join_opfamilies,
-											 pxfres);
+											 pdrgpexprInner, pxfres);
 		}
 
 		return;
@@ -1002,11 +958,6 @@ CXformUtils::ImplementMergeJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 	// output from inner or outer child
 	pdrgpexprOuter = GPOS_NEW(mp) CExpressionArray(mp);
 	pdrgpexprInner = GPOS_NEW(mp) CExpressionArray(mp);
-
-	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-	{
-		join_opfamilies = GPOS_NEW(mp) IMdIdArray(mp);
-	}
 
 	CExpressionArray *pdrgpexpr =
 		CPredicateUtils::PdrgpexprConjuncts(mp, pexprScalar);
@@ -1028,16 +979,6 @@ CXformUtils::ImplementMergeJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 			pexprPredOuter->AddRef();
 			pdrgpexprOuter->Append(pexprPredOuter);
 			pdrgpexprInner->Append(pexprPredInner);
-
-			if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-			{
-				CMDAccessor *mda = COptCtxt::PoctxtFromTLS()->Pmda();
-				IMDId *hash_opfamily =
-					mda->RetrieveScOp(mdid_scop)->HashOpfamilyMdid();
-				GPOS_ASSERT(NULL != hash_opfamily && hash_opfamily->IsValid());
-				hash_opfamily->AddRef();
-				join_opfamilies->Append(hash_opfamily);
-			}
 		}
 		else
 		{
@@ -1046,13 +987,10 @@ CXformUtils::ImplementMergeJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 			pdrgpexpr->Release();
 			pdrgpexprOuter->Release();
 			pdrgpexprInner->Release();
-			CRefCount::SafeRelease(join_opfamilies);
 			return;
 		}
 	}
 	GPOS_ASSERT(pdrgpexprInner->Size() == pdrgpexprOuter->Size());
-	GPOS_ASSERT_IMP(GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution),
-					pdrgpexprInner->Size() == join_opfamilies->Size());
 
 	// construct new MergeJoin expression using explicit casting, if needed
 	pexpr->Pop()->AddRef();
@@ -1063,21 +1001,19 @@ CXformUtils::ImplementMergeJoin(CXformContext *pxfctxt, CXformResult *pxfres,
 					CPredicateUtils::PexprConjunction(mp, pdrgpexpr));
 
 	// cache hash join keys on scalar child group
-	CacheJoinKeys(pexprResult, pdrgpexprOuter, pdrgpexprInner, join_opfamilies);
+	CacheJoinKeys(pexprResult, pdrgpexprOuter, pdrgpexprInner);
 
 	// Add an alternative only if we found at least one merge-joinable predicate
 	if (0 != pdrgpexprOuter->Size())
 	{
 		AddHashOrMergeJoinAlternative<T>(mp, pexprResult, pdrgpexprOuter,
-										 pdrgpexprInner, join_opfamilies,
-										 pxfres);
+										 pdrgpexprInner, pxfres);
 	}
 	else
 	{
 		// clean up
 		pdrgpexprOuter->Release();
 		pdrgpexprInner->Release();
-		CRefCount::SafeRelease(join_opfamilies);
 	}
 
 	pexprResult->Release();

@@ -16,6 +16,7 @@
 
 #include "gpopt/base/CColRef.h"
 #include "gpopt/base/CPropSpec.h"
+#include "naucrates/md/IMDId.h"
 
 
 namespace gpopt
@@ -34,7 +35,7 @@ using namespace gpos;
 //		Description of window frame
 //
 //---------------------------------------------------------------------------
-class CWindowFrame : public CRefCount, public DbgPrintMixin<CWindowFrame>
+class CWindowFrame : public CRefCount
 {
 public:
 	// specification method

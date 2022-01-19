@@ -12,13 +12,10 @@
 #define GPOPT_CConstraint_H
 
 #include "gpos/base.h"
-#include "gpos/common/CDynamicPtrArray.h"
-#include "gpos/common/CHashMap.h"
 #include "gpos/common/CRefCount.h"
 #include "gpos/types.h"
 
-#include "gpopt/base/CColRef.h"
-#include "gpopt/base/CColRefSet.h"
+#include "gpopt/base/CRange.h"
 
 namespace gpopt
 {
@@ -27,13 +24,15 @@ using namespace gpos;
 // fwd declaration
 class CExpression;
 class CConstraint;
+class CRange;
 
 // constraint array
 typedef CDynamicPtrArray<CConstraint, CleanupRelease> CConstraintArray;
 
 // hash map mapping CColRef -> CConstraintArray
-typedef CHashMap<CColRef, CConstraintArray, CColRef::HashValue, CColRef::Equals,
-				 CleanupNULL<CColRef>, CleanupRelease<CConstraintArray> >
+typedef CHashMap<CColRef, CConstraintArray, gpos::HashValue<CColRef>,
+				 gpos::Equals<CColRef>, CleanupNULL<CColRef>,
+				 CleanupRelease<CConstraintArray> >
 	ColRefToConstraintArrayMap;
 
 // mapping CConstraint -> BOOL to cache previous containment queries,
@@ -58,7 +57,7 @@ typedef CHashMap<ULONG, CConstraint, gpos::HashValue<ULONG>,
 //		Base class for representing constraints
 //
 //---------------------------------------------------------------------------
-class CConstraint : public CRefCount, public DbgPrintMixin<CConstraint>
+class CConstraint : public CRefCount
 {
 public:
 	enum EConstraintType

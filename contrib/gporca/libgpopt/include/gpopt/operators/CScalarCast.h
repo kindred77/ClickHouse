@@ -119,6 +119,7 @@ public:
 		return m_is_binary_coercible;
 	}
 
+
 	// boolean expression evaluation
 	virtual EBoolEvalResult
 	Eber(ULongPtrArray *pdrgpulChildren) const

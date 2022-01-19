@@ -18,7 +18,6 @@
 #include "gpopt/cost/CCost.h"
 #include "gpopt/cost/ICostModel.h"
 #include "gpopt/cost/ICostModelParams.h"
-#include "gpopt/operators/COperator.h"
 
 
 namespace gpdbcost

@@ -13,9 +13,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalGbAgg.h"
-#include "gpopt/operators/CPatternMultiLeaf.h"
-#include "gpopt/operators/CPatternTree.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "gpopt/xforms/CXformExploration.h"
 

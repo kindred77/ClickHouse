@@ -11,7 +11,6 @@
 
 #include "unittest/gpopt/search/CTreeMapTest.h"
 
-#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/string/CWStringDynamic.h"
 #include "gpos/task/CAutoTraceFlag.h"
@@ -453,8 +452,12 @@ CTreeMapTest::EresUnittest_FailedPlanEnumerationTests()
 
 	BOOL fMatchPlans = false;
 	BOOL fTestSpacePruning = false;
+#if defined(GPOS_Darwin) || defined(GPOS_Linux)
+	// restrict plan matching to OsX and Linux to avoid arithmetic operations differences
+	// across systems
 	fMatchPlans = true;
 	fTestSpacePruning = true;
+#endif	// GPOS_Darwin || GPOS_Linux
 
 	// enable plan enumeration only if we match plans
 	CAutoTraceFlag atf1(EopttraceEnumeratePlans, fMatchPlans);

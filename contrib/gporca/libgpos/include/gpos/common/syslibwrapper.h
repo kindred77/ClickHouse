@@ -26,6 +26,9 @@ void GetTimeOfDay(TIMEVAL *tv, TIMEZONE *tz);
 // get system and user time
 void GetRusage(RUSAGE *usage);
 
+// yield the processor
+void SchedYield();
+
 // open a connection to the system logger for a program
 void OpenLog(const CHAR *ident, INT option, INT facility);
 

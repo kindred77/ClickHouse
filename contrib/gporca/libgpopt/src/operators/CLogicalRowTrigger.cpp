@@ -33,7 +33,9 @@ CLogicalRowTrigger::CLogicalRowTrigger(CMemoryPool *mp)
 	  m_rel_mdid(NULL),
 	  m_type(0),
 	  m_pdrgpcrOld(NULL),
-	  m_pdrgpcrNew(NULL)
+	  m_pdrgpcrNew(NULL),
+	  m_efs(IMDFunction::EfsImmutable),
+	  m_efda(IMDFunction::EfdaNoSQL)
 {
 	m_fPattern = true;
 }
@@ -53,7 +55,9 @@ CLogicalRowTrigger::CLogicalRowTrigger(CMemoryPool *mp, IMDId *rel_mdid,
 	  m_rel_mdid(rel_mdid),
 	  m_type(type),
 	  m_pdrgpcrOld(pdrgpcrOld),
-	  m_pdrgpcrNew(pdrgpcrNew)
+	  m_pdrgpcrNew(pdrgpcrNew),
+	  m_efs(IMDFunction::EfsImmutable),
+	  m_efda(IMDFunction::EfdaNoSQL)
 {
 	GPOS_ASSERT(rel_mdid->IsValid());
 	GPOS_ASSERT(0 != type);
@@ -106,10 +110,16 @@ CLogicalRowTrigger::InitFunctionProperties()
 		const IMDFunction *pmdfunc =
 			md_accessor->RetrieveFunc(pmdtrigger->FuncMdId());
 		IMDFunction::EFuncStbl efs = pmdfunc->GetFuncStability();
+		IMDFunction::EFuncDataAcc efda = pmdfunc->GetFuncDataAccess();
 
 		if (efs > m_efs)
 		{
 			m_efs = efs;
+		}
+
+		if (efda > m_efda)
+		{
+			m_efda = efda;
 		}
 	}
 }
@@ -327,7 +337,7 @@ CFunctionProp *
 CLogicalRowTrigger::DeriveFunctionProperties(CMemoryPool *mp,
 											 CExpressionHandle &exprhdl) const
 {
-	return PfpDeriveFromChildren(mp, exprhdl, m_efs,
+	return PfpDeriveFromChildren(mp, exprhdl, m_efs, m_efda,
 								 false /*fHasVolatileFunctionScan*/,
 								 false /*fScan*/);
 }

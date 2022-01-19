@@ -401,6 +401,8 @@ CMDAccessor::RegisterProvider(CSystemId sysid, IMDProvider *pmdp)
 
 	MDPHTAccessor mdhtacc(m_shtProviders, *(a_pmdpelem.Value()));
 
+	GPOS_ASSERT(NULL == mdhtacc.Find());
+
 	// insert provider in the hash table
 	mdhtacc.Insert(a_pmdpelem.Value());
 	a_pmdpelem.Reset();
@@ -992,7 +994,7 @@ CMDAccessor::Pmdsccmp(IMDId *left_mdid, IMDId *right_mdid,
 //---------------------------------------------------------------------------
 void
 CMDAccessor::RecordColumnStats(CMemoryPool *mp, IMDId *rel_mdid, ULONG colid,
-							   ULONG ulPos, BOOL isSystemCol, BOOL isEmptyTable,
+							   ULONG ulPos, BOOL fSystemCol, BOOL fEmptyTable,
 							   UlongToHistogramMap *col_histogram_mapping,
 							   UlongToDoubleMap *colid_width_mapping,
 							   CStatisticsConfig *stats_config)
@@ -1017,7 +1019,7 @@ CMDAccessor::RecordColumnStats(CMemoryPool *mp, IMDId *rel_mdid, ULONG colid,
 	col_histogram_mapping->Insert(GPOS_NEW(mp) ULONG(colid), histogram);
 
 	BOOL fGuc = GPOS_FTRACE(EopttracePrintColsWithMissingStats);
-	BOOL fRecordMissingStats = !isEmptyTable && fGuc && !isSystemCol &&
+	BOOL fRecordMissingStats = !fEmptyTable && fGuc && !fSystemCol &&
 							   (NULL != stats_config) &&
 							   histogram->IsColStatsMissing();
 	if (fRecordMissingStats)
@@ -1088,7 +1090,7 @@ CMDAccessor::Pstats(CMemoryPool *mp, IMDId *rel_mdid, CColRefSet *pcrsHist,
 		INT attno = pcrtable->AttrNum();
 		ULONG ulPos = pmdrel->GetPosFromAttno(attno);
 
-		RecordColumnStats(mp, rel_mdid, colid, ulPos, pcrtable->IsSystemCol(),
+		RecordColumnStats(mp, rel_mdid, colid, ulPos, pcrtable->FSystemCol(),
 						  fEmptyTable, col_histogram_mapping,
 						  colid_width_mapping, stats_config);
 	}
@@ -1114,9 +1116,8 @@ CMDAccessor::Pstats(CMemoryPool *mp, IMDId *rel_mdid, CColRefSet *pcrsHist,
 
 	CDouble rows = std::max(DOUBLE(1.0), pmdRelStats->Rows().Get());
 
-	return GPOS_NEW(mp) CStatistics(
-		mp, col_histogram_mapping, colid_width_mapping, rows, fEmptyTable,
-		pmdRelStats->RelPages(), pmdRelStats->RelAllVisible());
+	return GPOS_NEW(mp) CStatistics(mp, col_histogram_mapping,
+									colid_width_mapping, rows, fEmptyTable);
 }
 
 

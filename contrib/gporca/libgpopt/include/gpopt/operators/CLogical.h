@@ -18,7 +18,6 @@
 #include "gpopt/base/CPartInfo.h"
 #include "gpopt/base/CPropConstraint.h"
 #include "gpopt/base/CReqdProp.h"
-#include "gpopt/base/CUtils.h"
 #include "gpopt/operators/COperator.h"
 #include "gpopt/xforms/CXform.h"
 
@@ -160,7 +159,8 @@ protected:
 
 	// derive function properties using data access property of scalar child
 	static CFunctionProp *PfpDeriveFromScalar(CMemoryPool *mp,
-											  CExpressionHandle &exprhdl);
+											  CExpressionHandle &exprhdl,
+											  ULONG ulScalarIndex);
 
 	// derive outer references
 	static CColRefSet *DeriveOuterReferences(CMemoryPool *mp,

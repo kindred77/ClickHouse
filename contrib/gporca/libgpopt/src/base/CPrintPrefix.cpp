@@ -12,7 +12,6 @@
 #include "gpopt/base/CPrintPrefix.h"
 
 #include "gpos/base.h"
-#include "gpos/task/IWorker.h"
 
 using namespace gpopt;
 

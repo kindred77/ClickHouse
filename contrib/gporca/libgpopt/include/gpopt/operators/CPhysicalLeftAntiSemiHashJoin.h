@@ -33,11 +33,9 @@ private:
 
 public:
 	// ctor
-	CPhysicalLeftAntiSemiHashJoin(
-		CMemoryPool *mp, CExpressionArray *pdrgpexprOuterKeys,
-		CExpressionArray *pdrgpexprInnerKeys,
-		IMdIdArray *hash_opfamilies = NULL,
-		CXform::EXformId origin_xform = CXform::ExfSentinel);
+	CPhysicalLeftAntiSemiHashJoin(CMemoryPool *mp,
+								  CExpressionArray *pdrgpexprOuterKeys,
+								  CExpressionArray *pdrgpexprInnerKeys);
 
 	// dtor
 	virtual ~CPhysicalLeftAntiSemiHashJoin();

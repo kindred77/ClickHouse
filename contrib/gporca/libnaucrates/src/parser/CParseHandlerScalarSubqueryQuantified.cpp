@@ -13,7 +13,6 @@
 #include "naucrates/dxl/parser/CParseHandlerScalarSubqueryQuantified.h"
 
 #include "naucrates/dxl/operators/CDXLOperatorFactory.h"
-#include "naucrates/dxl/operators/CDXLScalarSubqueryAll.h"
 #include "naucrates/dxl/parser/CParseHandlerFactory.h"
 #include "naucrates/dxl/parser/CParseHandlerLogicalOp.h"
 

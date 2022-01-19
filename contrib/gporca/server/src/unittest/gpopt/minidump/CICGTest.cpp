@@ -11,7 +11,6 @@
 
 #include "unittest/gpopt/minidump/CICGTest.h"
 
-#include "gpos/error/CAutoTrace.h"
 #include "gpos/task/CAutoTraceFlag.h"
 
 #include "gpopt/base/CAutoOptCtxt.h"
@@ -97,6 +96,8 @@ const struct UnSupportedTestCase unSupportedTestCases[] = {
 	 gpdxl::ExmiExpr2DXLUnsupportedFeature},
 	{"../data/dxl/minidump/CTEWithOuterReferences.mdp", gpopt::ExmaGPOPT,
 	 gpopt::ExmiUnsupportedOp},
+	{"../data/dxl/minidump/BitmapIndexUnsupportedOperator.mdp",
+	 gpopt::ExmaGPOPT, gpopt::ExmiNoPlanFound},
 	{"../data/dxl/minidump/CTEMisAlignedProducerConsumer.mdp", gpopt::ExmaGPOPT,
 	 gpopt::ExmiCTEProducerConsumerMisAligned}};
 

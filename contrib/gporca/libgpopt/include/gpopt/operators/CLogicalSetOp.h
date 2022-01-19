@@ -66,11 +66,9 @@ protected:
 	CConstraint *PcnstrColumn(CMemoryPool *mp, CExpressionHandle &exprhdl,
 							  ULONG ulColIndex, ULONG ulChild) const;
 
-	// derive constraint property for difference, intersect, and union
-	// operators
-	CPropConstraint *PpcDeriveConstraintSetop(CMemoryPool *mp,
-											  CExpressionHandle &exprhdl,
-											  BOOL fIntersect) const;
+	// derive constraint property for intersect and union operators
+	CPropConstraint *PpcDeriveConstraintIntersectUnion(
+		CMemoryPool *mp, CExpressionHandle &exprhdl, BOOL fIntersect) const;
 
 public:
 	// ctor

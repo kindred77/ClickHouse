@@ -14,6 +14,7 @@
 #include "gpos/base.h"
 
 #include "gpopt/base/CDistributionSpecReplicated.h"
+#include "gpopt/base/CUtils.h"
 #include "gpopt/operators/CExpressionHandle.h"
 
 using namespace gpopt;
@@ -28,10 +29,8 @@ using namespace gpopt;
 //---------------------------------------------------------------------------
 CPhysicalLeftAntiSemiHashJoinNotIn::CPhysicalLeftAntiSemiHashJoinNotIn(
 	CMemoryPool *mp, CExpressionArray *pdrgpexprOuterKeys,
-	CExpressionArray *pdrgpexprInnerKeys, IMdIdArray *hash_opfamilies,
-	CXform::EXformId origin_xform)
-	: CPhysicalLeftAntiSemiHashJoin(mp, pdrgpexprOuterKeys, pdrgpexprInnerKeys,
-									hash_opfamilies, origin_xform)
+	CExpressionArray *pdrgpexprInnerKeys)
+	: CPhysicalLeftAntiSemiHashJoin(mp, pdrgpexprOuterKeys, pdrgpexprInnerKeys)
 {
 }
 
@@ -45,23 +44,10 @@ CPhysicalLeftAntiSemiHashJoinNotIn::CPhysicalLeftAntiSemiHashJoinNotIn(
 //---------------------------------------------------------------------------
 CDistributionSpec *
 CPhysicalLeftAntiSemiHashJoinNotIn::PdsRequired(
-	CMemoryPool * /*mp*/, CExpressionHandle & /*exprhdl*/,
-	CDistributionSpec * /*pdsInput*/, ULONG /*child_index*/,
-	CDrvdPropArray * /*pdrgpdpCtxt*/,
-	ULONG  //ulOptReq// identifies which optimization request should be created
+	CMemoryPool *mp, CExpressionHandle &exprhdl, CDistributionSpec *pdsInput,
+	ULONG child_index, CDrvdPropArray *pdrgpdpCtxt,
+	ULONG ulOptReq	// identifies which optimization request should be created
 ) const
-{
-	GPOS_RAISE(
-		CException::ExmaInvalid, CException::ExmiInvalid,
-		GPOS_WSZ_LIT(
-			"PdsRequired should not be called for CPhysicalLeftAntiSemiHashJoinNotIn"));
-	return NULL;
-}
-
-CEnfdDistribution *
-CPhysicalLeftAntiSemiHashJoinNotIn::Ped(
-	CMemoryPool *mp, CExpressionHandle &exprhdl, CReqdPropPlan *prppInput,
-	ULONG child_index, CDrvdPropArray *pdrgpdpCtxt, ULONG ulOptReq)
 {
 	GPOS_ASSERT(2 > child_index);
 	GPOS_ASSERT(ulOptReq < UlDistrRequests());
@@ -75,14 +61,11 @@ CPhysicalLeftAntiSemiHashJoinNotIn::Ped(
 		//	  whether the inner is empty, and this needs to be detected everywhere
 		// b. if the inner hash keys are nullable, because every segment needs to
 		//	  detect nulls coming from the inner child
-		return GPOS_NEW(mp) CEnfdDistribution(
-			GPOS_NEW(mp)
-				CDistributionSpecReplicated(CDistributionSpec::EdtReplicated),
-			CEnfdDistribution::EdmSatisfy);
+		return GPOS_NEW(mp) CDistributionSpecReplicated();
 	}
 
-	return CPhysicalHashJoin::Ped(mp, exprhdl, prppInput, child_index,
-								  pdrgpdpCtxt, ulOptReq);
+	return CPhysicalHashJoin::PdsRequired(mp, exprhdl, pdsInput, child_index,
+										  pdrgpdpCtxt, ulOptReq);
 }
 
 // EOF

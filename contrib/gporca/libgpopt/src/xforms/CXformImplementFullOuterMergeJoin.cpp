@@ -6,9 +6,8 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalFullOuterJoin.h"
-#include "gpopt/operators/CPatternLeaf.h"
 #include "gpopt/operators/CPhysicalFullMergeJoin.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 using namespace gpopt;

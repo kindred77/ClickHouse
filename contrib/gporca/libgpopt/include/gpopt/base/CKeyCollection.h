@@ -30,7 +30,7 @@ using namespace gpos;
 //		Captures sets of keys for a relation
 //
 //---------------------------------------------------------------------------
-class CKeyCollection : public CRefCount, public DbgPrintMixin<CKeyCollection>
+class CKeyCollection : public CRefCount
 {
 private:
 	// memory pool

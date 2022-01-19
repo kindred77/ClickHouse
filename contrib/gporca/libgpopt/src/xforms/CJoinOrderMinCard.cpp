@@ -22,6 +22,7 @@
 #include "gpopt/base/CUtils.h"
 #include "gpopt/operators/CNormalizer.h"
 #include "gpopt/operators/CPredicateUtils.h"
+#include "gpopt/operators/ops.h"
 
 using namespace gpopt;
 

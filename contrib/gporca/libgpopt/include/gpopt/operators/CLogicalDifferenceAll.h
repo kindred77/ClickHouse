@@ -82,9 +82,10 @@ public:
 
 	// derive constraint property
 	virtual CPropConstraint *
-	DerivePropertyConstraint(CMemoryPool *mp, CExpressionHandle &exprhdl) const
+	DerivePropertyConstraint(CMemoryPool *,	 //mp,
+							 CExpressionHandle &exprhdl) const
 	{
-		return PpcDeriveConstraintSetop(mp, exprhdl, false /*fIntersect*/);
+		return PpcDeriveConstraintPassThru(exprhdl, 0 /*ulChild*/);
 	}
 
 	//-------------------------------------------------------------------------------------

@@ -14,7 +14,6 @@
 #include "gpos/base.h"
 #include "gpos/common/CDynamicPtrArray.h"
 #include "gpos/common/CRefCount.h"
-#include "gpos/common/DbgPrintMixin.h"
 
 #include "gpopt/base/CDrvdProp.h"
 
@@ -65,7 +64,7 @@ typedef CDynamicPtrArray<CReqdProp, CleanupRelease> CReqdPropArray;
 //		children.
 //
 //---------------------------------------------------------------------------
-class CReqdProp : public CRefCount, public DbgPrintMixin<CReqdProp>
+class CReqdProp : public CRefCount
 {
 public:
 	// types of required properties

@@ -64,6 +64,13 @@ public:
 	{
 	}
 
+	// print
+	virtual IOstream &
+	OsPrint(IOstream &os) const
+	{
+		return os;
+	}
+
 #ifdef GPOS_DEBUG
 
 	// is it a relational property context?

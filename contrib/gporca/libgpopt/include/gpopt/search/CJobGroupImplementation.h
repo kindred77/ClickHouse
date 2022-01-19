@@ -105,7 +105,7 @@ public:
 #ifdef GPOS_DEBUG
 
 	// print function
-	virtual IOstream &OsPrint(IOstream &os) const;
+	virtual IOstream &OsPrint(IOstream &os);
 
 	// dump state machine diagram in graphviz format
 	virtual IOstream &

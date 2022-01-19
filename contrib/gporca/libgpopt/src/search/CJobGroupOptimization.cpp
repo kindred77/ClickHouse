@@ -379,7 +379,7 @@ CJobGroupOptimization::ScheduleJob(CSchedulerContext *psc, CGroup *pgroup,
 //
 //---------------------------------------------------------------------------
 IOstream &
-CJobGroupOptimization::OsPrint(IOstream &os) const
+CJobGroupOptimization::OsPrint(IOstream &os)
 {
 	return m_jsm.OsHistory(os);
 }

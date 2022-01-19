@@ -85,7 +85,7 @@ public:
 
 #ifdef GPOS_DEBUG
 	// printer
-	virtual IOstream &OsPrint(IOstream &) const;
+	virtual IOstream &OsPrint(IOstream &);
 #endif	// GPOS_DEBUG
 
 	// set execution parameters

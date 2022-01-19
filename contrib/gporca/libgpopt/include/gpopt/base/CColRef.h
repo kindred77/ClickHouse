@@ -15,7 +15,6 @@
 #include "gpos/common/CDynamicPtrArray.h"
 #include "gpos/common/CHashMap.h"
 #include "gpos/common/CList.h"
-#include "gpos/common/DbgPrintMixin.h"
 
 #include "gpopt/metadata/CName.h"
 #include "naucrates/md/IMDType.h"
@@ -52,7 +51,7 @@ typedef CHashMapIter<ULONG, CColRef, gpos::HashValue<ULONG>,
 //		factory object
 //
 //---------------------------------------------------------------------------
-class CColRef : public gpos::DbgPrintMixin<CColRef>
+class CColRef
 {
 public:
 	enum EUsedStatus
@@ -167,10 +166,7 @@ public:
 	virtual Ecolreftype Ecrt() const = 0;
 
 	// is column a system column?
-	virtual BOOL IsSystemCol() const = 0;
-
-	// is column a distribution column?
-	virtual BOOL IsDistCol() const = 0;
+	virtual BOOL FSystemCol() const = 0;
 
 	// print
 	IOstream &OsPrint(IOstream &) const;
@@ -204,12 +200,9 @@ public:
 	}
 
 	EUsedStatus
-	GetUsage(BOOL check_system_col = false,
-			 BOOL check_distribution_col = false) const
+	GetUsage() const
 	{
-		if (GPOS_FTRACE(EopttraceTranslateUnusedColrefs) ||
-			(!check_system_col && IsSystemCol()) ||
-			(!check_distribution_col && IsDistCol()))
+		if (GPOS_FTRACE(EopttraceTranslateUnusedColrefs) || FSystemCol())
 		{
 			return EUsed;
 		}
@@ -228,6 +221,10 @@ public:
 	{
 		m_mdid_table = mdid_table;
 	}
+
+#ifdef GPOS_DEBUG
+	void DbgPrint() const;
+#endif	// GPOS_DEBUG
 
 };	// class CColRef
 

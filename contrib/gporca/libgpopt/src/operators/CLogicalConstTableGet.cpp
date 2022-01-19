@@ -18,7 +18,6 @@
 #include "gpopt/base/CUtils.h"
 #include "gpopt/metadata/CName.h"
 #include "gpopt/operators/CExpressionHandle.h"
-#include "naucrates/statistics/CStatistics.h"
 
 using namespace gpopt;
 

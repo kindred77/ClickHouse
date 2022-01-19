@@ -4,7 +4,6 @@
 #include "gpopt/operators/CStrictHashedDistributions.h"
 
 #include "gpopt/base/CDistributionSpecStrictRandom.h"
-#include "gpopt/base/CUtils.h"
 
 using namespace gpopt;
 

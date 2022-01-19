@@ -13,7 +13,6 @@
 
 #include "gpos/base.h"
 #include "gpos/io/ioutils.h"
-#include "gpos/task/IWorker.h"
 
 using namespace gpos;
 

@@ -16,8 +16,6 @@
 
 using namespace gpos;
 
-FORCE_GENERATE_DBGSTR(CMessage);
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CMessage::CMessage
@@ -116,7 +114,7 @@ CMessage::FormatMessage(CWStringStatic *str, ULONG major, ULONG minor, ...)
 //
 //---------------------------------------------------------------------------
 IOstream &
-CMessage::OsPrint(IOstream &os) const
+CMessage::OsPrint(IOstream &os)
 {
 	os << "Message No: " << m_exception.Major() << "-" << m_exception.Minor()
 	   << std::endl

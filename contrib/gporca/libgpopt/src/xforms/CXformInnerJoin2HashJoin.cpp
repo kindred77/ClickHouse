@@ -13,11 +13,8 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalInnerJoin.h"
-#include "gpopt/operators/CPatternLeaf.h"
-#include "gpopt/operators/CPhysicalInnerHashJoin.h"
-#include "gpopt/operators/CPhysicalInnerNLJoin.h"
 #include "gpopt/operators/CPredicateUtils.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 using namespace gpopt;
@@ -55,9 +52,9 @@ CXformInnerJoin2HashJoin::CXformInnerJoin2HashJoin(CMemoryPool *mp)
 //
 //---------------------------------------------------------------------------
 CXform::EXformPromise
-CXformInnerJoin2HashJoin::Exfp(CExpressionHandle &) const
+CXformInnerJoin2HashJoin::Exfp(CExpressionHandle &exprhdl) const
 {
-	return CXform::ExfpNone;
+	return CXformUtils::ExfpLogicalJoin2PhysicalJoin(exprhdl);
 }
 
 
@@ -67,13 +64,19 @@ CXformInnerJoin2HashJoin::Exfp(CExpressionHandle &) const
 //
 //	@doc:
 //		actual transformation
-//		Deprecated in favor of CXformImplementInnerJoin.
 //
 //---------------------------------------------------------------------------
 void
-CXformInnerJoin2HashJoin::Transform(CXformContext *, CXformResult *,
-									CExpression *) const
+CXformInnerJoin2HashJoin::Transform(CXformContext *pxfctxt,
+									CXformResult *pxfres,
+									CExpression *pexpr) const
 {
+	GPOS_ASSERT(NULL != pxfctxt);
+	GPOS_ASSERT(FPromising(pxfctxt->Pmp(), this, pexpr));
+	GPOS_ASSERT(FCheckPattern(pexpr));
+
+	CXformUtils::ImplementHashJoin<CPhysicalInnerHashJoin>(pxfctxt, pxfres,
+														   pexpr);
 }
 
 // EOF

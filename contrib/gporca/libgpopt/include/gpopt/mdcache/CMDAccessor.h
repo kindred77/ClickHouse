@@ -17,6 +17,7 @@
 #include "gpos/base.h"
 #include "gpos/memory/CCache.h"
 #include "gpos/memory/CCacheAccessor.h"
+#include "gpos/string/CWStringBase.h"
 
 #include "gpopt/engine/CStatisticsConfig.h"
 #include "gpopt/mdcache/CMDKey.h"
@@ -252,7 +253,7 @@ private:
 
 	// record histogram and width information for a given column of a table
 	void RecordColumnStats(CMemoryPool *mp, IMDId *rel_mdid, ULONG colid,
-						   ULONG ulPos, BOOL isSystemCol, BOOL isEmptyTable,
+						   ULONG ulPos, BOOL fSystemCol, BOOL fEmptyTable,
 						   UlongToHistogramMap *col_histogram_mapping,
 						   UlongToDoubleMap *colid_width_mapping,
 						   CStatisticsConfig *stats_config);

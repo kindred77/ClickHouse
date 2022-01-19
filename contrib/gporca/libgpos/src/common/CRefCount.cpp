@@ -15,3 +15,16 @@
 #include "gpos/task/CTask.h"
 
 using namespace gpos;
+
+#ifdef GPOS_DEBUG
+// debug print for interactive debugging sessions only
+void
+CRefCount::DbgPrint() const
+{
+	CAutoTrace at(CTask::Self()->Pmp());
+
+	OsPrint(at.Os());
+}
+#endif	// GPOS_DEBUG
+
+// EOF

@@ -33,8 +33,7 @@ private:
 
 public:
 	// ctor
-	explicit CLogicalLeftSemiJoin(
-		CMemoryPool *mp, CXform::EXformId origin_xform = CXform::ExfSentinel);
+	explicit CLogicalLeftSemiJoin(CMemoryPool *mp);
 
 	// dtor
 	virtual ~CLogicalLeftSemiJoin()

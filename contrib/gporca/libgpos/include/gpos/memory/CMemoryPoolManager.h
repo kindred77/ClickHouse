@@ -108,21 +108,23 @@ protected:
 		// raw allocation of memory for internal memory pools
 		void *alloc_internal = gpos::clib::Malloc(sizeof(PoolType));
 
-		GPOS_OOM_CHECK(alloc_internal);
+		// create internal memory pool
+		CMemoryPool *internal = ::new (alloc_internal) PoolType();
 
+		// instantiate manager
 		GPOS_TRY
 		{
-			// create internal memory pool
-			CMemoryPool *internal = ::new (alloc_internal) PoolType();
-
-			// instantiate manager
 			m_memory_pool_mgr = ::new ManagerType(internal, EMemoryPoolTracker);
 			m_memory_pool_mgr->Setup();
 		}
 		GPOS_CATCH_EX(ex)
 		{
-			gpos::clib::Free(alloc_internal);
-			GPOS_RETHROW(ex);
+			if (GPOS_MATCH_EX(ex, CException::ExmaSystem, CException::ExmiOOM))
+			{
+				gpos::clib::Free(alloc_internal);
+
+				return GPOS_OOM;
+			}
 		}
 		GPOS_CATCH_END;
 		return GPOS_OK;

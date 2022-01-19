@@ -1,9 +1,6 @@
 #include "gpopt/operators/CPhysicalUnionAll.h"
 
-#include "gpos/error/CAutoTrace.h"
-
 #include "gpopt/base/CColRefSetIter.h"
-#include "gpopt/base/CDistributionSpecReplicated.h"
 #include "gpopt/base/CDistributionSpecStrictRandom.h"
 #include "gpopt/base/CDrvdPropCtxtPlan.h"
 #include "gpopt/operators/CExpressionHandle.h"
@@ -73,7 +70,8 @@ CPhysicalUnionAll::CPhysicalUnionAll(CMemoryPool *mp,
 	  m_pdrgpdrgpcrInput(pdrgpdrgpcrInput),
 	  m_ulScanIdPartialIndex(ulScanIdPartialIndex),
 	  m_pdrgpcrsInput(NULL),
-	  m_pdrgpds(NULL)
+	  m_pdrgpds(GPOS_NEW(mp)
+					CHashedDistributions(mp, pdrgpcrOutput, pdrgpdrgpcrInput))
 {
 	GPOS_ASSERT(NULL != pdrgpcrOutput);
 	GPOS_ASSERT(NULL != pdrgpdrgpcrInput);
@@ -86,46 +84,6 @@ CPhysicalUnionAll::CPhysicalUnionAll(CMemoryPool *mp,
 		CColRefArray *colref_array = (*m_pdrgpdrgpcrInput)[ulChild];
 		m_pdrgpcrsInput->Append(GPOS_NEW(mp) CColRefSet(mp, colref_array));
 	}
-	PopulateDistrSpecs(mp, pdrgpcrOutput, pdrgpdrgpcrInput);
-}
-
-void
-CPhysicalUnionAll::PopulateDistrSpecs(CMemoryPool *mp,
-									  CColRefArray *pdrgpcrOutput,
-									  CColRef2dArray *pdrgpdrgpcrInput)
-{
-	CDistributionSpecArray *pdrgpds = GPOS_NEW(mp) CDistributionSpecArray(mp);
-	const ULONG num_cols = pdrgpcrOutput->Size();
-	const ULONG arity = pdrgpdrgpcrInput->Size();
-	for (ULONG ulChild = 0; ulChild < arity; ulChild++)
-	{
-		CColRefArray *colref_array = (*pdrgpdrgpcrInput)[ulChild];
-		CExpressionArray *pdrgpexpr = GPOS_NEW(mp) CExpressionArray(mp);
-		for (ULONG ulCol = 0; ulCol < num_cols; ulCol++)
-		{
-			CColRef *colref = (*colref_array)[ulCol];
-			CExpression *pexpr = CUtils::PexprScalarIdent(mp, colref);
-			pdrgpexpr->Append(pexpr);
-		}
-
-		// create a hashed distribution on input columns of the current child
-		BOOL fNullsColocated = true;
-		CDistributionSpec *pdshashed =
-			CDistributionSpecHashed::MakeHashedDistrSpec(
-				mp, pdrgpexpr, fNullsColocated, NULL, NULL);
-		if (NULL == pdshashed)
-		{
-			pdrgpexpr->Release();
-			pdrgpds->Release();
-			return;
-		}
-		else
-		{
-			pdrgpds->Append(pdshashed);
-		}
-	}
-
-	m_pdrgpds = pdrgpds;
 }
 
 CPhysicalUnionAll::~CPhysicalUnionAll()
@@ -133,7 +91,7 @@ CPhysicalUnionAll::~CPhysicalUnionAll()
 	m_pdrgpcrOutput->Release();
 	m_pdrgpdrgpcrInput->Release();
 	m_pdrgpcrsInput->Release();
-	CRefCount::SafeRelease(m_pdrgpds);
+	m_pdrgpds->Release();
 }
 
 // accessor of output column array
@@ -640,11 +598,6 @@ CDistributionSpecHashed *
 CPhysicalUnionAll::PdshashedDerive(CMemoryPool *mp,
 								   CExpressionHandle &exprhdl) const
 {
-	if (m_pdrgpds == NULL)
-	{
-		return NULL;
-	}
-
 	BOOL fSuccess = true;
 	const ULONG arity = exprhdl.Arity();
 
@@ -863,8 +816,7 @@ CPhysicalUnionAll::PdsDeriveFromChildren(CMemoryPool *
 			break;
 		}
 
-		if (CDistributionSpec::EdtStrictReplicated == edtChild ||
-			CDistributionSpec::EdtTaintedReplicated == edtChild)
+		if (CDistributionSpec::EdtReplicated == edtChild)
 		{
 			fReplicatedChild = true;
 			pds = pdsChild;
@@ -881,23 +833,6 @@ CPhysicalUnionAll::PdsDeriveFromChildren(CMemoryPool *
 	{
 		// failed to derive distribution from children
 		pds = NULL;
-	}
-
-	// even if a single child is tainted, the result should be tainted
-	if (fReplicatedChild)
-	{
-		for (ULONG ul = 0; ul < arity; ul++)
-		{
-			CDistributionSpec *pdsChild =
-				exprhdl.Pdpplan(ul /*child_index*/)->Pds();
-			CDistributionSpec::EDistributionType edtChild = pdsChild->Edt();
-
-			if (CDistributionSpec::EdtTaintedReplicated == edtChild)
-			{
-				pds = pdsChild;
-				break;
-			}
-		}
 	}
 
 	return pds;
@@ -1014,19 +949,18 @@ CheckChildDistributions(CMemoryPool *mp, CExpressionHandle &exprhdl,
 						BOOL fSingletonChild, BOOL fReplicatedChild,
 						BOOL fUniversalOuterChild)
 {
-	CDistributionSpec::EDistributionType rgedt[5];
+	CDistributionSpec::EDistributionType rgedt[4];
 	rgedt[0] = CDistributionSpec::EdtSingleton;
 	rgedt[1] = CDistributionSpec::EdtStrictSingleton;
 	rgedt[2] = CDistributionSpec::EdtUniversal;
-	rgedt[3] = CDistributionSpec::EdtStrictReplicated;
-	rgedt[4] = CDistributionSpec::EdtTaintedReplicated;
+	rgedt[3] = CDistributionSpec::EdtReplicated;
 
 	if (fReplicatedChild)
 	{
 		// assert all children have distribution Universal or Replicated
 		AssertValidChildDistributions(
 			mp, exprhdl, rgedt + 2 /*start from Universal in rgedt*/,
-			3 /*ulDistrs*/,
+			2 /*ulDistrs*/,
 			"expecting Replicated or Universal distribution in UnionAll children" /*szAssertMsg*/);
 	}
 	else if (fSingletonChild || fUniversalOuterChild)

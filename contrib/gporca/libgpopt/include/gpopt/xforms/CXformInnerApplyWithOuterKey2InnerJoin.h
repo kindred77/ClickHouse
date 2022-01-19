@@ -14,6 +14,7 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CDecorrelator.h"
 #include "gpopt/xforms/CXformExploration.h"
 

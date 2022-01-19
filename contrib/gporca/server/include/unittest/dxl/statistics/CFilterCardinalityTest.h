@@ -87,9 +87,6 @@ private:
 	// disjunction filters
 	static CStatsPred *PstatspredDisj8(CMemoryPool *mp);
 
-	// disjunction filters
-	static CStatsPred *PstatspredDisj9(CMemoryPool *mp);
-
 	// nested AND and OR predicates
 	static CStatsPred *PstatspredNestedPredDiffCol1(CMemoryPool *mp);
 

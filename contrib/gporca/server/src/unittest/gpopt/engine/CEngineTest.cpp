@@ -10,7 +10,6 @@
 //---------------------------------------------------------------------------
 #include "unittest/gpopt/engine/CEngineTest.h"
 
-#include "gpos/error/CAutoTrace.h"
 #include "gpos/task/CAutoTraceFlag.h"
 
 #include "gpopt/base/CColRefSetIter.h"

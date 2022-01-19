@@ -14,8 +14,7 @@
 #include "gpos/base.h"
 
 #include "gpopt/metadata/CTableDescriptor.h"
-#include "gpopt/operators/CLogicalExternalGet.h"
-#include "gpopt/operators/CPhysicalExternalScan.h"
+#include "gpopt/operators/ops.h"
 
 using namespace gpopt;
 

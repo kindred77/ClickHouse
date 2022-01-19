@@ -13,9 +13,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalCTEAnchor.h"
-#include "gpopt/operators/CLogicalSequence.h"
-#include "gpopt/operators/CPatternLeaf.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 using namespace gpopt;

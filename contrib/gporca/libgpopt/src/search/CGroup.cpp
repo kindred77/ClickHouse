@@ -12,7 +12,6 @@
 #include "gpopt/search/CGroup.h"
 
 #include "gpos/base.h"
-#include "gpos/error/CAutoTrace.h"
 #include "gpos/task/CAutoSuspendAbort.h"
 #include "gpos/task/CAutoTraceFlag.h"
 #include "gpos/task/CWorker.h"
@@ -28,16 +27,12 @@
 #include "gpopt/operators/CLogicalInnerJoin.h"
 #include "gpopt/operators/COperator.h"
 #include "gpopt/operators/CPhysicalMotionGather.h"
-#include "gpopt/operators/CScalarSubquery.h"
 #include "gpopt/search/CGroupProxy.h"
 #include "gpopt/search/CJobGroup.h"
-#include "naucrates/statistics/CStatistics.h"
 #include "naucrates/traceflags/traceflags.h"
 
 using namespace gpnaucrates;
 using namespace gpopt;
-
-FORCE_GENERATE_DBGSTR(CGroup);
 
 #define GPOPT_OPTCTXT_HT_BUCKETS 100
 
@@ -156,7 +151,6 @@ CGroup::CGroup(CMemoryPool *mp, BOOL fScalar)
 	  m_fScalar(fScalar),
 	  m_pdrgpexprJoinKeysOuter(NULL),
 	  m_pdrgpexprJoinKeysInner(NULL),
-	  m_join_opfamilies(NULL),
 	  m_pdp(NULL),
 	  m_pstats(NULL),
 	  m_pexprScalarRep(NULL),
@@ -202,7 +196,6 @@ CGroup::~CGroup()
 {
 	CRefCount::SafeRelease(m_pdrgpexprJoinKeysOuter);
 	CRefCount::SafeRelease(m_pdrgpexprJoinKeysInner);
-	CRefCount::SafeRelease(m_join_opfamilies);
 	CRefCount::SafeRelease(m_pdp);
 	CRefCount::SafeRelease(m_pexprScalarRep);
 	CRefCount::SafeRelease(m_pccDummy);
@@ -536,8 +529,7 @@ CGroup::SetState(EState estNewState)
 
 void
 CGroup::SetJoinKeys(CExpressionArray *pdrgpexprOuter,
-					CExpressionArray *pdrgpexprInner,
-					IMdIdArray *join_opfamilies)
+					CExpressionArray *pdrgpexprInner)
 {
 	GPOS_ASSERT(m_fScalar);
 	GPOS_ASSERT(NULL != pdrgpexprOuter);
@@ -556,17 +548,6 @@ CGroup::SetJoinKeys(CExpressionArray *pdrgpexprOuter,
 
 	pdrgpexprInner->AddRef();
 	m_pdrgpexprJoinKeysInner = pdrgpexprInner;
-
-	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-	{
-		GPOS_ASSERT(join_opfamilies != NULL);
-		join_opfamilies->AddRef();
-	}
-	else
-	{
-		GPOS_ASSERT(NULL == join_opfamilies);
-	}
-	m_join_opfamilies = join_opfamilies;
 }
 
 
@@ -1727,21 +1708,6 @@ CGroup::OsPrintGrpScalarProps(IOstream &os, const CHAR *szPrefix) const
 		for (ULONG ul = 0; ul < size; ul++)
 		{
 			os << szPrefix << *(*m_pdrgpexprJoinKeysInner)[ul] << std::endl;
-		}
-	}
-
-	GPOS_CHECK_ABORT;
-
-	if (NULL != m_join_opfamilies)
-	{
-		os << szPrefix << "Inner Join Opfamilies: " << std::endl;
-
-		const ULONG size = m_join_opfamilies->Size();
-		for (ULONG ul = 0; ul < size; ul++)
-		{
-			os << szPrefix;
-			(*m_join_opfamilies)[ul]->OsPrint(os);
-			os << std::endl;
 		}
 	}
 

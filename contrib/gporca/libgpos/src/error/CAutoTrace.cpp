@@ -11,8 +11,6 @@
 
 #include "gpos/error/CAutoTrace.h"
 
-#include "gpos/task/ITask.h"
-
 using namespace gpos;
 
 //---------------------------------------------------------------------------

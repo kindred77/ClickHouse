@@ -14,18 +14,20 @@
 #define GPOPT_CExpressionHandle_H
 
 #include "gpos/base.h"
+#include "gpos/common/CDynamicPtrArray.h"
+#include "gpos/common/CRefCount.h"
 
 #include "gpopt/base/CDrvdProp.h"
 #include "gpopt/base/CDrvdPropRelational.h"
 #include "gpopt/base/CReqdProp.h"
+#include "gpopt/operators/CExpression.h"
 #include "gpopt/search/CGroupExpression.h"
-#include "naucrates/statistics/IStatistics.h"
+#include "naucrates/statistics/CStatistics.h"
 
 
 namespace gpopt
 {
 // fwd declaration
-class CExpression;
 class COperator;
 class CDrvdPropPlan;
 class CDrvdPropScalar;

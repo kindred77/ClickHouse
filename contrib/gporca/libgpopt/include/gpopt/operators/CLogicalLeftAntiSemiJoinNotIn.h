@@ -40,8 +40,7 @@ private:
 
 public:
 	// ctor
-	explicit CLogicalLeftAntiSemiJoinNotIn(
-		CMemoryPool *mp, CXform::EXformId origin_xform = CXform::ExfSentinel);
+	explicit CLogicalLeftAntiSemiJoinNotIn(CMemoryPool *mp);
 
 	// dtor
 	virtual ~CLogicalLeftAntiSemiJoinNotIn()

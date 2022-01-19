@@ -26,7 +26,6 @@
 #include "naucrates/dxl/operators/CDXLDatumOid.h"
 #include "naucrates/dxl/operators/CDXLDatumStatsDoubleMappable.h"
 #include "naucrates/dxl/operators/CDXLDatumStatsLintMappable.h"
-#include "naucrates/dxl/operators/dxlops.h"
 #include "naucrates/md/CMDIdCast.h"
 #include "naucrates/md/CMDIdColStats.h"
 #include "naucrates/md/CMDIdGPDB.h"
@@ -1305,9 +1304,7 @@ CDXLOperatorFactory::MakeDXLHashExpr(CDXLMemoryManager *dxl_memory_manager,
 	// get column type id and type name from attributes
 
 	IMDId *mdid_type = ExtractConvertAttrValueToMdId(
-		dxl_memory_manager, attrs, EdxltokenOpfamily, EdxltokenScalarHashExpr,
-		true /* is_optional */, NULL /* default_val */
-	);
+		dxl_memory_manager, attrs, EdxltokenTypeId, EdxltokenScalarHashExpr);
 
 	return GPOS_NEW(mp) CDXLScalarHashExpr(mp, mdid_type);
 }
@@ -2465,7 +2462,7 @@ CDXLOperatorFactory::GetDatumVal(CDXLMemoryManager *dxl_memory_manager,
 		 &CDXLOperatorFactory::GetDatumStatsDoubleMappable},
 		// time-related types
 		{CMDIdGPDB::m_mdid_date.Oid(),
-		 &CDXLOperatorFactory::GetDatumStatsLintMappable},
+		 &CDXLOperatorFactory::GetDatumStatsDoubleMappable},
 		{CMDIdGPDB::m_mdid_time.Oid(),
 		 &CDXLOperatorFactory::GetDatumStatsDoubleMappable},
 		{CMDIdGPDB::m_mdid_timeTz.Oid(),

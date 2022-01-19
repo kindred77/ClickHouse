@@ -16,6 +16,7 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformLeftSemiApplyWithExternalCorrs2InnerJoin.h"
 
 

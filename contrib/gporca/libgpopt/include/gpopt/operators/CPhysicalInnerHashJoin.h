@@ -55,9 +55,7 @@ public:
 	// ctor
 	CPhysicalInnerHashJoin(CMemoryPool *mp,
 						   CExpressionArray *pdrgpexprOuterKeys,
-						   CExpressionArray *pdrgpexprInnerKeys,
-						   IMdIdArray *hash_opfamilies = NULL,
-						   CXform::EXformId origin_xform = CXform::ExfSentinel);
+						   CExpressionArray *pdrgpexprInnerKeys);
 
 	// dtor
 	virtual ~CPhysicalInnerHashJoin();

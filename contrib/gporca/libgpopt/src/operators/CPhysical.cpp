@@ -11,8 +11,6 @@
 
 #include "gpopt/operators/CPhysical.h"
 
-#include <cwchar>
-
 #include "gpos/base.h"
 
 #include "gpopt/base/CCTEMap.h"
@@ -23,6 +21,7 @@
 #include "gpopt/base/CDistributionSpecReplicated.h"
 #include "gpopt/base/CDistributionSpecSingleton.h"
 #include "gpopt/base/CDrvdPropPlan.h"
+#include "gpopt/base/COptCtxt.h"
 #include "gpopt/base/CPartIndexMap.h"
 #include "gpopt/base/CReqdPropPlan.h"
 #include "gpopt/operators/CExpression.h"
@@ -252,7 +251,7 @@ CPhysical::CReqdColsRequest::Equals(const CReqdColsRequest *prcrFst,
 //---------------------------------------------------------------------------
 CDistributionSpec *
 CPhysical::PdsCompute(CMemoryPool *mp, const CTableDescriptor *ptabdesc,
-					  CColRefArray *pdrgpcrOutput, CColRef *pcr_segment_id)
+					  CColRefArray *pdrgpcrOutput)
 {
 	CDistributionSpec *pds = NULL;
 
@@ -264,24 +263,8 @@ CPhysical::PdsCompute(CMemoryPool *mp, const CTableDescriptor *ptabdesc,
 			break;
 
 		case IMDRelation::EreldistrRandom:
-		{
-			// We calculate gp_segment_id directly through ptabdesc by
-			// finding the column Attno that matches the string in question
-			if (pcr_segment_id == NULL)
-			{
-				for (ULONG i = 0; i < pdrgpcrOutput->Size(); i++)
-				{
-					if (wcscmp((*pdrgpcrOutput)[i]->Name().Pstr()->GetBuffer(),
-							   L"gp_segment_id") == 0)
-					{
-						pcr_segment_id = (*pdrgpcrOutput)[i];
-					}
-				}
-			}
-
-			pds = GPOS_NEW(mp) CDistributionSpecRandom(pcr_segment_id);
+			pds = GPOS_NEW(mp) CDistributionSpecRandom();
 			break;
-		}
 
 		case IMDRelation::EreldistrHash:
 		{
@@ -307,28 +290,13 @@ CPhysical::PdsCompute(CMemoryPool *mp, const CTableDescriptor *ptabdesc,
 				CUtils::PdrgpexprScalarIdents(mp, colref_array);
 			colref_array->Release();
 
-			IMdIdArray *opfamilies = NULL;
-			if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-			{
-				opfamilies = GPOS_NEW(mp) IMdIdArray(mp);
-				for (ULONG ul = 0; ul < size; ul++)
-				{
-					IMDId *opfamily = (*ptabdesc->DistrOpfamilies())[ul];
-					GPOS_ASSERT(NULL != opfamily && opfamily->IsValid());
-					opfamily->AddRef();
-					opfamilies->Append(opfamily);
-				}
-				GPOS_ASSERT(opfamilies->Size() == pdrgpexpr->Size());
-			}
-
-			pds = GPOS_NEW(mp) CDistributionSpecHashed(
-				pdrgpexpr, true /*fNullsColocated*/, opfamilies);
+			pds = GPOS_NEW(mp)
+				CDistributionSpecHashed(pdrgpexpr, true /*fNullsColocated*/);
 			break;
 		}
 
 		case IMDRelation::EreldistrReplicated:
-			return GPOS_NEW(mp) CDistributionSpecReplicated(
-				CDistributionSpec::EdtStrictReplicated);
+			return GPOS_NEW(mp) CDistributionSpecReplicated();
 			break;
 
 		default:
@@ -410,8 +378,7 @@ CPhysical::PdsRequireSingletonOrReplicated(CMemoryPool *mp,
 	{
 		if (0 == ulOptReq)
 		{
-			return GPOS_NEW(mp)
-				CDistributionSpecReplicated(CDistributionSpec::EdtReplicated);
+			return GPOS_NEW(mp) CDistributionSpecReplicated();
 		}
 
 		return GPOS_NEW(mp) CDistributionSpecSingleton();
@@ -830,17 +797,11 @@ CPhysical::PppsRequiredPushThruNAry(CMemoryPool *mp, CExpressionHandle &exprhdl,
 		if (ppfmReqd->FContainsScanId(part_idx_id))
 		{
 			CExpression *pexpr = ppfmReqd->Pexpr(part_idx_id);
-			// if the current child is inner child and the predicate is IsNull check and the parent is left outer join,
+			// if the current child is inner child and the predicate is IsNull check and the parent is outer join,
 			// don't push IsNull check predicate to the partition filter.
 			// for all the other cases, push the filter down.
-			BOOL isNullOuterJoin =
-				CUtils::FScalarNullTest(pexpr) &&
-				((1 == child_index &&
-				  CUtils::FPhysicalLeftOuterJoin(exprhdl.Pop())) ||
-				 (0 == child_index &&
-				  COperator::EopPhysicalRightOuterHashJoin ==
-					  exprhdl.Pop()->Eopid()));
-			if (!(isNullOuterJoin))
+			if (!(1 == child_index && CUtils::FScalarNullTest(pexpr) &&
+				  CUtils::FPhysicalOuterJoin(exprhdl.Pop())))
 			{
 				pexpr->AddRef();
 				ppfmResult->AddPartFilter(mp, part_idx_id, pexpr,
@@ -1295,16 +1256,5 @@ CPhysical::Erm(CReqdPropPlan *, ULONG, CDrvdPropArray *, ULONG)
 	return CEnfdRewindability::ErmSatisfy;
 }
 
-CEnfdDistribution *
-CPhysical::Ped(CMemoryPool *mp, CExpressionHandle &exprhdl,
-			   CReqdPropPlan *prppInput, ULONG child_index,
-			   CDrvdPropArray *pdrgpdpCtxt, ULONG ulDistrReq)
-{
-	return GPOS_NEW(mp) CEnfdDistribution(
-		PdsRequired(mp, exprhdl, prppInput->Ped()->PdsRequired(), child_index,
-					pdrgpdpCtxt, ulDistrReq),
-		Edm(prppInput, child_index, pdrgpdpCtxt, ulDistrReq));
-	;
-}
 
 // EOF

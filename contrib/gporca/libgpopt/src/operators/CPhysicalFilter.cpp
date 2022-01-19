@@ -14,8 +14,7 @@
 #include "gpos/base.h"
 
 #include "gpopt/base/CDistributionSpecAny.h"
-#include "gpopt/base/CDistributionSpecReplicated.h"
-#include "gpopt/base/CPartInfo.h"
+#include "gpopt/base/CUtils.h"
 #include "gpopt/operators/CExpressionHandle.h"
 #include "gpopt/operators/CPredicateUtils.h"
 
@@ -115,8 +114,7 @@ CPhysicalFilter::PdsRequired(CMemoryPool *mp, CExpressionHandle &exprhdl,
 							 ULONG ulOptReq) const
 {
 	if (CDistributionSpec::EdtAny == pdsRequired->Edt() &&
-		CDistributionSpecAny::PdsConvert(pdsRequired)->FAllowOuterRefs() &&
-		!exprhdl.NeedsSingletonExecution())
+		CDistributionSpecAny::PdsConvert(pdsRequired)->FAllowOuterRefs())
 	{
 		// this situation arises when we have Filter on top of (Dynamic)IndexScan,
 		// in this case, we impose no distribution requirements even with the presence of outer references,
@@ -203,16 +201,12 @@ CPhysicalFilter::PppsRequired(CMemoryPool *mp, CExpressionHandle &exprhdl,
 			ppimReqd, part_idx_id, CPartIndexMap::EppraPreservePropagators);
 
 		// look for a filter on the part key
-		CExpression *pexprScalar =
-			exprhdl.PexprScalarExactChild(1 /*child_index*/);
+		CExpression *pexprScalar = exprhdl.PexprScalarExactChild(
+			1 /*child_index*/, true /*error_on_null_return*/);
 
 		CExpression *pexprCmp = NULL;
 		CPartKeysArray *pdrgppartkeys = ppimReqd->Pdrgppartkeys(part_idx_id);
 		const ULONG ulKeysets = pdrgppartkeys->Size();
-		CMDAccessor *mda = COptCtxt::PoctxtFromTLS()->Pmda();
-		;
-		const IMDRelation *pmdrel =
-			(IMDRelation *) mda->RetrieveRel(ppimReqd->GetRelMdId(part_idx_id));
 		for (ULONG ulKey = 0; NULL == pexprCmp && ulKey < ulKeysets; ulKey++)
 		{
 			// get partition key
@@ -222,7 +216,7 @@ CPhysicalFilter::PppsRequired(CMemoryPool *mp, CExpressionHandle &exprhdl,
 			// try to generate a request with dynamic partition selection
 			pexprCmp = CPredicateUtils::PexprExtractPredicatesOnPartKeys(
 				mp, pexprScalar, pdrgpdrgpcrPartKeys, NULL, /*pcrsAllowedRefs*/
-				fUseConstraints, pmdrel);
+				fUseConstraints);
 		}
 
 		if (NULL == pexprCmp)
@@ -306,15 +300,6 @@ CPhysicalFilter::PdsDerive(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 {
 	CDistributionSpec *pdsChild = PdsDerivePassThruOuter(exprhdl);
 
-	if (CDistributionSpec::EdtStrictReplicated == pdsChild->Edt() &&
-		IMDFunction::EfsVolatile ==
-			exprhdl.DeriveScalarFunctionProperties(1)->Efs())
-	{
-		pdsChild->Release();
-		return GPOS_NEW(mp) CDistributionSpecReplicated(
-			CDistributionSpec::EdtTaintedReplicated);
-	}
-
 	if (CDistributionSpec::EdtHashed == pdsChild->Edt() &&
 		exprhdl.HasOuterRefs())
 	{
@@ -351,38 +336,38 @@ CPhysicalFilter::PdsDerive(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 			}
 
 			CDistributionSpecHashed *pdshashedComplete =
-				CDistributionSpecHashed::TryToCompleteEquivSpec(
-					mp, pdshashed, pexprFilterPred,
-					exprhdl.DeriveOuterReferences());
+				CDistributionSpecHashed::CompleteEquivSpec(mp, pdshashed,
+														   pexprFilterPred);
 
 			CExpressionArray *pdrgpexprOriginal =
 				pdshashedOriginal->Pdrgpexpr();
 			pdrgpexprOriginal->AddRef();
-			IMdIdArray *opfamiliesOriginal = pdshashedOriginal->Opfamilies();
-			if (NULL != opfamiliesOriginal)
-			{
-				opfamiliesOriginal->AddRef();
-			}
 
 			CDistributionSpecHashed *pdsResult;
 			if (NULL == pdshashedComplete)
 			{
 				// could not complete the spec, return the original without any equiv spec
 				pdsResult = GPOS_NEW(mp) CDistributionSpecHashed(
-					pdrgpexprOriginal, pdshashedOriginal->FNullsColocated(),
-					opfamiliesOriginal);
+					pdrgpexprOriginal, pdshashedOriginal->FNullsColocated());
 			}
 			else
 			{
 				// return the original with the completed equiv spec
 				pdsResult = GPOS_NEW(mp) CDistributionSpecHashed(
 					pdrgpexprOriginal, pdshashedOriginal->FNullsColocated(),
-					pdshashedComplete, opfamiliesOriginal);
+					pdshashedComplete);
 			}
 
+			// in any case, returned distribution spec must be complete!
+			GPOS_ASSERT(NULL == pdsResult->PdshashedEquiv() ||
+						pdsResult->HasCompleteEquivSpec(mp));
 			pdsChild->Release();
 			return pdsResult;
 		}
+
+		// in any case, returned distribution spec must be complete!
+		GPOS_ASSERT(NULL == pdshashedEquiv ||
+					pdshashedOriginal->HasCompleteEquivSpec(mp));
 	}
 
 	return pdsChild;

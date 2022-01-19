@@ -22,7 +22,6 @@
 #include "gpos/common/CList.h"
 #include "gpos/common/CStackDescriptor.h"
 #include "gpos/memory/CMemoryPool.h"
-#include "gpos/memory/CMemoryPoolStatistics.h"
 #include "gpos/types.h"
 #include "gpos/utils.h"
 

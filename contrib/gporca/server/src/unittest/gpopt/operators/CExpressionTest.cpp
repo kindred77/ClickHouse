@@ -10,7 +10,6 @@
 //---------------------------------------------------------------------------
 #include "unittest/gpopt/operators/CExpressionTest.h"
 
-#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/string/CWStringDynamic.h"
 

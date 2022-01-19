@@ -54,14 +54,6 @@ public:
 
 	static GPOS_RESULT EresUnittest_Basics();
 
-	static GPOS_RESULT StatsComparisonDoubleLessThan();
-
-	static GPOS_RESULT StatsComparisonDoubleEqualWithinEpsilon();
-
-	static GPOS_RESULT StatsComparisonIntLessThan();
-
-	static GPOS_RESULT StatsComparisonIntEqual();
-
 };	// class CDatumTest
 }  // namespace gpnaucrates
 

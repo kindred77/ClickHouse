@@ -12,7 +12,6 @@
 
 #include "naucrates/dxl/operators/CDXLNode.h"
 #include "naucrates/dxl/xml/CXMLSerializer.h"
-#include "naucrates/traceflags/traceflags.h"
 
 using namespace gpos;
 using namespace gpdxl;
@@ -25,11 +24,10 @@ using namespace gpdxl;
 //		Constructor
 //
 //---------------------------------------------------------------------------
-CDXLScalarHashExpr::CDXLScalarHashExpr(CMemoryPool *mp, IMDId *opfamily)
-	: CDXLScalar(mp), m_mdid_opfamily(opfamily)
+CDXLScalarHashExpr::CDXLScalarHashExpr(CMemoryPool *mp, IMDId *mdid_type)
+	: CDXLScalar(mp), m_mdid_type(mdid_type)
 {
-	GPOS_ASSERT_IMP(GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution),
-					m_mdid_opfamily->IsValid());
+	GPOS_ASSERT(m_mdid_type->IsValid());
 }
 
 //---------------------------------------------------------------------------
@@ -42,7 +40,7 @@ CDXLScalarHashExpr::CDXLScalarHashExpr(CMemoryPool *mp, IMDId *opfamily)
 //---------------------------------------------------------------------------
 CDXLScalarHashExpr::~CDXLScalarHashExpr()
 {
-	CRefCount::SafeRelease(m_mdid_opfamily);
+	m_mdid_type->Release();
 }
 
 //---------------------------------------------------------------------------
@@ -83,9 +81,9 @@ CDXLScalarHashExpr::GetOpNameStr() const
 //
 //---------------------------------------------------------------------------
 IMDId *
-CDXLScalarHashExpr::MdidOpfamily() const
+CDXLScalarHashExpr::MdidType() const
 {
-	return m_mdid_opfamily;
+	return m_mdid_type;
 }
 
 //---------------------------------------------------------------------------
@@ -104,11 +102,8 @@ CDXLScalarHashExpr::SerializeToDXL(CXMLSerializer *xml_serializer,
 	xml_serializer->OpenElement(
 		CDXLTokens::GetDXLTokenStr(EdxltokenNamespacePrefix), element_name);
 
-	if (NULL != m_mdid_opfamily)
-	{
-		m_mdid_opfamily->Serialize(
-			xml_serializer, CDXLTokens::GetDXLTokenStr(EdxltokenOpfamily));
-	}
+	m_mdid_type->Serialize(xml_serializer,
+						   CDXLTokens::GetDXLTokenStr(EdxltokenTypeId));
 
 	node->SerializeChildrenToDXL(xml_serializer);
 	xml_serializer->CloseElement(

@@ -44,13 +44,10 @@ using namespace gpopt;
 //---------------------------------------------------------------------------
 CPhysicalHashJoin::CPhysicalHashJoin(CMemoryPool *mp,
 									 CExpressionArray *pdrgpexprOuterKeys,
-									 CExpressionArray *pdrgpexprInnerKeys,
-									 IMdIdArray *hash_opfamilies,
-									 CXform::EXformId origin_xform)
-	: CPhysicalJoin(mp, origin_xform),
+									 CExpressionArray *pdrgpexprInnerKeys)
+	: CPhysicalJoin(mp),
 	  m_pdrgpexprOuterKeys(pdrgpexprOuterKeys),
 	  m_pdrgpexprInnerKeys(pdrgpexprInnerKeys),
-	  m_hash_opfamilies(NULL),
 	  m_pdrgpdsRedistributeRequests(NULL)
 {
 	GPOS_ASSERT(NULL != mp);
@@ -58,14 +55,41 @@ CPhysicalHashJoin::CPhysicalHashJoin(CMemoryPool *mp,
 	GPOS_ASSERT(NULL != pdrgpexprInnerKeys);
 	GPOS_ASSERT(pdrgpexprOuterKeys->Size() == pdrgpexprInnerKeys->Size());
 
-	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-	{
-		GPOS_ASSERT(NULL != hash_opfamilies);
-		m_hash_opfamilies = hash_opfamilies;
-		GPOS_ASSERT(pdrgpexprOuterKeys->Size() == m_hash_opfamilies->Size());
-	}
+	CreateHashRedistributeRequests(mp);
 
-	CreateOptRequests(mp);
+	// given an optimization context, HJN creates three optimization requests
+	// to enforce distribution of its children:
+	// Req(1 to N) (redistribute, redistribute), where we request the first hash join child
+	//		to be distributed on single hash join keys separately, as well as the set
+	//		of all hash join keys,
+	//		the second hash join child is always required to match the distribution returned
+	//		by first child
+	// Req(N + 1) (hashed, broadcast)
+	// Req(N + 2) (non-singleton, broadcast)
+	// Req(N + 3) (singleton, singleton)
+
+	ULONG ulDistrReqs =
+		GPOPT_NON_HASH_DIST_REQUESTS + m_pdrgpdsRedistributeRequests->Size();
+	SetDistrRequests(ulDistrReqs);
+
+	// With DP enabled, there are several (max 10 controlled by macro)
+	// alternatives generated for a join tree and during optimization of those
+	// alternatives expressions PS is inserted in almost all the groups possibly.
+	// However, if DP is turned off, i.e in query or greedy join order,
+	// PS must be inserted in the group with DTS else in some cases HJ plan
+	// cannot be created. So, to ensure pushing PS without DPE 2 partition
+	// propagation request are required if DP is disabled.
+	//    Req 0 => Push PS with considering DPE possibility
+	//    Req 1 => Push PS without considering DPE possibility
+	// Ex case: select * from non_part_tbl1 t1, part_tbl t2, non_part_tbl2 t3
+	// where t1.b = t2.b and t2.b = t3.b;
+	// Note: b is the partitioned column for part_tbl. If DP is turned off, HJ
+	// will not be created for the above query if we send only 1 request.
+	// Also, increasing the number of request increases the optimization time, so
+	// set 2 only when needed.
+	if (GPOPT_FDISABLED_XFORM(CXform::ExfExpandNAryJoinDP) &&
+		GPOPT_FDISABLED_XFORM(CXform::ExfExpandNAryJoinDPv2))
+		SetPartPropagateRequests(2);
 }
 
 //---------------------------------------------------------------------------
@@ -80,7 +104,6 @@ CPhysicalHashJoin::~CPhysicalHashJoin()
 {
 	m_pdrgpexprOuterKeys->Release();
 	m_pdrgpexprInnerKeys->Release();
-	CRefCount::SafeRelease(m_hash_opfamilies);
 	CRefCount::SafeRelease(m_pdrgpdsRedistributeRequests);
 }
 
@@ -123,35 +146,20 @@ CPhysicalHashJoin::CreateHashRedistributeRequests(CMemoryPool *mp)
 			pexpr->AddRef();
 			pdrgpexprCurrent->Append(pexpr);
 
-			IMdIdArray *opfamilies = NULL;
-			if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-			{
-				GPOS_ASSERT(NULL != m_hash_opfamilies);
-				opfamilies = GPOS_NEW(mp) IMdIdArray(mp);
-				IMDId *opfamily = (*m_hash_opfamilies)[ul];
-				opfamily->AddRef();
-				opfamilies->Append(opfamily);
-			}
-
 			// add a separate request for each hash join key
 
 			// TODO:  - Dec 30, 2011; change fNullsColocated to false when our
 			// distribution matching can handle differences in NULL colocation
 			CDistributionSpecHashed *pdshashedCurrent =
 				GPOS_NEW(mp) CDistributionSpecHashed(
-					pdrgpexprCurrent, true /* fNullsCollocated */, opfamilies);
+					pdrgpexprCurrent, true /* fNullsCollocated */);
 			m_pdrgpdsRedistributeRequests->Append(pdshashedCurrent);
 		}
 	}
 	// add a request that contains all hash join keys
 	pdrgpexpr->AddRef();
-	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-	{
-		GPOS_ASSERT(NULL != m_hash_opfamilies);
-		m_hash_opfamilies->AddRef();
-	}
-	CDistributionSpecHashed *pdshashed = GPOS_NEW(mp) CDistributionSpecHashed(
-		pdrgpexpr, true /* fNullsCollocated */, m_hash_opfamilies);
+	CDistributionSpecHashed *pdshashed = GPOS_NEW(mp)
+		CDistributionSpecHashed(pdrgpexpr, true /* fNullsCollocated */);
 	m_pdrgpdsRedistributeRequests->Append(pdshashed);
 }
 
@@ -250,7 +258,7 @@ CPhysicalHashJoin::PdsMatch(CMemoryPool *mp, CDistributionSpec *pds,
 
 	EChildExecOrder eceo = Eceo();
 
-	// check the type of distribution delivered by first (inner) child
+	// check the type of distribution delivered by first child
 	switch (pds->Edt())
 	{
 		case CDistributionSpec::EdtUniversal:
@@ -270,19 +278,11 @@ CPhysicalHashJoin::PdsMatch(CMemoryPool *mp, CDistributionSpec *pds,
 									 ulSourceChildIndex);
 
 		default:
-			GPOS_ASSERT(CDistributionSpec::EdtStrictReplicated == pds->Edt() ||
-						CDistributionSpec::EdtTaintedReplicated == pds->Edt());
-
+			GPOS_ASSERT(CDistributionSpec::EdtReplicated == pds->Edt());
 			if (EceoRightToLeft == eceo)
 			{
 				GPOS_ASSERT(1 == ulSourceChildIndex);
 
-				// inner child is replicated, for ROJ outer must be executed on a single (non-master) segment to avoid duplicates
-				if (this->Eopid() == EopPhysicalRightOuterHashJoin)
-				{
-					return GPOS_NEW(mp) CDistributionSpecSingleton(
-						CDistributionSpecSingleton::EstSegment);
-				}
 				// inner child is replicated, request outer child to have non-singleton distribution
 				return GPOS_NEW(mp) CDistributionSpecNonSingleton();
 			}
@@ -290,8 +290,7 @@ CPhysicalHashJoin::PdsMatch(CMemoryPool *mp, CDistributionSpec *pds,
 			GPOS_ASSERT(0 == ulSourceChildIndex);
 
 			// outer child is replicated, replicate inner child too in order to preserve correctness of semi-join
-			return GPOS_NEW(mp) CDistributionSpecReplicated(
-				CDistributionSpec::EdtStrictReplicated);
+			return GPOS_NEW(mp) CDistributionSpecReplicated();
 	}
 }
 
@@ -328,13 +327,6 @@ CPhysicalHashJoin::PdshashedMatching(
 	// construct an array of target key expressions matching source key expressions
 	CExpressionArray *pdrgpexpr = GPOS_NEW(mp) CExpressionArray(mp);
 	CExpressionArrays *all_equiv_exprs = pdshashed->HashSpecEquivExprs();
-	IMdIdArray *opfamilies = NULL;
-
-	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-	{
-		opfamilies = GPOS_NEW(mp) IMdIdArray(mp);
-	}
-
 	for (ULONG ulDlvrdIdx = 0; ulDlvrdIdx < ulDlvrdSize; ulDlvrdIdx++)
 	{
 		CExpression *pexprDlvrd = (*pdrgpexprDist)[ulDlvrdIdx];
@@ -361,14 +353,6 @@ CPhysicalHashJoin::PdshashedMatching(
 				CExpression *pexprTarget = (*pdrgpexprTarget)[idx];
 				pexprTarget->AddRef();
 				pdrgpexpr->Append(pexprTarget);
-
-				if (NULL != opfamilies)
-				{
-					GPOS_ASSERT(NULL != m_hash_opfamilies);
-					IMDId *opfamily = (*m_hash_opfamilies)[idx];
-					opfamily->AddRef();
-					opfamilies->Append(opfamily);
-				}
 				break;
 			}
 		}
@@ -379,7 +363,6 @@ CPhysicalHashJoin::PdshashedMatching(
 		pdrgpexpr->Release();
 		if (NULL != pdshashed->PdshashedEquiv())
 		{
-			CRefCount::SafeRelease(opfamilies);
 			// try again using the equivalent hashed distribution
 			return PdshashedMatching(mp, pdshashed->PdshashedEquiv(),
 									 ulSourceChild);
@@ -393,8 +376,8 @@ CPhysicalHashJoin::PdshashedMatching(
 			GPOS_WSZ_LIT("Unable to create matching hashed distribution."));
 	}
 
-	return GPOS_NEW(mp) CDistributionSpecHashed(
-		pdrgpexpr, true /* fNullsCollocated */, opfamilies);
+	return GPOS_NEW(mp)
+		CDistributionSpecHashed(pdrgpexpr, true /* fNullsCollocated */);
 }
 
 
@@ -426,19 +409,18 @@ CPhysicalHashJoin::PdsRequiredSingleton(CMemoryPool *mp,
 		CDrvdPropPlan::Pdpplan((*pdrgpdpCtxt)[0])->Pds();
 	GPOS_ASSERT(NULL != pdsFirst);
 
-	if (CDistributionSpec::EdtUniversal == pdsFirst->Edt() ||
-		CDistributionSpec::EdtTaintedReplicated == pdsFirst->Edt())
+	if (CDistributionSpec::EdtUniversal == pdsFirst->Edt())
 	{
 		// first child is universal, request second child to execute on a single host to avoid duplicates
 		return GPOS_NEW(mp) CDistributionSpecSingleton();
 	}
 
 	if (COptCtxt::PoctxtFromTLS()->OptimizeDMLQueryWithSingletonSegment() &&
-		CDistributionSpec::EdtStrictReplicated == pdsFirst->Edt())
+		CDistributionSpec::EdtReplicated == pdsFirst->Edt())
 	{
 		// For a DML query that can be optimized by enforcing a non-master gather motion,
 		// we request singleton-segment distribution on the outer child. If the outer child
-		// is replicated, no enforcer gets added; in which case pdsFirst is EdtStrictReplicated.
+		// is replicated, no enforcer gets added; in which case pdsFirst is EdtReplicated.
 		// Hence handle this scenario here and require a singleton-segment on the
 		// inner child to produce a singleton execution alternavtive for the HJ.
 		return GPOS_NEW(mp)
@@ -466,27 +448,21 @@ CPhysicalHashJoin::PdsRequiredSingleton(CMemoryPool *mp,
 CDistributionSpec *
 CPhysicalHashJoin::PdsRequiredReplicate(
 	CMemoryPool *mp, CExpressionHandle &exprhdl, CDistributionSpec *pdsInput,
-	ULONG child_index, CDrvdPropArray *pdrgpdpCtxt, ULONG ulOptReq,
-	CReqdPropPlan *prppInput)
+	ULONG child_index, CDrvdPropArray *pdrgpdpCtxt, ULONG ulOptReq) const
 {
 	EChildExecOrder eceo = Eceo();
 	if (EceoLeftToRight == eceo)
 	{
 		// if optimization order is left to right, fall-back to implementation of parent Join operator
-		CEnfdDistribution *ped = CPhysicalJoin::Ped(
-			mp, exprhdl, prppInput, child_index, pdrgpdpCtxt, ulOptReq);
-		CDistributionSpec *pds = ped->PdsRequired();
-		pds->AddRef();
-		SafeRelease(ped);
-		return pds;
+		return CPhysicalJoin::PdsRequired(mp, exprhdl, pdsInput, child_index,
+										  pdrgpdpCtxt, 0 /*ulOptReq*/);
 	}
 	GPOS_ASSERT(EceoRightToLeft == eceo);
 
 	if (1 == child_index)
 	{
 		// require inner child to be replicated
-		return GPOS_NEW(mp)
-			CDistributionSpecReplicated(CDistributionSpec::EdtReplicated);
+		return GPOS_NEW(mp) CDistributionSpecReplicated();
 	}
 	GPOS_ASSERT(0 == child_index);
 
@@ -515,8 +491,7 @@ CPhysicalHashJoin::PdsRequiredReplicate(
 	}
 
 	// otherwise, require second child to deliver non-singleton distribution
-	GPOS_ASSERT(CDistributionSpec::EdtStrictReplicated == pdsInner->Edt() ||
-				CDistributionSpec::EdtTaintedReplicated == pdsInner->Edt());
+	GPOS_ASSERT(CDistributionSpec::EdtReplicated == pdsInner->Edt());
 	return GPOS_NEW(mp) CDistributionSpecNonSingleton();
 }
 
@@ -665,23 +640,10 @@ CPhysicalHashJoin::PdsRequiredRedistribute(CMemoryPool *mp,
 	return pdsMatch;
 }
 
-CDistributionSpec *
-CPhysicalHashJoin::PdsRequired(
-	CMemoryPool * /*mp*/, CExpressionHandle & /*exprhdl*/,
-	CDistributionSpec * /*pdsInput*/, ULONG /*child_index*/,
-	CDrvdPropArray * /*pdrgpdpCtxt*/,
-	ULONG /*ulOptReq*/	// identifies which optimization request should be created
-) const
-{
-	GPOS_RAISE(
-		CException::ExmaInvalid, CException::ExmiInvalid,
-		GPOS_WSZ_LIT("PdsRequired should not be called for CPhysicalHashJoin"));
-	return NULL;
-}
 
 //---------------------------------------------------------------------------
 //	@function:
-//		CPhysicalHashJoin::Ped
+//		CPhysicalHashJoin::PdsRequired
 //
 //	@doc:
 //		Compute required distribution of the n-th child;
@@ -701,37 +663,30 @@ CPhysicalHashJoin::PdsRequired(
 //
 //
 //---------------------------------------------------------------------------
-CEnfdDistribution *
-CPhysicalHashJoin::Ped(CMemoryPool *mp, CExpressionHandle &exprhdl,
-					   CReqdPropPlan *prppInput, ULONG child_index,
-					   CDrvdPropArray *pdrgpdpCtxt, ULONG ulOptReq)
+CDistributionSpec *
+CPhysicalHashJoin::PdsRequired(
+	CMemoryPool *mp, CExpressionHandle &exprhdl, CDistributionSpec *pdsInput,
+	ULONG child_index, CDrvdPropArray *pdrgpdpCtxt,
+	ULONG ulOptReq	// identifies which optimization request should be created
+) const
 {
 	GPOS_ASSERT(2 > child_index);
 	GPOS_ASSERT(ulOptReq < UlDistrRequests());
 
-	CEnfdDistribution::EDistributionMatching dmatch =
-		Edm(prppInput, child_index, pdrgpdpCtxt, ulOptReq);
-	CDistributionSpec *const pdsInput = prppInput->Ped()->PdsRequired();
-
 	// if expression has to execute on a single host then we need a gather
 	if (exprhdl.NeedsSingletonExecution())
 	{
-		return GPOS_NEW(mp) CEnfdDistribution(
-			PdsRequireSingleton(mp, exprhdl, pdsInput, child_index), dmatch);
+		return PdsRequireSingleton(mp, exprhdl, pdsInput, child_index);
 	}
 
 	if (exprhdl.HasOuterRefs())
 	{
 		if (CDistributionSpec::EdtSingleton == pdsInput->Edt() ||
-			CDistributionSpec::EdtStrictReplicated == pdsInput->Edt())
+			CDistributionSpec::EdtReplicated == pdsInput->Edt())
 		{
-			return GPOS_NEW(mp) CEnfdDistribution(
-				PdsPassThru(mp, exprhdl, pdsInput, child_index), dmatch);
+			return PdsPassThru(mp, exprhdl, pdsInput, child_index);
 		}
-		return GPOS_NEW(mp)
-			CEnfdDistribution(GPOS_NEW(mp) CDistributionSpecReplicated(
-								  CDistributionSpec::EdtStrictReplicated),
-							  dmatch);
+		return GPOS_NEW(mp) CDistributionSpecReplicated();
 	}
 
 	const ULONG ulHashDistributeRequests =
@@ -747,7 +702,7 @@ CPhysicalHashJoin::Ped(CMemoryPool *mp, CExpressionHandle &exprhdl,
 				CDistributionSpecHashed::PdsConvert(pds);
 			pdsHashed->ComputeEquivHashExprs(mp, exprhdl);
 		}
-		return GPOS_NEW(mp) CEnfdDistribution(pds, dmatch);
+		return pds;
 	}
 
 	if (ulOptReq == ulHashDistributeRequests ||
@@ -755,25 +710,23 @@ CPhysicalHashJoin::Ped(CMemoryPool *mp, CExpressionHandle &exprhdl,
 	{
 		// requests N+1, N+2 are (hashed/non-singleton, replicate)
 
-		CDistributionSpec *pds =
-			PdsRequiredReplicate(mp, exprhdl, pdsInput, child_index,
-								 pdrgpdpCtxt, ulOptReq, prppInput);
+		CDistributionSpec *pds = PdsRequiredReplicate(
+			mp, exprhdl, pdsInput, child_index, pdrgpdpCtxt, ulOptReq);
 		if (CDistributionSpec::EdtHashed == pds->Edt())
 		{
 			CDistributionSpecHashed *pdsHashed =
 				CDistributionSpecHashed::PdsConvert(pds);
 			pdsHashed->ComputeEquivHashExprs(mp, exprhdl);
 		}
-		return GPOS_NEW(mp) CEnfdDistribution(pds, dmatch);
+		return pds;
 	}
 
 	GPOS_ASSERT(ulOptReq == ulHashDistributeRequests + 2);
 
 	// requests N+3 is (singleton, singleton)
 
-	return GPOS_NEW(mp) CEnfdDistribution(
-		PdsRequiredSingleton(mp, exprhdl, pdsInput, child_index, pdrgpdpCtxt),
-		dmatch);
+	return PdsRequiredSingleton(mp, exprhdl, pdsInput, child_index,
+								pdrgpdpCtxt);
 }
 
 
@@ -895,57 +848,5 @@ CPhysicalHashJoin::FNullableHashKey(ULONG ulKey, CColRefSet *pcrsNotNull,
 	return true;
 }
 
-void
-CPhysicalHashJoin::CreateOptRequests(CMemoryPool *mp)
-{
-	CreateHashRedistributeRequests(mp);
 
-	// given an optimization context, HJN creates three optimization requests
-	// to enforce distribution of its children:
-	// Req(1 to N) (redistribute, redistribute), where we request the first hash join child
-	//		to be distributed on single hash join keys separately, as well as the set
-	//		of all hash join keys,
-	//		the second hash join child is always required to match the distribution returned
-	//		by first child
-	// Req(N + 1) (hashed, broadcast)
-	// Req(N + 2) (non-singleton, broadcast)
-	// Req(N + 3) (singleton, singleton)
-
-	ULONG ulDistrReqs =
-		GPOPT_NON_HASH_DIST_REQUESTS + m_pdrgpdsRedistributeRequests->Size();
-	SetDistrRequests(ulDistrReqs);
-
-	// With DP enabled, there are several (max 10 controlled by macro)
-	// alternatives generated for a join tree and during optimization of those
-	// alternatives expressions PS is inserted in almost all the groups possibly.
-	// However, if DP is turned off, i.e in query or greedy join order,
-	// PS must be inserted in the group with DTS else in some cases HJ plan
-	// cannot be created. So, to ensure pushing PS without DPE 2 partition
-	// propagation request are required if DP is disabled.
-	//    Req 0 => Push PS with considering DPE possibility
-	//    Req 1 => Push PS without considering DPE possibility
-	// Ex case: select * from non_part_tbl1 t1, part_tbl t2, non_part_tbl2 t3
-	// where t1.b = t2.b and t2.b = t3.b;
-	// Note: b is the partitioned column for part_tbl. If DP is turned off, HJ
-	// will not be created for the above query if we send only 1 request.
-	// Also, increasing the number of request increases the optimization time, so
-	// set 2 only when needed.
-	//
-	// There are also cases where greedy does generate a better plan
-	// without DPE. This adds some overhead (<10%)to optimization time in
-	// some cases, but can create better alternatives to DPE, so
-	// we also generate this additional request for expressions that originated
-	// from CXformExpandNAryJoinGreedy.
-	CPhysicalJoin *physical_join = dynamic_cast<CPhysicalJoin *>(this);
-	if ((GPOPT_FDISABLED_XFORM(CXform::ExfExpandNAryJoinDP) &&
-		 GPOPT_FDISABLED_XFORM(CXform::ExfExpandNAryJoinDPv2)) ||
-		physical_join->OriginXform() == CXform::ExfExpandNAryJoinGreedy)
-	{
-		SetPartPropagateRequests(2);
-	}
-	else
-	{
-		SetPartPropagateRequests(1);
-	}
-}
 // EOF

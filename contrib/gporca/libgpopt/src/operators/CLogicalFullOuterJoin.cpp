@@ -28,9 +28,7 @@ using namespace gpopt;
 //		ctor
 //
 //---------------------------------------------------------------------------
-CLogicalFullOuterJoin::CLogicalFullOuterJoin(CMemoryPool *mp,
-											 CXform::EXformId origin_xform)
-	: CLogicalJoin(mp, origin_xform)
+CLogicalFullOuterJoin::CLogicalFullOuterJoin(CMemoryPool *mp) : CLogicalJoin(mp)
 {
 	GPOS_ASSERT(NULL != mp);
 }

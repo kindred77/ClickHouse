@@ -10,8 +10,6 @@
 //---------------------------------------------------------------------------
 #include "unittest/gpopt/base/CRangeTest.h"
 
-#include "gpos/error/CAutoTrace.h"
-
 #include "gpopt/base/CDefaultComparator.h"
 #include "gpopt/eval/CConstExprEvaluatorDefault.h"
 #include "naucrates/base/CDatumInt2GPDB.h"

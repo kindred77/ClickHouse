@@ -11,7 +11,6 @@
 
 #include "naucrates/dxl/parser/CParseHandlerLogicalGet.h"
 
-#include "naucrates/dxl/operators/CDXLLogicalExternalGet.h"
 #include "naucrates/dxl/operators/CDXLOperatorFactory.h"
 #include "naucrates/dxl/parser/CParseHandlerFactory.h"
 #include "naucrates/dxl/parser/CParseHandlerScalarOp.h"

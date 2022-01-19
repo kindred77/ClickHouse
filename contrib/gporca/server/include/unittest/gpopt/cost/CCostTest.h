@@ -30,7 +30,7 @@ class CCostTest
 {
 private:
 	// test cost model parameters
-	static void TestParams(CMemoryPool *mp);
+	static void TestParams(CMemoryPool *mp, BOOL fCalibrated);
 
 public:
 	// unittests

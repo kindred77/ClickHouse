@@ -28,8 +28,9 @@ class CColRefSet;
 typedef CDynamicPtrArray<CColRefSet, CleanupRelease> CColRefSetArray;
 
 // hash map mapping CColRef -> CColRefSet
-typedef CHashMap<CColRef, CColRefSet, CColRef::HashValue, CColRef::Equals,
-				 CleanupNULL<CColRef>, CleanupRelease<CColRefSet> >
+typedef CHashMap<CColRef, CColRefSet, gpos::HashValue<CColRef>,
+				 gpos::Equals<CColRef>, CleanupNULL<CColRef>,
+				 CleanupRelease<CColRefSet> >
 	ColRefToColRefSetMap;
 
 // hash map mapping INT -> CColRef
@@ -48,7 +49,7 @@ typedef CHashMap<INT, CColRef, gpos::HashValue<INT>, gpos::Equals<INT>,
 //		member functions inaccessible
 //
 //---------------------------------------------------------------------------
-class CColRefSet : public CBitSet, public DbgPrintMixin<CColRefSet>
+class CColRefSet : public CBitSet
 {
 	// bitset iter needs to access internals
 	friend class CColRefSetIter;

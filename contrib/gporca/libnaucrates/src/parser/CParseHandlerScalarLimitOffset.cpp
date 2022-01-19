@@ -13,7 +13,6 @@
 #include "naucrates/dxl/parser/CParseHandlerScalarLimitOffset.h"
 
 #include "naucrates/dxl/operators/CDXLOperatorFactory.h"
-#include "naucrates/dxl/operators/CDXLScalarLimitOffset.h"
 #include "naucrates/dxl/parser/CParseHandlerFactory.h"
 #include "naucrates/dxl/parser/CParseHandlerScalarOp.h"
 

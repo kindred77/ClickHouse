@@ -15,7 +15,6 @@
 #include "gpos/common/CAutoTimer.h"
 #include "gpos/common/CSyncHashtableAccessByIter.h"
 #include "gpos/common/CSyncHashtableAccessByKey.h"
-#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/string/CWStringDynamic.h"
 
@@ -610,8 +609,6 @@ CMemo::Trace()
 }
 
 
-FORCE_GENERATE_DBGSTR(gpopt::CMemo);
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CMemo::OsPrint
@@ -621,18 +618,20 @@ FORCE_GENERATE_DBGSTR(gpopt::CMemo);
 //
 //---------------------------------------------------------------------------
 IOstream &
-CMemo::OsPrint(IOstream &os) const
+CMemo::OsPrint(IOstream &os)
 {
 	CGroup *pgroup = m_listGroups.PtFirst();
 
 	while (NULL != pgroup)
 	{
+		CAutoTrace at(m_mp);
+
 		if (m_pgroupRoot == pgroup)
 		{
-			os << std::endl << "ROOT ";
+			at.Os() << std::endl << "ROOT ";
 		}
 
-		pgroup->OsPrint(os);
+		pgroup->OsPrint(at.Os());
 		pgroup = m_listGroups.Next(pgroup);
 
 		GPOS_CHECK_ABORT;
@@ -808,3 +807,14 @@ CMemo::UlGrpExprs()
 
 	return ulGExprs;
 }
+
+#ifdef GPOS_DEBUG
+void
+CMemo::DbgPrint()
+{
+	CAutoTrace at(m_mp);
+	(void) this->OsPrint(at.Os());
+}
+#endif	// GPOS_DEBUG
+
+// EOF

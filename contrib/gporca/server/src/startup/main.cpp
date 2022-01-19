@@ -16,6 +16,7 @@
 #include "gpos/test/CUnittest.h"
 #include "gpos/types.h"
 
+#include "gpdbcost/CCostModelGPDBLegacy.h"
 #include "gpopt/engine/CEnumeratorConfig.h"
 #include "gpopt/engine/CStatisticsConfig.h"
 #include "gpopt/init.h"
@@ -87,6 +88,7 @@
 #include "unittest/gpopt/minidump/CMinidumpWithConstExprEvaluatorTest.h"
 #include "unittest/gpopt/minidump/CMissingStatsTest.h"
 #include "unittest/gpopt/minidump/CMultilevelPartitionTest.h"
+#include "unittest/gpopt/minidump/CPartitionSelectorRewindabilityTest.h"
 #include "unittest/gpopt/minidump/CPhysicalParallelUnionAllTest.h"
 #include "unittest/gpopt/minidump/CPruneColumnsTest.h"
 #include "unittest/gpopt/minidump/CPullUpProjectElementTest.h"
@@ -177,8 +179,11 @@ static gpos::CUnittest rgut[] = {
 	GPOS_UNITTEST_STD(CDistributionSpecTest),
 	GPOS_UNITTEST_STD(CCastTest),
 	GPOS_UNITTEST_STD(CConstTblGetTest),
+	GPOS_UNITTEST_STD(CPartitionSelectorRewindabilityTest),
 
+#if !defined(GPOS_32BIT)
 	GPOS_UNITTEST_STD(CSubqueryHandlerTest),
+#endif	// !defined(GPOS_32BIT)
 	GPOS_UNITTEST_STD(CBindingTest),
 	GPOS_UNITTEST_STD(CEngineTest),
 	GPOS_UNITTEST_STD(CEquivalenceClassesTest),
@@ -193,7 +198,9 @@ static gpos::CUnittest rgut[] = {
 	GPOS_UNITTEST_STD(CPredicateUtilsTest),
 	GPOS_UNITTEST_STD(CScalarIsDistinctFromTest),
 	GPOS_UNITTEST_STD(CPartConstraintTest),
+#if !defined(GPOS_SunOS)
 	GPOS_UNITTEST_STD(CSearchStrategyTest),
+#endif	// !defined(GPOS_SunOS)
 	GPOS_UNITTEST_STD(COptimizationJobsTest),
 	GPOS_UNITTEST_STD(CStateMachineTest),
 	GPOS_UNITTEST_STD(CTableDescriptorTest),
@@ -204,7 +211,9 @@ static gpos::CUnittest rgut[] = {
 	GPOS_UNITTEST_STD(CConstExprEvaluatorDefaultTest),
 	GPOS_UNITTEST_STD(CConstExprEvaluatorDXLTest),
 // disable CEnumeratorTest until it is fixed
+//#if !defined(GPOS_SunOS)
 //	GPOS_UNITTEST_STD(CEnumeratorTest),
+//#endif // GPOS_SunOS
 // extended tests
 #ifdef GPOS_FPSIMULATOR
 	GPOS_UNITTEST_EXT(CFSimulatorTestExt),

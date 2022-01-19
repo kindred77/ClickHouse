@@ -94,12 +94,11 @@ CMDAccessorUtils::FCmpExists(CMDAccessor *md_accessor, IMDId *left_mdid,
 	}
 	GPOS_CATCH_EX(ex)
 	{
-		if (GPOS_MATCH_EX(ex, gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound))
-		{
-			GPOS_RESET_EX;
-			return false;
-		}
-		GPOS_RETHROW(ex);
+		GPOS_ASSERT(
+			GPOS_MATCH_EX(ex, gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound));
+		GPOS_RESET_EX;
+
+		return false;
 	}
 	GPOS_CATCH_END;
 }
@@ -168,12 +167,11 @@ CMDAccessorUtils::FCmpOrCastedCmpExists(IMDId *left_mdid, IMDId *right_mdid,
 	}
 	GPOS_CATCH_EX(ex)
 	{
-		if (GPOS_MATCH_EX(ex, gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound))
-		{
-			GPOS_RESET_EX;
-			return false;
-		}
-		GPOS_RETHROW(ex);
+		GPOS_ASSERT(
+			GPOS_MATCH_EX(ex, gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound));
+		GPOS_RESET_EX;
+
+		return false;
 	}
 	GPOS_CATCH_END;
 }
@@ -360,12 +358,11 @@ CMDAccessorUtils::FCastExists(CMDAccessor *md_accessor, IMDId *mdid_src,
 	}
 	GPOS_CATCH_EX(ex)
 	{
-		if (GPOS_MATCH_EX(ex, gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound))
-		{
-			GPOS_RESET_EX;
-			return false;
-		}
-		GPOS_RETHROW(ex);
+		GPOS_ASSERT(
+			GPOS_MATCH_EX(ex, gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound));
+		GPOS_RESET_EX;
+
+		return false;
 	}
 	GPOS_CATCH_END;
 }
@@ -404,12 +401,9 @@ CMDAccessorUtils::FScalarOpReturnsNullOnNullInput(CMDAccessor *md_accessor,
 	}
 	GPOS_CATCH_EX(ex)
 	{
-		if (GPOS_MATCH_EX(ex, gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound))
-		{
-			GPOS_RESET_EX;
-			return false;
-		}
-		GPOS_RETHROW(ex);
+		GPOS_ASSERT(
+			GPOS_MATCH_EX(ex, gpdxl::ExmaMD, gpdxl::ExmiMDCacheEntryNotFound));
+		GPOS_RESET_EX;
 	}
 	GPOS_CATCH_END;
 

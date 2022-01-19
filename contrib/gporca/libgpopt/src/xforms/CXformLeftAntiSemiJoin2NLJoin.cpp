@@ -13,9 +13,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalLeftAntiSemiJoin.h"
-#include "gpopt/operators/CPatternLeaf.h"
-#include "gpopt/operators/CPhysicalLeftAntiSemiNLJoin.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 

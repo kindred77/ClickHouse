@@ -14,8 +14,7 @@
 #include "gpos/base.h"
 
 #include "gpopt/metadata/CTableDescriptor.h"
-#include "gpopt/operators/CLogicalInsert.h"
-#include "gpopt/operators/CPatternLeaf.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 using namespace gpopt;

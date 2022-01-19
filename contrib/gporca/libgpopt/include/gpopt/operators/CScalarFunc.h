@@ -48,6 +48,9 @@ protected:
 	// function stability
 	IMDFunction::EFuncStbl m_efs;
 
+	// function data access
+	IMDFunction::EFuncDataAcc m_efda;
+
 	// can the function return multiple rows?
 	BOOL m_returns_set;
 
@@ -113,7 +116,7 @@ public:
 	virtual CFunctionProp *
 	DeriveFunctionProperties(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 	{
-		return PfpDeriveFromChildren(mp, exprhdl, m_efs,
+		return PfpDeriveFromChildren(mp, exprhdl, m_efs, m_efda,
 									 false /*fHasVolatileFunctionScan*/,
 									 false /*fScan*/);
 	}

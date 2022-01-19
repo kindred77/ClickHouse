@@ -12,7 +12,6 @@
 #define GPOS_CAutoTrace_H
 
 #include "gpos/base.h"
-#include "gpos/common/CStackObject.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/string/CWStringDynamic.h"
 

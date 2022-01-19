@@ -13,10 +13,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalGbAgg.h"
-#include "gpopt/operators/CLogicalInnerJoin.h"
-#include "gpopt/operators/CLogicalSelect.h"
-#include "gpopt/operators/CPatternLeaf.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 

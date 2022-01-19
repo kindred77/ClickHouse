@@ -15,12 +15,20 @@ list(APPEND srcs ${hdrs})
 add_library(naucrates ${srcs})
 
 target_link_libraries(naucrates
-                      ${CMAKE_DL_LIBS}
+                      ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS}
                       gpos
-                      ${XERCES_LIBRARIES})
+                      ${XERCES_LIBRARIES}
+                      ${GPORCA_SOLARIS_EXTRA_LIBS})
 
 # Prevent linker errors from undefined symbols on OSX.
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set_target_properties(naucrates PROPERTIES
                         LINK_FLAGS "-undefined dynamic_lookup")
 endif()
+
+set_target_properties(naucrates PROPERTIES
+                      SOVERSION ${GPORCA_ABI_VERSION}
+                      VERSION ${GPORCA_VERSION_STRING})
+
+install(TARGETS naucrates DESTINATION lib)
+install(DIRECTORY include/naucrates DESTINATION include)

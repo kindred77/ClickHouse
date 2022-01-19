@@ -17,9 +17,6 @@
 
 using namespace gpopt;
 
-FORCE_GENERATE_DBGSTR(CCTEMap);
-FORCE_GENERATE_DBGSTR(CCTEMap::CCTEMapEntry);
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CCTEMap::CCTEMap

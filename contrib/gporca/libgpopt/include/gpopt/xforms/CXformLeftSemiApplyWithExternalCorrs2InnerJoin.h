@@ -15,8 +15,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalInnerJoin.h"
-#include "gpopt/operators/CLogicalLeftSemiApply.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformApply2Join.h"
 #include "gpopt/xforms/CXformUtils.h"
 

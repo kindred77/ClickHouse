@@ -10,7 +10,6 @@
 //---------------------------------------------------------------------------
 #include "unittest/gpopt/xforms/CJoinOrderTest.h"
 
-#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/test/CUnittest.h"
 

@@ -225,8 +225,7 @@ public:
 	{
 		GPOS_ASSERT(NULL != pop);
 		GPOS_ASSERT(EopLogicalGet == pop->Eopid() ||
-					EopLogicalExternalGet == pop->Eopid() ||
-					EopLogicalMultiExternalGet == pop->Eopid());
+					EopLogicalExternalGet == pop->Eopid());
 
 		return dynamic_cast<CLogicalGet *>(pop);
 	}

@@ -53,8 +53,7 @@ CPhysicalScan::CPhysicalScan(CMemoryPool *mp, const CName *pnameAlias,
 	}
 	else
 	{
-		m_pds = CPhysical::PdsCompute(m_mp, ptabdesc, pdrgpcrOutput,
-									  NULL /* gp_segment_id */);
+		m_pds = CPhysical::PdsCompute(m_mp, ptabdesc, pdrgpcrOutput);
 	}
 	ComputeTableStats(m_mp);
 }
@@ -187,21 +186,17 @@ CPhysicalScan::PdsDerive(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 		CDistributionSpecHashed *pdshashed =
 			CDistributionSpecHashed::PdsConvert(m_pds);
 		CDistributionSpecHashed *pdshashedEquiv =
-			CDistributionSpecHashed::TryToCompleteEquivSpec(
-				mp, pdshashed, pexprIndexPred, exprhdl.DeriveOuterReferences());
+			CDistributionSpecHashed::CompleteEquivSpec(mp, pdshashed,
+													   pexprIndexPred);
 
 		if (NULL != pdshashedEquiv)
 		{
 			CExpressionArray *pdrgpexprHashed = pdshashed->Pdrgpexpr();
 			pdrgpexprHashed->AddRef();
-			if (NULL != pdshashed->Opfamilies())
-			{
-				pdshashed->Opfamilies()->AddRef();
-			}
-			CDistributionSpecHashed *pdshashedResult =
-				GPOS_NEW(mp) CDistributionSpecHashed(
-					pdrgpexprHashed, pdshashed->FNullsColocated(),
-					pdshashedEquiv, pdshashed->Opfamilies());
+			CDistributionSpecHashed *pdshashedResult = GPOS_NEW(mp)
+				CDistributionSpecHashed(pdrgpexprHashed,
+										pdshashed->FNullsColocated(),
+										pdshashedEquiv);
 
 			return pdshashedResult;
 		}

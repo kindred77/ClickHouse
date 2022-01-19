@@ -422,17 +422,16 @@ CLogicalSetOp::PcnstrColumn(CMemoryPool *mp, CExpressionHandle &exprhdl,
 
 //---------------------------------------------------------------------------
 //	@function:
-//		CLogicalSetOp::PpcDeriveConstraintSetop
+//		CLogicalSetOp::PpcDeriveConstraintIntersectUnion
 //
 //	@doc:
-//		Derive constraint property for difference, intersect, and union
-//		operators
+//		Derive constraint property for intersect and union operators
 //
 //---------------------------------------------------------------------------
 CPropConstraint *
-CLogicalSetOp::PpcDeriveConstraintSetop(CMemoryPool *mp,
-										CExpressionHandle &exprhdl,
-										BOOL fIntersect) const
+CLogicalSetOp::PpcDeriveConstraintIntersectUnion(CMemoryPool *mp,
+												 CExpressionHandle &exprhdl,
+												 BOOL fIntersect) const
 {
 	const ULONG num_cols = m_pdrgpcrOutput->Size();
 

@@ -35,7 +35,7 @@ class CReqdPropPlan;
 //		Abstract base class for all enforceable properties.
 //
 //---------------------------------------------------------------------------
-class CEnfdProp : public CRefCount, public DbgPrintMixin<CEnfdProp>
+class CEnfdProp : public CRefCount
 {
 public:
 	// Definition of property enforcing type for a given operator.

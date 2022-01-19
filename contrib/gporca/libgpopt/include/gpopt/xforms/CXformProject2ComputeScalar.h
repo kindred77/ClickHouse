@@ -13,7 +13,6 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CExpressionHandle.h"
 #include "gpopt/xforms/CXformImplementation.h"
 
 namespace gpopt

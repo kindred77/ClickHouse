@@ -18,6 +18,7 @@
 #include "naucrates/dxl/CDXLUtils.h"
 #include "naucrates/dxl/operators/CDXLDatumBool.h"
 #include "naucrates/dxl/operators/CDXLScalarConstValue.h"
+#include "naucrates/md/CGPDBTypeHelper.h"
 #include "naucrates/md/CMDIdGPDB.h"
 
 using namespace gpdxl;
@@ -39,17 +40,6 @@ CMDName CMDTypeBoolGPDB::m_mdname(&m_str);
 CMDTypeBoolGPDB::CMDTypeBoolGPDB(CMemoryPool *mp) : m_mp(mp)
 {
 	m_mdid = GPOS_NEW(mp) CMDIdGPDB(GPDB_BOOL_OID);
-	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
-	{
-		m_distr_opfamily = GPOS_NEW(mp) CMDIdGPDB(GPDB_BOOL_OPFAMILY);
-		m_legacy_distr_opfamily =
-			GPOS_NEW(mp) CMDIdGPDB(GPDB_BOOL_LEGACY_OPFAMILY);
-	}
-	else
-	{
-		m_distr_opfamily = NULL;
-		m_legacy_distr_opfamily = NULL;
-	}
 	m_mdid_op_eq = GPOS_NEW(mp) CMDIdGPDB(GPDB_BOOL_EQ_OP);
 	m_mdid_op_neq = GPOS_NEW(mp) CMDIdGPDB(GPDB_BOOL_NEQ_OP);
 	m_mdid_op_lt = GPOS_NEW(mp) CMDIdGPDB(GPDB_BOOL_LT_OP);
@@ -86,8 +76,6 @@ CMDTypeBoolGPDB::CMDTypeBoolGPDB(CMemoryPool *mp) : m_mp(mp)
 CMDTypeBoolGPDB::~CMDTypeBoolGPDB()
 {
 	m_mdid->Release();
-	CRefCount::SafeRelease(m_distr_opfamily);
-	CRefCount::SafeRelease(m_legacy_distr_opfamily);
 	m_mdid_op_eq->Release();
 	m_mdid_op_neq->Release();
 	m_mdid_op_lt->Release();
@@ -193,19 +181,6 @@ IMDId *
 CMDTypeBoolGPDB::MDId() const
 {
 	return m_mdid;
-}
-
-IMDId *
-CMDTypeBoolGPDB::GetDistrOpfamilyMdid() const
-{
-	if (GPOS_FTRACE(EopttraceUseLegacyOpfamilies))
-	{
-		return m_legacy_distr_opfamily;
-	}
-	else
-	{
-		return m_distr_opfamily;
-	}
 }
 
 //---------------------------------------------------------------------------

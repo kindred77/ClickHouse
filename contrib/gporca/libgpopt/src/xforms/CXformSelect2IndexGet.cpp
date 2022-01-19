@@ -13,8 +13,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalGet.h"
-#include "gpopt/operators/CLogicalSelect.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 #include "naucrates/md/CMDIndexGPDB.h"
 #include "naucrates/md/CMDRelationGPDB.h"

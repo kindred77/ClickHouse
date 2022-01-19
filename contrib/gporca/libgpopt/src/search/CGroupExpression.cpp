@@ -20,17 +20,14 @@
 
 #include "gpopt/base/COptimizationContext.h"
 #include "gpopt/base/CUtils.h"
-#include "gpopt/operators/CPhysicalAgg.h"
+#include "gpopt/operators/ops.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
-#include "gpopt/search/CBinding.h"
 #include "gpopt/search/CGroupProxy.h"
 #include "gpopt/xforms/CXformFactory.h"
 #include "gpopt/xforms/CXformUtils.h"
 #include "naucrates/traceflags/traceflags.h"
 
 using namespace gpopt;
-
-FORCE_GENERATE_DBGSTR(CGroupExpression);
 
 #define GPOPT_COSTCTXT_HT_BUCKETS 100
 
@@ -51,7 +48,8 @@ CGroupExpression::CGroupExpression(CMemoryPool *mp, COperator *pop,
 								   CXform::EXformId exfid,
 								   CGroupExpression *pgexprOrigin,
 								   BOOL fIntermediate)
-	: m_id(GPOPT_INVALID_GEXPR_ID),
+	: m_mp(mp),
+	  m_id(GPOPT_INVALID_GEXPR_ID),
 	  m_pgexprDuplicate(NULL),
 	  m_pop(pop),
 	  m_pdrgpgroup(pdrgpgroup),
@@ -1115,7 +1113,14 @@ CGroupExpression::ContainsCircularDependencies()
 
 	GPOS_ASSERT(m_ecirculardependency == CGroupExpression::ecdDefault);
 
-	// check if there are any circular dependencies
+	// if exploration is completed, then the group expression does not have
+	// any circular dependency
+	if (Pgroup()->FExplored())
+	{
+		return false;
+	}
+
+	// we are still in exploration phase, check if there are any circular dependencies
 	CGroupArray *child_groups = Pdrgpgroup();
 	for (ULONG ul = 0; ul < child_groups->Size(); ul++)
 	{
@@ -1210,7 +1215,7 @@ void
 CGroupExpression::DbgPrintWithProperties()
 {
 	CAutoTraceFlag atf(EopttracePrintGroupProperties, true);
-	CAutoTrace at(CTask::Self()->Pmp());
+	CAutoTrace at(m_mp);
 	(void) this->OsPrint(at.Os());
 }
 #endif	// GPOS_DEBUG

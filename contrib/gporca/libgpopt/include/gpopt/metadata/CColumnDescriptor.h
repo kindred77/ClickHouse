@@ -31,8 +31,7 @@ using namespace gpmd;
 //		column descriptor;
 //
 //---------------------------------------------------------------------------
-class CColumnDescriptor : public CRefCount,
-						  public DbgPrintMixin<CColumnDescriptor>
+class CColumnDescriptor : public CRefCount
 {
 private:
 	// type information
@@ -52,9 +51,6 @@ private:
 
 	// width of the column, for instance  char(10) column has width 10
 	ULONG m_width;
-
-	// is the column a distribution col
-	BOOL m_is_dist_col;
 
 public:
 	// ctor
@@ -112,20 +108,6 @@ public:
 	Width() const
 	{
 		return m_width;
-	}
-
-	// is this a distribution column
-	BOOL
-	IsDistCol() const
-	{
-		return m_is_dist_col;
-	}
-
-	// set this column as a distribution column
-	void
-	SetAsDistCol()
-	{
-		m_is_dist_col = true;
 	}
 
 	virtual IOstream &OsPrint(IOstream &os) const;

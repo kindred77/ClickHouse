@@ -19,6 +19,7 @@
 #include "gpopt/operators/CLogical.h"
 #include "gpopt/search/CJobQueue.h"
 #include "gpopt/search/CTreeMap.h"
+#include "naucrates/statistics/CStatistics.h"
 
 #define GPOPT_INVALID_GROUP_ID gpos::ulong_max
 
@@ -70,7 +71,7 @@ enum EOptimizationLevel
 //		Group of equivalent expressions in the Memo structure
 //
 //---------------------------------------------------------------------------
-class CGroup : public CRefCount, public DbgPrintMixin<CGroup>
+class CGroup : public CRefCount
 {
 	friend class CGroupProxy;
 
@@ -180,9 +181,6 @@ private:
 	// join keys for inner child (only for scalar groups) (used by hash & merge joins)
 	CExpressionArray *m_pdrgpexprJoinKeysInner;
 
-	// join op families (only for scalar groups) (used by hash & merge joins)
-	IMdIdArray *m_join_opfamilies;
-
 	// list of group expressions
 	CList<CGroupExpression> m_listGExprs;
 
@@ -270,8 +268,7 @@ private:
 
 	// set hash join keys
 	void SetJoinKeys(CExpressionArray *pdrgpexprOuter,
-					 CExpressionArray *pdrgpexprInner,
-					 IMdIdArray *join_opfamilies);
+					 CExpressionArray *pdrgpexprInner);
 
 	// insert new group expression
 	void Insert(CGroupExpression *pgexpr);
@@ -389,13 +386,6 @@ public:
 	PdrgpexprJoinKeysInner() const
 	{
 		return m_pdrgpexprJoinKeysInner;
-	}
-
-	// join op families
-	IMdIdArray *
-	JoinOpfamilies() const
-	{
-		return m_join_opfamilies;
 	}
 
 	// return a representative cached scalar expression usable for stat derivation etc.

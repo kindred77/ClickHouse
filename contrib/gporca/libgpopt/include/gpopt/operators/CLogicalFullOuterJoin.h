@@ -33,8 +33,7 @@ private:
 
 public:
 	// ctor
-	explicit CLogicalFullOuterJoin(
-		CMemoryPool *mp, CXform::EXformId origin_xform = CXform::ExfSentinel);
+	explicit CLogicalFullOuterJoin(CMemoryPool *mp);
 
 	// dtor
 	virtual ~CLogicalFullOuterJoin()

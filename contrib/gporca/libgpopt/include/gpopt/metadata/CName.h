@@ -13,7 +13,6 @@
 #define GPOPT_CName_H
 
 #include "gpos/base.h"
-#include "gpos/common/DbgPrintMixin.h"
 #include "gpos/string/CWStringConst.h"
 
 #define GPOPT_NAME_QUOTE_BEGIN "\""
@@ -35,7 +34,7 @@ using namespace gpos;
 //		enforced is zero termination of string;
 //
 //---------------------------------------------------------------------------
-class CName : public DbgPrintMixin<CName>
+class CName
 {
 private:
 	// actual name

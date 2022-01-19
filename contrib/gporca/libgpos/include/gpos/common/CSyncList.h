@@ -64,29 +64,70 @@ public:
 	void
 	Push(T *elem)
 	{
-		m_list.Prepend(elem);
+		GPOS_ASSERT(NULL != elem);
+		GPOS_ASSERT(m_list.First() != elem);
+
+		SLink &link = m_list.Link(elem);
+
+#ifdef GPOS_DEBUG
+		void *next_head = link.m_next;
+#endif	// GPOS_DEBUG
+
+		GPOS_ASSERT(NULL == link.m_next);
+
+		T *head = m_list.First();
+
+		GPOS_ASSERT(elem != head && "Element is already inserted");
+		GPOS_ASSERT(next_head == link.m_next &&
+					"Element is concurrently accessed");
+
+		// set current head as next element
+		link.m_next = head;
+#ifdef GPOS_DEBUG
+		next_head = link.m_next;
+#endif	// GPOS_DEBUG
+
+		// set element as head
+		GPOS_ASSERT(m_list.m_head == head);
+		m_list.m_head = elem;
 	}
 
 	// remove element from the head of the list;
 	T *
 	Pop()
 	{
-		if (!m_list.IsEmpty())
-			return m_list.RemoveHead();
-		return NULL;
+		T *old_head = NULL;
+
+		// get current head
+		old_head = m_list.First();
+		if (NULL != old_head)
+		{
+			// second element becomes the new head
+			SLink &link = m_list.Link(old_head);
+			T *new_head = static_cast<T *>(link.m_next);
+
+			GPOS_ASSERT(m_list.m_head == old_head);
+			m_list.m_head = new_head;
+			// reset link
+			link.m_next = NULL;
+		}
+
+		return old_head;
 	}
 
 	// get first element
 	T *
-	PtFirst() const
+	PtFirst()
 	{
+		m_list.m_tail = m_list.m_head;
 		return m_list.First();
 	}
 
 	// get next element
 	T *
-	Next(T *elem) const
+	Next(T *elem)
 	{
+		m_list.m_tail = m_list.m_head;
 		return m_list.Next(elem);
 	}
 
@@ -102,8 +143,9 @@ public:
 	// lookup a given element in the stack
 	// this works only when no elements are removed
 	GPOS_RESULT
-	Find(T *elem) const
+	Find(T *elem)
 	{
+		m_list.m_tail = m_list.m_head;
 		return m_list.Find(elem);
 	}
 

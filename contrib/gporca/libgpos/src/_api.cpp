@@ -44,8 +44,7 @@ const ULONG expected_opt_fallback[] = {
 	gpopt::ExmiUnexpectedOp,
 	gpopt::ExmiUnsatisfiedRequiredProperties,
 	gpopt::ExmiEvalUnsupportedScalarExpr,
-	gpopt::ExmiCTEProducerConsumerMisAligned,
-	gpopt::ExmiNoStats};
+	gpopt::ExmiCTEProducerConsumerMisAligned};
 
 // array of DXL minor exception types that trigger expected fallback to the planner
 // refer naucrates/exception.cpp for explanation of errors

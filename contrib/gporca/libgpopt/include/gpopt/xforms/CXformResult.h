@@ -27,7 +27,7 @@ using namespace gpos;
 //		result container
 //
 //---------------------------------------------------------------------------
-class CXformResult : public CRefCount, public DbgPrintMixin<CXformResult>
+class CXformResult : public CRefCount
 {
 private:
 	// set of alternatives
@@ -61,12 +61,6 @@ public:
 
 	// print function
 	virtual IOstream &OsPrint(IOstream &os) const;
-
-	ULONG
-	Size() const
-	{
-		return m_pdrgpexpr->Size();
-	}
 
 };	// class CXformResult
 

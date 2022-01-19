@@ -140,7 +140,8 @@ public:
 	DeriveFunctionProperties(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 	{
 		return PfpDeriveFromChildren(mp, exprhdl,
-									 IMDFunction::EfsImmutable,	 // efdaDefault
+									 IMDFunction::EfsImmutable,	 // efsDefault
+									 IMDFunction::EfdaNoSQL,	 // efdaDefault
 									 false,	 // fHasVolatileFunctionScan
 									 false	 // fScan
 		);

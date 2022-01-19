@@ -19,8 +19,6 @@
 
 using namespace gpopt;
 
-FORCE_GENERATE_DBGSTR(CIndexDescriptor);
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CIndexDescriptor::CIndexDescriptor
@@ -140,12 +138,6 @@ CIndexDescriptor::Pindexdesc(CMemoryPool *mp, const CTableDescriptor *ptabdesc,
 		mp, pmdindex->MDId(), CName(&strIndexName), pdrgcoldescKey,
 		pdrgcoldescIncluded, pmdindex->IsClustered(), pmdindex->IndexType());
 	return pindexdesc;
-}
-
-BOOL
-CIndexDescriptor::SupportsIndexOnlyScan() const
-{
-	return m_index_type == IMDIndex::EmdindBtree;
 }
 
 //---------------------------------------------------------------------------

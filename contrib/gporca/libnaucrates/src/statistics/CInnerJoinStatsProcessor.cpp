@@ -11,6 +11,8 @@
 
 #include "naucrates/statistics/CInnerJoinStatsProcessor.h"
 
+#include "gpopt/operators/ops.h"
+
 using namespace gpmd;
 
 // return statistics object after performing inner join

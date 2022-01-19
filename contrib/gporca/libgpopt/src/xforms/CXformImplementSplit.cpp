@@ -14,9 +14,7 @@
 #include "gpos/base.h"
 
 #include "gpopt/metadata/CTableDescriptor.h"
-#include "gpopt/operators/CLogicalSplit.h"
-#include "gpopt/operators/CPatternLeaf.h"
-#include "gpopt/operators/CPhysicalSplit.h"
+#include "gpopt/operators/ops.h"
 
 using namespace gpopt;
 

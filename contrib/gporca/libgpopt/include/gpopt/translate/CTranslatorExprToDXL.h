@@ -50,8 +50,9 @@ using namespace gpdxl;
 using namespace gpnaucrates;
 
 // hash map mapping CColRef -> CDXLNode
-typedef CHashMap<CColRef, CDXLNode, CColRef::HashValue, CColRef::Equals,
-				 CleanupNULL<CColRef>, CleanupRelease<CDXLNode> >
+typedef CHashMap<CColRef, CDXLNode, gpos::HashValue<CColRef>,
+				 gpos::Equals<CColRef>, CleanupNULL<CColRef>,
+				 CleanupRelease<CDXLNode> >
 	ColRefToDXLNodeMap;
 
 //---------------------------------------------------------------------------
@@ -174,16 +175,6 @@ private:
 							 CColRefArray *colref_array,
 							 CDistributionSpecArray *pdrgpdsBaseTables,
 							 ULONG *pulNonGatherMotions, BOOL *pfDML);
-
-	CDXLNode *PdxlnIndexOnlyScan(CExpression *pexprIndexScan,
-								 CColRefArray *colref_array,
-								 CDistributionSpecArray *pdrgpdsBaseTables,
-								 ULONG *pulNonGatherMotions, BOOL *pfDML);
-
-	CDXLNode *PdxlnIndexOnlyScan(CExpression *pexprIndexScan,
-								 CColRefArray *colref_array,
-								 CDXLPhysicalProperties *dxl_properties,
-								 CReqdPropPlan *prpp);
 
 	// translate a bitmap index probe expression to DXL
 	CDXLNode *PdxlnBitmapIndexProbe(CExpression *pexprBitmapIndexProbe);
@@ -391,14 +382,6 @@ private:
 									CDistributionSpecArray *pdrgpdsBaseTables,
 									ULONG *pulNonGatherMotions, BOOL *pfDML);
 
-	// translate a multi external scan to multiple external scans
-	CDXLNode *PdxlnMultiExternalScan(CExpression *pexprTblScan,
-									 CColRefSet *pcrsOutput,
-									 CColRefArray *colref_array,
-									 CDistributionSpecArray *pdrgpdsBaseTables,
-									 CExpression *pexprScalarCond,
-									 CDXLPhysicalProperties *dxl_properties);
-
 	// translate a const table get into a result node
 	CDXLNode *PdxlnResultFromConstTableGet(
 		CExpression *pexprCTG, CColRefArray *colref_array,
@@ -448,21 +431,12 @@ private:
 		BOOL *pfDML, CExpression *pexprScalarCond,
 		CDXLPhysicalProperties *dxl_properties);
 
-	// construct a part eq filter list for fast pass
-	CDXLNode *PdxlPartEqFilterList(CExpression *pexpr);
-
-	// construct a part filter list with all children being scalar const true
-	CDXLNode *PdxlnPartFilterListDummy(CExpression *pexpr);
-
-	// construct a part eq filter elem list for the given partition level
-	CDXLNode *PdxlnPartEqFilterElemList(
-		CExpression *pexpr, bool fEqFilter, ULONG level,
-		CPhysicalPartitionSelector *popSelector);
+	// translate partition filter list
+	CDXLNode *PdxlnPartFilterList(CExpression *pexpr, BOOL fEqFilters);
 
 	// check whether the given partition selector only has equality filters
-	// or no filters on all partitioning levels. If fCheckGeneralFilters is
-	// true, returns true if content of general filter is disjunction of ident
-	// equality filters
+	// or no filters on all partitioning levels. return false if it has
+	// non-equality filters.
 	BOOL FEqPartFiltersAllLevels(CExpression *pexpr, BOOL fCheckGeneralFilters);
 
 	// translate a filter-based partition selector
@@ -488,20 +462,24 @@ private:
 	// comparison type flags accordingly
 	CDXLNode *PdxlnPredOnPartKey(CExpression *pexprPred, CColRef *pcrPartKey,
 								 IMDId *pmdidTypePartKey, ULONG ulPartLevel,
-								 BOOL fRangePart);
+								 BOOL fRangePart, BOOL *pfLTComparison,
+								 BOOL *pfGTComparison, BOOL *pfEQComparison);
 
 	// translate a conjunctive or disjunctive predicate on a part key and update the various
 	// comparison type flags accordingly
 	CDXLNode *PdxlnConjDisjOnPartKey(CExpression *pexprPred,
 									 CColRef *pcrPartKey,
 									 IMDId *pmdidTypePartKey, ULONG ulPartLevel,
-									 BOOL fRangePart);
+									 BOOL fRangePart, BOOL *pfLTComparison,
+									 BOOL *pfGTComparison,
+									 BOOL *pfEQComparison);
 
 	// translate a scalar comparison on a part key and update the various
 	// comparison type flags accordingly
 	CDXLNode *PdxlnScCmpPartKey(CExpression *pexprScCmp, CColRef *pcrPartKey,
 								IMDId *pmdidTypePartKey, ULONG ulPartLevel,
-								BOOL fRangePart);
+								BOOL fRangePart, BOOL *pfLTComparison,
+								BOOL *pfGTComparison, BOOL *pfEQComparison);
 
 	// translate a scalar null test on a part key
 	CDXLNode *PdxlnScNullTestPartKey(IMDId *pmdidTypePartKey, ULONG ulPartLevel,
@@ -518,7 +496,11 @@ private:
 	CDXLNode *PdxlArrayExprOnPartKey(CExpression *pexprPred,
 									 CColRef *pcrPartKey,
 									 IMDId *pmdidTypePartKey, ULONG ulPartLevel,
-									 BOOL fRangePart);
+									 BOOL fRangePart,
+									 BOOL *pfLTComparison,	// input/output
+									 BOOL *pfGTComparison,	// input/output
+									 BOOL *pfEQComparison	// input/output
+	);
 
 	// translate a DML operator
 	CDXLNode *PdxlnDML(CExpression *pexpr, CColRefArray *colref_array,
@@ -683,8 +665,7 @@ private:
 	CDXLNode *GetSortColListDXL(CExpression *pexprMotion);
 
 	// create a DXL hash expr list from an array of hash columns
-	CDXLNode *PdxlnHashExprList(const CExpressionArray *pdrgpexpr,
-								const IMdIdArray *opfamilies);
+	CDXLNode *PdxlnHashExprList(const CExpressionArray *pdrgpexpr);
 
 	// create a DXL filter node with the given scalar expression
 	CDXLNode *PdxlnFilter(CDXLNode *pdxlnCond);

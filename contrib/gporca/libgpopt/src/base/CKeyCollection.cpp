@@ -17,8 +17,6 @@
 
 using namespace gpopt;
 
-FORCE_GENERATE_DBGSTR(CKeyCollection);
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CKeyCollection::CKeyCollection

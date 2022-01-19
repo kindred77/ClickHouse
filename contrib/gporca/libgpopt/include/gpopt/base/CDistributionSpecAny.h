@@ -15,11 +15,13 @@
 #include "gpos/base.h"
 
 #include "gpopt/base/CDistributionSpec.h"
-#include "gpopt/operators/COperator.h"
+#include "gpopt/operators/CPhysical.h"
 
 namespace gpopt
 {
 using namespace gpos;
+
+class CPhysical;
 
 //---------------------------------------------------------------------------
 //	@class:

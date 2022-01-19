@@ -19,17 +19,39 @@
 
 #include "gpopt/base/CColRefSetIter.h"
 #include "gpopt/base/CDrvdPropScalar.h"
-#include "gpopt/operators/CLogicalInnerJoin.h"
-#include "gpopt/operators/CLogicalJoin.h"
-#include "gpopt/operators/CLogicalLeftOuterJoin.h"
 #include "gpopt/operators/CPredicateUtils.h"
+#include "gpopt/operators/ops.h"
 
 
 using namespace gpopt;
 
-FORCE_GENERATE_DBGSTR(CJoinOrder);
-FORCE_GENERATE_DBGSTR(CJoinOrder::SEdge);
-FORCE_GENERATE_DBGSTR(CJoinOrder::SComponent);
+
+//---------------------------------------------------------------------------
+//	@function:
+//		ICmpEdgesByLength
+//
+//	@doc:
+//		Comparison function for simple join ordering: sort edges by length
+//		only to guaranteed that single-table predicates don't end up above
+//		joins;
+//
+//---------------------------------------------------------------------------
+INT
+ICmpEdgesByLength(const void *pvOne, const void *pvTwo)
+{
+	CJoinOrder::SEdge *pedgeOne = *(CJoinOrder::SEdge **) pvOne;
+	CJoinOrder::SEdge *pedgeTwo = *(CJoinOrder::SEdge **) pvTwo;
+
+
+	INT iDiff = (pedgeOne->m_pbs->Size() - pedgeTwo->m_pbs->Size());
+	if (0 == iDiff)
+	{
+		return (INT) pedgeOne->m_pbs->HashValue() -
+			   (INT) pedgeTwo->m_pbs->HashValue();
+	}
+
+	return iDiff;
+}
 
 
 // ctor
@@ -517,8 +539,7 @@ CJoinOrder::PcompCombine(SComponent *comp1, SComponent *comp2)
 			CExpression *loj_predicate =
 				CPredicateUtils::PexprConjunction(m_mp, loj_conjuncts);
 			pexpr = CUtils::PexprLogicalJoin<CLogicalLeftOuterJoin>(
-				m_mp, pexprLeft, pexprRight, loj_predicate,
-				this->EOriginXForm());
+				m_mp, pexprLeft, pexprRight, loj_predicate);
 
 			// remaining predicates are place on top as a filter
 			CExpression *filter_predicate =
@@ -564,8 +585,7 @@ CJoinOrder::PcompCombine(SComponent *comp1, SComponent *comp2)
 			CExpression *predicate =
 				CPredicateUtils::PexprConjunction(m_mp, loj_conjuncts);
 			pexpr = CUtils::PexprLogicalJoin<CLogicalInnerJoin>(
-				m_mp, pexprChild1, pexprChild2, predicate,
-				this->EOriginXForm());
+				m_mp, pexprChild1, pexprChild2, predicate);
 		}
 	}
 	// if the component has parent_loj_id > 0, it must be the left child or has the left child

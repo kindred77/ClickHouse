@@ -19,7 +19,6 @@
 #include "gpopt/operators/CPredicateUtils.h"
 #include "gpopt/operators/ops.h"
 #include "naucrates/md/CMDIdGPDB.h"
-#include "naucrates/md/IMDTypeBool.h"
 
 using namespace gpopt;
 

@@ -15,6 +15,7 @@
 #include "gpos/base.h"
 
 #include "gpopt/base/CConstraint.h"
+#include "gpopt/base/CRange.h"
 
 namespace gpopt
 {

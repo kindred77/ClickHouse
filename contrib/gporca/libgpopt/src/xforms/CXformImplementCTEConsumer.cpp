@@ -13,8 +13,8 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalCTEConsumer.h"
-#include "gpopt/operators/CPhysicalCTEConsumer.h"
+#include "gpopt/metadata/CTableDescriptor.h"
+#include "gpopt/operators/ops.h"
 
 using namespace gpopt;
 

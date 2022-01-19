@@ -13,9 +13,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/CLogicalRowTrigger.h"
-#include "gpopt/operators/CPatternLeaf.h"
-#include "gpopt/operators/CPhysicalRowTrigger.h"
+#include "gpopt/operators/ops.h"
 
 using namespace gpopt;
 
