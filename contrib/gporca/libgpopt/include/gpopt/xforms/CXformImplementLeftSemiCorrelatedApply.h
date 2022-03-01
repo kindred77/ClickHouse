@@ -14,6 +14,8 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/CLogicalLeftSemiCorrelatedApply.h"
+#include "gpopt/operators/CPhysicalCorrelatedLeftSemiNLJoin.h"
 #include "gpopt/xforms/CXformImplementCorrelatedApply.h"
 
 namespace gpopt

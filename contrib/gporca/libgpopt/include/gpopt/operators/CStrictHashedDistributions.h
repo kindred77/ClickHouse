@@ -9,7 +9,6 @@
 #include "gpopt/base/CColRef.h"
 #include "gpopt/base/CDistributionSpec.h"
 #include "gpopt/base/CDistributionSpecStrictHashed.h"
-#include "gpopt/base/CUtils.h"
 
 namespace gpopt
 {

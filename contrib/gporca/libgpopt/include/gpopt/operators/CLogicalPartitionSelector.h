@@ -14,7 +14,6 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/base/CUtils.h"
 #include "gpopt/operators/CLogical.h"
 
 

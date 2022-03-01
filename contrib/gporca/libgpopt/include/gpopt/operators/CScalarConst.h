@@ -17,7 +17,6 @@
 #include "gpopt/base/CDrvdProp.h"
 #include "gpopt/operators/CScalar.h"
 #include "naucrates/base/IDatum.h"
-#include "naucrates/md/CMDTypeBoolGPDB.h"
 
 namespace gpopt
 {

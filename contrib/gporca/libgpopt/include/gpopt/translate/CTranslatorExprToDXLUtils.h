@@ -13,10 +13,10 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/base/CRange.h"
 #include "gpopt/mdcache/CMDAccessor.h"
 #include "gpopt/metadata/CTableDescriptor.h"
 #include "gpopt/operators/CExpression.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/translate/CTranslatorExprToDXL.h"
 #include "naucrates/dxl/operators/CDXLColDescr.h"
 #include "naucrates/dxl/operators/CDXLNode.h"
@@ -218,12 +218,6 @@ public:
 		IMDId *pmdidTypeCastExpr, IMDId *mdid_cast_func, ULONG ulPartLevel,
 		ULONG fLowerBound, IMDType::ECmpType cmp_type);
 
-	// construct predicates to cover the cases of default partition and
-	// open-ended partitions if necessary
-	static CDXLNode *PdxlnRangeFilterDefaultAndOpenEnded(
-		CMemoryPool *mp, ULONG ulPartLevel, BOOL fLTComparison,
-		BOOL fGTComparison, BOOL fEQComparison, BOOL fDefaultPart);
-
 	// construct a test for partial scan in the partial partition propagator
 	static CDXLNode *PdxlnPartialScanTest(CMemoryPool *mp,
 										  CMDAccessor *md_accessor,
@@ -348,9 +342,9 @@ public:
 	// is the aggregate a local hash aggregate that is safe to stream
 	static BOOL FLocalHashAggStreamSafe(CExpression *pexprAgg);
 
-	// if operator is a scalar cast, extract cast type and function
-	static void ExtractCastMdids(COperator *pop, IMDId **ppmdidType,
-								 IMDId **ppmdidCastFunc);
+	// if operator is a scalar cast or func allowed for Partition selection, extract type and function
+	static void ExtractCastFuncMdids(COperator *pop, IMDId **ppmdidType,
+									 IMDId **ppmdidCastFunc);
 
 	// produce DXL representation of a datum
 	static CDXLDatum *

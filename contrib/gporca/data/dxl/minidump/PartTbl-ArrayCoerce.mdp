@@ -13,7 +13,7 @@ select * from pt where gender in ( 'F', 'FM');
   <dxl:Thread Id="0">
     <dxl:OptimizerConfig>
       <dxl:EnumeratorConfig Id="0" PlanSamples="0" CostThreshold="0"/>
-      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000"/>
+      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000" MaxStatsBuckets="100"/>
       <dxl:CTEConfig CTEInliningCutoff="0"/> 
       <dxl:WindowOids RowNumber="7000" Rank="7001"/>
       <dxl:CostModelConfig CostModelType="1" SegmentsForCosting="3">
@@ -91,7 +91,7 @@ select * from pt where gender in ( 'F', 'FM');
         <dxl:IndexInfoList/>
         <dxl:Triggers/>
         <dxl:CheckConstraints/>
-        <dxl:PartConstraint DefaultPartition="0" Unbounded="true">
+        <dxl:PartConstraint DefaultPartition="0" Unbounded="true" ExprAbsent="true">
         </dxl:PartConstraint>
       </dxl:Relation>
       <dxl:Type Mdid="0.23.1.0" Name="int4" IsRedistributable="true" IsHashable="true" IsMergeJoinable="true" IsComposite="false" IsFixedLength="true" Length="4" PassByValue="true">
@@ -275,33 +275,17 @@ select * from pt where gender in ( 'F', 'FM');
             </dxl:Properties>
             <dxl:ProjList/>
             <dxl:PartEqFilters>
-              <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
+              <dxl:PartEqFilterElems>
+                <dxl:Cast TypeMdid="0.25.1.0" FuncId="0.0.0.0">
+                  <dxl:ConstValue TypeMdid="0.1043.1.0" Value="AAAABUY=" LintValue="160743980"/>
+                </dxl:Cast>
+                <dxl:Cast TypeMdid="0.25.1.0" FuncId="0.0.0.0">
+                  <dxl:ConstValue TypeMdid="0.1043.1.0" Value="AAAABkZN" LintValue="689808164"/>
+                </dxl:Cast>
+              </dxl:PartEqFilterElems>
             </dxl:PartEqFilters>
             <dxl:PartFilters>
-              <dxl:Or>
-                <dxl:Or>
-                  <dxl:ArrayComp OperatorName="=" OperatorMdid="0.98.1.0" OperatorType="Any">
-                    <dxl:Cast TypeMdid="0.25.1.0" FuncId="0.0.0.0">
-                      <dxl:ConstValue TypeMdid="0.1043.1.0" Value="AAAABUY=" LintValue="160743980"/>
-                    </dxl:Cast>
-                    <dxl:ArrayCoerceExpr ElementFunc="0.0.0.0" TypeMdid="0.1009.1.0" IsExplicit="true" CoercionForm="3" Location="-1">
-                      <dxl:PartListValues Level="0" ResultType="0.1015.1.0" ElementType="0.1043.1.0"/>
-                    </dxl:ArrayCoerceExpr>
-                  </dxl:ArrayComp>
-                  <dxl:DefaultPart Level="0"/>
-                </dxl:Or>
-                <dxl:Or>
-                  <dxl:ArrayComp OperatorName="=" OperatorMdid="0.98.1.0" OperatorType="Any">
-                    <dxl:Cast TypeMdid="0.25.1.0" FuncId="0.0.0.0">
-                      <dxl:ConstValue TypeMdid="0.1043.1.0" Value="AAAABkZN" LintValue="689808164"/>
-                    </dxl:Cast>
-                    <dxl:ArrayCoerceExpr ElementFunc="0.0.0.0" TypeMdid="0.1009.1.0" IsExplicit="true" CoercionForm="3" Location="-1">
-                      <dxl:PartListValues Level="0" ResultType="0.1015.1.0" ElementType="0.1043.1.0"/>
-                    </dxl:ArrayCoerceExpr>
-                  </dxl:ArrayComp>
-                  <dxl:DefaultPart Level="0"/>
-                </dxl:Or>
-              </dxl:Or>
+              <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
             </dxl:PartFilters>
             <dxl:ResidualFilter>
               <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>

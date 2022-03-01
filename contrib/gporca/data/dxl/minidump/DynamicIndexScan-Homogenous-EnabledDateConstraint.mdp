@@ -3,10 +3,10 @@
   <dxl:Thread Id="0">
     <dxl:OptimizerConfig>
       <dxl:EnumeratorConfig Id="1" PlanSamples="0" CostThreshold="0"/>
-      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000"/>
+      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.000000" DampingFactorGroupBy="0.750000" MaxStatsBuckets="100"/>
       <dxl:CTEConfig CTEInliningCutoff="0"/> 
       <dxl:WindowOids RowNumber="7000" Rank="7001"/>
-      <dxl:TraceFlags Value="103027,101001,101013,103001"/>
+      <dxl:TraceFlags Value="101001,101013,102001,102002,102003,102144,103001,103027,103033"/>
     </dxl:OptimizerConfig>
     <dxl:Metadata SystemIds="0.GPDB">
       <dxl:Type Mdid="0.16.1.0" Name="bool" IsRedistributable="true" IsHashable="true" IsMergeJoinable="true" IsComposite="false" IsFixedLength="true" Length="1" PassByValue="true">
@@ -146,21 +146,21 @@
             <dxl:And>
               <dxl:Comparison ComparisonOperator="&gt;=" OperatorMdid="0.1098.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="HxEAAA==" DoubleValue="378691200000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="HxEAAA==" LintValue="4383"/>
               </dxl:Comparison>
               <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.1095.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1BEAAA==" DoubleValue="394329600000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1BEAAA==" LintValue="4564"/>
               </dxl:Comparison>
             </dxl:And>
             <dxl:And>
               <dxl:Comparison ComparisonOperator="&gt;=" OperatorMdid="0.1098.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1REAAA==" DoubleValue="394416000000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1REAAA==" LintValue="4565"/>
               </dxl:Comparison>
               <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.1095.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="jBIAAA==" DoubleValue="410227200000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="jBIAAA==" LintValue="4748"/>
               </dxl:Comparison>
             </dxl:And>
           </dxl:Or>
@@ -226,21 +226,21 @@
             <dxl:And>
               <dxl:Comparison ComparisonOperator="&gt;=" OperatorMdid="0.1098.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="HxEAAA==" DoubleValue="378691200000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="HxEAAA==" LintValue="4383"/>
               </dxl:Comparison>
               <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.1095.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1BEAAA==" DoubleValue="394329600000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1BEAAA==" LintValue="4564"/>
               </dxl:Comparison>
             </dxl:And>
             <dxl:And>
               <dxl:Comparison ComparisonOperator="&gt;=" OperatorMdid="0.1098.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1REAAA==" DoubleValue="394416000000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1REAAA==" LintValue="4565"/>
               </dxl:Comparison>
               <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.1095.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="jBIAAA==" DoubleValue="410227200000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="jBIAAA==" LintValue="4748"/>
               </dxl:Comparison>
             </dxl:And>
           </dxl:Or>
@@ -253,7 +253,7 @@
       <dxl:ColumnStatistics Mdid="1.310650.1.1.0" Name="id" Width="8.000000"/>
       <dxl:ColumnStatistics Mdid="1.310650.1.1.1" Name="ship_date" Width="8.000000"/>
       <dxl:RelationStatistics Mdid="2.310650.1.1" Name="test_orders" Rows="0.000000"/>
-      <dxl:Relation Mdid="0.310650.1.1" Name="test_orders" IsTemporary="false" HasOids="false" StorageType="Heap" DistributionPolicy="Hash" DistributionColumns="0" Keys="9,3" PartitionColumns="1">
+      <dxl:Relation Mdid="0.310650.1.1" Name="test_orders" IsTemporary="false" HasOids="false" StorageType="Heap" DistributionPolicy="Hash" DistributionColumns="0" Keys="9,3" PartitionColumns="1" PartitionTypes="r">
         <dxl:Columns>
           <dxl:Column Name="id" Attno="1" Mdid="0.23.1.0" Nullable="true" ColWidth="4">
             <dxl:DefaultValue/>
@@ -297,21 +297,21 @@
             <dxl:And>
               <dxl:Comparison ComparisonOperator="&gt;=" OperatorMdid="0.1098.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="HxEAAA==" DoubleValue="378691200000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="HxEAAA==" LintValue="4383"/>
               </dxl:Comparison>
               <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.1095.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1BEAAA==" DoubleValue="394329600000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1BEAAA==" LintValue="4564"/>
               </dxl:Comparison>
             </dxl:And>
             <dxl:And>
               <dxl:Comparison ComparisonOperator="&gt;=" OperatorMdid="0.1098.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1REAAA==" DoubleValue="394416000000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="1REAAA==" LintValue="4565"/>
               </dxl:Comparison>
               <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.1095.1.0">
                 <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="jBIAAA==" DoubleValue="410227200000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="jBIAAA==" LintValue="4748"/>
               </dxl:Comparison>
             </dxl:And>
           </dxl:Or>
@@ -328,7 +328,7 @@
       <dxl:LogicalSelect>
         <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
           <dxl:Ident ColId="2" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-          <dxl:ConstValue TypeMdid="0.1082.1.0" Value="PxEAAA==" DoubleValue="381456000000000"/>
+          <dxl:ConstValue TypeMdid="0.1082.1.0" Value="PxEAAA==" LintValue="4415"/>
         </dxl:Comparison>
         <dxl:LogicalGet>
           <dxl:TableDescriptor Mdid="0.310650.1.1" TableName="test_orders">
@@ -351,7 +351,7 @@
     <dxl:Plan Id="1" SpaceSize="3">
       <dxl:GatherMotion InputSegments="0,1" OutputSegments="-1">
         <dxl:Properties>
-          <dxl:Cost StartupCost="0" TotalCost="3.382161" Rows="1.000000" Width="20"/>
+          <dxl:Cost StartupCost="0" TotalCost="6.000292" Rows="1.000000" Width="20"/>
         </dxl:Properties>
         <dxl:ProjList>
           <dxl:ProjElem ColId="0" Alias="id">
@@ -368,7 +368,7 @@
         <dxl:SortingColumnList/>
         <dxl:Sequence>
           <dxl:Properties>
-            <dxl:Cost StartupCost="0" TotalCost="0.333333" Rows="1.000000" Width="20"/>
+            <dxl:Cost StartupCost="0" TotalCost="6.000167" Rows="1.000000" Width="20"/>
           </dxl:Properties>
           <dxl:ProjList>
             <dxl:ProjElem ColId="0" Alias="id">
@@ -387,7 +387,9 @@
             </dxl:Properties>
             <dxl:ProjList/>
             <dxl:PartEqFilters>
-              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="PxEAAA==" DoubleValue="381456000000000.000000"/>
+              <dxl:PartEqFilterElems>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="PxEAAA==" LintValue="4415"/>
+              </dxl:PartEqFilterElems>
             </dxl:PartEqFilters>
             <dxl:PartFilters>
               <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
@@ -401,13 +403,13 @@
             <dxl:PrintableFilter>
               <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                 <dxl:Ident ColId="1" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="PxEAAA==" DoubleValue="381456000000000.000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="PxEAAA==" LintValue="4415"/>
               </dxl:Comparison>
             </dxl:PrintableFilter>
           </dxl:PartitionSelector>
           <dxl:DynamicIndexScan IndexScanDirection="Forward" PartIndexId="1">
             <dxl:Properties>
-              <dxl:Cost StartupCost="0" TotalCost="0.333333" Rows="1.000000" Width="20"/>
+              <dxl:Cost StartupCost="0" TotalCost="6.000167" Rows="1.000000" Width="20"/>
             </dxl:Properties>
             <dxl:ProjList>
               <dxl:ProjElem ColId="0" Alias="id">
@@ -424,7 +426,7 @@
             <dxl:IndexCondList>
               <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                 <dxl:Ident ColId="1" ColName="ship_date" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="PxEAAA==" DoubleValue="381456000000000.000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="PxEAAA==" LintValue="4415"/>
               </dxl:Comparison>
             </dxl:IndexCondList>
             <dxl:IndexDescriptor Mdid="0.310765.1.0" IndexName="ord_ind_1_prt_orders_1"/>

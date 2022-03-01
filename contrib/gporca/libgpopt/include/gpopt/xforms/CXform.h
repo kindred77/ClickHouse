@@ -17,9 +17,8 @@
 #include "gpos/common/CEnumSetIter.h"
 #include "gpos/common/CRefCount.h"
 
-#include "gpopt/base/CUtils.h"
 #include "gpopt/operators/CExpression.h"
-#include "gpopt/operators/CPhysicalHashJoin.h"
+#include "gpopt/operators/CPhysical.h"
 #include "gpopt/xforms/CXform.h"
 #include "gpopt/xforms/CXformContext.h"
 #include "gpopt/xforms/CXformResult.h"
@@ -45,7 +44,7 @@ using namespace gpos;
 //		base class for all transformations
 //
 //---------------------------------------------------------------------------
-class CXform : public CRefCount
+class CXform : public CRefCount, public DbgPrintMixin<CXform>
 {
 private:
 	// pattern
@@ -89,8 +88,8 @@ public:
 		ExfGbAgg2Apply,
 		ExfSubqJoin2Apply,
 		ExfSubqNAryJoin2Apply,
-		ExfInnerJoin2IndexGetApply,
-		ExfInnerJoin2DynamicIndexGetApply,
+		ExfInnerJoin2IndexGetApply____removed,
+		ExfInnerJoin2DynamicIndexGetApply____removed,
 		ExfInnerApplyWithOuterKey2InnerJoin,
 		ExfInnerJoin2NLJoin,
 		ExfImplementIndexApply,
@@ -193,30 +192,38 @@ public:
 		ExfLeftSemiApplyIn2LeftSemiJoin,
 		ExfLeftSemiApplyInWithExternalCorrs2InnerJoin,
 		ExfLeftSemiApplyIn2LeftSemiJoinNoCorrelations,
-		ExfInnerJoin2BitmapIndexGetApply,
+		ExfInnerJoin2BitmapIndexGetApply____removed,
 		ExfImplementPartitionSelector,
 		ExfMaxOneRow2Assert,
-		ExfInnerJoinWithInnerSelect2IndexGetApply,
-		ExfInnerJoinWithInnerSelect2DynamicIndexGetApply,
+		ExfInnerJoinWithInnerSelect2IndexGetApply____removed,
+		ExfInnerJoinWithInnerSelect2DynamicIndexGetApply____removed,
 		ExfInnerJoinWithInnerSelect2PartialDynamicIndexGetApply,
-		ExfInnerJoin2DynamicBitmapIndexGetApply,
-		ExfInnerJoinWithInnerSelect2BitmapIndexGetApply,
-		ExfInnerJoinWithInnerSelect2DynamicBitmapIndexGetApply,
+		ExfInnerJoin2DynamicBitmapIndexGetApply____removed,
+		ExfInnerJoinWithInnerSelect2BitmapIndexGetApply____removed,
+		ExfInnerJoinWithInnerSelect2DynamicBitmapIndexGetApply____removed,
 		ExfGbAggWithMDQA2Join,
 		ExfCollapseProject,
 		ExfRemoveSubqDistinct,
-		ExfLeftOuterJoin2BitmapIndexGetApply,
-		ExfLeftOuterJoin2IndexGetApply,
-		ExfLeftOuterJoinWithInnerSelect2BitmapIndexGetApply,
-		ExfLeftOuterJoinWithInnerSelect2IndexGetApply,
+		ExfLeftOuterJoin2BitmapIndexGetApply____removed,
+		ExfLeftOuterJoin2IndexGetApply____removed,
+		ExfLeftOuterJoinWithInnerSelect2BitmapIndexGetApply____removed,
+		ExfLeftOuterJoinWithInnerSelect2IndexGetApply____removed,
 		ExfExpandNAryJoinGreedy,
 		ExfEagerAgg,
 		ExfExpandNAryJoinDPv2,
 		ExfImplementFullOuterMergeJoin,
-		ExfLeftOuterJoin2DynamicBitmapIndexGetApply,
-		ExfLeftOuterJoin2DynamicIndexGetApply,
-		ExfLeftOuterJoinWithInnerSelect2DynamicBitmapIndexGetApply,
-		ExfLeftOuterJoinWithInnerSelect2DynamicIndexGetApply,
+		ExfLeftOuterJoin2DynamicBitmapIndexGetApply____removed,
+		ExfLeftOuterJoin2DynamicIndexGetApply____removed,
+		ExfLeftOuterJoinWithInnerSelect2DynamicBitmapIndexGetApply____removed,
+		ExfLeftOuterJoinWithInnerSelect2DynamicIndexGetApply____removed,
+		ExfIndexGet2IndexOnlyScan,
+		ExfJoin2BitmapIndexGetApply,
+		ExfJoin2IndexGetApply,
+		ExfMultiExternalGet2MultiExternalScan,
+		ExfExpandDynamicGetWithExternalPartitions,
+		ExfLeftJoin2RightJoin,
+		ExfRightOuterJoin2HashJoin,
+		ExfImplementInnerJoin,
 		ExfInvalid,
 		ExfSentinel = ExfInvalid
 	};

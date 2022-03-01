@@ -35,6 +35,8 @@ private:
 	// array of distribution expressions
 	CExpressionArray *m_pdrgpexpr;
 
+	IMdIdArray *m_opfamilies;
+
 	// are NULLS consistently distributed
 	BOOL m_fNullsColocated;
 
@@ -70,19 +72,29 @@ private:
 	BOOL FMatchHashedDistribution(
 		const CDistributionSpecHashed *pdshashed) const;
 
+	BOOL FDistributionSpecHashedOnlyOnGpSegmentId() const;
+
 	// private copy ctor
 	CDistributionSpecHashed(const CDistributionSpecHashed &);
 
 public:
 	// ctor
-	CDistributionSpecHashed(CExpressionArray *pdrgpexpr, BOOL fNullsColocated);
+	CDistributionSpecHashed(CExpressionArray *pdrgpexpr, BOOL fNullsColocated,
+							IMdIdArray *opfamilies = NULL);
 
 	// ctor
 	CDistributionSpecHashed(CExpressionArray *pdrgpexpr, BOOL fNullsColocated,
-							CDistributionSpecHashed *pdshashedEquiv);
+							CDistributionSpecHashed *pdshashedEquiv,
+							IMdIdArray *opfamilies = NULL);
+
+	static CDistributionSpecHashed *MakeHashedDistrSpec(
+		CMemoryPool *mp, CExpressionArray *pdrgpexpr, BOOL fNullsColocated,
+		CDistributionSpecHashed *pdshashedEquiv, IMdIdArray *opfamilies);
 
 	// dtor
 	virtual ~CDistributionSpecHashed();
+
+	void PopulateDefaultOpfamilies();
 
 	// distribution type accessor
 	virtual EDistributionType
@@ -116,6 +128,12 @@ public:
 	PdshashedEquiv() const
 	{
 		return m_pdshashedEquiv;
+	}
+
+	IMdIdArray *
+	Opfamilies() const
+	{
+		return m_opfamilies;
 	}
 
 	// columns used by distribution expressions
@@ -220,9 +238,9 @@ public:
 	BOOL HasCompleteEquivSpec(CMemoryPool *mp);
 
 	// use given predicates to complete an incomplete spec, if possible
-	static CDistributionSpecHashed *CompleteEquivSpec(
+	static CDistributionSpecHashed *TryToCompleteEquivSpec(
 		CMemoryPool *mp, CDistributionSpecHashed *pdshashed,
-		CExpression *pexprPred);
+		CExpression *pexprPred, CColRefSet *outerRefs);
 };	// class CDistributionSpecHashed
 
 }  // namespace gpopt

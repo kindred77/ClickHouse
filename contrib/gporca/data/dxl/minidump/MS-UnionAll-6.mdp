@@ -3,7 +3,7 @@
   <dxl:Thread Id="0">
     <dxl:OptimizerConfig>
       <dxl:EnumeratorConfig Id="0" PlanSamples="0" CostThreshold="0"/>
-      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000"/>
+      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000" MaxStatsBuckets="100"/>
       <dxl:CTEConfig CTEInliningCutoff="0"/> 
       <dxl:WindowOids RowNumber="7000" Rank="7001"/>
       <dxl:CostModelConfig CostModelType="1" SegmentsForCosting="3">
@@ -11,7 +11,7 @@
           <dxl:CostParam Name="NLJFactor" Value="1.000000" LowerBound="0.500000" UpperBound="1.500000"/>
         </dxl:CostParams>
       </dxl:CostModelConfig>
-      <dxl:TraceFlags Value="103027,101013,102120,103001,103014,103015,103016,103022,103023,104002"/>
+      <dxl:TraceFlags Value="101013,102001,102002,102003,102120,102144,103001,103014,103015,103016,103022,103023,103027,103033,104002"/>
     </dxl:OptimizerConfig>
     <dxl:Metadata SystemIds="0.GPDB">
       <dxl:ColumnStatistics Mdid="1.17306732.1.1.31" Name="gp_segment_id" Width="4.000000" NullFreq="0.000000" NdvRemain="0.000000" FreqRemain="0.000000" ColStatsMissing="true"/>
@@ -181,7 +181,7 @@
       <dxl:ColumnStatistics Mdid="1.17306732.1.1.13" Name="value" Width="8.000000" NullFreq="0.000000" NdvRemain="0.000000" FreqRemain="0.000000" ColStatsMissing="true"/>
       <dxl:ColumnStatistics Mdid="1.17306732.1.1.12" Name="measurename" Width="8.000000" NullFreq="0.000000" NdvRemain="0.000000" FreqRemain="0.000000" ColStatsMissing="true"/>
       <dxl:RelationStatistics Mdid="2.17306732.1.1" Name="mr_star1_deltas_dh" Rows="0.000000" EmptyRelation="true"/>
-      <dxl:Relation Mdid="0.17306732.1.1" Name="mr_star1_deltas_dh" IsTemporary="false" HasOids="false" StorageType="AppendOnly, Column-oriented" DistributionPolicy="Hash" DistributionColumns="9,18,19" Keys="30,31,29" PartitionColumns="2" NumberLeafPartitions="0">
+      <dxl:Relation Mdid="0.17306732.1.1" Name="mr_star1_deltas_dh" IsTemporary="false" HasOids="false" StorageType="AppendOnly, Column-oriented" DistributionPolicy="Hash" DistributionColumns="9,18,19" Keys="30,31,29" PartitionColumns="2" PartitionTypes="r" NumberLeafPartitions="0">
         <dxl:Columns>
           <dxl:Column Name="riskrunid" Attno="1" Mdid="0.20.1.0" Nullable="true" ColWidth="8">
             <dxl:DefaultValue/>
@@ -283,7 +283,7 @@
         <dxl:IndexInfoList/>
         <dxl:Triggers/>
         <dxl:CheckConstraints/>
-        <dxl:PartConstraint DefaultPartition="0" Unbounded="true">
+        <dxl:PartConstraint DefaultPartition="0" Unbounded="true" ExprAbsent="true">
         </dxl:PartConstraint>
       </dxl:Relation>
       <dxl:ColumnStatistics Mdid="1.17327104.1.1.27" Name="valuationmodelid" Width="4.000000" NullFreq="0.000000" NdvRemain="0.000000" FreqRemain="0.000000" ColStatsMissing="true"/>
@@ -337,7 +337,7 @@
         <dxl:IntermediateResultType Mdid="0.701.1.0"/>
       </dxl:GPDBAgg>
       <dxl:RelationStatistics Mdid="2.17327104.1.1" Name="mr_star1_gammas_dh" Rows="0.000000" EmptyRelation="true"/>
-      <dxl:Relation Mdid="0.17327104.1.1" Name="mr_star1_gammas_dh" IsTemporary="false" HasOids="false" StorageType="AppendOnly, Column-oriented" DistributionPolicy="Hash" DistributionColumns="9,18,19" Keys="30,31,29" PartitionColumns="2" NumberLeafPartitions="0">
+      <dxl:Relation Mdid="0.17327104.1.1" Name="mr_star1_gammas_dh" IsTemporary="false" HasOids="false" StorageType="AppendOnly, Column-oriented" DistributionPolicy="Hash" DistributionColumns="9,18,19" Keys="30,31,29" PartitionColumns="2" PartitionTypes="r" NumberLeafPartitions="0">
         <dxl:Columns>
           <dxl:Column Name="riskrunid" Attno="1" Mdid="0.20.1.0" Nullable="true" ColWidth="8">
             <dxl:DefaultValue/>
@@ -439,7 +439,7 @@
         <dxl:IndexInfoList/>
         <dxl:Triggers/>
         <dxl:CheckConstraints/>
-        <dxl:PartConstraint DefaultPartition="0" Unbounded="true">
+        <dxl:PartConstraint DefaultPartition="0" Unbounded="true" ExprAbsent="true">
         </dxl:PartConstraint>
       </dxl:Relation>
       <dxl:GPDBScalarOp Mdid="0.1093.1.0" Name="=" ComparisonType="Eq" ReturnsNullOnNullInput="true">
@@ -488,7 +488,7 @@
       <dxl:ColumnStatistics Mdid="1.17306732.1.1.0" Name="riskrunid" Width="8.000000" NullFreq="0.000000" NdvRemain="0.000000" FreqRemain="0.000000" ColStatsMissing="true"/>
       <dxl:ColumnStatistics Mdid="1.17306732.1.1.9" Name="contractid" Width="8.000000" NullFreq="0.000000" NdvRemain="0.000000" FreqRemain="0.000000" ColStatsMissing="true"/>
       <dxl:RelationStatistics Mdid="2.17298420.1.1" Name="mr_star1_cashflows_dh" Rows="0.000000" EmptyRelation="true"/>
-      <dxl:Relation Mdid="0.17298420.1.1" Name="mr_star1_cashflows_dh" IsTemporary="false" HasOids="false" StorageType="AppendOnly, Column-oriented" DistributionPolicy="Hash" DistributionColumns="9,18,19" Keys="30,31,29" PartitionColumns="2" NumberLeafPartitions="0">
+      <dxl:Relation Mdid="0.17298420.1.1" Name="mr_star1_cashflows_dh" IsTemporary="false" HasOids="false" StorageType="AppendOnly, Column-oriented" DistributionPolicy="Hash" DistributionColumns="9,18,19" Keys="30,31,29" PartitionColumns="2" PartitionTypes="r" NumberLeafPartitions="0">
         <dxl:Columns>
           <dxl:Column Name="riskrunid" Attno="1" Mdid="0.20.1.0" Nullable="true" ColWidth="8">
             <dxl:DefaultValue/>
@@ -590,7 +590,7 @@
         <dxl:IndexInfoList/>
         <dxl:Triggers/>
         <dxl:CheckConstraints/>
-        <dxl:PartConstraint DefaultPartition="0" Unbounded="true">
+        <dxl:PartConstraint DefaultPartition="0" Unbounded="true" ExprAbsent="true">
         </dxl:PartConstraint>
       </dxl:Relation>
       <dxl:ColumnStatistics Mdid="1.17327104.1.1.31" Name="gp_segment_id" Width="4.000000" NullFreq="0.000000" NdvRemain="0.000000" FreqRemain="0.000000" ColStatsMissing="true"/>
@@ -651,7 +651,7 @@
                 </dxl:IsNotNull>
                 <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                   <dxl:Ident ColId="3" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                  <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                  <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
                 </dxl:Comparison>
               </dxl:And>
               <dxl:LogicalGet>
@@ -716,7 +716,7 @@
                 </dxl:IsNotNull>
                 <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                   <dxl:Ident ColId="36" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                  <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                  <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
                 </dxl:Comparison>
               </dxl:And>
               <dxl:LogicalGet>
@@ -782,7 +782,7 @@
               </dxl:IsNotNull>
               <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                 <dxl:Ident ColId="69" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
               </dxl:Comparison>
             </dxl:And>
             <dxl:LogicalGet>
@@ -923,10 +923,10 @@
                 <dxl:Filter/>
                 <dxl:SortingColumnList/>
                 <dxl:HashExprList>
-                  <dxl:HashExpr TypeMdid="0.1043.1.0">
+                  <dxl:HashExpr>
                     <dxl:Ident ColId="28" ColName="bookname" TypeMdid="0.1043.1.0"/>
                   </dxl:HashExpr>
-                  <dxl:HashExpr TypeMdid="0.1043.1.0">
+                  <dxl:HashExpr>
                     <dxl:Ident ColId="12" ColName="measurename" TypeMdid="0.1043.1.0"/>
                   </dxl:HashExpr>
                 </dxl:HashExprList>
@@ -1024,7 +1024,9 @@
                           </dxl:Properties>
                           <dxl:ProjList/>
                           <dxl:PartEqFilters>
-                            <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                            <dxl:PartEqFilterElems>
+                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
+                            </dxl:PartEqFilterElems>
                           </dxl:PartEqFilters>
                           <dxl:PartFilters>
                             <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
@@ -1038,7 +1040,7 @@
                           <dxl:PrintableFilter>
                             <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                               <dxl:Ident ColId="2" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
                             </dxl:Comparison>
                           </dxl:PrintableFilter>
                         </dxl:PartitionSelector>
@@ -1077,7 +1079,7 @@
                               </dxl:Not>
                               <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                                 <dxl:Ident ColId="2" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
                               </dxl:Comparison>
                             </dxl:And>
                           </dxl:Filter>
@@ -1166,10 +1168,10 @@
                 <dxl:Filter/>
                 <dxl:SortingColumnList/>
                 <dxl:HashExprList>
-                  <dxl:HashExpr TypeMdid="0.1043.1.0">
+                  <dxl:HashExpr>
                     <dxl:Ident ColId="61" ColName="bookname" TypeMdid="0.1043.1.0"/>
                   </dxl:HashExpr>
-                  <dxl:HashExpr TypeMdid="0.1043.1.0">
+                  <dxl:HashExpr>
                     <dxl:Ident ColId="45" ColName="measurename" TypeMdid="0.1043.1.0"/>
                   </dxl:HashExpr>
                 </dxl:HashExprList>
@@ -1267,7 +1269,9 @@
                           </dxl:Properties>
                           <dxl:ProjList/>
                           <dxl:PartEqFilters>
-                            <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                            <dxl:PartEqFilterElems>
+                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
+                            </dxl:PartEqFilterElems>
                           </dxl:PartEqFilters>
                           <dxl:PartFilters>
                             <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
@@ -1281,7 +1285,7 @@
                           <dxl:PrintableFilter>
                             <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                               <dxl:Ident ColId="35" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
                             </dxl:Comparison>
                           </dxl:PrintableFilter>
                         </dxl:PartitionSelector>
@@ -1320,7 +1324,7 @@
                               </dxl:Not>
                               <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                                 <dxl:Ident ColId="35" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
                               </dxl:Comparison>
                             </dxl:And>
                           </dxl:Filter>
@@ -1409,10 +1413,10 @@
                 <dxl:Filter/>
                 <dxl:SortingColumnList/>
                 <dxl:HashExprList>
-                  <dxl:HashExpr TypeMdid="0.1043.1.0">
+                  <dxl:HashExpr>
                     <dxl:Ident ColId="94" ColName="bookname" TypeMdid="0.1043.1.0"/>
                   </dxl:HashExpr>
-                  <dxl:HashExpr TypeMdid="0.1043.1.0">
+                  <dxl:HashExpr>
                     <dxl:Ident ColId="78" ColName="measurename" TypeMdid="0.1043.1.0"/>
                   </dxl:HashExpr>
                 </dxl:HashExprList>
@@ -1510,7 +1514,9 @@
                           </dxl:Properties>
                           <dxl:ProjList/>
                           <dxl:PartEqFilters>
-                            <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                            <dxl:PartEqFilterElems>
+                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
+                            </dxl:PartEqFilterElems>
                           </dxl:PartEqFilters>
                           <dxl:PartFilters>
                             <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
@@ -1524,7 +1530,7 @@
                           <dxl:PrintableFilter>
                             <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                               <dxl:Ident ColId="68" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                              <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
                             </dxl:Comparison>
                           </dxl:PrintableFilter>
                         </dxl:PartitionSelector>
@@ -1563,7 +1569,7 @@
                               </dxl:Not>
                               <dxl:Comparison ComparisonOperator="=" OperatorMdid="0.1093.1.0">
                                 <dxl:Ident ColId="68" ColName="businessdate" TypeMdid="0.1082.1.0"/>
-                                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" DoubleValue="451267200000000.000000"/>
+                                <dxl:ConstValue TypeMdid="0.1082.1.0" Value="ZxQAAA==" LintValue="5223"/>
                               </dxl:Comparison>
                             </dxl:And>
                           </dxl:Filter>

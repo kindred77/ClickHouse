@@ -9,6 +9,8 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/CLogicalApply.h"
+#include "gpopt/operators/CLogicalJoin.h"
 #include "gpopt/xforms/CXformExploration.h"
 #include "gpopt/xforms/CXformUtils.h"
 
@@ -28,8 +30,10 @@ private:
 	// helper to add IndexApply expression to given xform results container
 	// for homogeneous b-tree indexes
 	void CreateHomogeneousBtreeIndexApplyAlternatives(
-		CMemoryPool *mp, ULONG ulOriginOpId, CExpression *pexprOuter,
+		CMemoryPool *mp, COperator *joinOp, CExpression *pexprOuter,
 		CExpression *pexprInner, CExpression *pexprScalar,
+		CExpression *origJoinPred, CExpression *nodesToInsertAboveIndexGet,
+		CExpression *endOfNodesToInsertAboveIndexGet,
 		CTableDescriptor *ptabdescInner, CLogicalDynamicGet *popDynamicGet,
 		CColRefSet *pcrsScalarExpr, CColRefSet *outer_refs,
 		CColRefSet *pcrsReqd, ULONG ulIndices, CXformResult *pxfres) const;
@@ -37,8 +41,10 @@ private:
 	// helper to add IndexApply expression to given xform results container
 	// for homogeneous b-tree indexes
 	void CreateAlternativesForBtreeIndex(
-		CMemoryPool *mp, ULONG ulOriginOpId, CExpression *pexprOuter,
-		CExpression *pexprInner, CMDAccessor *md_accessor,
+		CMemoryPool *mp, COperator *joinOp, CExpression *pexprOuter,
+		CExpression *pexprInner, CExpression *origJoinPred,
+		CExpression *nodesToInsertAboveIndexGet,
+		CExpression *endOfNodesToInsertAboveIndexGet, CMDAccessor *md_accessor,
 		CExpressionArray *pdrgpexprConjuncts, CColRefSet *pcrsScalarExpr,
 		CColRefSet *outer_refs, CColRefSet *pcrsReqd, const IMDRelation *pmdrel,
 		const IMDIndex *pmdindex, CPartConstraint *ppartcnstrIndex,
@@ -47,8 +53,10 @@ private:
 	// helper to add IndexApply expression to given xform results container
 	// for homogeneous bitmap indexes
 	void CreateHomogeneousBitmapIndexApplyAlternatives(
-		CMemoryPool *mp, ULONG ulOriginOpId, CExpression *pexprOuter,
+		CMemoryPool *mp, COperator *joinOp, CExpression *pexprOuter,
 		CExpression *pexprInner, CExpression *pexprScalar,
+		CExpression *origJoinPred, CExpression *nodesToInsertAboveIndexGet,
+		CExpression *endOfNodesToInsertAboveIndexGet,
 		CTableDescriptor *ptabdescInner, CColRefSet *outer_refs,
 		CColRefSet *pcrsReqd, CXformResult *pxfres) const;
 
@@ -62,7 +70,7 @@ private:
 
 	// create an index apply plan when applicable
 	void CreatePartialIndexApplyPlan(
-		CMemoryPool *mp, ULONG ulOriginOpId, CExpression *pexprOuter,
+		CMemoryPool *mp, COperator *joinOp, CExpression *pexprOuter,
 		CExpression *pexprScalar, CColRefSet *outer_refs,
 		CLogicalDynamicGet *popDynamicGet,
 		SPartDynamicIndexGetInfoArray *pdrgppartdig, const IMDRelation *pmdrel,
@@ -71,7 +79,7 @@ private:
 	// create an join with a CTE consumer on the inner branch, with the given
 	// partition constraint
 	CExpression *PexprJoinOverCTEConsumer(
-		CMemoryPool *mp, ULONG ulOriginOpId, CLogicalDynamicGet *popDynamicGet,
+		CMemoryPool *mp, COperator *joinOp, CLogicalDynamicGet *popDynamicGet,
 		ULONG ulCTEId, CExpression *pexprScalar,
 		CColRefArray *pdrgpcrDynamicGet, CPartConstraint *ppartcnstr,
 		CColRefArray *pdrgpcrOuter, CColRefArray *pdrgpcrOuterNew) const;
@@ -79,7 +87,7 @@ private:
 	// create an index apply with a CTE consumer on the outer branch
 	// and a dynamic get on the inner one
 	CExpression *PexprIndexApplyOverCTEConsumer(
-		CMemoryPool *mp, ULONG ulOriginOpId, CLogicalDynamicGet *popDynamicGet,
+		CMemoryPool *mp, COperator *joinOp, CLogicalDynamicGet *popDynamicGet,
 		CExpressionArray *pdrgpexprIndex, CExpressionArray *pdrgpexprResidual,
 		CColRefArray *pdrgpcrIndexGet, const IMDIndex *pmdindex,
 		const IMDRelation *pmdrel, BOOL fFirst, ULONG ulCTEId,
@@ -111,15 +119,17 @@ protected:
 	// helper to add IndexApply expression to given xform results container
 	// for homogeneous indexes
 	virtual void CreateHomogeneousIndexApplyAlternatives(
-		CMemoryPool *mp, ULONG ulOriginOpId, CExpression *pexprOuter,
+		CMemoryPool *mp, COperator *joinOp, CExpression *pexprOuter,
 		CExpression *pexprInner, CExpression *pexprScalar,
+		CExpression *origJoinPred, CExpression *nodesToInsertAboveIndexGet,
+		CExpression *endOfNodesToInsertAboveIndexGet,
 		CTableDescriptor *PtabdescInner, CLogicalDynamicGet *popDynamicGet,
 		CXformResult *pxfres, gpmd::IMDIndex::EmdindexType emdtype) const;
 
 	// helper to add IndexApply expression to given xform results container
 	// for partial indexes
 	virtual void CreatePartialIndexApplyAlternatives(
-		CMemoryPool *mp, ULONG ulOriginOpId, CExpression *pexprOuter,
+		CMemoryPool *mp, COperator *joinOp, CExpression *pexprOuter,
 		CExpression *pexprInner, CExpression *pexprScalar,
 		CTableDescriptor *PtabdescInner, CLogicalDynamicGet *popDynamicGet,
 		CXformResult *pxfres) const;
@@ -134,8 +144,9 @@ protected:
 	// that it is trying to transform to in the current
 	// xform rule, caller takes the ownership and
 	// responsibility to release the instance.
-	virtual CLogicalApply *PopLogicalApply(
-		CMemoryPool *mp, CColRefArray *pdrgpcrOuterRefs) const = 0;
+	virtual CLogicalApply *PopLogicalApply(CMemoryPool *mp,
+										   CColRefArray *pdrgpcrOuterRefs,
+										   CExpression *origJoinPred) const = 0;
 
 public:
 	// ctor

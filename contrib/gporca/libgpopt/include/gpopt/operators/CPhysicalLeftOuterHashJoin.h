@@ -33,9 +33,11 @@ private:
 
 public:
 	// ctor
-	CPhysicalLeftOuterHashJoin(CMemoryPool *mp,
-							   CExpressionArray *pdrgpexprOuterKeys,
-							   CExpressionArray *pdrgpexprInnerKeys);
+	CPhysicalLeftOuterHashJoin(
+		CMemoryPool *mp, CExpressionArray *pdrgpexprOuterKeys,
+		CExpressionArray *pdrgpexprInnerKeys,
+		IMdIdArray *hash_opfamilies = NULL,
+		CXform::EXformId origin_xform = CXform::ExfSentinel);
 
 	// dtor
 	virtual ~CPhysicalLeftOuterHashJoin();

@@ -14,6 +14,7 @@
 #include "gpos/base.h"
 #include "gpos/common/CDynamicPtrArray.h"
 #include "gpos/common/CRefCount.h"
+#include "gpos/common/DbgPrintMixin.h"
 
 #include "gpopt/base/CColRef.h"
 #include "gpopt/base/CCostContext.h"
@@ -24,10 +25,8 @@
 #include "gpopt/base/CReqdProp.h"
 #include "gpopt/base/CReqdPropRelational.h"
 #include "gpopt/cost/CCost.h"
-#include "gpopt/metadata/CTableDescriptor.h"
 #include "gpopt/operators/COperator.h"
-#include "naucrates/statistics/CStatistics.h"
-
+#include "naucrates/statistics/IStatistics.h"
 
 namespace gpopt
 {
@@ -55,7 +54,7 @@ using namespace gpnaucrates;
 //		Simply dynamic array for pointer types
 //
 //---------------------------------------------------------------------------
-class CExpression : public CRefCount
+class CExpression : public CRefCount, public gpos::DbgPrintMixin<CExpression>
 {
 	friend class CExpressionHandle;
 

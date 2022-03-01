@@ -22,7 +22,6 @@
 #include "gpopt/base/CEnfdRewindability.h"
 #include "gpopt/base/COrderSpec.h"
 #include "gpopt/base/CRewindabilitySpec.h"
-#include "gpopt/cost/CCost.h"
 #include "gpopt/operators/COperator.h"
 
 // number of plan properties requested during optimization, currently, there are 4 properties:
@@ -39,7 +38,6 @@ typedef CDynamicPtrArray<ULONG_PTR, CleanupDeleteArray> UlongPtrArray;
 // forward declaration
 class CPartIndexMap;
 class CTableDescriptor;
-class CCostContext;
 class CCTEMap;
 
 //---------------------------------------------------------------------------
@@ -312,6 +310,19 @@ protected:
 	static BOOL FUnaryUsesDefinedColumns(CColRefSet *pcrs,
 										 CExpressionHandle &exprhdl);
 
+	// compute required distribution of the n-th child
+	virtual CDistributionSpec *PdsRequired(CMemoryPool *mp,
+										   CExpressionHandle &exprhdl,
+										   CDistributionSpec *pdsRequired,
+										   ULONG child_index,
+										   CDrvdPropArray *pdrgpdpCtxt,
+										   ULONG ulOptReq) const = 0;
+
+	// distribution matching type
+	virtual CEnfdDistribution::EDistributionMatching Edm(
+		CReqdPropPlan *prppInput, ULONG child_index,
+		CDrvdPropArray *pdrgpdpCtxt, ULONG ulOptReq);
+
 public:
 	// ctor
 	explicit CPhysical(CMemoryPool *mp);
@@ -355,21 +366,14 @@ public:
 	// compute distribution spec from the table descriptor
 	static CDistributionSpec *PdsCompute(CMemoryPool *mp,
 										 const CTableDescriptor *ptabdesc,
-										 CColRefArray *pdrgpcrOutput);
+										 CColRefArray *pdrgpcrOutput,
+										 CColRef *gp_segment_id);
 
 	// compute required sort order of the n-th child
 	virtual COrderSpec *PosRequired(CMemoryPool *mp, CExpressionHandle &exprhdl,
 									COrderSpec *posRequired, ULONG child_index,
 									CDrvdPropArray *pdrgpdpCtxt,
 									ULONG ulOptReq) const = 0;
-
-	// compute required distribution of the n-th child
-	virtual CDistributionSpec *PdsRequired(CMemoryPool *mp,
-										   CExpressionHandle &exprhdl,
-										   CDistributionSpec *pdsRequired,
-										   ULONG child_index,
-										   CDrvdPropArray *pdrgpdpCtxt,
-										   ULONG ulOptReq) const = 0;
 
 	// compute required rewindability of the n-th child
 	virtual CRewindabilitySpec *PrsRequired(CMemoryPool *mp,
@@ -444,11 +448,6 @@ public:
 	virtual CEnfdProp::EPropEnforcingType EpetPartitionPropagation(
 		CExpressionHandle &exprhdl,
 		const CEnfdPartitionPropagation *pepp) const;
-
-	// distribution matching type
-	virtual CEnfdDistribution::EDistributionMatching Edm(
-		CReqdPropPlan *prppInput, ULONG child_index,
-		CDrvdPropArray *pdrgpdpCtxt, ULONG ulOptReq);
 
 	// order matching type
 	virtual CEnfdOrder::EOrderMatching Eom(CReqdPropPlan *prppInput,
@@ -553,6 +552,11 @@ public:
 	// helper for computing a singleton distribution matching the given distribution
 	static CDistributionSpecSingleton *PdssMatching(
 		CMemoryPool *mp, CDistributionSpecSingleton *pdss);
+
+	virtual CEnfdDistribution *Ped(CMemoryPool *mp, CExpressionHandle &exprhdl,
+								   CReqdPropPlan *prppInput, ULONG child_index,
+								   CDrvdPropArray *pdrgpdpCtxt,
+								   ULONG ulDistrReq);
 
 };	// class CPhysical
 

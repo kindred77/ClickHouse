@@ -62,8 +62,13 @@
         <dxl:IndexInfoList/>
         <dxl:Triggers/>
         <dxl:CheckConstraints/>
+        <dxl:DistrOpfamilies>
+          <dxl:DistrOpfamily Mdid="0.1977.1.0"/>
+        </dxl:DistrOpfamilies>
       </dxl:Relation>
       <dxl:Type Mdid="0.16.1.0" Name="bool" IsRedistributable="true" IsHashable="true" IsMergeJoinable="true" IsComposite="false" IsTextRelated="false" IsFixedLength="true" Length="1" PassByValue="true">
+        <dxl:DistrOpfamily Mdid="0.2222.1.0"/>
+        <dxl:LegacyDistrOpfamily Mdid="0.7124.1.0"/>
         <dxl:EqualityOp Mdid="0.91.1.0"/>
         <dxl:InequalityOp Mdid="0.85.1.0"/>
         <dxl:LessThanOp Mdid="0.58.1.0"/>
@@ -79,6 +84,8 @@
         <dxl:CountAgg Mdid="0.2147.1.0"/>
       </dxl:Type>
       <dxl:Type Mdid="0.23.1.0" Name="int4" IsRedistributable="true" IsHashable="true" IsMergeJoinable="true" IsComposite="false" IsTextRelated="false" IsFixedLength="true" Length="4" PassByValue="true">
+        <dxl:DistrOpfamily Mdid="0.1977.1.0"/>
+        <dxl:LegacyDistrOpfamily Mdid="0.7100.1.0"/>
         <dxl:EqualityOp Mdid="0.96.1.0"/>
         <dxl:InequalityOp Mdid="0.518.1.0"/>
         <dxl:LessThanOp Mdid="0.97.1.0"/>
@@ -542,6 +549,8 @@
         </dxl:StatsBucket>
       </dxl:ColumnStatistics>
       <dxl:Type Mdid="0.26.1.0" Name="oid" IsRedistributable="true" IsHashable="true" IsMergeJoinable="true" IsComposite="false" IsTextRelated="false" IsFixedLength="true" Length="4" PassByValue="true">
+        <dxl:DistrOpfamily Mdid="0.1990.1.0"/>
+        <dxl:LegacyDistrOpfamily Mdid="0.7109.1.0"/>
         <dxl:EqualityOp Mdid="0.607.1.0"/>
         <dxl:InequalityOp Mdid="0.608.1.0"/>
         <dxl:LessThanOp Mdid="0.609.1.0"/>
@@ -557,6 +566,8 @@
         <dxl:CountAgg Mdid="0.2147.1.0"/>
       </dxl:Type>
       <dxl:Type Mdid="0.27.1.0" Name="tid" IsRedistributable="true" IsHashable="true" IsMergeJoinable="true" IsComposite="false" IsTextRelated="false" IsFixedLength="true" Length="6" PassByValue="false">
+        <dxl:DistrOpfamily Mdid="0.7077.1.0"/>
+        <dxl:LegacyDistrOpfamily Mdid="0.7110.1.0"/>
         <dxl:EqualityOp Mdid="0.387.1.0"/>
         <dxl:InequalityOp Mdid="0.402.1.0"/>
         <dxl:LessThanOp Mdid="0.2799.1.0"/>
@@ -572,6 +583,7 @@
         <dxl:CountAgg Mdid="0.2147.1.0"/>
       </dxl:Type>
       <dxl:Type Mdid="0.29.1.0" Name="cid" IsRedistributable="true" IsHashable="true" IsMergeJoinable="false" IsComposite="false" IsTextRelated="false" IsFixedLength="true" Length="4" PassByValue="true">
+        <dxl:DistrOpfamily Mdid="0.2226.1.0"/>
         <dxl:EqualityOp Mdid="0.385.1.0"/>
         <dxl:InequalityOp Mdid="0.0.0.0"/>
         <dxl:LessThanOp Mdid="0.0.0.0"/>
@@ -587,6 +599,7 @@
         <dxl:CountAgg Mdid="0.2147.1.0"/>
       </dxl:Type>
       <dxl:Type Mdid="0.28.1.0" Name="xid" IsRedistributable="true" IsHashable="true" IsMergeJoinable="false" IsComposite="false" IsTextRelated="false" IsFixedLength="true" Length="4" PassByValue="true">
+        <dxl:DistrOpfamily Mdid="0.2225.1.0"/>
         <dxl:EqualityOp Mdid="0.352.1.0"/>
         <dxl:InequalityOp Mdid="0.0.0.0"/>
         <dxl:LessThanOp Mdid="0.0.0.0"/>
@@ -602,6 +615,8 @@
         <dxl:CountAgg Mdid="0.2147.1.0"/>
       </dxl:Type>
       <dxl:Type Mdid="0.1700.1.0" Name="numeric" IsRedistributable="true" IsHashable="true" IsMergeJoinable="true" IsComposite="false" IsTextRelated="false" IsFixedLength="false" Length="-1" PassByValue="false">
+        <dxl:DistrOpfamily Mdid="0.1998.1.0"/>
+        <dxl:LegacyDistrOpfamily Mdid="0.7103.1.0"/>
         <dxl:EqualityOp Mdid="0.1752.1.0"/>
         <dxl:InequalityOp Mdid="0.1753.1.0"/>
         <dxl:LessThanOp Mdid="0.1754.1.0"/>
@@ -1025,6 +1040,14 @@
         <dxl:OpFunc Mdid="0.1718.1.0"/>
         <dxl:Commutator Mdid="0.1752.1.0"/>
         <dxl:InverseOp Mdid="0.1753.1.0"/>
+        <dxl:HashOpfamily Mdid="0.1998.1.0"/>
+        <dxl:LegacyHashOpfamily Mdid="0.7103.1.0"/>
+        <dxl:Opfamilies>
+          <dxl:Opfamily Mdid="0.1988.1.0"/>
+          <dxl:Opfamily Mdid="0.1998.1.0"/>
+          <dxl:Opfamily Mdid="0.7032.1.0"/>
+          <dxl:Opfamily Mdid="0.7103.1.0"/>
+        </dxl:Opfamilies>
       </dxl:GPDBScalarOp>
       <dxl:MDCast Mdid="3.1700.1.0;1700.1.0" Name="numeric" BinaryCoercible="true" SourceTypeId="0.1700.1.0" DestinationTypeId="0.1700.1.0" CastFuncId="0.0.0.0" CoercePathType="0"/>
       <dxl:GPDBScalarOp Mdid="0.1758.1.0" Name="+" ComparisonType="Other" ReturnsNullOnNullInput="true" IsNDVPreserving="false">
@@ -1084,10 +1107,10 @@
         </dxl:LogicalJoin>
       </dxl:LogicalCTEAnchor>
     </dxl:Query>
-    <dxl:Plan Id="0" SpaceSize="70">
+    <dxl:Plan Id="0" SpaceSize="52">
       <dxl:GatherMotion InputSegments="0,1,2" OutputSegments="-1">
         <dxl:Properties>
-          <dxl:Cost StartupCost="0" TotalCost="1293.393136" Rows="301.511345" Width="26"/>
+          <dxl:Cost StartupCost="0" TotalCost="1293.488056" Rows="1000.000000" Width="26"/>
         </dxl:Properties>
         <dxl:ProjList>
           <dxl:ProjElem ColId="10" Alias="a">
@@ -1113,7 +1136,7 @@
         <dxl:SortingColumnList/>
         <dxl:Sequence>
           <dxl:Properties>
-            <dxl:Cost StartupCost="0" TotalCost="1293.363921" Rows="301.511345" Width="26"/>
+            <dxl:Cost StartupCost="0" TotalCost="1293.391162" Rows="1000.000000" Width="26"/>
           </dxl:Properties>
           <dxl:ProjList>
             <dxl:ProjElem ColId="10" Alias="a">
@@ -1221,7 +1244,7 @@
           </dxl:CTEProducer>
           <dxl:HashJoin JoinType="Inner">
             <dxl:Properties>
-              <dxl:Cost StartupCost="0" TotalCost="862.340698" Rows="301.511345" Width="26"/>
+              <dxl:Cost StartupCost="0" TotalCost="862.361886" Rows="1000.000000" Width="26"/>
             </dxl:Properties>
             <dxl:ProjList>
               <dxl:ProjElem ColId="10" Alias="a">
@@ -1276,10 +1299,10 @@
               <dxl:Filter/>
               <dxl:SortingColumnList/>
               <dxl:HashExprList>
-                <dxl:HashExpr TypeMdid="0.1700.1.0">
+                <dxl:HashExpr Opfamily="0.1998.1.0">
                   <dxl:Ident ColId="12" ColName="c" TypeMdid="0.1700.1.0"/>
                 </dxl:HashExpr>
-                <dxl:HashExpr TypeMdid="0.1700.1.0">
+                <dxl:HashExpr Opfamily="0.1998.1.0">
                   <dxl:Ident ColId="11" ColName="b" TypeMdid="0.1700.1.0"/>
                 </dxl:HashExpr>
               </dxl:HashExprList>
@@ -1318,10 +1341,10 @@
               <dxl:Filter/>
               <dxl:SortingColumnList/>
               <dxl:HashExprList>
-                <dxl:HashExpr TypeMdid="0.1700.1.0">
+                <dxl:HashExpr Opfamily="0.1998.1.0">
                   <dxl:Ident ColId="22" ColName="c" TypeMdid="0.1700.1.0"/>
                 </dxl:HashExpr>
-                <dxl:HashExpr TypeMdid="0.1700.1.0">
+                <dxl:HashExpr Opfamily="0.1998.1.0">
                   <dxl:OpExpr OperatorName="+" OperatorMdid="0.1758.1.0" OperatorType="0.1700.1.0">
                     <dxl:Ident ColId="21" ColName="b" TypeMdid="0.1700.1.0"/>
                     <dxl:ConstValue TypeMdid="0.1700.1.0" Value="AAAACACAAQA=" DoubleValue="1.000000"/>

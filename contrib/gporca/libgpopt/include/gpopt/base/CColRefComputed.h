@@ -53,11 +53,19 @@ public:
 
 	// is column a system column?
 	BOOL
-	FSystemCol() const
+	IsSystemCol() const
 	{
 		// we cannot introduce system columns as computed column
 		return false;
 	}
+
+	// is column a distribution column?
+	BOOL
+	IsDistCol() const
+	{
+		// we cannot introduce distribution columns as computed column
+		return false;
+	};
 
 
 };	// class CColRefComputed

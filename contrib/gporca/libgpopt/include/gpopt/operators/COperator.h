@@ -20,7 +20,6 @@
 #include "gpopt/base/CFunctionProp.h"
 #include "gpopt/base/CReqdPropPlan.h"
 #include "gpopt/base/CReqdPropRelational.h"
-#include "naucrates/statistics/CStatistics.h"
 
 namespace gpopt
 {
@@ -47,7 +46,7 @@ typedef CHashMap<CColRef, CColRef, CColRef::HashValue, CColRef::Equals,
 //		base class for all operators
 //
 //---------------------------------------------------------------------------
-class COperator : public CRefCount
+class COperator : public CRefCount, public DbgPrintMixin<COperator>
 {
 private:
 	// private copy ctor
@@ -67,10 +66,6 @@ protected:
 	// return an addref'ed copy of the operator
 	virtual COperator *PopCopyDefault();
 
-	// derive data access function property from children
-	static IMDFunction::EFuncDataAcc EfdaDeriveFromChildren(
-		CExpressionHandle &exprhdl, IMDFunction::EFuncDataAcc efdaDefault);
-
 	// derive stability function property from children
 	static IMDFunction::EFuncStbl EfsDeriveFromChildren(
 		CExpressionHandle &exprhdl, IMDFunction::EFuncStbl efsDefault);
@@ -78,8 +73,7 @@ protected:
 	// derive function properties from children
 	static CFunctionProp *PfpDeriveFromChildren(
 		CMemoryPool *mp, CExpressionHandle &exprhdl,
-		IMDFunction::EFuncStbl efsDefault,
-		IMDFunction::EFuncDataAcc efdaDefault, BOOL fHasVolatileFunctionScan,
+		IMDFunction::EFuncStbl efsDefault, BOOL fHasVolatileFunctionScan,
 		BOOL fScan);
 
 	// generate unique operator ids
@@ -125,6 +119,7 @@ public:
 		EopLogicalLeftAntiSemiCorrelatedApply,
 		EopLogicalLeftAntiSemiApplyNotIn,
 		EopLogicalLeftAntiSemiCorrelatedApplyNotIn,
+		EopLogicalRightOuterJoin,
 		EopLogicalConstTableGet,
 		EopLogicalDynamicGet,
 		EopLogicalDynamicIndexGet,
@@ -143,6 +138,7 @@ public:
 		EopLogicalPartitionSelector,
 		EopLogicalAssert,
 		EopLogicalMaxOneRow,
+		EopLogicalMultiExternalGet,
 
 		EopScalarCmp,
 		EopScalarIsDistinctFrom,
@@ -191,6 +187,7 @@ public:
 		EopPhysicalTableScan,
 		EopPhysicalExternalScan,
 		EopPhysicalIndexScan,
+		EopPhysicalIndexOnlyScan,
 		EopPhysicalBitmapTableScan,
 		EopPhysicalFilter,
 		EopPhysicalInnerNLJoin,
@@ -220,6 +217,7 @@ public:
 		EopPhysicalLeftSemiHashJoin,
 		EopPhysicalLeftAntiSemiHashJoin,
 		EopPhysicalLeftAntiSemiHashJoinNotIn,
+		EopPhysicalRightOuterHashJoin,
 
 		EopPhysicalMotionGather,
 		EopPhysicalMotionBroadcast,
@@ -255,9 +253,11 @@ public:
 		EopPatternLeaf,
 		EopPatternMultiLeaf,
 		EopPatternMultiTree,
+		EopPatternNode,
 
 		EopLogicalDynamicBitmapTableGet,
 		EopPhysicalDynamicBitmapTableScan,
+		EopPhysicalMultiExternalScan,
 
 		EopSentinel
 	};

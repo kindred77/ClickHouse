@@ -3,10 +3,10 @@
   <dxl:Thread Id="0">
     <dxl:OptimizerConfig>
       <dxl:EnumeratorConfig Id="0" PlanSamples="0" CostThreshold="0"/>
-      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000"/>
+      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.000000" DampingFactorGroupBy="0.750000" MaxStatsBuckets="100"/>
       <dxl:CTEConfig CTEInliningCutoff="0"/> 
       <dxl:WindowOids RowNumber="7000" Rank="7001"/>
-      <dxl:TraceFlags Value="103027,101013,103001"/>
+      <dxl:TraceFlags Value="101013,102001,102002,102003,102144,103001,103027,103033"/>
     </dxl:OptimizerConfig>
     <dxl:Metadata SystemIds="0.GPDB">
       <dxl:Type Mdid="0.26.1.0" Name="oid" IsRedistributable="true" IsHashable="true" IsMergeJoinable="true" IsComposite="false" IsFixedLength="true" Length="4" PassByValue="true">
@@ -5141,7 +5141,7 @@
             <dxl:Filter/>
             <dxl:SortingColumnList/>
             <dxl:HashExprList>
-              <dxl:HashExpr TypeMdid="0.1043.1.0">
+              <dxl:HashExpr>
                 <dxl:Ident ColId="72" ColName="quarter_desc" TypeMdid="0.1043.1.0"/>
               </dxl:HashExpr>
             </dxl:HashExprList>
@@ -5465,7 +5465,7 @@
                               <dxl:Filter/>
                               <dxl:SortingColumnList/>
                               <dxl:HashExprList>
-                                <dxl:HashExpr TypeMdid="0.23.1.0">
+                                <dxl:HashExpr>
                                   <dxl:Ident ColId="34" ColName="month_number" TypeMdid="0.23.1.0"/>
                                 </dxl:HashExpr>
                               </dxl:HashExprList>
@@ -5601,7 +5601,7 @@
                                         <dxl:Filter/>
                                         <dxl:SortingColumnList/>
                                         <dxl:HashExprList>
-                                          <dxl:HashExpr TypeMdid="0.23.1.0">
+                                          <dxl:HashExpr>
                                             <dxl:Ident ColId="49" ColName="?column?" TypeMdid="0.23.1.0"/>
                                           </dxl:HashExpr>
                                         </dxl:HashExprList>
@@ -5678,7 +5678,7 @@
                                       <dxl:Filter/>
                                       <dxl:SortingColumnList/>
                                       <dxl:HashExprList>
-                                        <dxl:HashExpr TypeMdid="0.23.1.0">
+                                        <dxl:HashExpr>
                                           <dxl:Ident ColId="53" ColName="?column?" TypeMdid="0.23.1.0"/>
                                         </dxl:HashExpr>
                                       </dxl:HashExprList>
@@ -5721,7 +5721,7 @@
                                   <dxl:Filter/>
                                   <dxl:SortingColumnList/>
                                   <dxl:HashExprList>
-                                    <dxl:HashExpr TypeMdid="0.23.1.0">
+                                    <dxl:HashExpr>
                                       <dxl:Ident ColId="55" ColName="?column?" TypeMdid="0.23.1.0"/>
                                     </dxl:HashExpr>
                                   </dxl:HashExprList>

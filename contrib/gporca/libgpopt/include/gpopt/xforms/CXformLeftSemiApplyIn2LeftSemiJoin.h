@@ -13,7 +13,9 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalLeftSemiApplyIn.h"
+#include "gpopt/operators/CPatternLeaf.h"
+#include "gpopt/operators/CPatternTree.h"
 #include "gpopt/xforms/CXformLeftSemiApply2LeftSemiJoin.h"
 
 

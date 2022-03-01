@@ -48,6 +48,9 @@ private:
 	// not owned
 	ULONG m_ulSourceOpId;
 
+	// is the column a distribution key
+	BOOL m_is_dist_col;
+
 	// width of the column, for instance  char(10) column has width 10
 	ULONG m_width;
 
@@ -58,7 +61,8 @@ public:
 
 	CColRefTable(const IMDType *pmdtype, INT type_modifier, INT attno,
 				 BOOL is_nullable, ULONG id, const CName *pname,
-				 ULONG ulOpSource, ULONG ulWidth = gpos::ulong_max);
+				 ULONG ulOpSource, BOOL is_dist_col,
+				 ULONG ulWidth = gpos::ulong_max);
 
 	// dtor
 	virtual ~CColRefTable();
@@ -86,11 +90,18 @@ public:
 
 	// is column a system column?
 	BOOL
-	FSystemCol() const
+	IsSystemCol() const
 	{
 		// TODO-  04/13/2012, make this check system independent
 		// using MDAccessor
 		return 0 >= m_iAttno;
+	}
+
+	// is column a distribution column?
+	BOOL
+	IsDistCol() const
+	{
+		return m_is_dist_col;
 	}
 
 	// width of the column

@@ -13,6 +13,8 @@
 
 #include "gpos/base.h"
 #include "gpos/common/CList.h"
+#include "gpos/common/DbgPrintMixin.h"
+#include "gpos/task/ITask.h"
 
 namespace gpopt
 {
@@ -77,7 +79,7 @@ class CSchedulerContext;
 //		about how job are scheduled.
 //
 //---------------------------------------------------------------------------
-class CJob
+class CJob : public DbgPrintMixin<CJob>
 {
 	// friends
 	friend class CJobFactory;
@@ -302,7 +304,7 @@ public:
 
 #ifdef GPOS_DEBUG
 	// print job description
-	virtual IOstream &OsPrint(IOstream &os);
+	virtual IOstream &OsPrint(IOstream &os) const;
 
 	// link for running job list
 	SLink m_linkRunning;

@@ -13,7 +13,7 @@ SELECT * FROM pp WHERE b=2 AND c=2;
   <dxl:Thread Id="0">
     <dxl:OptimizerConfig>
       <dxl:EnumeratorConfig Id="0" PlanSamples="0" CostThreshold="0"/>
-      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000"/>
+      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000" MaxStatsBuckets="100"/>
       <dxl:CTEConfig CTEInliningCutoff="0"/> 
       <dxl:WindowOids RowNumber="7000" Rank="7001"/>
       <dxl:CostModelConfig CostModelType="1" SegmentsForCosting="3">
@@ -375,40 +375,46 @@ SELECT * FROM pp WHERE b=2 AND c=2;
                 <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
               </dxl:PartEqFilters>
               <dxl:PartFilters>
-                <dxl:Or>
-                  <dxl:And>
-                    <dxl:Or>
-                      <dxl:And>
+                <dxl:And>
+                  <dxl:Or>
+                    <dxl:And>
+                      <dxl:Or>
                         <dxl:Comparison ComparisonOperator="&lt;=" OperatorMdid="0.523.1.0">
                           <dxl:PartBound Level="0" Type="0.23.1.0" LowerBound="true"/>
                           <dxl:ConstValue TypeMdid="0.23.1.0" Value="2"/>
                         </dxl:Comparison>
-                        <dxl:PartBoundInclusion Level="0" LowerBound="true"/>
-                      </dxl:And>
+                        <dxl:PartBoundOpen Level="0" LowerBound="true"/>
+                      </dxl:Or>
+                      <dxl:PartBoundInclusion Level="0" LowerBound="true"/>
+                    </dxl:And>
+                    <dxl:Or>
                       <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.97.1.0">
                         <dxl:PartBound Level="0" Type="0.23.1.0" LowerBound="true"/>
                         <dxl:ConstValue TypeMdid="0.23.1.0" Value="2"/>
                       </dxl:Comparison>
+                      <dxl:PartBoundOpen Level="0" LowerBound="true"/>
                     </dxl:Or>
-                    <dxl:Or>
-                      <dxl:And>
+                  </dxl:Or>
+                  <dxl:Or>
+                    <dxl:And>
+                      <dxl:Or>
                         <dxl:Comparison ComparisonOperator="&gt;=" OperatorMdid="0.525.1.0">
                           <dxl:PartBound Level="0" Type="0.23.1.0" LowerBound="false"/>
                           <dxl:ConstValue TypeMdid="0.23.1.0" Value="2"/>
                         </dxl:Comparison>
-                        <dxl:PartBoundInclusion Level="0" LowerBound="false"/>
-                      </dxl:And>
+                        <dxl:PartBoundOpen Level="0" LowerBound="false"/>
+                      </dxl:Or>
+                      <dxl:PartBoundInclusion Level="0" LowerBound="false"/>
+                    </dxl:And>
+                    <dxl:Or>
                       <dxl:Comparison ComparisonOperator="&gt;" OperatorMdid="0.521.1.0">
                         <dxl:PartBound Level="0" Type="0.23.1.0" LowerBound="false"/>
                         <dxl:ConstValue TypeMdid="0.23.1.0" Value="2"/>
                       </dxl:Comparison>
+                      <dxl:PartBoundOpen Level="0" LowerBound="false"/>
                     </dxl:Or>
-                  </dxl:And>
-                  <dxl:Or>
-                    <dxl:PartBoundOpen Level="0" LowerBound="true"/>
-                    <dxl:PartBoundOpen Level="0" LowerBound="false"/>
                   </dxl:Or>
-                </dxl:Or>
+                </dxl:And>
               </dxl:PartFilters>
               <dxl:ResidualFilter>
                 <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
@@ -488,7 +494,7 @@ SELECT * FROM pp WHERE b=2 AND c=2;
                       </dxl:And>
                     </dxl:And>
                     <dxl:ConstValue TypeMdid="0.23.1.0" Value="3"/>
-                    <dxl:ConstValue TypeMdid="0.23.1.0" IsNull="true" IsByValue="true"/>
+                    <dxl:ConstValue TypeMdid="0.23.1.0" IsNull="true"/>
                   </dxl:If>
                 </dxl:If>
               </dxl:PropagationExpression>

@@ -66,9 +66,9 @@ public:
 	// set hash join keys
 	void
 	SetJoinKeys(CExpressionArray *pdrgpexprOuter,
-				CExpressionArray *pdrgpexprInner)
+				CExpressionArray *pdrgpexprInner, IMdIdArray *join_opfamilies)
 	{
-		m_pgroup->SetJoinKeys(pdrgpexprOuter, pdrgpexprInner);
+		m_pgroup->SetJoinKeys(pdrgpexprOuter, pdrgpexprInner, join_opfamilies);
 	}
 
 	// insert group expression
