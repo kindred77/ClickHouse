@@ -66,6 +66,7 @@ enum Edxltoken
 	EdxltokenEnforceConstraintsOnDML,
 	EdxltokenPushGroupByBelowSetopThreshold,
 	EdxltokenXformBindThreshold,
+	EdxltokenMaxStatsBuckets,
 	EdxltokenWindowOids,
 	EdxltokenOidRowNumber,
 	EdxltokenOidRank,
@@ -87,6 +88,7 @@ enum Edxltoken
 	EdxltokenPhysicalBitmapTableScan,
 	EdxltokenPhysicalDynamicBitmapTableScan,
 	EdxltokenPhysicalExternalScan,
+	EdxltokenPhysicalMultiExternalScan,
 	EdxltokenPhysicalIndexScan,
 	EdxltokenPhysicalIndexOnlyScan,
 	EdxltokenPhysicalHashJoin,
@@ -210,6 +212,7 @@ enum Edxltoken
 	EdxltokenScalarOpList,
 
 	EdxltokenPartLevelEqFilterList,
+	EdxltokenPartLevelEqFilterElemList,
 	EdxltokenPartLevelFilterList,
 	EdxltokenPartLevel,
 	EdxltokenScalarPartOid,
@@ -318,6 +321,8 @@ enum Edxltoken
 	EdxltokenTotalCost,
 	EdxltokenRows,
 	EdxltokenWidth,
+	EdxltokenRelPages,
+	EdxltokenRelAllVisible,
 	EdxltokenCTASOptions,
 	EdxltokenCTASOption,
 
@@ -474,6 +479,15 @@ enum Edxltoken
 	EdxltokenRelDistrReplicated,
 	EdxltokenConvertHashToRandom,
 
+	EdxltokenRelDistrOpfamilies,
+	EdxltokenRelDistrOpfamily,
+
+	EdxltokenRelDistrOpclasses,
+	EdxltokenRelDistrOpclass,
+
+	EdxltokenRelExternalPartitions,
+	EdxltokenRelExternalPartition,
+
 	EdxltokenExtRelRejLimit,
 	EdxltokenExtRelRejLimitInRows,
 	EdxltokenExtRelFmtErrRel,
@@ -517,6 +531,7 @@ enum Edxltoken
 	EdxltokenCheckConstraints,
 	EdxltokenCheckConstraint,
 	EdxltokenPartConstraint,
+	EdxltokenPartConstraintExprAbsent,
 	EdxltokenDefaultPartition,
 	EdxltokenPartConstraintUnbounded,
 
@@ -529,6 +544,8 @@ enum Edxltoken
 	EdxltokenMDTypeFixedLength,
 	EdxltokenMDTypeLength,
 	EdxltokenMDTypeByValue,
+	EdxltokenMDTypeDistrOpfamily,
+	EdxltokenMDTypeLegacyDistrOpfamily,
 	EdxltokenMDTypeEqOp,
 	EdxltokenMDTypeNEqOp,
 	EdxltokenMDTypeLTOp,
@@ -556,6 +573,8 @@ enum Edxltoken
 	EdxltokenGPDBScalarOpLTOpId,
 	EdxltokenGPDBScalarOpGTOpId,
 	EdxltokenGPDBScalarOpCmpType,
+	EdxltokenGPDBScalarOpHashOpfamily,
+	EdxltokenGPDBScalarOpLegacyHashOpfamily,
 
 	EdxltokenCmpEq,
 	EdxltokenCmpNeq,
@@ -594,6 +613,7 @@ enum Edxltoken
 	EdxltokenGPDBFuncReturnsSet,
 	EdxltokenGPDBFuncStrict,
 	EdxltokenGPDBFuncNDVPreserving,
+	EdxltokenGPDBFuncIsAllowedForPS,
 
 	EdxltokenGPDBCast,
 	EdxltokenGPDBCastBinaryCoercible,

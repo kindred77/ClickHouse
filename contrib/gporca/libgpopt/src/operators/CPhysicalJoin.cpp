@@ -17,7 +17,12 @@
 #include "gpopt/base/CUtils.h"
 #include "gpopt/exception.h"
 #include "gpopt/operators/CExpressionHandle.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CPhysicalInnerIndexNLJoin.h"
+#include "gpopt/operators/CPhysicalLeftOuterIndexNLJoin.h"
+#include "gpopt/operators/CPredicateUtils.h"
+#include "gpopt/operators/CScalarCmp.h"
+#include "gpopt/operators/CScalarIsDistinctFrom.h"
+#include "naucrates/md/IMDScalarOp.h"
 
 using namespace gpopt;
 
@@ -30,7 +35,8 @@ using namespace gpopt;
 //		Ctor
 //
 //---------------------------------------------------------------------------
-CPhysicalJoin::CPhysicalJoin(CMemoryPool *mp) : CPhysical(mp)
+CPhysicalJoin::CPhysicalJoin(CMemoryPool *mp, CXform::EXformId origin_xform)
+	: CPhysical(mp), m_origin_xform(origin_xform)
 {
 	m_phmpp = GPOS_NEW(mp) PartPropReqToPartPropSpecMap(mp);
 }
@@ -248,28 +254,50 @@ CPhysicalJoin::FOuterProvidesReqdCols(CExpressionHandle &exprhdl,
 //
 //---------------------------------------------------------------------------
 CDistributionSpec *
-CPhysicalJoin::PdsRequired(CMemoryPool *mp, CExpressionHandle &exprhdl,
-						   CDistributionSpec *pdsRequired, ULONG child_index,
-						   CDrvdPropArray *pdrgpdpCtxt,
+CPhysicalJoin::PdsRequired(CMemoryPool * /*mp*/,
+						   CExpressionHandle & /*exprhdl*/,
+						   CDistributionSpec *,	 //pdsRequired,
+						   ULONG /*child_index*/,
+						   CDrvdPropArray * /*pdrgpdpCtxt*/,
 						   ULONG  // ulOptReq
 ) const
 {
+	GPOS_RAISE(
+		CException::ExmaInvalid, CException::ExmiInvalid,
+		GPOS_WSZ_LIT("PdsRequired should not be called for CPhysicalJoin"));
+	return NULL;
+}
+
+CEnfdDistribution *
+CPhysicalJoin::Ped(CMemoryPool *mp, CExpressionHandle &exprhdl,
+				   CReqdPropPlan *prppInput, ULONG child_index,
+				   CDrvdPropArray *pdrgpdpCtxt, ULONG ulDistrReq)
+{
 	GPOS_ASSERT(2 > child_index);
+
+	CEnfdDistribution::EDistributionMatching dmatch =
+		Edm(prppInput, child_index, pdrgpdpCtxt, ulDistrReq);
+	CDistributionSpec *const pdsRequired = prppInput->Ped()->PdsRequired();
 
 	// if expression has to execute on a single host then we need a gather
 	if (exprhdl.NeedsSingletonExecution())
 	{
-		return PdsRequireSingleton(mp, exprhdl, pdsRequired, child_index);
+		return GPOS_NEW(mp) CEnfdDistribution(
+			PdsRequireSingleton(mp, exprhdl, pdsRequired, child_index), dmatch);
 	}
 
 	if (exprhdl.HasOuterRefs())
 	{
 		if (CDistributionSpec::EdtSingleton == pdsRequired->Edt() ||
-			CDistributionSpec::EdtReplicated == pdsRequired->Edt())
+			CDistributionSpec::EdtStrictReplicated == pdsRequired->Edt())
 		{
-			return PdsPassThru(mp, exprhdl, pdsRequired, child_index);
+			return GPOS_NEW(mp) CEnfdDistribution(
+				PdsPassThru(mp, exprhdl, pdsRequired, child_index), dmatch);
 		}
-		return GPOS_NEW(mp) CDistributionSpecReplicated();
+		return GPOS_NEW(mp) CEnfdDistribution(
+			GPOS_NEW(mp)
+				CDistributionSpecReplicated(CDistributionSpec::EdtReplicated),
+			dmatch);
 	}
 
 	if (1 == child_index)
@@ -281,23 +309,113 @@ CPhysicalJoin::PdsRequired(CMemoryPool *mp, CExpressionHandle &exprhdl,
 		if (CDistributionSpec::EdtUniversal == pdsOuter->Edt())
 		{
 			// first child is universal, request second child to execute on a single host to avoid duplicates
-			return GPOS_NEW(mp) CDistributionSpecSingleton();
+			return GPOS_NEW(mp) CEnfdDistribution(
+				GPOS_NEW(mp) CDistributionSpecSingleton(), dmatch);
 		}
 
 		if (CDistributionSpec::EdtSingleton == pdsOuter->Edt() ||
 			CDistributionSpec::EdtStrictSingleton == pdsOuter->Edt())
 		{
 			// require inner child to have matching singleton distribution
-			return CPhysical::PdssMatching(
-				mp, CDistributionSpecSingleton::PdssConvert(pdsOuter));
+			return GPOS_NEW(mp) CEnfdDistribution(
+				CPhysical::PdssMatching(
+					mp, CDistributionSpecSingleton::PdssConvert(pdsOuter)),
+				dmatch);
 		}
 
+		if ((GPOS_FTRACE(EopttraceEnableRedistributeNLLOJInnerChild) &&
+			 this->Eopid() == COperator::EopPhysicalLeftOuterNLJoin))
+		{
+			CEnfdDistribution *pEnfdHashedDistribution =
+				CPhysicalJoin::PedInnerHashedFromOuterHashed(
+					mp, exprhdl, dmatch, (*pdrgpdpCtxt)[0]);
+			if (pEnfdHashedDistribution)
+				return pEnfdHashedDistribution;
+		}
+
+
 		// otherwise, require inner child to be replicated
-		return GPOS_NEW(mp) CDistributionSpecReplicated();
+		return GPOS_NEW(mp) CEnfdDistribution(
+			GPOS_NEW(mp)
+				CDistributionSpecReplicated(CDistributionSpec::EdtReplicated),
+			CEnfdDistribution::EdmSatisfy);
 	}
 
 	// no distribution requirement on the outer side
-	return GPOS_NEW(mp) CDistributionSpecAny(this->Eopid());
+	return GPOS_NEW(mp) CEnfdDistribution(
+		GPOS_NEW(mp) CDistributionSpecAny(this->Eopid()), dmatch);
+}
+
+CEnfdDistribution *
+CPhysicalJoin::PedInnerHashedFromOuterHashed(
+	CMemoryPool *mp, CExpressionHandle &exprhdl,
+	CEnfdDistribution::EDistributionMatching dmatch, CDrvdProp *outerDrvdProp)
+{
+	// compute a matching distribution based on derived distribution of outer child
+	CDistributionSpec *pdsOuter = CDrvdPropPlan::Pdpplan(outerDrvdProp)->Pds();
+	if (CDistributionSpec::EdtHashed == pdsOuter->Edt())
+	{
+		// require inner child to have matching hashed distribution
+		CExpression *pexprScPredicate =
+			exprhdl.PexprScalarExactChild(2, true /*error_on_null_return*/);
+
+		CExpressionArray *pdrgpexpr =
+			CPredicateUtils::PdrgpexprConjuncts(mp, pexprScPredicate);
+
+		CExpressionArray *pdrgpexprMatching = GPOS_NEW(mp) CExpressionArray(mp);
+		CDistributionSpecHashed *pdshashed =
+			CDistributionSpecHashed::PdsConvert(pdsOuter);
+		CExpressionArray *pdrgpexprHashed = pdshashed->Pdrgpexpr();
+		const ULONG ulSize = pdrgpexprHashed->Size();
+
+		BOOL fSuccess = true;
+		for (ULONG ul = 0; fSuccess && ul < ulSize; ul++)
+		{
+			CExpression *pexpr = (*pdrgpexprHashed)[ul];
+			// get matching expression from predicate for the corresponding outer child
+			// to create CDistributionSpecHashed for inner child
+			CExpression *pexprMatching =
+				CUtils::PexprMatchEqualityOrINDF(pexpr, pdrgpexpr);
+			// columns on which the inner side must be distributed should not contain any column from the outer side
+			// for ex: t1.a = t2.a + t1.a, in this case we can't request t2.a + t1.a from the inner side
+			// where t1 is outer side and t2 is inner table
+			CColRefSet *pcrsOutputOuter = exprhdl.DeriveOutputColumns(0);
+			fSuccess = NULL != pexprMatching &&
+					   !pexprMatching->DeriveUsedColumns()->FIntersects(
+						   pcrsOutputOuter);
+			if (fSuccess)
+			{
+				IMDId *pmdidTypeInner =
+					CScalar::PopConvert(pexprMatching->Pop())->MdidType();
+				CMDAccessor *md_accessor = COptCtxt::PoctxtFromTLS()->Pmda();
+				if (md_accessor->RetrieveType(pmdidTypeInner)->IsHashable())
+				{
+					pexprMatching->AddRef();
+					pdrgpexprMatching->Append(pexprMatching);
+				}
+				else
+				{
+					fSuccess = false;
+				}
+			}
+		}
+		pdrgpexpr->Release();
+
+		if (fSuccess)
+		{
+			GPOS_ASSERT(pdrgpexprMatching->Size() == pdrgpexprHashed->Size());
+
+			// create a matching hashed distribution request
+			BOOL fNullsColocated = pdshashed->FNullsColocated();
+			CDistributionSpecHashed *pdshashedEquiv = GPOS_NEW(mp)
+				CDistributionSpecHashed(pdrgpexprMatching, fNullsColocated);
+			pdshashedEquiv->ComputeEquivHashExprs(mp, exprhdl);
+			return GPOS_NEW(mp) CEnfdDistribution(pdshashedEquiv, dmatch);
+		}
+		pdrgpexprMatching->Release();
+	}
+
+	return NULL;
 }
 
 
@@ -315,9 +433,18 @@ CPhysicalJoin::PdsDerive(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 	CDistributionSpec *pdsOuter = exprhdl.Pdpplan(0 /*child_index*/)->Pds();
 	CDistributionSpec *pdsInner = exprhdl.Pdpplan(1 /*child_index*/)->Pds();
 
+	// We must use the non-nullable side for the distribution spec for outer joins.
+	// For right join, the hash side is the non-nullable side, so we swap the inner/outer
+	// distribution specs for the logic below
+	if (exprhdl.Pop()->Eopid() == EopPhysicalRightOuterHashJoin)
+	{
+		pdsOuter = exprhdl.Pdpplan(1 /*child_index*/)->Pds();
+		pdsInner = exprhdl.Pdpplan(0 /*child_index*/)->Pds();
+	}
+
 	CDistributionSpec *pds;
 
-	if (CDistributionSpec::EdtReplicated == pdsOuter->Edt() ||
+	if (CDistributionSpec::EdtStrictReplicated == pdsOuter->Edt() ||
 		CDistributionSpec::EdtUniversal == pdsOuter->Edt())
 	{
 		// if outer is replicated/universal, return inner distribution
@@ -339,9 +466,15 @@ CPhysicalJoin::PdsDerive(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 		if (!pdsHashed->HasCompleteEquivSpec(mp))
 		{
 			CExpressionArray *pdrgpexpr = pdsHashed->Pdrgpexpr();
+			IMdIdArray *opfamilies = pdsHashed->Opfamilies();
+
+			if (NULL != opfamilies)
+			{
+				opfamilies->AddRef();
+			}
 			pdrgpexpr->AddRef();
 			return GPOS_NEW(mp) CDistributionSpecHashed(
-				pdrgpexpr, pdsHashed->FNullsColocated());
+				pdrgpexpr, pdsHashed->FNullsColocated(), opfamilies);
 		}
 	}
 
@@ -493,16 +626,19 @@ CPhysicalJoin::FHashJoinCompatible(
 
 	CExpression *pexprPredOuter = NULL;
 	CExpression *pexprPredInner = NULL;
+	IMDId *mdid_scop = NULL;
 	if (CPredicateUtils::IsEqualityOp(pexprPred))
 	{
 		pexprPredOuter = (*pexprPred)[0];
 		pexprPredInner = (*pexprPred)[1];
+		mdid_scop = CScalarCmp::PopConvert(pexprPred->Pop())->MdIdOp();
 	}
 	else if (CPredicateUtils::FINDF(pexprPred))
 	{
 		CExpression *pexpr = (*pexprPred)[0];
 		pexprPredOuter = (*pexpr)[0];
 		pexprPredInner = (*pexpr)[1];
+		mdid_scop = CScalarIsDistinctFrom::PopConvert(pexpr->Pop())->MdIdOp();
 	}
 	else
 	{
@@ -515,6 +651,13 @@ CPhysicalJoin::FHashJoinCompatible(
 		CScalar::PopConvert(pexprPredInner->Pop())->MdidType();
 
 	CMDAccessor *md_accessor = COptCtxt::PoctxtFromTLS()->Pmda();
+
+	const IMDScalarOp *scop = md_accessor->RetrieveScOp(mdid_scop);
+	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution) &&
+		NULL == scop->HashOpfamilyMdid())
+	{
+		return false;
+	}
 
 	if (md_accessor->RetrieveType(pmdidTypeOuter)->IsHashable() &&
 		md_accessor->RetrieveType(pmdidTypeInner)->IsHashable())
@@ -540,11 +683,14 @@ CPhysicalJoin::FMergeJoinCompatible(
 
 	CExpression *pexprPredOuter = NULL;
 	CExpression *pexprPredInner = NULL;
+	IMDId *mdid_scop = NULL;
+
 	// Only merge join between ScalarIdents of the same types is currently supported
 	if (CPredicateUtils::FEqIdentsOfSameType(pexprPred))
 	{
 		pexprPredOuter = (*pexprPred)[0];
 		pexprPredInner = (*pexprPred)[1];
+		mdid_scop = CScalarCmp::PopConvert(pexprPred->Pop())->MdIdOp();
 		GPOS_ASSERT(CUtils::FScalarIdent(pexprPredOuter));
 		GPOS_ASSERT(CUtils::FScalarIdent(pexprPredInner));
 	}
@@ -558,14 +704,36 @@ CPhysicalJoin::FMergeJoinCompatible(
 	IMDId *pmdidTypeInner =
 		CScalar::PopConvert(pexprPredInner->Pop())->MdidType();
 
+	CMDAccessor *mda = COptCtxt::PoctxtFromTLS()->Pmda();
+
+	if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
+	{
+		const IMDScalarOp *op = mda->RetrieveScOp(mdid_scop);
+		const IMDType *left_type = mda->RetrieveType(pmdidTypeOuter);
+		const IMDType *right_type = mda->RetrieveType(pmdidTypeInner);
+
+		// MJ sends Sort requests whose btree opclass must match that of the join
+		// clause. ORCA currently doesn't have support to retrive the information
+		// to send such requests.
+		// So, check that hash family used for distribution matches the default for
+		// its operands' types. This must match the operator using in
+		// CPhysicalFullMergeJoin::PosRequired().
+		if (!CUtils::Equals(op->HashOpfamilyMdid(),
+							left_type->GetDistrOpfamilyMdid()) ||
+			!CUtils::Equals(op->HashOpfamilyMdid(),
+							right_type->GetDistrOpfamilyMdid()))
+		{
+			return false;
+		}
+	}
+
 	// MJ sends a distribution request for merge clauses on both sides, they
 	// must, therefore, be hashable and merge joinable.
-	CMDAccessor *md_accessor = COptCtxt::PoctxtFromTLS()->Pmda();
 
-	if (md_accessor->RetrieveType(pmdidTypeOuter)->IsHashable() &&
-		md_accessor->RetrieveType(pmdidTypeInner)->IsHashable() &&
-		md_accessor->RetrieveType(pmdidTypeOuter)->IsMergeJoinable() &&
-		md_accessor->RetrieveType(pmdidTypeInner)->IsMergeJoinable())
+	if (mda->RetrieveType(pmdidTypeOuter)->IsHashable() &&
+		mda->RetrieveType(pmdidTypeInner)->IsHashable() &&
+		mda->RetrieveType(pmdidTypeOuter)->IsMergeJoinable() &&
+		mda->RetrieveType(pmdidTypeInner)->IsMergeJoinable())
 	{
 		return FPredKeysSeparated(pexprInner, pexprOuter, pexprPredInner,
 								  pexprPredOuter);
@@ -865,28 +1033,24 @@ CPhysicalJoin::PrsRequiredCorrelatedJoin(CMemoryPool *mp,
 	return PrsPassThru(mp, exprhdl, prsRequired, 0 /*child_index*/);
 }
 
-//---------------------------------------------------------------------------
-//	@function:
-//		CPhysicalJoin::PdsRequiredCorrelatedJoin
-//
-//	@doc:
-//		 Helper to compute required distribution of correlated join's children
-//
-//---------------------------------------------------------------------------
-CDistributionSpec *
-CPhysicalJoin::PdsRequiredCorrelatedJoin(
-	CMemoryPool *mp, CExpressionHandle &exprhdl, CDistributionSpec *pdsRequired,
-	ULONG child_index, CDrvdPropArray *pdrgpdpCtxt, ULONG ulOptReq) const
+CEnfdDistribution *
+CPhysicalJoin::PedCorrelatedJoin(CMemoryPool *mp, CExpressionHandle &exprhdl,
+								 CReqdPropPlan *prppInput, ULONG child_index,
+								 CDrvdPropArray *pdrgpdpCtxt, ULONG ulOptReq)
 {
 	GPOS_ASSERT(3 == exprhdl.Arity());
 	GPOS_ASSERT(2 > child_index);
 	GPOS_ASSERT(CUtils::FCorrelatedNLJoin(exprhdl.Pop()));
 
+	CDistributionSpec *const pdsRequired = prppInput->Ped()->PdsRequired();
+
 	if (0 == ulOptReq && pdsRequired->FSingletonOrStrictSingleton())
 	{
 		// propagate Singleton request to children to comply with
 		// correlated execution requirements
-		return PdsPassThru(mp, exprhdl, pdsRequired, child_index);
+		return GPOS_NEW(mp) CEnfdDistribution(
+			PdsPassThru(mp, exprhdl, pdsRequired, child_index),
+			CEnfdDistribution::EdmSatisfy);
 	}
 
 	if (exprhdl.PfpChild(1)->FHasVolatileFunctionScan() &&
@@ -894,7 +1058,9 @@ CPhysicalJoin::PdsRequiredCorrelatedJoin(
 	{
 		// if the inner child has a volatile TVF and has outer refs then request
 		// gather from both children
-		return GPOS_NEW(mp) CDistributionSpecSingleton();
+		return GPOS_NEW(mp)
+			CEnfdDistribution(GPOS_NEW(mp) CDistributionSpecSingleton(),
+							  CEnfdDistribution::EdmSatisfy);
 	}
 
 	if (1 == child_index)
@@ -906,12 +1072,14 @@ CPhysicalJoin::PdsRequiredCorrelatedJoin(
 			// if outer child delivers a universal distribution, request inner child
 			// to match Singleton distribution to detect more than one row generated
 			// at runtime, for example: 'select (select 1 union select 2)'
-			return GPOS_NEW(mp) CDistributionSpecSingleton();
+			return GPOS_NEW(mp)
+				CEnfdDistribution(GPOS_NEW(mp) CDistributionSpecSingleton(),
+								  CEnfdDistribution::EdmSatisfy);
 		}
 	}
 
-	return CPhysicalJoin::PdsRequired(mp, exprhdl, pdsRequired, child_index,
-									  pdrgpdpCtxt, ulOptReq);
+	return CPhysicalJoin::Ped(mp, exprhdl, prppInput, child_index, pdrgpdpCtxt,
+							  ulOptReq);
 }
 
 
@@ -940,7 +1108,7 @@ CPhysicalJoin::Edm(CReqdPropPlan *,	 // prppInput
 	CDistributionSpec::EDistributionType edtPrevChild =
 		CDrvdPropPlan::Pdpplan((*pdrgpdpCtxt)[0])->Pds()->Edt();
 
-	if (CDistributionSpec::EdtReplicated == edtPrevChild ||
+	if (CDistributionSpec::EdtStrictReplicated == edtPrevChild ||
 		CDistributionSpec::EdtUniversal == edtPrevChild)
 	{
 		// if previous child is replicated or universal, we use
@@ -1026,6 +1194,27 @@ CPhysicalJoin::PppsRequiredCompute(CMemoryPool *mp, CExpressionHandle &exprhdl,
 	CColRefSet *pcrsOutputOuter = exprhdl.DeriveOutputColumns(0);
 	CColRefSet *pcrsOutputInner = exprhdl.DeriveOutputColumns(1);
 
+	// the original join predicate for index NLJs, those just have a "true"
+	// join predicate which isn't very useful for DPE
+	CExpression *origJoinPredForIndexNLJ = NULL;
+
+	switch (Eopid())
+	{
+		case COperator::EopPhysicalInnerIndexNLJoin:
+			origJoinPredForIndexNLJ =
+				CPhysicalInnerIndexNLJoin::PopConvert(this)->OrigJoinPred();
+			break;
+
+		case COperator::EopPhysicalLeftOuterIndexNLJoin:
+			origJoinPredForIndexNLJ =
+				CPhysicalLeftOuterIndexNLJoin::PopConvert(this)->OrigJoinPred();
+			break;
+
+		default:
+			// no original join pred to worry about
+			break;
+	}
+
 	const ULONG ulPartIndexIds = pdrgpul->Size();
 
 	for (ULONG ul = 0; ul < ulPartIndexIds; ul++)
@@ -1070,8 +1259,17 @@ CPhysicalJoin::PppsRequiredCompute(CMemoryPool *mp, CExpressionHandle &exprhdl,
 			else
 			{
 				// check if there is an interesting condition involving the partition key
-				CExpression *pexprScalar = exprhdl.PexprScalarExactChild(
-					2 /*child_index*/, true /*error_on_null_return*/);
+				CExpression *pexprScalar =
+					exprhdl.PexprScalarExactChild(2 /*child_index*/);
+
+				if (NULL != origJoinPredForIndexNLJ &&
+					CUtils::FScalarConstTrue(pexprScalar))
+				{
+					// use the original join predicate, not the "true" expression of the
+					// index nested loop join, for dynamic partition elimination
+					pexprScalar = origJoinPredForIndexNLJ;
+				}
+
 				AddFilterOnPartKey(mp, true /*fNLJoin*/, pexprScalar, ppim,
 								   ppfm, child_index, part_idx_id,
 								   fOuterPartConsumer, ppimResult, ppfmResult,
@@ -1097,8 +1295,8 @@ CPhysicalJoin::PppsRequiredCompute(CMemoryPool *mp, CExpressionHandle &exprhdl,
 			else
 			{
 				// look for a filter on the part key
-				CExpression *pexprScalar = exprhdl.PexprScalarExactChild(
-					2 /*child_index*/, true /*error_on_null_return*/);
+				CExpression *pexprScalar =
+					exprhdl.PexprScalarExactChild(2 /*child_index*/);
 				AddFilterOnPartKey(mp, false /*fNLJoin*/, pexprScalar, ppim,
 								   ppfm, child_index, part_idx_id,
 								   fOuterPartConsumer, ppimResult, ppfmResult,
@@ -1130,6 +1328,7 @@ CPhysicalJoin::PppsRequiredJoinChild(CMemoryPool *mp,
 								   fNLJoin);
 	}
 
+	// try to find a previously generated CPartitionPropagationSpec in the cache, m_phmpp
 	CPartitionPropagationSpec *ppps = m_phmpp->Find(pppr);
 	if (NULL == ppps)
 	{

@@ -13,10 +13,10 @@
 
 #include "gpos/base.h"
 
-#include "gpdbcost/CCostModelGPDBLegacy.h"
 #include "gpopt/base/CAutoOptCtxt.h"
 #include "gpopt/base/CColRef.h"
 #include "gpopt/base/CQueryContext.h"
+#include "gpopt/base/CRange.h"
 #include "gpopt/engine/CEnumeratorConfig.h"
 #include "gpopt/mdcache/CMDAccessor.h"
 #include "gpopt/metadata/CTableDescriptor.h"
@@ -602,7 +602,7 @@ public:
 	static ICostModel *
 	GetCostModel(CMemoryPool *mp)
 	{
-		return GPOS_NEW(mp) CCostModelGPDBLegacy(mp, GPOPT_TEST_SEGMENTS);
+		return GPOS_NEW(mp) CCostModelGPDB(mp, GPOPT_TEST_SEGMENTS);
 	}
 
 	// create a datum with a given type, encoded value and int value
@@ -611,6 +611,9 @@ public:
 									  CWStringDynamic *pstrEncodedValue,
 									  LINT value);
 
+	// Create a datum with a given type and double value
+	static IDatum *CreateDoubleDatum(CMemoryPool *mp, CMDAccessor *md_accessor,
+									 IMDId *mdid_type, CDouble value);
 	// create an interval for generic data types
 	// does not take ownership of mdid_type
 	static CConstraintInterval *PciGenericInterval(

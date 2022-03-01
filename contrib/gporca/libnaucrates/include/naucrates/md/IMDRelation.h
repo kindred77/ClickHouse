@@ -137,6 +137,8 @@ public:
 	// retrieve the column at the given position in the distribution key for the relation
 	virtual const IMDColumn *GetDistrColAt(ULONG pos) const = 0;
 
+	virtual IMDId *GetDistrOpfamilyAt(ULONG pos) const = 0;
+
 	// return true if a hash distributed table needs to be considered as random
 	virtual BOOL ConvertHashToRandom() const = 0;
 
@@ -184,6 +186,21 @@ public:
 
 	// part constraint
 	virtual IMDPartConstraint *MDPartConstraint() const = 0;
+
+	// external partitions (for partitioned tables)
+	virtual IMdIdArray *
+	GetExternalPartitions() const
+	{
+		return NULL;
+	}
+
+	// contains any external partitions (for partitioned tables only)
+	BOOL
+	HasExternalPartitions() const
+	{
+		return (NULL != GetExternalPartitions() &&
+				GetExternalPartitions()->Size() > 0);
+	}
 
 	// relation distribution policy as a string value
 	static const CWStringConst *GetDistrPolicyStr(

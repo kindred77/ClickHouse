@@ -16,7 +16,6 @@
 #include "gpopt/base/CCastUtils.h"
 #include "gpopt/base/CDistributionSpecHashed.h"
 #include "gpopt/base/CDistributionSpecNonSingleton.h"
-#include "gpopt/base/CDistributionSpecReplicated.h"
 #include "gpopt/base/CUtils.h"
 #include "gpopt/operators/CExpressionHandle.h"
 #include "gpopt/operators/CPredicateUtils.h"
@@ -29,8 +28,9 @@ using namespace gpopt;
 // ctor
 CPhysicalFullMergeJoin::CPhysicalFullMergeJoin(
 	CMemoryPool *mp, CExpressionArray *outer_merge_clauses,
-	CExpressionArray *inner_merge_clauses)
-	: CPhysicalJoin(mp),
+	CExpressionArray *inner_merge_clauses, IMdIdArray *,
+	CXform::EXformId origin_xform)
+	: CPhysicalJoin(mp, origin_xform),
 	  m_outer_merge_clauses(outer_merge_clauses),
 	  m_inner_merge_clauses(inner_merge_clauses)
 {
@@ -55,18 +55,35 @@ CPhysicalFullMergeJoin::~CPhysicalFullMergeJoin()
 }
 
 CDistributionSpec *
-CPhysicalFullMergeJoin::PdsRequired(CMemoryPool *mp, CExpressionHandle &exprhdl,
-									CDistributionSpec *pdsRequired,
-									ULONG child_index,
+CPhysicalFullMergeJoin::PdsRequired(CMemoryPool * /*mp*/,
+									CExpressionHandle & /*exprhdl*/,
+									CDistributionSpec * /*pdsRequired*/,
+									ULONG /*child_index*/,
 									CDrvdPropArray *,  //pdrgpdpCtxt,
-									ULONG ulOptReq) const
+									ULONG /*ulOptReq*/) const
+{
+	GPOS_RAISE(
+		CException::ExmaInvalid, CException::ExmiInvalid,
+		GPOS_WSZ_LIT(
+			"PdsRequired should not be called for CPhysicalFullMergeJoin"));
+	return NULL;
+}
+
+CEnfdDistribution *
+CPhysicalFullMergeJoin::Ped(CMemoryPool *mp, CExpressionHandle &exprhdl,
+							CReqdPropPlan *prppInput, ULONG child_index,
+							CDrvdPropArray * /*pdrgpdpCtxt*/, ULONG ulOptReq)
 {
 	GPOS_ASSERT(2 > child_index);
+
+	CDistributionSpec *const pdsRequired = prppInput->Ped()->PdsRequired();
 
 	// if expression has to execute on a single host then we need a gather
 	if (exprhdl.NeedsSingletonExecution() || exprhdl.HasOuterRefs())
 	{
-		return PdsRequireSingleton(mp, exprhdl, pdsRequired, child_index);
+		return GPOS_NEW(mp) CEnfdDistribution(
+			PdsRequireSingleton(mp, exprhdl, pdsRequired, child_index),
+			CEnfdDistribution::EdmExact);
 	}
 
 	BOOL nulls_collocated = true;
@@ -95,19 +112,21 @@ CPhysicalFullMergeJoin::PdsRequired(CMemoryPool *mp, CExpressionHandle &exprhdl,
 
 		CDistributionSpecHashed *pds = GPOS_NEW(mp)
 			CDistributionSpecHashed(pdrgpexprCurrent, nulls_collocated);
-		return pds;
+		return GPOS_NEW(mp) CEnfdDistribution(pds, CEnfdDistribution::EdmExact);
 	}
 	else if (ulOptReq == num_hash_reqs)
 	{
 		clauses->AddRef();
 		CDistributionSpecHashed *pds =
 			GPOS_NEW(mp) CDistributionSpecHashed(clauses, nulls_collocated);
-		return pds;
+		return GPOS_NEW(mp) CEnfdDistribution(pds, CEnfdDistribution::EdmExact);
 	}
 	else
 	{
 		GPOS_ASSERT(ulOptReq == (num_hash_reqs + 1));
-		return PdsRequireSingleton(mp, exprhdl, pdsRequired, child_index);
+		return GPOS_NEW(mp) CEnfdDistribution(
+			PdsRequireSingleton(mp, exprhdl, pdsRequired, child_index),
+			CEnfdDistribution::EdmExact);
 	}
 }
 
@@ -147,6 +166,13 @@ CPhysicalFullMergeJoin::PosRequired(CMemoryPool *mp,
 
 		// Make sure that the corresponding properties (mergeStrategies, mergeNullsFirst)
 		// in CTranslatorDXLToPlStmt::TranslateDXLMergeJoin() match.
+		//
+		// NB: The operator used for sorting here is the '<' operator in the
+		// default btree opfamily of the column's type. For this to work correctly,
+		// the '=' operator of the merge join clauses must also belong to the same
+		// opfamily, which in this case, is the default of the type.
+		// See FMergeJoinCompatible() where predicates using a different opfamily
+		// are rejected from merge clauses.
 		gpmd::IMDId *mdid =
 			colref->RetrieveType()->GetMdidForCmpType(IMDType::EcmptL);
 		mdid->AddRef();

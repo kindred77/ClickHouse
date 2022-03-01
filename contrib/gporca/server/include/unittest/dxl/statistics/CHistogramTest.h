@@ -46,6 +46,11 @@ public:
 	// skew basic tests
 	static GPOS_RESULT EresUnittest_Skew();
 
+	// merge basic tests
+	static GPOS_RESULT EresUnittest_MergeUnion();
+
+	// merge union test with double values differing by less than epsilon
+	static GPOS_RESULT EresUnittest_MergeUnionDoubleLessThanEpsilon();
 };	// class CHistogramTest
 }  // namespace gpnaucrates
 

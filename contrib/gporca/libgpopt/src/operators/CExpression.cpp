@@ -10,6 +10,7 @@
 //---------------------------------------------------------------------------
 
 #include "gpos/base.h"
+#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/string/CWStringDynamic.h"
 #include "gpos/task/CAutoSuspendAbort.h"
@@ -28,10 +29,13 @@
 #include "gpopt/exception.h"
 #include "gpopt/metadata/CTableDescriptor.h"
 #include "gpopt/operators/CExpressionHandle.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/COperator.h"
+#include "gpopt/operators/CPattern.h"
+#include "gpopt/operators/CPatternNode.h"
+#include "gpopt/operators/CPhysicalCTEProducer.h"
 #include "gpopt/search/CGroupExpression.h"
+#include "naucrates/statistics/CStatistics.h"
 #include "naucrates/traceflags/traceflags.h"
-
 
 using namespace gpnaucrates;
 using namespace gpopt;
@@ -819,7 +823,12 @@ CExpression::FMatchPattern(CGroupExpression *pgexpr) const
 
 	if (this->Pop()->FPattern())
 	{
-		// a pattern operator matches any group expression
+		if (COperator::EopPatternNode == this->Pop()->Eopid())
+		{
+			return CPatternNode::PopConvert(this->Pop())
+				->MatchesOperator(pgexpr->Pop()->Eopid());
+		}
+		// a pattern operator other than a CPatternNode matches any group expression
 		return true;
 	}
 	else
@@ -944,7 +953,10 @@ CExpression::FMatchPattern(CExpression *pexprPattern) const
 		return true;
 	}
 
-	if (Pop()->Eopid() == op_id)
+	if (Pop()->Eopid() == op_id ||
+		(COperator::EopPatternNode == op_id &&
+		 CPatternNode::PopConvert(pexprPattern->Pop())
+			 ->MatchesOperator(Pop()->Eopid())))
 	{
 		// check arity, children
 		return FMatchPatternChildren(pexprPattern);
@@ -1109,6 +1121,8 @@ CExpression::DbgPrintWithProperties() const
 }
 
 #endif	// GPOS_DEBUG
+
+FORCE_GENERATE_DBGSTR(gpopt::CExpression);
 
 //---------------------------------------------------------------------------
 //	@function:

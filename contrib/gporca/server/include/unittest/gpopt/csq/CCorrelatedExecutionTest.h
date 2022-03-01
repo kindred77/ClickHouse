@@ -22,6 +22,11 @@
 #include "gpopt/operators/CExpression.h"
 #include "gpopt/operators/COperator.h"
 
+// forward declarations
+namespace gpdxl
+{
+typedef CDynamicPtrArray<INT, CleanupDelete> IntPtrArray;
+}
 
 namespace gpopt
 {

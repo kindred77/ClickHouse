@@ -13,6 +13,7 @@
 #define GPNAUCRATES_CBucket_H
 
 #include "gpos/base.h"
+#include "gpos/common/DbgPrintMixin.h"
 #include "gpos/error/CAutoTrace.h"
 #include "gpos/task/CTask.h"
 
@@ -42,7 +43,7 @@ typedef CDynamicPtrArray<CBucket, CleanupDelete> CBucketArray;
 //
 //---------------------------------------------------------------------------
 
-class CBucket : public IBucket
+class CBucket : public IBucket, public gpos::DbgPrintMixin<CBucket>
 {
 private:
 	// lower bound of bucket
@@ -88,7 +89,8 @@ public:
 	BOOL IsAfter(const CPoint *point) const;
 
 	// what percentage of bucket is covered by [lb,pp]
-	CDouble GetOverlapPercentage(const CPoint *point) const;
+	CDouble GetOverlapPercentage(const CPoint *point,
+								 BOOL include_point = true) const;
 
 	// frequency associated with bucket
 	CDouble
@@ -167,10 +169,6 @@ public:
 	// print function
 	virtual IOstream &OsPrint(IOstream &os) const;
 
-#ifdef GPOS_DEBUG
-	void DbgPrint() const;
-#endif
-
 	// construct new bucket with lower bound greater than given point
 	CBucket *MakeBucketGreaterThan(CMemoryPool *mp, CPoint *point) const;
 
@@ -183,6 +181,7 @@ public:
 								  BOOL include_lower) const;
 
 	// extract singleton bucket at given point
+	// use_width to calculate the scaling ratio instead of default (ndv)
 	CBucket *MakeBucketSingleton(CMemoryPool *mp,
 								 CPoint *point_singleton) const;
 
@@ -203,12 +202,12 @@ public:
 	CBucket *MakeBucketUpdateFrequency(CMemoryPool *mp, CDouble rows_old,
 									   CDouble rows_new);
 
-	// Merge with another bucket and return leftovers
-	CBucket *MakeBucketMerged(CMemoryPool *mp, CBucket *bucket_other,
-							  CDouble rows, CDouble rows_other,
-							  CBucket **result_bucket1_new,
-							  CBucket **result_bucket2_new,
-							  BOOL is_union_all = true);
+	// Attempt a merge with another bucket and return leftovers
+	CBucket *SplitAndMergeBuckets(CMemoryPool *mp, CBucket *bucket_other,
+								  CDouble rows, CDouble rows_other,
+								  CBucket **bucket1_new, CBucket **bucket2_new,
+								  CDouble *result_rows,
+								  BOOL is_union_all = true);
 
 	// does bucket support sampling
 	BOOL
@@ -216,6 +215,8 @@ public:
 	{
 		return m_bucket_lower_bound->GetDatum()->StatsMappable();
 	}
+
+	BOOL Equals(const CBucket *bucket);
 
 	// generate a random data point within bucket boundaries
 	CDouble GetSample(ULONG *seed) const;

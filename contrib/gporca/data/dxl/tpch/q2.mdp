@@ -3,7 +3,7 @@
   <dxl:Thread Id="0">
     <dxl:OptimizerConfig>
       <dxl:EnumeratorConfig Id="0" PlanSamples="0" CostThreshold="0"/>
-      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000"/>
+      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000" MaxStatsBuckets="100"/>
       <dxl:CTEConfig CTEInliningCutoff="0"/> 
       <dxl:WindowOids RowNumber="7000" Rank="7001"/>
       <dxl:TraceFlags Value="103001"/>
@@ -3719,7 +3719,7 @@
                             <dxl:Filter/>
                             <dxl:SortingColumnList/>
                             <dxl:HashExprList>
-                              <dxl:HashExpr TypeMdid="0.23.1.0">
+                              <dxl:HashExpr>
                                 <dxl:Ident ColId="0" ColName="p_partkey" TypeMdid="0.23.1.0"/>
                               </dxl:HashExpr>
                             </dxl:HashExprList>
@@ -4239,7 +4239,7 @@
                                 <dxl:Filter/>
                                 <dxl:SortingColumnList/>
                                 <dxl:HashExprList>
-                                  <dxl:HashExpr TypeMdid="0.23.1.0">
+                                  <dxl:HashExpr>
                                     <dxl:Ident ColId="31" ColName="ps_suppkey" TypeMdid="0.23.1.0"/>
                                   </dxl:HashExpr>
                                 </dxl:HashExprList>

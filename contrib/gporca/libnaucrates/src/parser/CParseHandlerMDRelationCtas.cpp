@@ -18,6 +18,7 @@
 #include "naucrates/dxl/parser/CParseHandlerFactory.h"
 #include "naucrates/dxl/parser/CParseHandlerManager.h"
 #include "naucrates/dxl/parser/CParseHandlerMetadataColumns.h"
+#include "naucrates/dxl/parser/CParseHandlerMetadataIdList.h"
 #include "naucrates/dxl/parser/CParseHandlerScalarOp.h"
 #include "naucrates/md/CMDRelationCtasGPDB.h"
 
@@ -52,9 +53,9 @@ CParseHandlerMDRelationCtas::CParseHandlerMDRelationCtas(
 //
 //---------------------------------------------------------------------------
 void
-CParseHandlerMDRelationCtas::StartElement(const XMLCh *const,  // element_uri,
+CParseHandlerMDRelationCtas::StartElement(const XMLCh *const,
 										  const XMLCh *const element_local_name,
-										  const XMLCh *const,  // element_qname
+										  const XMLCh *const,
 										  const Attributes &attrs)
 {
 	if (0 !=
@@ -108,6 +109,20 @@ CParseHandlerMDRelationCtas::StartElement(const XMLCh *const,  // element_uri,
 		m_parse_handler_mgr->GetDXLMemoryManager(), vartypemod_xml,
 		EdxltokenVarTypeModList, EdxltokenRelation);
 
+	// parse handler for distr opclasses
+	CParseHandlerBase *opclasses_parse_handler =
+		CParseHandlerFactory::GetParseHandler(
+			m_mp, CDXLTokens::XmlstrToken(EdxltokenMetadataIdList),
+			m_parse_handler_mgr, this);
+	m_parse_handler_mgr->ActivateParseHandler(opclasses_parse_handler);
+
+	// parse handler for distr opfamilies
+	CParseHandlerBase *opfamilies_parse_handler =
+		CParseHandlerFactory::GetParseHandler(
+			m_mp, CDXLTokens::XmlstrToken(EdxltokenMetadataIdList),
+			m_parse_handler_mgr, this);
+	m_parse_handler_mgr->ActivateParseHandler(opfamilies_parse_handler);
+
 	//parse handler for the storage options
 	CParseHandlerBase *ctas_options_parse_handler =
 		CParseHandlerFactory::GetParseHandler(
@@ -125,6 +140,8 @@ CParseHandlerMDRelationCtas::StartElement(const XMLCh *const,  // element_uri,
 	// store parse handlers
 	this->Append(columns_parse_handler);
 	this->Append(ctas_options_parse_handler);
+	this->Append(opfamilies_parse_handler);
+	this->Append(opclasses_parse_handler);
 }
 
 //---------------------------------------------------------------------------
@@ -155,9 +172,15 @@ CParseHandlerMDRelationCtas::EndElement(const XMLCh *const,	 // element_uri,
 		dynamic_cast<CParseHandlerMetadataColumns *>((*this)[0]);
 	CParseHandlerCtasStorageOptions *ctas_options_parse_handler =
 		dynamic_cast<CParseHandlerCtasStorageOptions *>((*this)[1]);
+	CParseHandlerMetadataIdList *opfamilies_parse_handler =
+		dynamic_cast<CParseHandlerMetadataIdList *>((*this)[2]);
+	CParseHandlerMetadataIdList *opclasses_parse_handler =
+		dynamic_cast<CParseHandlerMetadataIdList *>((*this)[3]);
 
 	GPOS_ASSERT(NULL != md_cols_parse_handler->GetMdColArray());
 	GPOS_ASSERT(NULL != ctas_options_parse_handler->GetDxlCtasStorageOption());
+	GPOS_ASSERT(NULL != opfamilies_parse_handler->GetMdIdArray());
+	GPOS_ASSERT(NULL != opclasses_parse_handler->GetMdIdArray());
 
 	CMDColumnArray *md_col_array = md_cols_parse_handler->GetMdColArray();
 	CDXLCtasStorageOptions *dxl_ctas_storage_options =
@@ -166,10 +189,22 @@ CParseHandlerMDRelationCtas::EndElement(const XMLCh *const,	 // element_uri,
 	md_col_array->AddRef();
 	dxl_ctas_storage_options->AddRef();
 
+	IMdIdArray *distr_opfamilies =
+		dynamic_cast<CParseHandlerMetadataIdList *>(opfamilies_parse_handler)
+			->GetMdIdArray();
+	distr_opfamilies->AddRef();
+
+	IMdIdArray *distr_opclasses =
+		dynamic_cast<CParseHandlerMetadataIdList *>(opclasses_parse_handler)
+			->GetMdIdArray();
+	distr_opclasses->AddRef();
+
+
 	m_imd_obj = GPOS_NEW(m_mp) CMDRelationCtasGPDB(
 		m_mp, m_mdid, m_mdname_schema, m_mdname, m_is_temp_table, m_has_oids,
 		m_rel_storage_type, m_rel_distr_policy, md_col_array, m_distr_col_array,
-		m_key_sets_arrays, dxl_ctas_storage_options, m_vartypemod_array);
+		distr_opfamilies, distr_opclasses, m_key_sets_arrays,
+		dxl_ctas_storage_options, m_vartypemod_array);
 
 	// deactivate handler
 	m_parse_handler_mgr->DeactivateHandler();

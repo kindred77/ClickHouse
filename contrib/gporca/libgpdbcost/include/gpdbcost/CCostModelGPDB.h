@@ -18,6 +18,7 @@
 #include "gpopt/cost/CCost.h"
 #include "gpopt/cost/ICostModel.h"
 #include "gpopt/cost/ICostModelParams.h"
+#include "gpopt/operators/COperator.h"
 
 
 namespace gpdbcost
@@ -113,6 +114,11 @@ private:
 	static CCost CostIndexScan(CMemoryPool *mp, CExpressionHandle &exprhdl,
 							   const CCostModelGPDB *pcmgpdb,
 							   const SCostingInfo *pci);
+
+	// cost of index only scan
+	static CCost CostIndexOnlyScan(CMemoryPool *mp, CExpressionHandle &exprhdl,
+								   const CCostModelGPDB *pcmgpdb,
+								   const SCostingInfo *pci);
 
 	// cost of bitmap table scan
 	static CCost CostBitmapTableScan(CMemoryPool *mp,

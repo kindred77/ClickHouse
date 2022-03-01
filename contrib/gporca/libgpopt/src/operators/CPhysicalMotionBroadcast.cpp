@@ -13,6 +13,7 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/base/CDistributionSpecReplicated.h"
 #include "gpopt/base/COptCtxt.h"
 #include "gpopt/operators/CExpressionHandle.h"
 
@@ -30,7 +31,8 @@ using namespace gpopt;
 CPhysicalMotionBroadcast::CPhysicalMotionBroadcast(CMemoryPool *mp)
 	: CPhysicalMotion(mp), m_pdsReplicated(NULL)
 {
-	m_pdsReplicated = GPOS_NEW(mp) CDistributionSpecReplicated();
+	m_pdsReplicated = GPOS_NEW(mp)
+		CDistributionSpecReplicated(CDistributionSpec::EdtStrictReplicated);
 }
 
 

@@ -210,6 +210,16 @@ CLogicalIndexGet::DeriveOuterReferences(CMemoryPool *mp,
 	return PcrsDeriveOuterIndexGet(mp, exprhdl);
 }
 
+CKeyCollection *
+CLogicalIndexGet::DeriveKeyCollection(CMemoryPool *mp,
+									  CExpressionHandle &  // exprhdl
+) const
+{
+	const CBitSetArray *pdrgpbs = m_ptabdesc->PdrgpbsKeys();
+
+	return CLogical::PkcKeysBaseTable(mp, pdrgpbs, m_pdrgpcrOutput);
+}
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CLogicalIndexGet::FInputOrderSensitive
@@ -238,6 +248,7 @@ CLogicalIndexGet::PxfsCandidates(CMemoryPool *mp) const
 	CXformSet *xform_set = GPOS_NEW(mp) CXformSet(mp);
 
 	(void) xform_set->ExchangeSet(CXform::ExfIndexGet2IndexScan);
+	(void) xform_set->ExchangeSet(CXform::ExfIndexGet2IndexOnlyScan);
 
 	return xform_set;
 }

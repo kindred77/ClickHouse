@@ -35,6 +35,7 @@ public:
 	enum EdxlOpListType
 	{
 		EdxloplistEqFilterList,
+		EdxloplistEqFilterElemList,
 		EdxloplistFilterList,
 		EdxloplistGeneral,
 		EdxloplistSentinel

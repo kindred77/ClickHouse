@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 
+#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/string/CWStringDynamic.h"
 
@@ -391,26 +392,29 @@ CStatisticsTest::EresUnittest_CStatisticsBasic()
 	if (NULL == col_factory->LookupColRef(1 /*id*/))
 	{
 		// create column references for grouping columns
-		(void) col_factory->PcrCreate(pmdtypeint4, default_type_modifier, NULL,
-									  0 /* attno */, false /*IsNullable*/,
-									  1 /* id */, CName(&strColA),
-									  pexprGet->Pop()->UlOpId());
+		(void) col_factory->PcrCreate(
+			pmdtypeint4, default_type_modifier, NULL, 0 /* attno */,
+			false /*IsNullable*/, 1 /* id */, CName(&strColA),
+			pexprGet->Pop()->UlOpId(), false /*IsDistCol*/
+		);
 	}
 
 	if (NULL == col_factory->LookupColRef(2 /*id*/))
 	{
-		(void) col_factory->PcrCreate(pmdtypeint4, default_type_modifier, NULL,
-									  1 /* attno */, false /*IsNullable*/,
-									  2 /* id */, CName(&strColB),
-									  pexprGet->Pop()->UlOpId());
+		(void) col_factory->PcrCreate(
+			pmdtypeint4, default_type_modifier, NULL, 1 /* attno */,
+			false /*IsNullable*/, 2 /* id */, CName(&strColB),
+			pexprGet->Pop()->UlOpId(), false /*IsDistCol*/
+		);
 	}
 
 	if (NULL == col_factory->LookupColRef(10 /*id*/))
 	{
-		(void) col_factory->PcrCreate(pmdtypeint4, default_type_modifier, NULL,
-									  2 /* attno */, false /*IsNullable*/,
-									  10 /* id */, CName(&strColC),
-									  pexprGet->Pop()->UlOpId());
+		(void) col_factory->PcrCreate(
+			pmdtypeint4, default_type_modifier, NULL, 2 /* attno */,
+			false /*IsNullable*/, 10 /* id */, CName(&strColC),
+			pexprGet->Pop()->UlOpId(), false /*IsDistCol*/
+		);
 	}
 
 	// create hash map from colid -> histogram
@@ -586,10 +590,8 @@ CStatisticsTest::Pdrgpstatspred2(CMemoryPool *mp)
 		GPOS_NEW(mp) CWStringDynamic(mp, GPOS_WSZ_LIT("HxEAAA=="));
 	CWStringDynamic *pstrUpperDate =
 		GPOS_NEW(mp) CWStringDynamic(mp, GPOS_WSZ_LIT("LREAAA=="));
-	LINT lLowerDate =
-		LINT(4383) * LINT(INT64_C(86400000000));  // microseconds per day
-	LINT lUpperDate =
-		LINT(4397) * LINT(INT64_C(86400000000));  // microseconds per day
+	LINT lLowerDate = LINT(4383);
+	LINT lUpperDate = LINT(4397);
 	StatsFilterGeneric(mp, 4, GPDB_DATE, pstrLowerDate, pstrUpperDate,
 					   lLowerDate, lUpperDate, pdrgpstatspred);
 

@@ -67,6 +67,7 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenDampingFactorFilter, GPOS_WSZ_LIT("DampingFactorFilter")},
 		{EdxltokenDampingFactorJoin, GPOS_WSZ_LIT("DampingFactorJoin")},
 		{EdxltokenDampingFactorGroupBy, GPOS_WSZ_LIT("DampingFactorGroupBy")},
+		{EdxltokenMaxStatsBuckets, GPOS_WSZ_LIT("MaxStatsBuckets")},
 		{EdxltokenCTEConfig, GPOS_WSZ_LIT("CTEConfig")},
 		{EdxltokenCTEInliningCutoff, GPOS_WSZ_LIT("CTEInliningCutoff")},
 		{EdxltokenCostModelConfig, GPOS_WSZ_LIT("CostModelConfig")},
@@ -253,6 +254,7 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenScalarSubPlanTypeAll, GPOS_WSZ_LIT("AllSubPlan")},
 
 		{EdxltokenPartLevelEqFilterList, GPOS_WSZ_LIT("PartEqFilters")},
+		{EdxltokenPartLevelEqFilterElemList, GPOS_WSZ_LIT("PartEqFilterElems")},
 		{EdxltokenPartLevelFilterList, GPOS_WSZ_LIT("PartFilters")},
 		{EdxltokenPartLevel, GPOS_WSZ_LIT("Level")},
 		{EdxltokenScalarPartOid, GPOS_WSZ_LIT("PartOid")},
@@ -371,6 +373,8 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenTotalCost, GPOS_WSZ_LIT("TotalCost")},
 		{EdxltokenRows, GPOS_WSZ_LIT("Rows")},
 		{EdxltokenWidth, GPOS_WSZ_LIT("Width")},
+		{EdxltokenRelPages, GPOS_WSZ_LIT("RelPages")},
+		{EdxltokenRelAllVisible, GPOS_WSZ_LIT("RelAllVisible")},
 		{EdxltokenTableName, GPOS_WSZ_LIT("TableName")},
 		{EdxltokenDerivedTableName, GPOS_WSZ_LIT("DerivedTableName")},
 		{EdxltokenExecuteAsUser, GPOS_WSZ_LIT("ExecuteAsUser")},
@@ -524,6 +528,12 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenRelDistrReplicated, GPOS_WSZ_LIT("Replicated")},
 		{EdxltokenConvertHashToRandom, GPOS_WSZ_LIT("ConvertHashToRandom")},
 
+		{EdxltokenRelDistrOpfamilies, GPOS_WSZ_LIT("DistrOpfamilies")},
+		{EdxltokenRelDistrOpfamily, GPOS_WSZ_LIT("DistrOpfamily")},
+
+		{EdxltokenRelDistrOpclasses, GPOS_WSZ_LIT("DistrOpclasses")},
+		{EdxltokenRelDistrOpclass, GPOS_WSZ_LIT("DistrOpclass")},
+
 		{EdxltokenExtRelRejLimit, GPOS_WSZ_LIT("RejectLimit")},
 		{EdxltokenExtRelRejLimitInRows, GPOS_WSZ_LIT("RejectLimitInRows")},
 		{EdxltokenExtRelFmtErrRel, GPOS_WSZ_LIT("FormatErrorRelId")},
@@ -564,6 +574,9 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenOpfamily, GPOS_WSZ_LIT("Opfamily")},
 		{EdxltokenOpfamilies, GPOS_WSZ_LIT("Opfamilies")},
 
+		{EdxltokenRelExternalPartitions, GPOS_WSZ_LIT("ExternalPartitions")},
+		{EdxltokenRelExternalPartition, GPOS_WSZ_LIT("ExternalPartition")},
+
 		{EdxltokenPartitions, GPOS_WSZ_LIT("Partitions")},
 		{EdxltokenPartition, GPOS_WSZ_LIT("Partition")},
 
@@ -574,6 +587,7 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenCheckConstraint, GPOS_WSZ_LIT("CheckConstraint")},
 
 		{EdxltokenPartConstraint, GPOS_WSZ_LIT("PartConstraint")},
+		{EdxltokenPartConstraintExprAbsent, GPOS_WSZ_LIT("ExprAbsent")},
 		{EdxltokenDefaultPartition, GPOS_WSZ_LIT("DefaultPartition")},
 		{EdxltokenPartConstraintUnbounded, GPOS_WSZ_LIT("Unbounded")},
 
@@ -586,6 +600,9 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenMDTypeFixedLength, GPOS_WSZ_LIT("IsFixedLength")},
 		{EdxltokenMDTypeLength, GPOS_WSZ_LIT("Length")},
 		{EdxltokenMDTypeByValue, GPOS_WSZ_LIT("PassByValue")},
+		{EdxltokenMDTypeDistrOpfamily, GPOS_WSZ_LIT("DistrOpfamily")},
+		{EdxltokenMDTypeLegacyDistrOpfamily,
+		 GPOS_WSZ_LIT("LegacyDistrOpfamily")},
 		{EdxltokenMDTypeEqOp, GPOS_WSZ_LIT("EqualityOp")},
 		{EdxltokenMDTypeNEqOp, GPOS_WSZ_LIT("InequalityOp")},
 		{EdxltokenMDTypeLTOp, GPOS_WSZ_LIT("LessThanOp")},
@@ -613,6 +630,9 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenGPDBScalarOpLTOpId, GPOS_WSZ_LIT("LessThanMergeOp")},
 		{EdxltokenGPDBScalarOpGTOpId, GPOS_WSZ_LIT("GreaterThanMergeOp")},
 		{EdxltokenGPDBScalarOpCmpType, GPOS_WSZ_LIT("ComparisonType")},
+		{EdxltokenGPDBScalarOpHashOpfamily, GPOS_WSZ_LIT("HashOpfamily")},
+		{EdxltokenGPDBScalarOpLegacyHashOpfamily,
+		 GPOS_WSZ_LIT("LegacyHashOpfamily")},
 
 		{EdxltokenCmpEq, GPOS_WSZ_LIT("Eq")},
 		{EdxltokenCmpNeq, GPOS_WSZ_LIT("NEq")},
@@ -652,6 +672,7 @@ CDXLTokens::Init(CMemoryPool *mp)
 		{EdxltokenGPDBFuncReturnsSet, GPOS_WSZ_LIT("ReturnsSet")},
 		{EdxltokenGPDBFuncStrict, GPOS_WSZ_LIT("IsStrict")},
 		{EdxltokenGPDBFuncNDVPreserving, GPOS_WSZ_LIT("IsNDVPreserving")},
+		{EdxltokenGPDBFuncIsAllowedForPS, GPOS_WSZ_LIT("IsAllowedForPS")},
 
 		{EdxltokenGPDBAgg, GPOS_WSZ_LIT("GPDBAgg")},
 		{EdxltokenGPDBIsAggOrdered, GPOS_WSZ_LIT("IsOrdered")},

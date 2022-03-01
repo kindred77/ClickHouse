@@ -3,6 +3,8 @@
 
 #include "unittest/dxl/CParseHandlerOptimizerConfigSerializeTest.h"
 
+#include "gpos/io/COstreamString.h"
+
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "naucrates/dxl/CDXLUtils.h"
 #include "naucrates/dxl/xml/CXMLSerializer.h"

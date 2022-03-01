@@ -14,9 +14,9 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/CExpressionHandle.h"
 #include "gpopt/operators/CNormalizer.h"
 #include "gpopt/operators/COperator.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CXformUtils.h"
 #include "naucrates/md/IMDScalarOp.h"
 

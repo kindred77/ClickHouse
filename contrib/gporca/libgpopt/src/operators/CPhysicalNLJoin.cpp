@@ -15,7 +15,6 @@
 
 #include "gpopt/base/COptCtxt.h"
 #include "gpopt/base/CRewindabilitySpec.h"
-#include "gpopt/base/CUtils.h"
 #include "gpopt/operators/CExpressionHandle.h"
 #include "gpopt/operators/CPhysicalCorrelatedInLeftSemiNLJoin.h"
 #include "gpopt/operators/CPhysicalCorrelatedInnerNLJoin.h"

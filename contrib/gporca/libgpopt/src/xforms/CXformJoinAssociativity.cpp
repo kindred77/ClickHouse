@@ -14,7 +14,10 @@
 #include "gpos/base.h"
 
 #include "gpopt/metadata/CTableDescriptor.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalInnerJoin.h"
+#include "gpopt/operators/CPatternLeaf.h"
+#include "gpopt/operators/CPatternTree.h"
+#include "gpopt/operators/CPredicateUtils.h"
 
 using namespace gpopt;
 using namespace gpmd;

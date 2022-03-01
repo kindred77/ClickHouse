@@ -40,9 +40,15 @@ public:
 		// mdid pair for the predicate
 		IMdIdArray *m_oid_pair;
 
+		// true if both sides of the predicate are distribution keys
+		BOOL m_dist_keys;
+
 		//ctor
-		SJoinCondition(CDouble scale_factor, IMdIdArray *mdid_pair)
-			: m_scale_factor(scale_factor), m_oid_pair(mdid_pair)
+		SJoinCondition(CDouble scale_factor, IMdIdArray *mdid_pair,
+					   BOOL both_dist_keys)
+			: m_scale_factor(scale_factor),
+			  m_oid_pair(mdid_pair),
+			  m_dist_keys(both_dist_keys)
 		{
 		}
 
@@ -94,7 +100,8 @@ public:
 	// calculate the cumulative join scaling factor
 	static CDouble CumulativeJoinScaleFactor(
 		CMemoryPool *mp, const CStatisticsConfig *stats_config,
-		SJoinConditionArray *join_conds_scale_factors);
+		SJoinConditionArray *join_conds_scale_factors,
+		CDouble limit_for_result_scale_factor);
 
 	// return scaling factor of the join predicate after apply damping
 	static CDouble DampedJoinScaleFactor(const CStatisticsConfig *stats_config,

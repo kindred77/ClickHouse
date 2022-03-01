@@ -12,11 +12,14 @@
 #include "gpopt/base/CPartKeys.h"
 
 #include "gpos/base.h"
+#include "gpos/error/CAutoTrace.h"
 
 #include "gpopt/base/CColRefSet.h"
 #include "gpopt/base/CUtils.h"
 
 using namespace gpopt;
+
+FORCE_GENERATE_DBGSTR(CPartKeys);
 
 //---------------------------------------------------------------------------
 //	@function:

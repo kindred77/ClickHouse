@@ -15,6 +15,7 @@
 
 #include "gpos/base.h"
 
+#include "naucrates/dxl/operators/CDXLScalarSubPlan.h"
 #include "naucrates/dxl/parser/CParseHandlerScalarOp.h"
 
 namespace gpdxl

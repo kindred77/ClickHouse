@@ -30,6 +30,7 @@ const CCostModelGPDBLegacy::SCostMapping CCostModelGPDBLegacy::m_rgcm[] = {
 
 	{COperator::EopPhysicalIndexScan, CostIndexScan},
 	{COperator::EopPhysicalDynamicIndexScan, CostIndexScan},
+	{COperator::EopPhysicalIndexOnlyScan, CostIndexScan},
 	{COperator::EopPhysicalBitmapTableScan, CostBitmapTableScan},
 	{COperator::EopPhysicalDynamicBitmapTableScan, CostBitmapTableScan},
 
@@ -59,6 +60,7 @@ const CCostModelGPDBLegacy::SCostMapping CCostModelGPDBLegacy::m_rgcm[] = {
 	{COperator::EopPhysicalLeftAntiSemiHashJoin, CostHashJoin},
 	{COperator::EopPhysicalLeftAntiSemiHashJoinNotIn, CostHashJoin},
 	{COperator::EopPhysicalLeftOuterHashJoin, CostHashJoin},
+	{COperator::EopPhysicalRightOuterHashJoin, CostHashJoin},
 
 	{COperator::EopPhysicalInnerIndexNLJoin, CostIndexNLJoin},
 	{COperator::EopPhysicalLeftOuterIndexNLJoin, CostIndexNLJoin},
@@ -709,7 +711,8 @@ CCostModelGPDBLegacy::CostHashJoin(CMemoryPool *,  // mp
 				COperator::EopPhysicalLeftSemiHashJoin == op_id ||
 				COperator::EopPhysicalLeftAntiSemiHashJoin == op_id ||
 				COperator::EopPhysicalLeftAntiSemiHashJoinNotIn == op_id ||
-				COperator::EopPhysicalLeftOuterHashJoin == op_id);
+				COperator::EopPhysicalLeftOuterHashJoin == op_id ||
+				COperator::EopPhysicalRightOuterHashJoin == op_id);
 #endif	// GPOS_DEBUG
 
 	DOUBLE num_rows_outer = pci->PdRows()[0];
@@ -952,6 +955,7 @@ CCostModelGPDBLegacy::CostIndexScan(CMemoryPool *,	// mp
 
 	COperator::EOperatorId op_id = exprhdl.Pop()->Eopid();
 	GPOS_ASSERT(COperator::EopPhysicalIndexScan == op_id ||
+				COperator::EopPhysicalIndexOnlyScan == op_id ||
 				COperator::EopPhysicalDynamicIndexScan == op_id);
 
 	CDouble dRandomIOBandwidth =
@@ -964,6 +968,7 @@ CCostModelGPDBLegacy::CostIndexScan(CMemoryPool *,	// mp
 	{
 		case COperator::EopPhysicalDynamicIndexScan:
 		case COperator::EopPhysicalIndexScan:
+		case COperator::EopPhysicalIndexOnlyScan:
 			return CCost(pci->NumRebinds() * (pci->Rows() * pci->Width()) /
 						 dRandomIOBandwidth);
 

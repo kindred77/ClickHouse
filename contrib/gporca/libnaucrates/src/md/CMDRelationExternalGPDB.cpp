@@ -28,10 +28,12 @@ using namespace gpmd;
 CMDRelationExternalGPDB::CMDRelationExternalGPDB(
 	CMemoryPool *mp, IMDId *mdid, CMDName *mdname,
 	Ereldistrpolicy rel_distr_policy, CMDColumnArray *mdcol_array,
-	ULongPtrArray *distr_col_array, BOOL convert_hash_to_random,
-	ULongPtr2dArray *keyset_array, CMDIndexInfoArray *md_index_info_array,
-	IMdIdArray *mdid_triggers_array, IMdIdArray *mdid_check_constraint_array,
-	INT reject_limit, BOOL is_reject_limit_in_rows, IMDId *mdid_fmt_err_table)
+	ULongPtrArray *distr_col_array, IMdIdArray *distr_opfamilies,
+	BOOL convert_hash_to_random, ULongPtr2dArray *keyset_array,
+	CMDIndexInfoArray *md_index_info_array, IMdIdArray *mdid_triggers_array,
+	IMdIdArray *mdid_check_constraint_array,
+	IMDPartConstraint *mdpart_constraint, INT reject_limit,
+	BOOL is_reject_limit_in_rows, IMDId *mdid_fmt_err_table)
 	: m_mp(mp),
 	  m_mdid(mdid),
 	  m_mdname(mdname),
@@ -39,11 +41,13 @@ CMDRelationExternalGPDB::CMDRelationExternalGPDB(
 	  m_md_col_array(mdcol_array),
 	  m_dropped_cols(0),
 	  m_distr_col_array(distr_col_array),
+	  m_distr_opfamilies(distr_opfamilies),
 	  m_convert_hash_to_random(convert_hash_to_random),
 	  m_keyset_array(keyset_array),
 	  m_mdindex_info_array(md_index_info_array),
 	  m_mdid_trigger_array(mdid_triggers_array),
 	  m_mdid_check_constraint_array(mdid_check_constraint_array),
+	  m_mdpart_constraint(mdpart_constraint),
 	  m_reject_limit(reject_limit),
 	  m_is_rej_limit_in_rows(is_reject_limit_in_rows),
 	  m_mdid_fmt_err_table(mdid_fmt_err_table),
@@ -61,6 +65,8 @@ CMDRelationExternalGPDB::CMDRelationExternalGPDB(
 		convert_hash_to_random,
 		IMDRelation::EreldistrHash == rel_distr_policy &&
 			"Converting hash distributed table to random only possible for hash distributed tables");
+	GPOS_ASSERT(NULL == distr_opfamilies ||
+				distr_opfamilies->Size() == m_distr_col_array->Size());
 
 	m_colpos_nondrop_colpos_map = GPOS_NEW(m_mp) UlongToUlongMap(m_mp);
 	m_attrno_nondrop_col_pos_map = GPOS_NEW(m_mp) IntToUlongMap(m_mp);
@@ -73,8 +79,8 @@ CMDRelationExternalGPDB::CMDRelationExternalGPDB(
 	{
 		IMDColumn *pmdcol = (*mdcol_array)[ul];
 
-		BOOL fSystemCol = pmdcol->IsSystemColumn();
-		if (fSystemCol)
+		BOOL isSystemCol = pmdcol->IsSystemColumn();
+		if (isSystemCol)
 		{
 			m_system_columns++;
 		}
@@ -85,7 +91,7 @@ CMDRelationExternalGPDB::CMDRelationExternalGPDB(
 		}
 		else
 		{
-			if (!fSystemCol)
+			if (!isSystemCol)
 			{
 				m_nondrop_col_pos_array->Append(GPOS_NEW(m_mp) ULONG(ul));
 			}
@@ -119,6 +125,7 @@ CMDRelationExternalGPDB::~CMDRelationExternalGPDB()
 	m_mdid->Release();
 	m_md_col_array->Release();
 	CRefCount::SafeRelease(m_distr_col_array);
+	CRefCount::SafeRelease(m_distr_opfamilies);
 	CRefCount::SafeRelease(m_keyset_array);
 	m_mdindex_info_array->Release();
 	m_mdid_trigger_array->Release();
@@ -126,6 +133,7 @@ CMDRelationExternalGPDB::~CMDRelationExternalGPDB()
 	m_mdid_check_constraint_array->Release();
 	CRefCount::SafeRelease(m_mdid_fmt_err_table);
 
+	CRefCount::SafeRelease(m_mdpart_constraint);
 	CRefCount::SafeRelease(m_colpos_nondrop_colpos_map);
 	CRefCount::SafeRelease(m_attrno_nondrop_col_pos_map);
 	CRefCount::SafeRelease(m_nondrop_col_pos_array);
@@ -277,6 +285,18 @@ CMDRelationExternalGPDB::NonDroppedColAt(ULONG pos) const
 	return *pul;
 }
 
+IMDId *
+CMDRelationExternalGPDB::GetDistrOpfamilyAt(ULONG pos) const
+{
+	if (m_distr_opfamilies == NULL)
+	{
+		GPOS_RAISE(CException::ExmaInvalid, CException::ExmiInvalid,
+				   GPOS_WSZ_LIT("GetDistrOpfamilyAt() returning NULL."));
+	}
+
+	GPOS_ASSERT(pos < m_distr_opfamilies->Size());
+	return (*m_distr_opfamilies)[pos];
+}
 //---------------------------------------------------------------------------
 //	@function:
 //		CMDRelationExternalGPDB::GetPosFromAttno
@@ -512,6 +532,12 @@ CMDRelationExternalGPDB::CheckConstraintMDidAt(ULONG pos) const
 	return (*m_mdid_check_constraint_array)[pos];
 }
 
+IMDPartConstraint *
+CMDRelationExternalGPDB::MDPartConstraint() const
+{
+	return m_mdpart_constraint;
+}
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CMDRelationExternalGPDB::Serialize
@@ -621,6 +647,21 @@ CMDRelationExternalGPDB::Serialize(CXMLSerializer *xml_serializer) const
 	SerializeMDIdList(xml_serializer, m_mdid_check_constraint_array,
 					  CDXLTokens::GetDXLTokenStr(EdxltokenCheckConstraints),
 					  CDXLTokens::GetDXLTokenStr(EdxltokenCheckConstraint));
+
+	// serialize operator class information, if present
+	if (EreldistrHash == m_rel_distr_policy && NULL != m_distr_opfamilies)
+	{
+		SerializeMDIdList(
+			xml_serializer, m_distr_opfamilies,
+			CDXLTokens::GetDXLTokenStr(EdxltokenRelDistrOpfamilies),
+			CDXLTokens::GetDXLTokenStr(EdxltokenRelDistrOpfamily));
+	}
+
+	// serialize part constraint
+	if (NULL != m_mdpart_constraint)
+	{
+		m_mdpart_constraint->Serialize(xml_serializer);
+	}
 
 	xml_serializer->CloseElement(
 		CDXLTokens::GetDXLTokenStr(EdxltokenNamespacePrefix),

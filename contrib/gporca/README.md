@@ -14,28 +14,18 @@
 Welcome to GPORCA, the Greenplum Next Generation Query Optimizer!
 
 To understand the objectives and architecture of GPORCA please refer to the following articles:
-* [Orca: A Modular Query Optimizer Architecture for Big Data](https://tanzu.vmware.com/content/white-papers/orca-a-modular-query-optimizer-architecture-for-big-data).
+* [Orca: A Modular Query Optimizer Architecture for Big Data](https://content.pivotal.io/white-papers/orca-a-modular-query-optimizer-architecture-for-big-data).
 * [Profiling Query Compilation Time with GPORCA](http://engineering.pivotal.io/post/orca-profiling/)
 * [Improving Constraints In ORCA](http://engineering.pivotal.io/post/making-orca-smarter/)
 
-Want to [Contribute](CONTRIBUTING.md)?
-
-Questions? Connect with Greenplum on [Slack](https://greenplum.slack.com).
+Want to [Contribute](#contribute)?
 
 GPORCA supports various build types: debug, release with debug info, release.
-You'll need CMake 3.1 or higher to build GPORCA. Get it from cmake.org, or your
-operating system's package manager.
-
-Note: GPDB 6X and later contain their own copy of GPORCA, this version is for GPDB 5X and any other uses.
+You'll need CMake 3.1 or higher to build the gporca_test and gpos_test
+utilities to test GPORCA. Get it from cmake.org, or your operating system's
+package manager.
 
 # First Time Setup
-
-## Clone GPORCA
-
-```
-git clone https://github.com/greenplum-db/gporca.git
-cd gporca
-```
 
 ## Pre-Requisites
 
@@ -49,24 +39,22 @@ gives instructions for building and installing.
 
 ## Build and install GPORCA
 
-ORCA is built with [CMake](https://cmake.org), so any build system supported by
-CMake can be used. The team uses [Ninja](https://ninja-build.org) because it's
-really really fast and convenient.
+ORCA is built automatically with GPDB as long as `--disable-orca` is not used.
+<a name="test"></a>
 
-Go into `gporca` directory:
+## Test GPORCA
+To test GPORCA, first go into the `gporca` directory:
 
 ```
 cmake -GNinja -H. -Bbuild
-ninja install -C build
 ```
 
-<a name="test"></a>
-## Test GPORCA
 
 To run all GPORCA tests, simply use the `ctest` command from the build directory
 after build finishes.
 
 ```
+cd build
 ctest
 ```
 
@@ -198,22 +186,6 @@ mdp files
 
 4. Ensure that all changes are valid and as expected.
 
-## Concourse
-GPORCA contains a series of pipeline and task files to run various sets of tests
-on [concourse](http://concourse.ci/). You can learn more about deploying concourse with
-[bosh at bosh.io](http://bosh.io/).
-
-Our concourse currently runs the following sets of tests:
-* build and ctest on centos6
-* build and ctest on centos7
-* build and ctest on ubuntu18
-
-All configuration files for our concourse pipelines can be found in the `concourse/` 
-directory.
-
-Note: concourse jobs and pipelines for GPORCA are currently experimental and should not be considered
-ready for use in production-level CI environments.
-
 # Advanced Setup
 
 ## How to generate build files with different options
@@ -253,43 +225,6 @@ cmake -GNinja -D XERCES_INCLUDE_DIR=/opt/gp_xerces/include -D XERCES_LIBRARY=/op
 
 Again, on Mac OS X, the library name will end with `.dylib` instead of `.so`.
 
-## Cross-Compiling 32-bit or 64-bit libraries
-
-### GP-XERCES
-Unless you intend to cross-compile a 32 or 64-bit version of GP-Orca, you can ignore these
-instructions. If you need to explicitly compile for the 32 or 64-bit version of
-your architecture, you need to set the `CFLAGS` and `CXXFLAGS` environment
-variables for the configure script like so (use `-m32` for 32-bit, `-m64` for
-64-bit):
-
-```
-CFLAGS="-m32" CXXFLAGS="-m32" ../configure --prefix=/opt/gp_xerces_32
-```
-
-### GPORCA
-
-For the most part you should not need to explicitly compile a 32-bit or 64-bit
-version of the optimizer libraries. By default, a "native" version for your host
-platform will be compiled. However, if you are on x86 and want to, for example,
-build a 32-bit version of Optimizer libraries on a 64-bit machine, you can do
-so as described below. Note that you will need a "multilib" C++ compiler that
-supports the -m32/-m64 switches, and you may also need to install 32-bit ("i386")
-versions of the C and C++ standard libraries for your OS. Finally, you will need
-to build 32-bit or 64-bit versions of GP-Xerces as appropriate.
-
-Toolchain files for building 32 or 64-bit x86 libraries are located in the cmake
-directory. Here is an example of building for 32-bit x86:
-
-```
-cmake -GNinja -D CMAKE_TOOLCHAIN_FILE=../cmake/i386.toolchain.cmake ../
-```
-
-And for 64-bit x86:
-
-```
-cmake -GNinja -D CMAKE_TOOLCHAIN_FILE=../cmake/x86_64.toolchain.cmake ../
-```
-
 ## How to debug the build
 
 Show all command lines while building (for debugging purpose)
@@ -306,73 +241,10 @@ in combination with the feature being tested. These tests can take a long time
 to run and are not enabled by default. To turn extended tests on, add the cmake
 arguments `-D ENABLE_EXTENDED_TESTS=1`.
 
-## Installation Details
-
-GPORCA has four libraries:
-
-1. libnaucrates --- has all DXL related classes, and statistics related classes
-2. libgpopt     --- has all the code related to the optimization engine, meta-data accessor, logical / physical operators,
-                    transformation rules, and translators (DXL to expression and vice versa).
-3. libgpdbcost  --- cost model for GPDB.
-4. libgpos	--- abstraction of memory allocation, scheduling, error handling, and testing framework.
-
-By default, GPORCA will be installed under /usr/local. You can change this by
-setting CMAKE_INSTALL_PREFIX when running cmake, for example:
-```
-cmake -GNinja -D CMAKE_INSTALL_PREFIX=/home/user/gporca -H. -Bbuild
-```
-
-By default, the header files are located in:
-```
-/usr/local/include/naucrates
-/usr/local/include/gpdbcost
-/usr/local/include/gpopt
-/usr/local/include/gpos
-```
-the library is located at:
-
-```
-/usr/local/lib/libnaucrates.so*
-/usr/local/lib/libgpdbcost.so*
-/usr/local/lib/libgpopt.so*
-/usr/local/lib/libgpos.so*
-```
-
-Build and install:
-```
-ninja install -C build
-```
-
-### Common Issues
-
-Note that because Red Hat-based systems do not normally look for shared
-libraries in `/usr/local/lib`, it is suggested to add `/usr/local/lib` to the
-/etc/ld.so.conf and run `ldconfig` to rebuild the shared library cache if
-developing on one of these Linux distributions.
-
-## Cleanup
-
-Remove the `cmake` files generated under `build` folder of `gporca` repo:
-
-```
-rm -fr build/*
-```
-
-Remove gporca header files and library, (assuming the default install prefix /usr/local)
-
-```
-rm -rf /usr/local/include/naucrates
-rm -rf /usr/local/include/gpdbcost
-rm -rf /usr/local/include/gpopt
-rm -rf /usr/local/include/gpos
-rm -rf /usr/local/lib/libnaucrates.so*
-rm -rf /usr/local/lib/libgpdbcost.so*
-rm -rf /usr/local/lib/libgpopt.so*
-rm -rf /usr/local/lib/libgpos.so*
-```
-
 <a name="contribute"></a>
 # How to Contribute
+
+We accept contributions via [Github Pull requests](https://help.github.com/articles/using-pull-requests) only.
 
 
 ORCA has a [style guide](StyleGuilde.md), try to follow the existing style in your contribution to be consistent.
@@ -381,10 +253,10 @@ ORCA has a [style guide](StyleGuilde.md), try to follow the existing style in yo
 A set of [clang-format]-based rules are enforced in CI. Your editor or IDE may automatically support it. When in doubt, check formatting locally before submitting your PR:
 
 ```
-CLANG_FORMAT=clang-format scripts/fmt chk
+CLANG_FORMAT=clang-format src/tools/fmt chk
 ```
 
 For more information, head over to the [formatting README](README.format.md).
 
-Please see the [CONTRIBUTING](CONTRIBUTING.md) file for details.
+We follow GPDB's comprehensive contribution policy. Please refer to it [here](https://github.com/greenplum-db/gpdb#contributing) for details.
 

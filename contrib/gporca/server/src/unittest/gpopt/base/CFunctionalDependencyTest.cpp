@@ -10,6 +10,8 @@
 //---------------------------------------------------------------------------
 #include "unittest/gpopt/base/CFunctionalDependencyTest.h"
 
+#include "gpos/error/CAutoTrace.h"
+
 #include "gpopt/base/CFunctionalDependency.h"
 #include "gpopt/eval/CConstExprEvaluatorDefault.h"
 

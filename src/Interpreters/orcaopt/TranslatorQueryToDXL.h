@@ -8,7 +8,7 @@
 #ifndef SRC_INTERPRETERS_ORCAOPT_TRANSLATORQUERYTODXL_H_
 #define SRC_INTERPRETERS_ORCAOPT_TRANSLATORQUERYTODXL_H_
 
-#include "naucrates/dxl/CDXLUtils.h"
+#include <naucrates/dxl/CDXLUtils.h>
 #include <Parsers/ASTSelectQuery.h>
 
 namespace Poco
@@ -18,9 +18,13 @@ class Logger;
 
 namespace DB
 {
+class CDXLNode;
+
 class TranslatorQueryToDXL {
 
 public:
+    TranslatorQueryToDXL();
+
     TranslatorQueryToDXL(
         gpopt::CMDAccessor * metadata_accessor_,
         ASTPtr select_query_);

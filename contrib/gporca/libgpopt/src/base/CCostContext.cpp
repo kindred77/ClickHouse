@@ -12,6 +12,7 @@
 #include "gpopt/base/CCostContext.h"
 
 #include "gpos/base.h"
+#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/string/CWStringDynamic.h"
 
@@ -33,6 +34,8 @@
 
 using namespace gpopt;
 using namespace gpnaucrates;
+
+FORCE_GENERATE_DBGSTR(CCostContext);
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -135,6 +138,14 @@ CCostContext::FNeedsNewStats() const
 		return false;
 	}
 
+	if (!m_pdpplan->Ppim()->FContainsUnresolved())
+	{
+		// All partition selectors have been resolved at this level.
+		// No need to use DPE stats for the common ancestor join and
+		// nodes above it, that aren't affected by the partition selector.
+		return false;
+	}
+
 	CEnfdPartitionPropagation *pepp = Poc()->Prpp()->Pepp();
 
 	if (GPOS_FTRACE(EopttraceDeriveStatsForDPE) && CUtils::FPhysicalScan(pop) &&
@@ -193,10 +204,8 @@ CCostContext::DeriveStats()
 	exprhdl.DeriveCostContextStats();
 	if (NULL == exprhdl.Pstats())
 	{
-		GPOS_RAISE(
-			gpopt::ExmaGPOPT, gpopt::ExmiNoPlanFound,
-			GPOS_WSZ_LIT(
-				"Could not compute cost since statistics for the group no derived"));
+		GPOS_RAISE(gpopt::ExmaGPOPT, gpopt::ExmiNoStats,
+				   GPOS_WSZ_LIT("CCostContext"));
 	}
 
 	exprhdl.Pstats()->AddRef();

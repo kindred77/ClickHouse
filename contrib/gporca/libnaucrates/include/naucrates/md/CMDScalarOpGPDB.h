@@ -70,12 +70,18 @@ private:
 	// does operator return NULL when all inputs are NULL?
 	BOOL m_returns_null_on_null_input;
 
+	// operator classes this operator belongs to
+	IMdIdArray *m_mdid_opfamilies_array;
+
+	// compatible hash op family
+	IMDId *m_mdid_hash_opfamily;
+
+	// compatible legacy hash op family using legacy (cdbhash) opclass
+	IMDId *m_mdid_legacy_hash_opfamily;
+
 	// does operator preserve the NDV of its input(s)
 	// (used for cardinality estimation)
 	BOOL m_is_ndv_preserving;
-
-	// operator classes this operator belongs to
-	IMdIdArray *m_mdid_opfamilies_array;
 
 	CMDScalarOpGPDB(const CMDScalarOpGPDB &);
 
@@ -86,7 +92,9 @@ public:
 					IMDId *result_type_mdid, IMDId *mdid_func,
 					IMDId *mdid_commute_opr, IMDId *m_mdid_inverse_opr,
 					IMDType::ECmpType cmp_type, BOOL returns_null_on_null_input,
-					BOOL is_ndv_preserving, IMdIdArray *mdid_opfamilies_array);
+					IMdIdArray *mdid_opfamilies_array,
+					IMDId *m_mdid_hash_opfamily,
+					IMDId *mdid_legacy_hash_opfamily, BOOL is_ndv_preserving);
 
 	~CMDScalarOpGPDB();
 
@@ -143,6 +151,9 @@ public:
 
 	// operator class at given position
 	virtual IMDId *OpfamilyMdidAt(ULONG pos) const;
+
+	// compatible hash opfamily
+	virtual IMDId *HashOpfamilyMdid() const;
 
 #ifdef GPOS_DEBUG
 	// debug print of the type in the provided stream

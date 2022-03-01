@@ -10,6 +10,8 @@
 //---------------------------------------------------------------------------
 #include "unittest/gpopt/search/COptimizationJobsTest.h"
 
+#include "gpos/error/CAutoTrace.h"
+
 #include "gpopt/engine/CEngine.h"
 #include "gpopt/eval/CConstExprEvaluatorDefault.h"
 #include "gpopt/operators/CLogicalInnerJoin.h"

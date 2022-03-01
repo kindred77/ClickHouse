@@ -31,11 +31,10 @@
 #include "gpopt/operators/CLogicalCTEConsumer.h"
 #include "gpopt/operators/CLogicalCTEProducer.h"
 #include "gpopt/operators/CPhysicalMotionRandom.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "gpopt/search/CMemo.h"
 #include "gpopt/translate/CTranslatorExprToDXLUtils.h"
-#include "naucrates/base/CDatumGenericGPDB.h"
+#include "naucrates/base/IDatumBool.h"
 #include "naucrates/base/IDatumInt2.h"
 #include "naucrates/base/IDatumInt4.h"
 #include "naucrates/base/IDatumInt8.h"
@@ -50,6 +49,7 @@
 #include "naucrates/md/IMDScalarOp.h"
 #include "naucrates/md/IMDType.h"
 #include "naucrates/md/IMDTypeBool.h"
+#include "naucrates/md/IMDTypeGeneric.h"
 #include "naucrates/md/IMDTypeInt2.h"
 #include "naucrates/md/IMDTypeInt4.h"
 #include "naucrates/md/IMDTypeInt8.h"
@@ -140,6 +140,7 @@ CUtils::OsPrintDrgPcoldesc(IOstream &os, CColumnDescriptorArray *pdrgpcoldesc,
 
 	return os;
 }
+
 
 // generate a ScalarIdent expression
 CExpression *
@@ -1058,9 +1059,9 @@ CUtils::FPhysicalJoin(COperator *pop)
 	return FHashJoin(pop) || FNLJoin(pop);
 }
 
-// check if a given operator is a physical outer join
+// check if a given operator is a physical left outer join
 BOOL
-CUtils::FPhysicalOuterJoin(COperator *pop)
+CUtils::FPhysicalLeftOuterJoin(COperator *pop)
 {
 	GPOS_ASSERT(NULL != pop);
 
@@ -1621,14 +1622,13 @@ CUtils::PexprScalarConstNull(CMemoryPool *mp, const IMDType *typ,
 	IDatum *datum = NULL;
 	IMDId *mdid = typ->MDId();
 	mdid->AddRef();
-	CMDAccessor *md_accessor = COptCtxt::PoctxtFromTLS()->Pmda();
 
 	switch (typ->GetDatumType())
 	{
 		case IMDType::EtiInt2:
 		{
 			const IMDTypeInt2 *pmdtypeint2 =
-				md_accessor->PtMDType<IMDTypeInt2>();
+				static_cast<const IMDTypeInt2 *>(typ);
 			datum = pmdtypeint2->CreateInt2Datum(mp, 0, true);
 		}
 		break;
@@ -1636,7 +1636,7 @@ CUtils::PexprScalarConstNull(CMemoryPool *mp, const IMDType *typ,
 		case IMDType::EtiInt4:
 		{
 			const IMDTypeInt4 *pmdtypeint4 =
-				md_accessor->PtMDType<IMDTypeInt4>();
+				static_cast<const IMDTypeInt4 *>(typ);
 			datum = pmdtypeint4->CreateInt4Datum(mp, 0, true);
 		}
 		break;
@@ -1644,7 +1644,7 @@ CUtils::PexprScalarConstNull(CMemoryPool *mp, const IMDType *typ,
 		case IMDType::EtiInt8:
 		{
 			const IMDTypeInt8 *pmdtypeint8 =
-				md_accessor->PtMDType<IMDTypeInt8>();
+				static_cast<const IMDTypeInt8 *>(typ);
 			datum = pmdtypeint8->CreateInt8Datum(mp, 0, true);
 		}
 		break;
@@ -1652,29 +1652,25 @@ CUtils::PexprScalarConstNull(CMemoryPool *mp, const IMDType *typ,
 		case IMDType::EtiBool:
 		{
 			const IMDTypeBool *pmdtypebool =
-				md_accessor->PtMDType<IMDTypeBool>();
+				static_cast<const IMDTypeBool *>(typ);
 			datum = pmdtypebool->CreateBoolDatum(mp, false, true);
 		}
 		break;
 
 		case IMDType::EtiOid:
 		{
-			const IMDTypeOid *pmdtypeoid = md_accessor->PtMDType<IMDTypeOid>();
+			const IMDTypeOid *pmdtypeoid = static_cast<const IMDTypeOid *>(typ);
 			datum = pmdtypeoid->CreateOidDatum(mp, 0, true);
 		}
 		break;
 
 		case IMDType::EtiGeneric:
-			// sorry, no IMDType interface to generate a generic datum
-			datum =
-				GPOS_NEW(mp) CDatumGenericGPDB(mp, mdid, type_modifier,
-											   NULL,  // source value buffer
-											   0,  // source value buffer length
-											   true,  // is NULL
-											   0,	  // LINT mapping for stats
-											   0.0	// CDouble mapping for stats
-				);
-			break;
+		{
+			const IMDTypeGeneric *pmdtypegeneric =
+				static_cast<const IMDTypeGeneric *>(typ);
+			datum = pmdtypegeneric->CreateGenericNullDatum(mp, type_modifier);
+		}
+		break;
 
 		default:
 			// shouldn't come here
@@ -2406,7 +2402,7 @@ CUtils::PdrgpcrGroupingKey(
 	{
 		CColRef *pcr = it.Pcr();
 
-		if (CColRef::EUsed == pcr->GetUsage() && !pcr->FSystemCol())
+		if (CColRef::EUsed == pcr->GetUsage() && !pcr->IsSystemCol())
 		{
 			pcrsUsedOuter->Include(pcr);
 		}
@@ -3623,6 +3619,13 @@ CUtils::PexprCast(CMemoryPool *mp, CMDAccessor *md_accessor, CExpression *pexpr,
 				parrayCoerceCast->Location()),
 			pexpr);
 	}
+	else if (pmdcast->GetMDPathType() == IMDCast::EmdtCoerceViaIO)
+	{
+		CScalarCoerceViaIO *op = GPOS_NEW(mp)
+			CScalarCoerceViaIO(mp, mdid_dest, default_type_modifier,
+							   COperator::EcfImplicitCast, -1 /* location */);
+		pexprCast = GPOS_NEW(mp) CExpression(mp, op, pexpr);
+	}
 	else
 	{
 		CScalarCast *popCast =
@@ -3964,9 +3967,19 @@ CUtils::FMotionOverUnresolvedPartConsumers(CMemoryPool *mp,
 	return fHasUnresolvedConsumers;
 }
 
+BOOL
+CUtils::FDuplicateHazardDistributionSpec(CDistributionSpec *pds)
+{
+	CDistributionSpec::EDistributionType edt = pds->Edt();
+
+	return CDistributionSpec::EdtStrictReplicated == edt ||
+		   CDistributionSpec::EdtUniversal == edt;
+}
+
 // Check if duplicate values can be generated when executing the given Motion expression,
-// duplicates occur if Motion's input has replicated/universal distribution,
-// which means that we have exactly the same copy of input on each host,
+// duplicates occur if Motion's input has strict-replicated/universal distribution,
+// which means that we have exactly the same copy of input on each host. Note that
+// tainted-replicated does not satisfy the assertion of identical input copies.
 BOOL
 CUtils::FDuplicateHazardMotion(CExpression *pexprMotion)
 {
@@ -3977,12 +3990,8 @@ CUtils::FDuplicateHazardMotion(CExpression *pexprMotion)
 	CDrvdPropPlan *pdpplanChild =
 		CDrvdPropPlan::Pdpplan(pexprChild->PdpDerive());
 	CDistributionSpec *pdsChild = pdpplanChild->Pds();
-	CDistributionSpec::EDistributionType edtChild = pdsChild->Edt();
 
-	BOOL fReplicatedInput = CDistributionSpec::EdtReplicated == edtChild ||
-							CDistributionSpec::EdtUniversal == edtChild;
-
-	return fReplicatedInput;
+	return CUtils::FDuplicateHazardDistributionSpec(pdsChild);
 }
 
 // Collapse the top two project nodes like this, if unable return NULL;
@@ -4559,6 +4568,29 @@ CUtils::FCrossJoin(CExpression *pexpr)
 	return fCrossJoin;
 }
 
+BOOL
+CUtils::IsHashJoinPossible(CMemoryPool *mp, CExpression *pexpr)
+{
+	GPOS_ASSERT(NULL != pexpr);
+
+	CExpressionArray *expr_preds =
+		CCastUtils::PdrgpexprCastEquality(mp, (*pexpr)[2]);
+
+	BOOL has_hashable_pred = false;
+	ULONG ulPreds = expr_preds->Size();
+	for (ULONG ul = 0; ul < ulPreds && !has_hashable_pred; ul++)
+	{
+		CExpression *pred = (*expr_preds)[ul];
+		if (CPhysicalJoin::FHashJoinCompatible(pred, (*pexpr)[0], (*pexpr)[1]))
+		{
+			has_hashable_pred = true;
+		}
+	}
+	expr_preds->Release();
+
+	return has_hashable_pred;
+}
+
 // Determine whether a scalar expression consists only of a scalar id and NDV-preserving
 // functions plus casts. If so, return the corresponding CColRef.
 BOOL
@@ -4812,6 +4844,51 @@ CUtils::Equals(const CExpressionArrays *exprs_arr,
 		equal = CUtils::Equals((*exprs_arr)[id], (*other_exprs_arr)[id]);
 	}
 	return equal;
+}
+
+BOOL
+CUtils::Equals(const IMdIdArray *mdids, const IMdIdArray *other_mdids)
+{
+	GPOS_CHECK_STACK_SIZE;
+
+	// NULL arrays are equal
+	if (NULL == mdids || NULL == other_mdids)
+	{
+		return NULL == mdids && NULL == other_mdids;
+	}
+
+	// do pointer comparision
+	if (mdids == other_mdids)
+	{
+		return true;
+	}
+
+	// if the size is not equal, the two arrays are not equal
+	if (mdids->Size() != other_mdids->Size())
+	{
+		return false;
+	}
+
+	// if all the elements are equal, then both the arrays are equal
+	for (ULONG id = 0; id < mdids->Size(); id++)
+	{
+		if (!CUtils::Equals((*mdids)[id], (*other_mdids)[id]))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+BOOL
+CUtils::Equals(const IMDId *mdid, const IMDId *other_mdid)
+{
+	if ((mdid == NULL) ^ (other_mdid == NULL))
+	{
+		return false;
+	}
+
+	return (mdid == other_mdid) || mdid->Equals(other_mdid);
 }
 
 // operators from which the inferred predicates can be removed

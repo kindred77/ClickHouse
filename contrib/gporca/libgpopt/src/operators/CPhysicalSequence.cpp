@@ -9,6 +9,8 @@
 //		Implementation of physical sequence operator
 //---------------------------------------------------------------------------
 
+#include "gpopt/operators/CPhysicalSequence.h"
+
 #include "gpos/base.h"
 
 #include "gpopt/base/CCTEReq.h"
@@ -16,8 +18,7 @@
 #include "gpopt/base/CDistributionSpecNonSingleton.h"
 #include "gpopt/base/CDistributionSpecSingleton.h"
 #include "gpopt/base/COptCtxt.h"
-#include "gpopt/base/CUtils.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CExpressionHandle.h"
 
 using namespace gpopt;
 

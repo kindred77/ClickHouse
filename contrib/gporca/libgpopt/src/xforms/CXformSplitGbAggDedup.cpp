@@ -16,8 +16,8 @@
 
 #include "gpopt/base/CColRefComputed.h"
 #include "gpopt/base/CUtils.h"
+#include "gpopt/operators/CLogicalGbAggDeduplicate.h"
 #include "gpopt/operators/COperator.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/translate/CTranslatorDXLToExpr.h"
 #include "naucrates/md/IMDAggregate.h"
 

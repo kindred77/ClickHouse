@@ -19,76 +19,6 @@
 
 using namespace gpos;
 
-#if (GPOS_sparc)
-
-
-//---------------------------------------------------------------------------
-//	@function:
-//		CStackDescriptor::GetStackFrames
-//
-//	@doc:
-//		Method called by walkcontext function to store return addresses
-//
-//---------------------------------------------------------------------------
-INT
-CStackDescriptor::GetStackFrames(ULONG_PTR func_ptr,
-								 INT sig __attribute__((unused)), void *context)
-{
-	CStackDescriptor *stack_descriptor = (CStackDescriptor *) context;
-
-	// check if max number of frames has been reached
-	if (stack_descriptor->m_depth < GPOS_STACK_TRACE_DEPTH)
-	{
-		// set frame address
-		stack_descriptor->m_array_of_addresses[stack_descriptor->m_depth++] =
-			(void *) func_ptr;
-	}
-
-	return 0;
-}
-
-//---------------------------------------------------------------------------
-//	@function:
-//		CStackDescriptor::BackTrace
-//
-//	@doc:
-//		Store current stack
-//
-//---------------------------------------------------------------------------
-void
-CStackDescriptor::BackTrace(ULONG top_frames_to_skip)
-{
-	// reset stack depth
-	Reset();
-
-	// retrieve stack context
-	ucontext_t context;
-	if (0 != clib::GetContext(&context))
-	{
-		return;
-	}
-
-	// walk stack context to get stack addresses
-	if (0 != clib::WalkContext(&context, GetStackFrames, this))
-	{
-		return;
-	}
-
-	// skip top frames
-	if (top_frames_to_skip <= m_depth)
-	{
-		m_depth -= top_frames_to_skip;
-
-		for (ULONG i = 0; i < m_depth; i++)
-		{
-			m_array_of_addresses[i] =
-				m_array_of_addresses[i + top_frames_to_skip];
-		}
-	}
-}
-
-#elif (GPOS_aarch64 || GPOS_i386 || GPOS_i686 || GPOS_x86_64)
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CStackDescriptor::BackTrace
@@ -149,16 +79,6 @@ CStackDescriptor::BackTrace(ULONG top_frames_to_skip)
 		next_frame = (void **) *next_frame;
 	}
 }
-
-#else  // unsupported platform
-
-void CStackDescriptor::BackTrace(ULONG)
-{
-	GPOS_CPL_ASSERT(!"Backtrace is not supported for this platform");
-}
-
-#endif
-
 
 //---------------------------------------------------------------------------
 //	@function:

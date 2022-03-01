@@ -12,7 +12,9 @@
 #define GPNAUCRATES_CHistogram_H
 
 #include "gpos/base.h"
+#include "gpos/common/DbgPrintMixin.h"
 
+#include "gpopt/base/CKHeap.h"
 #include "naucrates/statistics/CBucket.h"
 #include "naucrates/statistics/CStatsPred.h"
 
@@ -36,7 +38,7 @@ typedef CDynamicPtrArray<CDouble, CleanupDelete> CDoubleArray;
 //	@doc:
 //
 //---------------------------------------------------------------------------
-class CHistogram
+class CHistogram : public gpos::DbgPrintMixin<CHistogram>
 {
 	// hash map from column id to a histogram
 	typedef CHashMap<ULONG, CHistogram, gpos::HashValue<ULONG>,
@@ -154,6 +156,10 @@ private:
 						   CDoubleArray *dest_bucket_freqs, ULONG begin,
 						   ULONG end);
 
+	// helper to combine histogram buckets to reduce total buckets
+	static CBucketArray *CombineBuckets(CMemoryPool *mp, CBucketArray *buckets,
+										ULONG desired_num_buckets);
+
 	// check if we can compute NDVRemain for JOIN histogram for the given input histograms
 	static BOOL CanComputeJoinNDVRemain(const CHistogram *histogram1,
 										const CHistogram *histogram2);
@@ -171,7 +177,7 @@ private:
 
 
 	// check if the cardinality estimation should be done only via NDVs
-	static BOOL DoNDVBasedCardEstimation(const CHistogram *histogram);
+	static BOOL NeedsNDVBasedCardEstimationForEq(const CHistogram *histogram);
 
 	BOOL IsHistogramForTextRelatedTypes() const;
 
@@ -187,13 +193,35 @@ private:
 								 BOOL bucket_is_residual, ULONG index,
 								 CDoubleArray *dest_bucket_freqs) const;
 
-	// create a new histogram with updated bucket frequency
-	CHistogram *MakeHistogramUpdateFreq(const CBucketArray *histogram_buckets,
-										CDoubleArray *dest_bucket_freqs,
-										CDouble *num_output_rows,
-										CDouble num_null_rows,
-										CDouble num_NDV_remain,
-										CDouble num_NDV_remain_rows) const;
+	// used to keep track of adjacent stats buckets and how similar
+	// they are in terms of distribution
+	struct SAdjBucketBoundary
+	{
+		// boundary_index 0 refers to boundary between b[0] and b[1]
+		ULONG m_boundary_index;
+		// similarity factor between two adjacent buckets calculated as (freq0/ndv0 - freq1/ndv1) + (freq0/width0 - freq1/width1)
+		CDouble m_similarity_factor;
+
+		SAdjBucketBoundary(ULONG index, CDouble similarity_factor)
+			: m_boundary_index(index), m_similarity_factor(similarity_factor)
+		{
+		}
+
+		// used for sorting in the binary heap
+		CDouble
+		DCost()
+		{
+			return m_similarity_factor;
+		}
+		CDouble
+		GetCostForHeap()
+		{
+			return DCost();
+		}
+	};
+	typedef CDynamicPtrArray<SAdjBucketBoundary,
+							 CleanupDelete<SAdjBucketBoundary> >
+		SAdjBucketBoundaryArray;
 
 public:
 	// ctors
@@ -289,6 +317,7 @@ public:
 	ULONG
 	GetNumBuckets() const
 	{
+		GPOS_ASSERT(m_histogram_buckets != NULL);
 		return m_histogram_buckets->Size();
 	}
 
@@ -306,6 +335,8 @@ public:
 		return m_is_well_defined;
 	}
 
+	BOOL ContainsOnlySingletonBuckets() const;
+
 	// is the column statistics missing in the database
 	BOOL
 	IsColStatsMissing() const
@@ -315,10 +346,6 @@ public:
 
 	// print function
 	virtual IOstream &OsPrint(IOstream &os) const;
-
-#ifdef GPOS_DEBUG
-	void DbgPrint() const;
-#endif
 
 	// total frequency from buckets and null fraction
 	CDouble GetFrequency() const;

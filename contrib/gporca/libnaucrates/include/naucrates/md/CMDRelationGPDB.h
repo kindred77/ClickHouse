@@ -74,6 +74,8 @@ private:
 	// indices of distribution columns
 	ULongPtrArray *m_distr_col_array;
 
+	IMdIdArray *m_distr_opfamilies;
+
 	// do we need to consider a hash distributed table as random distributed
 	BOOL m_convert_hash_to_random;
 
@@ -120,6 +122,9 @@ private:
 	// array of column widths including dropped columns
 	CDoubleArray *m_col_width_array;
 
+	// oids of any external partitions (for partitioned tables only)
+	IMdIdArray *m_external_partitions;
+
 	// private copy ctor
 	CMDRelationGPDB(const CMDRelationGPDB &);
 
@@ -129,13 +134,15 @@ public:
 					BOOL is_temp_table, Erelstoragetype rel_storage_type,
 					Ereldistrpolicy rel_distr_policy,
 					CMDColumnArray *mdcol_array, ULongPtrArray *distr_col_array,
+					IMdIdArray *distr_opfamilies,
 					ULongPtrArray *partition_cols_array,
 					CharPtrArray *str_part_types_array, ULONG num_of_partitions,
 					BOOL convert_hash_to_random, ULongPtr2dArray *keyset_array,
 					CMDIndexInfoArray *md_index_info_array,
 					IMdIdArray *mdid_triggers_array,
 					IMdIdArray *mdid_check_constraint_array,
-					IMDPartConstraint *mdpart_constraint, BOOL has_oids);
+					IMDPartConstraint *mdpart_constraint, BOOL has_oids,
+					IMdIdArray *external_partitions);
 
 	// dtor
 	virtual ~CMDRelationGPDB();
@@ -201,6 +208,8 @@ public:
 	// retrieve the column at the given position in the distribution columns list for the relation
 	virtual const IMDColumn *GetDistrColAt(ULONG pos) const;
 
+	virtual IMDId *GetDistrOpfamilyAt(ULONG pos) const;
+
 	// return true if a hash distributed table needs to be considered as random
 	virtual BOOL ConvertHashToRandom() const;
 
@@ -251,6 +260,9 @@ public:
 
 	// part constraint
 	virtual IMDPartConstraint *MDPartConstraint() const;
+
+	// external partitions (for partitioned tables)
+	virtual IMdIdArray *GetExternalPartitions() const;
 
 #ifdef GPOS_DEBUG
 	// debug print of the metadata relation

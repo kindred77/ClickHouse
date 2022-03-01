@@ -179,13 +179,7 @@ CLogger::AppendDate()
 	m_entry_wrapper.AppendFormat(
 		GPOS_WSZ_LIT("%04d-%02d-%02d %02d:%02d:%02d:%06d %s"),
 		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,
-		tm.tm_sec, tv.tv_usec,
-#ifdef GPOS_SunOS
-		clib::GetEnv("TZ")
-#else
-		tm.tm_zone
-#endif	// GPOS_SunOS
-	);
+		tm.tm_sec, tv.tv_usec, tm.tm_zone);
 }
 
 

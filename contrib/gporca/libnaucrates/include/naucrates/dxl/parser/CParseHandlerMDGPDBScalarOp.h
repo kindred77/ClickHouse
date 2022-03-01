@@ -63,6 +63,9 @@ private:
 	// does operator return NULL on NULL input?
 	BOOL m_returns_null_on_null_input;
 
+	IMDId *m_mdid_hash_opfamily;
+	IMDId *m_mdid_legacy_hash_opfamily;
+
 	// preserves NDVs of inputs
 	BOOL m_is_ndv_preserving;
 

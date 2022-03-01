@@ -3820,13 +3820,14 @@ CTestUtils::CreateGenericDatum(CMemoryPool *mp, CMDAccessor *md_accessor,
 		CDXLUtils::DecodeByteArrayFromString(mp, pstrEncodedValue, &ulbaSize);
 
 	CDXLDatumGeneric *dxl_datum = NULL;
-	if (CMDTypeGenericGPDB::IsTimeRelatedType(mdid_type))
+	if (CMDTypeGenericGPDB::IsTimeRelatedTypeMappableToDouble(mdid_type))
 	{
 		dxl_datum = GPOS_NEW(mp) CDXLDatumStatsDoubleMappable(
 			mp, mdid_type, default_type_modifier, false /*is_const_null*/, data,
 			ulbaSize, CDouble(value));
 	}
-	else if (pmdtype->IsTextRelated())
+	else if (pmdtype->IsTextRelated() ||
+			 CMDTypeGenericGPDB::IsTimeRelatedTypeMappableToLint(mdid_type))
 	{
 		dxl_datum = GPOS_NEW(mp) CDXLDatumStatsLintMappable(
 			mp, mdid_type, default_type_modifier, false /*is_const_null*/, data,
@@ -3842,6 +3843,39 @@ CTestUtils::CreateGenericDatum(CMemoryPool *mp, CMDAccessor *md_accessor,
 	IDatum *datum = pmdtype->GetDatumForDXLDatum(mp, dxl_datum);
 	dxl_datum->Release();
 
+	return datum;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CTestUtils::CreateDoubleDatum
+//
+//	@doc:
+//		Create a datum with a given type and double value
+//
+//---------------------------------------------------------------------------
+IDatum *
+CTestUtils::CreateDoubleDatum(CMemoryPool *mp, CMDAccessor *md_accessor,
+							  IMDId *mdid_type, CDouble value)
+{
+	GPOS_ASSERT(NULL != md_accessor);
+
+	GPOS_ASSERT(!mdid_type->Equals(&CMDIdGPDB::m_mdid_numeric));
+	const IMDType *pmdtype = md_accessor->RetrieveType(mdid_type);
+	ULONG ulbaSize = 0;
+	CWStringDynamic *pstrW =
+		GPOS_NEW(mp) CWStringDynamic(mp, GPOS_WSZ_LIT("AAAABXc="));
+	BYTE *data = CDXLUtils::DecodeByteArrayFromString(mp, pstrW, &ulbaSize);
+	CDXLDatumGeneric *dxl_datum = NULL;
+
+	dxl_datum = GPOS_NEW(mp) CDXLDatumStatsDoubleMappable(
+		mp, mdid_type, default_type_modifier, false /*is_const_null*/, data,
+		ulbaSize, CDouble(value));
+
+
+	IDatum *datum = pmdtype->GetDatumForDXLDatum(mp, dxl_datum);
+	dxl_datum->Release();
+	GPOS_DELETE(pstrW);
 	return datum;
 }
 
@@ -3880,8 +3914,6 @@ CTestUtils::PciGenericInterval(CMemoryPool *mp, CMDAccessor *md_accessor,
 	return GPOS_NEW(mp)
 		CConstraintInterval(mp, colref, pdrgprng, false /*is_null*/);
 }
-
-
 //---------------------------------------------------------------------------
 //	@function:
 //		CTestUtils::PexprScalarCmpIdentToConstant
@@ -4107,12 +4139,8 @@ CTestUtils::EresUnittest_RunTests(const CHAR **rgszFileNames,
 {
 	BOOL fMatchPlans = false;
 	BOOL fTestSpacePruning = false;
-#if defined(GPOS_Darwin) || defined(GPOS_Linux)
-	// restrict plan matching to OsX and Linux to avoid arithmetic operations differences
-	// across systems
 	fMatchPlans = true;
 	fTestSpacePruning = true;
-#endif	// GPOS_Darwin || GPOS_Linux
 	// enable (Redistribute, Broadcast) hash join plans
 	CAutoTraceFlag atf1(EopttraceEnableRedistributeBroadcastHashJoin,
 						true /*value*/);

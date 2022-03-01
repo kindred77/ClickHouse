@@ -20,12 +20,12 @@
 #include "gpopt/base/CColRefSetIter.h"
 #include "gpopt/base/CColRefTable.h"
 #include "gpopt/base/CConstraintInterval.h"
+#include "gpopt/base/CFunctionProp.h"
 #include "gpopt/base/CUtils.h"
 #include "gpopt/exception.h"
 #include "gpopt/mdcache/CMDAccessor.h"
 #include "gpopt/operators/CExpressionUtils.h"
 #include "gpopt/operators/CPredicateUtils.h"
-#include "gpopt/operators/ops.h"
 #include "naucrates/md/IMDFunction.h"
 #include "naucrates/md/IMDScalarOp.h"
 #include "naucrates/md/IMDType.h"
@@ -349,9 +349,7 @@ CExpressionFactorizer::PcrsUsedByPushableScalar(CExpression *pexpr)
 	if (0 < pexpr->DeriveDefinedColumns()->Size() ||
 		pexpr->DeriveHasSubquery() ||
 		IMDFunction::EfsVolatile ==
-			pexpr->DeriveScalarFunctionProperties()->Efs() ||
-		IMDFunction::EfdaNoSQL !=
-			pexpr->DeriveScalarFunctionProperties()->Efda())
+			pexpr->DeriveScalarFunctionProperties()->Efs())
 	{
 		return NULL;
 	}

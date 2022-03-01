@@ -3,6 +3,8 @@
 
 #include "gpopt/operators/CHashedDistributions.h"
 
+#include "gpopt/base/CUtils.h"
+
 using namespace gpopt;
 CHashedDistributions::CHashedDistributions(CMemoryPool *mp,
 										   CColRefArray *pdrgpcrOutput,

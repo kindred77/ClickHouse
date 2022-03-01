@@ -12,6 +12,7 @@
 #include "gpopt/search/CScheduler.h"
 
 #include "gpos/base.h"
+#include "gpos/error/CAutoTrace.h"
 
 #include "gpopt/search/CJobFactory.h"
 #include "gpopt/search/CSchedulerContext.h"

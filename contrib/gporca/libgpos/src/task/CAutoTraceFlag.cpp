@@ -12,6 +12,7 @@
 #include "gpos/task/CAutoTraceFlag.h"
 
 #include "gpos/base.h"
+#include "gpos/error/CAutoTrace.h"
 
 using namespace gpos;
 

@@ -15,9 +15,11 @@
 
 #include "gpopt/base/CUtils.h"
 #include "gpopt/engine/CHint.h"
+#include "gpopt/operators/CLogicalNAryJoin.h"
 #include "gpopt/operators/CNormalizer.h"
+#include "gpopt/operators/CPatternMultiLeaf.h"
+#include "gpopt/operators/CPatternMultiTree.h"
 #include "gpopt/operators/CPredicateUtils.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "gpopt/xforms/CJoinOrderDP.h"
 #include "gpopt/xforms/CXformUtils.h"

@@ -21,6 +21,7 @@
 #define GPOS_CSyncPool_H
 
 #include "gpos/common/CAutoP.h"
+#include "gpos/task/ITask.h"
 #include "gpos/types.h"
 #include "gpos/utils.h"
 

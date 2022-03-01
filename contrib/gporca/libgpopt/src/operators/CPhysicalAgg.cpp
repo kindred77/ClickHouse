@@ -16,6 +16,7 @@
 #include "gpopt/base/CDistributionSpecAny.h"
 #include "gpopt/base/CDistributionSpecHashed.h"
 #include "gpopt/base/CDistributionSpecRandom.h"
+#include "gpopt/base/CDistributionSpecReplicated.h"
 #include "gpopt/base/CDistributionSpecSingleton.h"
 #include "gpopt/base/CDistributionSpecStrictSingleton.h"
 #include "gpopt/base/CUtils.h"
@@ -484,6 +485,15 @@ CPhysicalAgg::PdsDerive(CMemoryPool *mp, CExpressionHandle &exprhdl) const
 	{
 		return GPOS_NEW(mp) CDistributionSpecStrictSingleton(
 			CDistributionSpecSingleton::EstMaster);
+	}
+	else if (CDistributionSpec::EdtStrictReplicated == pds->Edt())
+	{
+		// Aggregate functions which are not trivial and which are sensitive to
+		// the order of their input cannot guarantee replicated data. If the child
+		// was replicated, we can no longer guarantee that property. Therefore
+		// we must now dervive tainted replicated.
+		return GPOS_NEW(mp) CDistributionSpecReplicated(
+			CDistributionSpec::EdtTaintedReplicated);
 	}
 
 	pds->AddRef();

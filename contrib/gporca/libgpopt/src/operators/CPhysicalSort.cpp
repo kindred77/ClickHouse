@@ -15,7 +15,6 @@
 
 #include "gpopt/base/CCTEMap.h"
 #include "gpopt/base/COptCtxt.h"
-#include "gpopt/base/CUtils.h"
 #include "gpopt/operators/CExpressionHandle.h"
 
 using namespace gpopt;

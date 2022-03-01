@@ -114,7 +114,6 @@ void CreateTempDir(CHAR *dir_path);
 BOOL SimulateIOError(INT *return_value, INT error_no, const CHAR *file,
 					 ULONG line_num);
 
-#if defined(GPOS_64BIT) || defined(GPOS_Darwin)
 // inject I/O error for functions whose returned value type is INT_PTR
 inline BOOL
 SimulateIOError(INT_PTR *return_value, INT error_no, const CHAR *file,
@@ -122,7 +121,6 @@ SimulateIOError(INT_PTR *return_value, INT error_no, const CHAR *file,
 {
 	return SimulateIOError((INT *) return_value, error_no, file, line_num);
 }
-#endif
 
 // inject I/O error for functions whose returned value type is CHAR*
 BOOL SimulateIOError(CHAR **return_value, INT error_no, const CHAR *file,

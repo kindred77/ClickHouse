@@ -14,7 +14,11 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalGbAgg.h"
+#include "gpopt/operators/CLogicalUnion.h"
+#include "gpopt/operators/CLogicalUnionAll.h"
+#include "gpopt/operators/CPatternMultiLeaf.h"
+#include "gpopt/operators/CScalarProjectList.h"
 
 using namespace gpopt;
 

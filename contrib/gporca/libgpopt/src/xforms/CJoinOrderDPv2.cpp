@@ -15,22 +15,23 @@
 #include "gpos/common/CBitSet.h"
 #include "gpos/common/CBitSetIter.h"
 #include "gpos/common/clibwrapper.h"
-#include "gpos/io/COstreamString.h"
-#include "gpos/string/CWStringDynamic.h"
+#include "gpos/error/CAutoTrace.h"
 
 #include "gpopt/base/CDrvdPropScalar.h"
 #include "gpopt/base/CUtils.h"
 #include "gpopt/cost/ICostModelParams.h"
 #include "gpopt/exception.h"
+#include "gpopt/operators/CLogicalInnerJoin.h"
+#include "gpopt/operators/CLogicalLeftOuterJoin.h"
+#include "gpopt/operators/CLogicalSelect.h"
 #include "gpopt/operators/CNormalizer.h"
+#include "gpopt/operators/CPhysicalJoin.h"
 #include "gpopt/operators/CPredicateUtils.h"
 #include "gpopt/operators/CScalarNAryJoinPredList.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "naucrates/md/CMDIdRelStats.h"
 #include "naucrates/md/IMDRelStats.h"
 #include "naucrates/statistics/CJoinStatsProcessor.h"
-
 
 using namespace gpopt;
 
@@ -85,13 +86,12 @@ CJoinOrderDPv2::CJoinOrderDPv2(CMemoryPool *mp,
 
 	// Contains top k expressions for a general DP algorithm, without considering cost of motions/PS
 	m_top_k_expressions =
-		GPOS_NEW(mp) KHeap<SExpressionInfoArray, SExpressionInfo>(
+		GPOS_NEW(mp) CKHeap<SExpressionInfoArray, SExpressionInfo>(
 			mp, GPOPT_DPV2_JOIN_ORDERING_TOPK);
-
 	// We use a separate heap to ensure we produce an alternative expression that contains a dynamic PS
 	// If no dynamic PS is valid, this will be empty.
 	m_top_k_part_expressions =
-		GPOS_NEW(mp) KHeap<SExpressionInfoArray, SExpressionInfo>(
+		GPOS_NEW(mp) CKHeap<SExpressionInfoArray, SExpressionInfo>(
 			mp, 1 /* keep top 1 expression */
 		);
 
@@ -189,7 +189,9 @@ CJoinOrderDPv2::ComputeCost(SExpressionInfo *expr_info,
 		dCost = dCost + expr_info->m_left_child_expr.GetExprInfo()->m_cost;
 		dCost = dCost + expr_info->m_right_child_expr.GetExprInfo()->m_cost;
 
-		if (CUtils::FCrossJoin(expr_info->m_expr))
+		// if none of the preds are hashable, penalize this join as it will
+		// generate a NLJ (which is penalized in the optimization phase)
+		if (!CUtils::IsHashJoinPossible(m_mp, expr_info->m_expr))
 		{
 			// penalize cross joins, similar to what we do in the optimization phase
 			dCost = dCost * m_cross_prod_penalty;
@@ -1467,7 +1469,7 @@ CJoinOrderDPv2::EnumerateDP()
 			// add a KHeap to this level, so that we can collect the k best expressions
 			// while we are building the level
 			Level(l)->m_top_k_groups =
-				GPOS_NEW(m_mp) KHeap<SGroupInfoArray, SGroupInfo>(
+				GPOS_NEW(m_mp) CKHeap<SGroupInfoArray, SGroupInfo>(
 					m_mp, number_of_allowed_groups);
 		}
 	}
@@ -1554,7 +1556,7 @@ CJoinOrderDPv2::FindLowestCardTwoWayJoin(JoinOrderPropType prop_type)
 		CDouble group_2_cardinality = group_2->m_cardinality;
 		CExpression *first_expr = (*group_2->m_best_expr_info_array)[0]->m_expr;
 		if (EJoinOrderGreedyAvoidXProd == prop_type &&
-			CUtils::FCrossJoin(first_expr))
+			!CUtils::IsHashJoinPossible(m_mp, first_expr))
 		{
 			group_2_cardinality = group_2_cardinality * m_cross_prod_penalty;
 		}
@@ -1806,6 +1808,8 @@ CJoinOrderDPv2::LevelIsFull(ULONG level)
 }
 
 
+FORCE_GENERATE_DBGSTR(gpopt::CJoinOrderDPv2);
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CJoinOrderDPv2::OsPrint
@@ -1979,17 +1983,3 @@ CJoinOrderDPv2::OsPrintProperty(IOstream &os,
 
 	return os;
 }
-
-
-#ifdef GPOS_DEBUG
-void
-CJoinOrderDPv2::DbgPrint()
-{
-	CAutoTrace at(m_mp);
-
-	OsPrint(at.Os());
-}
-#endif
-
-
-// EOF

@@ -26,7 +26,6 @@
 #include "gpopt/base/CDistributionSpecReplicated.h"
 #include "gpopt/base/CDistributionSpecSingleton.h"
 #include "gpopt/base/CDrvdPropCtxtPlan.h"
-#include "gpopt/base/CUtils.h"
 #include "gpopt/exception.h"
 #include "gpopt/operators/CExpressionHandle.h"
 #include "gpopt/operators/CScalarIdent.h"
@@ -123,17 +122,12 @@ CPhysicalSerialUnionAll::PdsRequired(
 		return GPOS_NEW(mp) CDistributionSpecSingleton();
 	}
 
-	if (CDistributionSpec::EdtReplicated == pdsOuter->Edt())
+	if (CDistributionSpec::EdtStrictReplicated == pdsOuter->Edt() ||
+		CDistributionSpec::EdtTaintedReplicated == pdsOuter->Edt())
 	{
 		// outer child is replicated, require inner child to be replicated
-		return GPOS_NEW(mp) CDistributionSpecReplicated();
-	}
-
-	if (CDistributionSpec::EdtExternal == pdsOuter->Edt())
-	{
-		// if the outer child delivers external spec, require inner child
-		// to provide any spec
-		return GPOS_NEW(mp) CDistributionSpecAny(this->Eopid());
+		return GPOS_NEW(mp)
+			CDistributionSpecReplicated(CDistributionSpec::EdtReplicated);
 	}
 
 	// outer child is non-replicated and is distributed across segments,

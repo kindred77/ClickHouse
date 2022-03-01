@@ -14,7 +14,8 @@
 #include "gpos/base.h"
 
 #include "gpopt/metadata/CTableDescriptor.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalDynamicGet.h"
+#include "gpopt/operators/CPhysicalDynamicTableScan.h"
 
 using namespace gpopt;
 

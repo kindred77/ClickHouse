@@ -44,6 +44,18 @@ private:
 	// format error table mdid
 	IMDId *m_mdid_fmt_err_table;
 
+	// distribution opfamilies parse handler
+	CParseHandlerBase *m_opfamilies_parse_handler;
+
+	// part constraint
+	CMDPartConstraintGPDB *m_part_constraint;
+
+	// levels that include default partitions
+	ULongPtrArray *m_level_with_default_part_array;
+
+	// is part constraint unbounded
+	BOOL m_part_constraint_unbounded;
+
 	// private copy ctor
 	CParseHandlerMDRelationExternal(const CParseHandlerMDRelationExternal &);
 

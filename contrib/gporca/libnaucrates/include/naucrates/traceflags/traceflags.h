@@ -207,6 +207,21 @@ enum EOptTraceFlag
 	// Consider non-equality predicates in Dynamic partition selection
 	EopttraceAllowGeneralPredicatesforDPE = 103037,
 
+	// Support Opfamilies in distribution specs
+	EopttraceConsiderOpfamiliesForDistribution = 103038,
+
+	// Use legacy (cdbhash) opfamilies for compatibility
+	EopttraceUseLegacyOpfamilies = 103039,
+
+	// Enable handling external partitioned tables
+	EopttraceEnableExternalPartitionedTables = 103040,
+
+	// enable NL Left Join plan alternatives where inner child is redistributed if possible
+	EopttraceEnableRedistributeNLLOJInnerChild = 103041,
+
+	// Explore a nested loop join even if a hash join is possible
+	EopttraceForceComprehensiveJoinImplementation = 103042,
+
 	///////////////////////////////////////////////////////
 	///////////////////// statistics flags ////////////////
 	//////////////////////////////////////////////////////
@@ -232,8 +247,11 @@ enum EOptTraceFlag
 	// Penalize HashJoins with a skewed hash distribute under them
 	EopttracePenalizeSkewedHashJoin = 104006,
 
-	// Use calibrated bitmap index cost model
-	EopttraceCalibratedBitmapIndexCostModel = 104007,
+	// Use legacy cost model
+	EopttraceLegacyCostModel = 104008,
+
+	// Use experimental cost model
+	EopttraceExperimentalCostModel = 104009,
 	///////////////////////////////////////////////////////
 	/////////// constant expression evaluator flags ///////
 	///////////////////////////////////////////////////////

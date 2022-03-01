@@ -13,8 +13,10 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/CLogicalCTEConsumer.h"
+#include "gpopt/operators/CLogicalSelect.h"
 #include "gpopt/operators/CNormalizer.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CPatternTree.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 using namespace gpopt;

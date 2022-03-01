@@ -29,9 +29,31 @@
 
 #include "gpopt/base/CColRefSetIter.h"
 #include "gpopt/exception.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalConstTableGet.h"
+#include "gpopt/operators/CLogicalGbAgg.h"
+#include "gpopt/operators/CLogicalInnerApply.h"
+#include "gpopt/operators/CLogicalInnerCorrelatedApply.h"
+#include "gpopt/operators/CLogicalLeftAntiSemiCorrelatedApply.h"
+#include "gpopt/operators/CLogicalLeftAntiSemiCorrelatedApplyNotIn.h"
+#include "gpopt/operators/CLogicalLeftOuterApply.h"
+#include "gpopt/operators/CLogicalLeftOuterCorrelatedApply.h"
+#include "gpopt/operators/CLogicalLeftSemiCorrelatedApply.h"
+#include "gpopt/operators/CLogicalLeftSemiCorrelatedApplyIn.h"
+#include "gpopt/operators/CLogicalMaxOneRow.h"
+#include "gpopt/operators/CScalarBooleanTest.h"
+#include "gpopt/operators/CScalarCmp.h"
+#include "gpopt/operators/CScalarCoalesce.h"
+#include "gpopt/operators/CScalarIdent.h"
+#include "gpopt/operators/CScalarIf.h"
+#include "gpopt/operators/CScalarProjectElement.h"
+#include "gpopt/operators/CScalarProjectList.h"
+#include "gpopt/operators/CScalarSubquery.h"
+#include "gpopt/operators/CScalarSubqueryAll.h"
+#include "gpopt/operators/CScalarSubqueryAny.h"
+#include "gpopt/operators/CScalarSubqueryQuantified.h"
 #include "gpopt/xforms/CXformUtils.h"
 #include "naucrates/md/IMDScalarOp.h"
+#include "naucrates/md/IMDTypeBool.h"
 #include "naucrates/md/IMDTypeInt8.h"
 
 using namespace gpopt;
@@ -1407,13 +1429,6 @@ CSubqueryHandler::FRemoveAnySubquery(CExpression *pexprOuter,
 #ifdef GPOS_DEBUG
 	AssertValidArguments(mp, pexprOuter, pexprSubquery, ppexprNewOuter,
 						 ppexprResidualScalar);
-	COperator *popSubqChild = (*pexprSubquery)[0]->Pop();
-	GPOS_ASSERT_IMP(
-		COperator::EopLogicalConstTableGet == popSubqChild->Eopid(),
-		0 == CLogicalConstTableGet::PopConvert(popSubqChild)
-					->Pdrgpdrgpdatum()
-					->Size() &&
-			"Constant subqueries must be unnested during preprocessing");
 #endif	// GPOS_DEBUG
 
 	CScalarSubqueryAny *pScalarSubqAny =
@@ -1578,13 +1593,6 @@ CSubqueryHandler::FRemoveAllSubquery(CExpression *pexprOuter,
 #ifdef GPOS_DEBUG
 	AssertValidArguments(mp, pexprOuter, pexprSubquery, ppexprNewOuter,
 						 ppexprResidualScalar);
-	COperator *popSubqChild = (*pexprSubquery)[0]->Pop();
-	GPOS_ASSERT_IMP(
-		COperator::EopLogicalConstTableGet == popSubqChild->Eopid(),
-		0 == CLogicalConstTableGet::PopConvert(popSubqChild)
-					->Pdrgpdrgpdatum()
-					->Size() &&
-			"Constant subqueries must be unnested during preprocessing");
 #endif	// GPOS_DEBUG
 
 	if (m_fEnforceCorrelatedApply)
@@ -1596,7 +1604,6 @@ CSubqueryHandler::FRemoveAllSubquery(CExpression *pexprOuter,
 
 	BOOL fSuccess = true;
 	BOOL fUseCorrelated = false;
-	CExpression *pexprInnerSelect = NULL;
 	CExpression *pexprPredicate = NULL;
 	CExpression *pexprInner = (*pexprSubquery)[0];
 	COperator::EOperatorId eopidSubq = pexprSubquery->Pop()->Eopid();
@@ -1632,13 +1639,11 @@ CSubqueryHandler::FRemoveAllSubquery(CExpression *pexprOuter,
 		}
 	}
 
-	CExpression *pexprInversePred =
-		CXformUtils::PexprInversePred(mp, pexprSubquery);
 	// generate a select with the inverse predicate as the selection predicate
 	// TODO: Handle the case where pexprInversePred == NULL
+	CExpression *pexprInversePred =
+		CXformUtils::PexprInversePred(mp, pexprSubquery);
 	pexprPredicate = pexprInversePred;
-	pexprInnerSelect =
-		CUtils::PexprLogicalSelect(mp, pexprInner, pexprPredicate);
 
 	if (EsqctxtValue == esqctxt)
 	{
@@ -1657,11 +1662,8 @@ CSubqueryHandler::FRemoveAllSubquery(CExpression *pexprOuter,
 				fUseCorrelated = true;
 		}
 
-		CExpression *pexprNewInnerSelect = PexprInnerSelect(
+		CExpression *pexprInnerSelect = PexprInnerSelect(
 			mp, colref, pexprInner, pexprPredicate, &fUseNotNullOptimization);
-
-		pexprInnerSelect->Release();
-		pexprInnerSelect = pexprNewInnerSelect;
 
 		if (!fUseCorrelated)
 		{
@@ -1677,6 +1679,10 @@ CSubqueryHandler::FRemoveAllSubquery(CExpression *pexprOuter,
 				mp, pexprOuter, pexprSubquery, esqctxt, ppexprNewOuter,
 				ppexprResidualScalar);
 		}
+
+		// cleanup
+		pexprInner->Release();
+		pexprPredicate->Release();
 	}
 	else
 	{
@@ -1685,7 +1691,7 @@ CSubqueryHandler::FRemoveAllSubquery(CExpression *pexprOuter,
 		*ppexprResidualScalar = CUtils::PexprScalarConstBool(mp, true);
 		*ppexprNewOuter =
 			CUtils::PexprLogicalApply<CLogicalLeftAntiSemiApplyNotIn>(
-				mp, pexprOuter, pexprInnerSelect, colref, eopidSubq);
+				mp, pexprOuter, pexprInner, colref, eopidSubq, pexprPredicate);
 	}
 
 	return fSuccess;

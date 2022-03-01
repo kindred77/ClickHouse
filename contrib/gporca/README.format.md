@@ -17,10 +17,10 @@
 1. We should use an explicit, complete (locked down) specification for the [.clang-format](.clang-format) file.
 
 1. But our intent is better expressed as [well organized, commented yaml](clang-format.intent.yaml).
-   We use a [simple script](scripts/fmt) to generate the complete config file from the intent file. For example, on my Linux laptop, I run:
+   We use a [simple script](../../../src/tools/fmt) to generate the complete config file from the intent file. For example, on my Linux laptop, I run:
 
    ```shell
-   CLANG_FORMAT=clang-format-10 scripts/fmt gen
+   CLANG_FORMAT=clang-format-10 src/tools/fmt gen
    ```
 
    If the correct version of `clang-format` is installed as `clang-format` (as is the case in macOS), you can omit the environment variable override.
@@ -28,7 +28,7 @@
 1. To check for formatting conformance, one can run
 
    ```shell
-   scripts/fmt chk
+   src/tools/fmt chk
    ```
 
    It will succeed quietly (with return code 0) or point out the first few places that need to be formatted.
@@ -36,7 +36,7 @@
 1. To wholesale format all of ORCA and GPOPT
 
    ```shell
-   scripts/fmt fmt
+   src/tools/fmt fmt
    ```
 
    On my laptop this takes about 2.5 seconds.
@@ -83,7 +83,7 @@ The following steps are used to convert in-flight branches to the new format.
 1. Get the format script
 
    ```sh
-   git restore --source master -- scripts/fmt
+   git restore --source master -- src/tools/fmt
    ```
 
 1. Get the format configuration files
@@ -95,7 +95,7 @@ The following steps are used to convert in-flight branches to the new format.
 1. Use `git filter-branch` to rewrite the branch history
 
    ```sh
-   git filter-branch --tree-filter 'scripts/fmt fmt' master..
+   git filter-branch --tree-filter 'src/tools/fmt fmt' master..
    ```
 
 1. Now that we have reformatted the history, rebase on top of master

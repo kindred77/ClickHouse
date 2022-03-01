@@ -23,11 +23,7 @@
 
 // pattern used to mark deallocated memory, this must match
 // GPOS_MEM_FREED_PATTERN_CHAR in CMemoryPool.h
-#ifdef GPOS_32BIT
-#define GPOS_WIPED_MEM_PATTERN 0xCdCdCdCd
-#else
 #define GPOS_WIPED_MEM_PATTERN 0xCdCdCdCdCdCdCdCd
-#endif
 
 namespace gpos
 {
@@ -131,11 +127,6 @@ public:
 			rc->Release();
 		}
 	}
-
-#ifdef GPOS_DEBUG
-	// debug print for interactive debugging sessions only
-	void DbgPrint() const;
-#endif	// GPOS_DEBUG
 
 	// print function
 	virtual IOstream &

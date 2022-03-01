@@ -18,7 +18,7 @@
 
 #include "naucrates/dxl/CDXLUtils.h"
 #include "naucrates/dxl/operators/CDXLNode.h"
-#include "naucrates/dxl/operators/dxlops.h"
+#include "naucrates/exception.h"
 
 namespace gpdxl
 {

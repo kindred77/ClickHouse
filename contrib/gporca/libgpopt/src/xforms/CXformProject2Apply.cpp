@@ -13,7 +13,8 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalProject.h"
+#include "gpopt/operators/CPatternLeaf.h"
 
 using namespace gpopt;
 

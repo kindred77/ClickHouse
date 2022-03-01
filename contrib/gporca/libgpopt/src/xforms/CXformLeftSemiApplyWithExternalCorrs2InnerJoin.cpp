@@ -15,8 +15,7 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/ops.h"
-
+#include "gpopt/operators/CScalarProjectList.h"
 
 using namespace gpopt;
 

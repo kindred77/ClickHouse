@@ -11,7 +11,7 @@ select * from PT where k < 4;
   <dxl:Thread Id="0">
     <dxl:OptimizerConfig>
       <dxl:EnumeratorConfig Id="0" PlanSamples="0" CostThreshold="0"/>
-      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000"/>
+      <dxl:StatisticsConfig DampingFactorFilter="0.750000" DampingFactorJoin="0.010000" DampingFactorGroupBy="0.750000" MaxStatsBuckets="100"/>
       <dxl:CTEConfig CTEInliningCutoff="0"/> 
       <dxl:WindowOids RowNumber="7000" Rank="7001"/>
       <dxl:CostModelConfig CostModelType="1" SegmentsForCosting="2">
@@ -169,7 +169,7 @@ select * from PT where k < 4;
         <dxl:IndexInfoList/>
         <dxl:Triggers/>
         <dxl:CheckConstraints/>
-        <dxl:PartConstraint DefaultPartition="0,1" Unbounded="true">
+        <dxl:PartConstraint DefaultPartition="0,1" Unbounded="true" ExprAbsent="true">
         </dxl:PartConstraint>
       </dxl:Relation>
       <dxl:GPDBScalarOp Mdid="0.97.1.0" Name="&lt;" ComparisonType="LT" ReturnsNullOnNullInput="true">
@@ -261,14 +261,14 @@ select * from PT where k < 4;
             </dxl:PartEqFilters>
             <dxl:PartFilters>
               <dxl:Or>
-                <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.97.1.0">
-                  <dxl:PartBound Level="0" Type="0.23.1.0" LowerBound="true"/>
-                  <dxl:ConstValue TypeMdid="0.23.1.0" Value="4"/>
-                </dxl:Comparison>
                 <dxl:Or>
-                  <dxl:DefaultPart Level="0"/>
+                  <dxl:Comparison ComparisonOperator="&lt;" OperatorMdid="0.97.1.0">
+                    <dxl:PartBound Level="0" Type="0.23.1.0" LowerBound="true"/>
+                    <dxl:ConstValue TypeMdid="0.23.1.0" Value="4"/>
+                  </dxl:Comparison>
                   <dxl:PartBoundOpen Level="0" LowerBound="true"/>
                 </dxl:Or>
+                <dxl:DefaultPart Level="0"/>
               </dxl:Or>
               <dxl:ConstValue TypeMdid="0.16.1.0" Value="true"/>
             </dxl:PartFilters>

@@ -15,15 +15,15 @@
 #include "gpos/common/CBitSet.h"
 #include "gpos/common/CBitSetIter.h"
 #include "gpos/common/clibwrapper.h"
-#include "gpos/io/COstreamString.h"
-#include "gpos/string/CWStringDynamic.h"
+#include "gpos/error/CAutoTrace.h"
 
 #include "gpopt/base/CDrvdPropScalar.h"
 #include "gpopt/base/CUtils.h"
 #include "gpopt/exception.h"
+#include "gpopt/operators/CLogicalInnerJoin.h"
 #include "gpopt/operators/CNormalizer.h"
+#include "gpopt/operators/CPatternLeaf.h"
 #include "gpopt/operators/CPredicateUtils.h"
-#include "gpopt/operators/ops.h"
 
 using namespace gpopt;
 
@@ -937,6 +937,8 @@ CJoinOrderDP::PexprExpand()
 }
 
 
+FORCE_GENERATE_DBGSTR(gpopt::CJoinOrderDP);
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CJoinOrderDP::OsPrint
@@ -993,16 +995,3 @@ CJoinOrderDP::OsPrint(IOstream &os) const
 
 	return os;
 }
-
-
-#ifdef GPOS_DEBUG
-void
-CJoinOrderDP::DbgPrint()
-{
-	CAutoTrace at(m_mp);
-
-	OsPrint(at.Os());
-}
-#endif
-
-// EOF

@@ -13,6 +13,7 @@
 
 #include "gpos/base.h"
 #include "gpos/common/CPrintablePointer.h"
+#include "gpos/error/CAutoTrace.h"
 
 #include "gpopt/base/CCTEReq.h"
 #include "gpopt/base/CColRefSet.h"
@@ -187,10 +188,8 @@ CReqdPropPlan::Compute(CMemoryPool *mp, CExpressionHandle &exprhdl,
 								 child_index, pdrgpdpCtxt, ulOrderReq),
 		popPhysical->Eom(prppInput, child_index, pdrgpdpCtxt, ulOrderReq));
 
-	m_ped = GPOS_NEW(mp) CEnfdDistribution(
-		popPhysical->PdsRequired(mp, exprhdl, prppInput->Ped()->PdsRequired(),
-								 child_index, pdrgpdpCtxt, ulDistrReq),
-		popPhysical->Edm(prppInput, child_index, pdrgpdpCtxt, ulDistrReq));
+	m_ped = popPhysical->Ped(mp, exprhdl, prppInput, child_index, pdrgpdpCtxt,
+							 ulDistrReq);
 
 	GPOS_ASSERT(
 		CDistributionSpec::EdtUniversal != m_ped->PdsRequired()->Edt() &&
@@ -685,8 +684,6 @@ CReqdPropPlan::PrppRemapForCTE(CMemoryPool *mp, CReqdPropPlan *prppInput,
 	GPOS_ASSERT(NULL != pdpplanInput);
 
 	// Remap derived sort order to a required sort order.
-
-	// a single order column, remap it to the equivalent CTE producer column
 	COrderSpec *pos = pdpplanInput->Pos()->PosCopyWithRemappedColumns(
 		mp, colref_mapping, false /*must_exist*/);
 	CEnfdOrder *peo = GPOS_NEW(mp) CEnfdOrder(pos, prppInput->Peo()->Eom());

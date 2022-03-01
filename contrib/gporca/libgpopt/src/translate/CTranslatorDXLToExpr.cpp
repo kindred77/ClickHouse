@@ -16,7 +16,6 @@
 #include "gpos/common/CAutoTimer.h"
 
 #include "gpopt/base/CAutoOptCtxt.h"
-#include "gpopt/base/CCastUtils.h"
 #include "gpopt/base/CColRef.h"
 #include "gpopt/base/CColRefSet.h"
 #include "gpopt/base/CColumnFactory.h"
@@ -28,7 +27,6 @@
 #include "gpopt/mdcache/CMDAccessorUtils.h"
 #include "gpopt/metadata/CColumnDescriptor.h"
 #include "gpopt/metadata/CTableDescriptor.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/translate/CTranslatorExprToDXLUtils.h"
 #include "naucrates/dxl/operators/dxlops.h"
 #include "naucrates/md/CMDArrayCoerceCastGPDB.h"
@@ -526,10 +524,9 @@ CTranslatorDXLToExpr::PexprLogicalTVF(const CDXLNode *dxlnode)
 
 	const IMDFunction *pmdfunc = m_pmda->RetrieveFunc(mdid_func);
 
-	if (IMDFunction::EfsVolatile == pmdfunc->GetFuncStability() ||
-		IMDFunction::EfdaNoSQL != pmdfunc->GetFuncDataAccess())
+	if (IMDFunction::EfsVolatile == pmdfunc->GetFuncStability())
 	{
-		COptCtxt::PoctxtFromTLS()->SetHasVolatileOrSQLFunc();
+		COptCtxt::PoctxtFromTLS()->SetHasVolatileFunc();
 	}
 
 	return pexpr;
@@ -1750,8 +1747,20 @@ CTranslatorDXLToExpr::PexprLogicalSeqPr(const CDXLNode *dxlnode)
 		{
 			CExpressionArray *pdrgpexprScalarIdents =
 				CUtils::PdrgpexprScalarIdents(m_mp, colref_array);
-			pds = GPOS_NEW(m_mp) CDistributionSpecHashed(
-				pdrgpexprScalarIdents, true /* fNullsCollocated */);
+			pds = CDistributionSpecHashed::MakeHashedDistrSpec(
+				m_mp, pdrgpexprScalarIdents, true /* fNullsCollocated */,
+				NULL /* pdshashedEquiv */, NULL /* opfamilies */);
+			if (NULL == pds)
+			{
+				// FIXME: Handle PARTITION BY clauses that cannot be capture using CDistributionSpecHashed
+				// CScalarProjectList uses CDistributionSpecHashed to represent PARTITION BY clauses, even
+				// though the clause may use expressions that are not distributable. For now, ORCA falls
+				// back for such cases.
+				GPOS_RAISE(
+					gpdxl::ExmaMD, gpdxl::ExmiMDObjUnsupported,
+					GPOS_WSZ_LIT(
+						"no default hash opclasses found in window function"));
+			}
 		}
 		else
 		{
@@ -1987,61 +1996,7 @@ CTranslatorDXLToExpr::PexprLogicalJoin(const CDXLNode *dxlnode)
 	CExpression *pexprCond = PexprScalar(pdxlnCond);
 	pdrgpexprChildren->Append(pexprCond);
 
-	// TODO: Remove this check once opfamily handling is fully implemented
-	if (ContainsHeterogenousCitextPredicate(pexprCond))
-	{
-		GPOS_RAISE(gpopt::ExmaGPOPT, gpopt::ExmiUnsupportedOp,
-				   GPOS_WSZ_LIT("Citext comparison in join."));
-	}
-
 	return CUtils::PexprLogicalJoin(m_mp, join_type, pdrgpexprChildren);
-}
-
-// checks for presense of citext op non-citext predicates.
-bool
-CTranslatorDXLToExpr::ContainsHeterogenousCitextPredicate(
-	CExpression *pexprScalar)
-{
-	// protect against stack overflow during recursion
-	GPOS_CHECK_STACK_SIZE;
-	GPOS_ASSERT(NULL != pexprScalar);
-
-	if (CUtils::FScalarCmp(pexprScalar))
-	{
-		CExpression *pexprLeft =
-			CCastUtils::PexprWithoutBinaryCoercibleCasts((*pexprScalar)[0]);
-		CExpression *pexprRight =
-			CCastUtils::PexprWithoutBinaryCoercibleCasts((*pexprScalar)[1]);
-
-		IMDId *mdidLeft = CScalar::PopConvert(pexprLeft->Pop())->MdidType();
-		IMDId *mdidRight = CScalar::PopConvert(pexprRight->Pop())->MdidType();
-
-		const CWStringConst *left_typename =
-			m_pmda->RetrieveType(mdidLeft)->Mdname().GetMDName();
-		const CWStringConst *right_typename =
-			m_pmda->RetrieveType(mdidRight)->Mdname().GetMDName();
-
-		const CWStringConst citext_typename =
-			CWStringConst(GPOS_WSZ_LIT("citext"));
-
-		// Allow "citext op citext" & "non-citext op non-citext"
-		if (left_typename->Equals(&citext_typename) ^
-			right_typename->Equals(&citext_typename))
-		{
-			return true;
-		}
-	}
-
-	// recursively process children
-	const ULONG arity = pexprScalar->Arity();
-	for (ULONG ul = 0; ul < arity; ul++)
-	{
-		if (ContainsHeterogenousCitextPredicate((*pexprScalar)[ul]))
-		{
-			return true;
-		}
-	}
-	return false;
 }
 
 //---------------------------------------------------------------------------
@@ -2245,12 +2200,19 @@ CTranslatorDXLToExpr::RegisterMDRelationCtas(CDXLLogicalCTAS *pdxlopCTAS)
 
 	IntPtrArray *vartypemod_array = pdxlopCTAS->GetVarTypeModArray();
 	vartypemod_array->AddRef();
+
+	IMdIdArray *distr_opfamilies = pdxlopCTAS->GetDistrOpfamilies();
+	distr_opfamilies->AddRef();
+	IMdIdArray *distr_opclasses = pdxlopCTAS->GetDistrOpclasses();
+	distr_opclasses->AddRef();
+
 	CMDRelationCtasGPDB *pmdrel = GPOS_NEW(m_mp) CMDRelationCtasGPDB(
 		m_mp, pdxlopCTAS->MDId(), mdname_schema,
 		GPOS_NEW(m_mp) CMDName(m_mp, pdxlopCTAS->MdName()->GetMDName()),
 		pdxlopCTAS->IsTemporary(), pdxlopCTAS->HasOids(),
 		pdxlopCTAS->RetrieveRelStorageType(), pdxlopCTAS->Ereldistrpolicy(),
-		mdcol_array, pdxlopCTAS->GetDistrColPosArray(),
+		mdcol_array, pdxlopCTAS->GetDistrColPosArray(), distr_opfamilies,
+		distr_opclasses,
 		GPOS_NEW(m_mp) ULongPtr2dArray(m_mp),  // keyset_array,
 		pdxlopCTAS->GetDxlCtasStorageOption(), vartypemod_array);
 
@@ -2922,10 +2884,9 @@ CTranslatorDXLToExpr::PexprScalarFunc(const CDXLNode *pdxlnFunc)
 		pexprFunc = GPOS_NEW(m_mp) CExpression(m_mp, pop);
 	}
 
-	if (IMDFunction::EfsVolatile == pmdfunc->GetFuncStability() ||
-		IMDFunction::EfdaNoSQL != pmdfunc->GetFuncDataAccess())
+	if (IMDFunction::EfsVolatile == pmdfunc->GetFuncStability())
 	{
-		COptCtxt::PoctxtFromTLS()->SetHasVolatileOrSQLFunc();
+		COptCtxt::PoctxtFromTLS()->SetHasVolatileFunc();
 	}
 
 	return pexprFunc;
@@ -3909,7 +3870,15 @@ CTranslatorDXLToExpr::AddDistributionColumns(
 		ULONG *pulPos = phmiulAttnoColMapping->Find(&attno);
 		GPOS_ASSERT(NULL != pulPos);
 
-		ptabdesc->AddDistributionColumn(*pulPos);
+		IMDId *opfamily = NULL;
+		if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
+		{
+			opfamily = pmdrel->GetDistrOpfamilyAt(ul);
+			GPOS_ASSERT(NULL != opfamily && opfamily->IsValid());
+			//opfamily->AddRef();
+		}
+
+		ptabdesc->AddDistributionColumn(*pulPos, opfamily);
 	}
 }
 

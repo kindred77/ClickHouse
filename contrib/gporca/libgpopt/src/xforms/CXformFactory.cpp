@@ -32,7 +32,8 @@ CXformFactory::CXformFactory(CMemoryPool *mp)
 	: m_mp(mp),
 	  m_phmszxform(NULL),
 	  m_pxfsExploration(NULL),
-	  m_pxfsImplementation(NULL)
+	  m_pxfsImplementation(NULL),
+	  m_lastAddedOrSkippedXformId(-1)
 {
 	GPOS_ASSERT(NULL != mp);
 
@@ -93,10 +94,11 @@ CXformFactory::Add(CXform *pxform)
 	GPOS_ASSERT(NULL != pxform);
 	CXform::EXformId exfid = pxform->Exfid();
 
-	GPOS_ASSERT_IMP(0 < exfid, m_rgpxf[exfid - 1] != NULL &&
-								   "Incorrect order of instantiation");
 	GPOS_ASSERT(NULL == m_rgpxf[exfid]);
 
+	m_lastAddedOrSkippedXformId++;
+	GPOS_ASSERT(exfid == m_lastAddedOrSkippedXformId &&
+				"Incorrect order of instantiation");
 	m_rgpxf[exfid] = pxform;
 
 	// create name -> xform mapping
@@ -138,6 +140,7 @@ CXformFactory::Add(CXform *pxform)
 void
 CXformFactory::Instantiate()
 {
+	// Order here needs to correspond to the order defined in CXform::EXformId
 	Add(GPOS_NEW(m_mp) CXformProject2ComputeScalar(m_mp));
 	Add(GPOS_NEW(m_mp) CXformExpandNAryJoin(m_mp));
 	Add(GPOS_NEW(m_mp) CXformExpandNAryJoinMinCard(m_mp));
@@ -162,8 +165,7 @@ CXformFactory::Instantiate()
 	Add(GPOS_NEW(m_mp) CXformGbAgg2Apply(m_mp));
 	Add(GPOS_NEW(m_mp) CXformSubqJoin2Apply(m_mp));
 	Add(GPOS_NEW(m_mp) CXformSubqNAryJoin2Apply(m_mp));
-	Add(GPOS_NEW(m_mp) CXformInnerJoin2IndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp) CXformInnerJoin2DynamicIndexGetApply(m_mp));
+	SkipUnused(2);
 	Add(GPOS_NEW(m_mp) CXformInnerApplyWithOuterKey2InnerJoin(m_mp));
 	Add(GPOS_NEW(m_mp) CXformInnerJoin2NLJoin(m_mp));
 	Add(GPOS_NEW(m_mp) CXformImplementIndexApply(m_mp));
@@ -270,38 +272,30 @@ CXformFactory::Instantiate()
 	Add(GPOS_NEW(m_mp) CXformLeftSemiApplyIn2LeftSemiJoin(m_mp));
 	Add(GPOS_NEW(m_mp) CXformLeftSemiApplyInWithExternalCorrs2InnerJoin(m_mp));
 	Add(GPOS_NEW(m_mp) CXformLeftSemiApplyIn2LeftSemiJoinNoCorrelations(m_mp));
-	Add(GPOS_NEW(m_mp) CXformInnerJoin2BitmapIndexGetApply(m_mp));
+	SkipUnused(1);
 	Add(GPOS_NEW(m_mp) CXformImplementPartitionSelector(m_mp));
 	Add(GPOS_NEW(m_mp) CXformMaxOneRow2Assert(m_mp));
-	Add(GPOS_NEW(m_mp) CXformInnerJoinWithInnerSelect2IndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp)
-			CXformInnerJoinWithInnerSelect2DynamicIndexGetApply(m_mp));
+	SkipUnused(2);
 	Add(GPOS_NEW(m_mp)
 			CXformInnerJoinWithInnerSelect2PartialDynamicIndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp) CXformInnerJoin2DynamicBitmapIndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp)
-			CXformInnerJoinWithInnerSelect2BitmapIndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp)
-			CXformInnerJoinWithInnerSelect2DynamicBitmapIndexGetApply(m_mp));
+	SkipUnused(3);
 	Add(GPOS_NEW(m_mp) CXformGbAggWithMDQA2Join(m_mp));
 	Add(GPOS_NEW(m_mp) CXformCollapseProject(m_mp));
 	Add(GPOS_NEW(m_mp) CXformRemoveSubqDistinct(m_mp));
-	Add(GPOS_NEW(m_mp) CXformLeftOuterJoin2BitmapIndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp) CXformLeftOuterJoin2IndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp)
-			CXformLeftOuterJoinWithInnerSelect2BitmapIndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp) CXformLeftOuterJoinWithInnerSelect2IndexGetApply(m_mp));
+	SkipUnused(4);
 	Add(GPOS_NEW(m_mp) CXformExpandNAryJoinGreedy(m_mp));
 	Add(GPOS_NEW(m_mp) CXformEagerAgg(m_mp));
 	Add(GPOS_NEW(m_mp) CXformExpandNAryJoinDPv2(m_mp));
 	Add(GPOS_NEW(m_mp) CXformImplementFullOuterMergeJoin(m_mp));
-	Add(GPOS_NEW(m_mp) CXformLeftOuterJoin2DynamicBitmapIndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp) CXformLeftOuterJoin2DynamicIndexGetApply(m_mp));
-	Add(GPOS_NEW(m_mp)
-			CXformLeftOuterJoinWithInnerSelect2DynamicBitmapIndexGetApply(
-				m_mp));
-	Add(GPOS_NEW(m_mp)
-			CXformLeftOuterJoinWithInnerSelect2DynamicIndexGetApply(m_mp));
+	SkipUnused(4);
+	Add(GPOS_NEW(m_mp) CXformIndexGet2IndexOnlyScan(m_mp));
+	Add(GPOS_NEW(m_mp) CXformJoin2BitmapIndexGetApply(m_mp));
+	Add(GPOS_NEW(m_mp) CXformJoin2IndexGetApply(m_mp));
+	Add(GPOS_NEW(m_mp) CXformMultiExternalGet2MultiExternalScan(m_mp));
+	Add(GPOS_NEW(m_mp) CXformExpandDynamicGetWithExternalPartitions(m_mp));
+	Add(GPOS_NEW(m_mp) CXformLeftJoin2RightJoin(m_mp));
+	Add(GPOS_NEW(m_mp) CXformRightOuterJoin2HashJoin(m_mp));
+	Add(GPOS_NEW(m_mp) CXformImplementInnerJoin(m_mp));
 
 	GPOS_ASSERT(NULL != m_rgpxf[CXform::ExfSentinel - 1] &&
 				"Not all xforms have been instantiated");
@@ -338,6 +332,16 @@ CXform *
 CXformFactory::Pxf(const CHAR *szXformName) const
 {
 	return m_phmszxform->Find(szXformName);
+}
+
+
+// is this xform id still used?
+BOOL
+CXformFactory::IsXformIdUsed(CXform::EXformId exfid)
+{
+	GPOS_ASSERT(exfid <= m_lastAddedOrSkippedXformId);
+
+	return (NULL != m_rgpxf[exfid]);
 }
 
 

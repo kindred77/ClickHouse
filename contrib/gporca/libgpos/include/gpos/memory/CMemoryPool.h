@@ -29,7 +29,6 @@
 #include "gpos/common/CLink.h"
 #include "gpos/common/CStackDescriptor.h"
 #include "gpos/error/CException.h"
-#include "gpos/memory/CMemoryPoolStatistics.h"
 #include "gpos/types.h"
 
 

@@ -27,10 +27,15 @@
 #include "gpopt/base/IColConstraintsMapper.h"
 #include "gpopt/operators/CPredicateUtils.h"
 #include "gpopt/operators/CScalarArrayCmp.h"
+#include "gpopt/operators/CScalarCmp.h"
 #include "gpopt/operators/CScalarIdent.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
+#include "naucrates/md/IMDScalarOp.h"
+#include "naucrates/md/IMDType.h"
 
 using namespace gpopt;
+
+FORCE_GENERATE_DBGSTR(CConstraint);
 
 // initialize constant true
 BOOL CConstraint::m_fTrue(true);
@@ -421,6 +426,31 @@ CConstraint::PcnstrFromScalarCmp(
 			!CUtils::FConstrainableType(pcrRight->RetrieveType()->MDId()))
 		{
 			return NULL;
+		}
+
+		if (GPOS_FTRACE(EopttraceConsiderOpfamiliesForDistribution))
+		{
+			CMDAccessor *mda = COptCtxt::PoctxtFromTLS()->Pmda();
+			CScalarCmp *sc_cmp = CScalarCmp::PopConvert(pexpr->Pop());
+			const IMDScalarOp *op = mda->RetrieveScOp(sc_cmp->MdIdOp());
+
+			IMDId *left_mdid =
+				CScalar::PopConvert(pexprLeft->Pop())->MdidType();
+			const IMDType *left_type = mda->RetrieveType(left_mdid);
+
+			IMDId *right_mdid =
+				CScalar::PopConvert(pexprRight->Pop())->MdidType();
+			const IMDType *right_type = mda->RetrieveType(right_mdid);
+
+			// Build constraint (e.g for equivalent classes) only when the hash families
+			// of the operator and operands match.
+			if (!CUtils::Equals(op->HashOpfamilyMdid(),
+								left_type->GetDistrOpfamilyMdid()) ||
+				!CUtils::Equals(op->HashOpfamilyMdid(),
+								right_type->GetDistrOpfamilyMdid()))
+			{
+				return NULL;
+			}
 		}
 
 		BOOL pcrLeftIncludesNull =

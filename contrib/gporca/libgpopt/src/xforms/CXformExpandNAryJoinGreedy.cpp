@@ -16,9 +16,11 @@
 #include "gpos/base.h"
 
 #include "gpopt/base/CUtils.h"
+#include "gpopt/operators/CExpressionUtils.h"
+#include "gpopt/operators/CLogicalNAryJoin.h"
 #include "gpopt/operators/CNormalizer.h"
+#include "gpopt/operators/CPatternMultiTree.h"
 #include "gpopt/operators/CPredicateUtils.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CJoinOrderGreedy.h"
 #include "gpopt/xforms/CXformUtils.h"
 

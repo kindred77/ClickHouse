@@ -12,9 +12,12 @@
 #include "naucrates/base/IDatum.h"
 
 #include "naucrates/md/CMDTypeGenericGPDB.h"
+#include "naucrates/statistics/CStatistics.h"
 
 using namespace gpnaucrates;
 using namespace gpmd;
+
+FORCE_GENERATE_DBGSTR(gpmd::IDatum);
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -61,7 +64,8 @@ IDatum::StatsAreEqual(const IDatum *datum) const
 
 	CDouble d1 = this->GetDoubleMapping();
 	CDouble d2 = datum->GetDoubleMapping();
-	return d1 == d2;
+	CDouble diff = d1 - d2;
+	return diff.Absolute() <= CStatistics::Epsilon;
 }
 
 //---------------------------------------------------------------------------
@@ -109,7 +113,8 @@ IDatum::StatsAreLessThan(const IDatum *datum) const
 
 	CDouble d1 = this->GetDoubleMapping();
 	CDouble d2 = datum->GetDoubleMapping();
-	return d1 < d2;
+	CDouble diff = d2 - d1;
+	return diff > CStatistics::Epsilon;
 }
 
 //---------------------------------------------------------------------------

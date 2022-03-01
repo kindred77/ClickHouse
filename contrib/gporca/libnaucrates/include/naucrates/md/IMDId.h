@@ -18,6 +18,7 @@
 #include "gpos/common/CDynamicPtrArray.h"
 #include "gpos/common/CHashSet.h"
 #include "gpos/common/CHashSetIter.h"
+#include "gpos/common/DbgPrintMixin.h"
 #include "gpos/string/CWStringConst.h"
 
 #include "naucrates/dxl/gpdb_types.h"
@@ -48,7 +49,7 @@ static const INT default_type_modifier = -1;
 //		Abstract class for representing metadata objects ids
 //
 //---------------------------------------------------------------------------
-class IMDId : public CRefCount
+class IMDId : public CRefCount, public DbgPrintMixin<IMDId>
 {
 private:
 	// number of deletion locks -- each MDAccessor adds a new deletion lock if it uses
@@ -138,15 +139,6 @@ public:
 		return mdid->HashValue();
 	}
 
-	// hash function for using mdids in a cache
-	static ULONG
-	MDIdPtrHash(const VOID_PTR &pv)
-	{
-		GPOS_ASSERT(NULL != pv);
-		IMDId *mdid = static_cast<IMDId *>(pv);
-		return mdid->HashValue();
-	}
-
 	// static equality functions for use in different structures,
 	// e.g. hashmaps, MD cache, etc.
 	static BOOL
@@ -156,25 +148,6 @@ public:
 		return left_mdid->Equals(right_mdid);
 	}
 
-	// equality function for using mdids in a cache
-	static BOOL
-	MDIdPtrCompare(const VOID_PTR &pvLeft, const VOID_PTR &pvRight)
-	{
-		if (NULL == pvLeft && NULL == pvRight)
-		{
-			return true;
-		}
-
-		if (NULL == pvLeft || NULL == pvRight)
-		{
-			return false;
-		}
-
-
-		IMDId *left_mdid = static_cast<IMDId *>(pvLeft);
-		IMDId *right_mdid = static_cast<IMDId *>(pvRight);
-		return left_mdid->Equals(right_mdid);
-	}
 
 	// is the mdid valid
 	virtual BOOL IsValid() const = 0;
@@ -205,7 +178,7 @@ typedef CHashSetIter<IMDId, IMDId::MDIdHash, IMDId::MDIdCompare,
 	MdidHashSetIter;
 }  // namespace gpmd
 
-
+FORCE_GENERATE_DBGSTR(gpmd::IMDId);
 
 #endif	// !GPMD_IMDId_H
 

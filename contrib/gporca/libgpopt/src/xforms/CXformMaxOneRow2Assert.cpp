@@ -13,6 +13,8 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/CLogicalMaxOneRow.h"
+#include "gpopt/operators/CPatternLeaf.h"
 #include "gpopt/xforms/CXformUtils.h"
 
 

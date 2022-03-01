@@ -13,7 +13,9 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalPartitionSelector.h"
+#include "gpopt/operators/CPatternLeaf.h"
+#include "gpopt/operators/CPhysicalPartitionSelectorDML.h"
 
 using namespace gpopt;
 

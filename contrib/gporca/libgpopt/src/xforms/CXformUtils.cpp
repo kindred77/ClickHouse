@@ -21,12 +21,43 @@
 #include "gpopt/base/CConstraintNegation.h"
 #include "gpopt/base/CKeyCollection.h"
 #include "gpopt/base/CUtils.h"
-#include "gpopt/engine/CHint.h"
 #include "gpopt/exception.h"
+#include "gpopt/operators/CExpressionHandle.h"
+#include "gpopt/operators/CLogicalAssert.h"
+#include "gpopt/operators/CLogicalBitmapTableGet.h"
+#include "gpopt/operators/CLogicalCTEConsumer.h"
+#include "gpopt/operators/CLogicalCTEProducer.h"
+#include "gpopt/operators/CLogicalDynamicBitmapTableGet.h"
+#include "gpopt/operators/CLogicalDynamicGet.h"
+#include "gpopt/operators/CLogicalGbAgg.h"
+#include "gpopt/operators/CLogicalGbAggDeduplicate.h"
+#include "gpopt/operators/CLogicalGet.h"
+#include "gpopt/operators/CLogicalInnerJoin.h"
+#include "gpopt/operators/CLogicalNAryJoin.h"
+#include "gpopt/operators/CLogicalPartitionSelector.h"
+#include "gpopt/operators/CLogicalRowTrigger.h"
+#include "gpopt/operators/CLogicalSelect.h"
+#include "gpopt/operators/CLogicalSequenceProject.h"
+#include "gpopt/operators/CPhysicalInnerHashJoin.h"
+#include "gpopt/operators/CScalarAssertConstraint.h"
+#include "gpopt/operators/CScalarAssertConstraintList.h"
+#include "gpopt/operators/CScalarBitmapBoolOp.h"
+#include "gpopt/operators/CScalarBitmapIndexProbe.h"
+#include "gpopt/operators/CScalarCmp.h"
+#include "gpopt/operators/CScalarDMLAction.h"
+#include "gpopt/operators/CScalarIdent.h"
+#include "gpopt/operators/CScalarIf.h"
+#include "gpopt/operators/CScalarProjectElement.h"
+#include "gpopt/operators/CScalarProjectList.h"
+#include "gpopt/operators/CScalarSubquery.h"
+#include "gpopt/operators/CScalarSubqueryAll.h"
+#include "gpopt/operators/CScalarSubqueryQuantified.h"
+#include "gpopt/operators/CScalarWindowFunc.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "gpopt/search/CGroupExpression.h"
 #include "gpopt/search/CGroupProxy.h"
 #include "gpopt/xforms/CDecorrelator.h"
+#include "gpopt/xforms/CSubqueryHandler.h"
 #include "gpopt/xforms/CXformExploration.h"
 #include "naucrates/base/CDatumInt8GPDB.h"
 #include "naucrates/md/CMDIdGPDB.h"
@@ -34,9 +65,12 @@
 #include "naucrates/md/IMDCheckConstraint.h"
 #include "naucrates/md/IMDScalarOp.h"
 #include "naucrates/md/IMDTrigger.h"
+#include "naucrates/md/IMDTypeBool.h"
+#include "naucrates/md/IMDTypeInt4.h"
 #include "naucrates/md/IMDTypeInt8.h"
 #include "naucrates/md/IMDTypeOid.h"
 #include "naucrates/statistics/CFilterStatsProcessor.h"
+
 using namespace gpopt;
 
 // predicates less selective than this threshold
@@ -2253,6 +2287,7 @@ CXformUtils::PdrgpcrIndexColumns(CMemoryPool *mp, CColRefArray *colref_array,
 			pdrgpcrIndex->Release();
 			return GPOS_NEW(mp) CColRefArray(mp);
 		}
+
 		GPOS_ASSERT(ulPosNonDropped < colref_array->Size());
 
 		CColRef *colref = (*colref_array)[ulPosNonDropped];
@@ -2494,13 +2529,16 @@ CXformUtils::PcrProjectElement(CExpression *pexpr, ULONG ulIdxProjElement)
 void
 CXformUtils::LookupJoinKeys(CMemoryPool *mp, CExpression *pexpr,
 							CExpressionArray **ppdrgpexprOuter,
-							CExpressionArray **ppdrgpexprInner)
+							CExpressionArray **ppdrgpexprInner,
+							IMdIdArray **join_opfamilies)
 {
 	GPOS_ASSERT(NULL != ppdrgpexprOuter);
 	GPOS_ASSERT(NULL != ppdrgpexprInner);
 
 	*ppdrgpexprOuter = NULL;
 	*ppdrgpexprInner = NULL;
+	*join_opfamilies = NULL;
+
 	CGroupExpression *pgexprScalarOrigin = (*pexpr)[2]->Pgexpr();
 	if (NULL == pgexprScalarOrigin)
 	{
@@ -2518,6 +2556,12 @@ CXformUtils::LookupJoinKeys(CMemoryPool *mp, CExpression *pexpr,
 	}
 
 	GPOS_ASSERT(NULL != pgroupScalar->PdrgpexprJoinKeysInner());
+
+	*join_opfamilies = pgroupScalar->JoinOpfamilies();
+	if (NULL != *join_opfamilies)
+	{
+		(*join_opfamilies)->AddRef();
+	}
 
 	// extract used columns by hash join keys
 	CColRefSet *pcrsUsedOuter =
@@ -2561,7 +2605,8 @@ CXformUtils::LookupJoinKeys(CMemoryPool *mp, CExpression *pexpr,
 // Cache join keys on scalar child group
 void
 CXformUtils::CacheJoinKeys(CExpression *pexpr, CExpressionArray *pdrgpexprOuter,
-						   CExpressionArray *pdrgpexprInner)
+						   CExpressionArray *pdrgpexprInner,
+						   IMdIdArray *join_opfamilies)
 {
 	GPOS_ASSERT(NULL != pdrgpexprOuter);
 	GPOS_ASSERT(NULL != pdrgpexprInner);
@@ -2573,7 +2618,7 @@ CXformUtils::CacheJoinKeys(CExpression *pexpr, CExpressionArray *pdrgpexprOuter,
 
 		{  // scope of group proxy
 			CGroupProxy gp(pgroupScalar);
-			gp.SetJoinKeys(pdrgpexprOuter, pdrgpexprInner);
+			gp.SetJoinKeys(pdrgpexprOuter, pdrgpexprInner, join_opfamilies);
 		}
 	}
 }
@@ -2714,9 +2759,12 @@ CXformUtils::FProcessGPDBAntiSemiHashJoin(
 				CPhysicalJoin::FHashJoinCompatible(
 					pexprEquality, pexprOuter,
 					pexprInner) &&	// equality is hash-join compatible
-				CUtils::FUsesNullableCol(
+				!CUtils::FUsesNullableCol(
 					mp, pexprEquality,
-					pexprInner))  // equality uses an inner nullable column
+					pexprInner) &&	// equality uses an inner NOT NULL column
+				!CUtils::FUsesNullableCol(
+					mp, pexprEquality,
+					pexprOuter))  // equality uses an outer NOT NULL column
 			{
 				pexprEquality->AddRef();
 				pdrgpexprNew->Append(pexprEquality);
@@ -4202,7 +4250,6 @@ CXformUtils::FJoinPredOnSingleChild(CMemoryPool *mp, CExpressionHandle &exprhdl)
 		pdrgpcrs->Append(pcrsOutput);
 	}
 
-	GPOS_ASSERT(NULL != exprhdl.PexprScalarExactChild(arity - 1));
 	CExpressionArray *pdrgpexprPreds = CPredicateUtils::PdrgpexprConjuncts(
 		mp, exprhdl.PexprScalarExactChild(arity - 1,
 										  true /*error_on_null_return*/));
@@ -4696,6 +4743,81 @@ CXformUtils::PexprGbAggOnCTEConsumer2Join(CMemoryPool *mp,
 	pexprTrue->Release();
 
 	return pexprJoin;
+}
+
+//---------------------------------------------------------------------------
+// CXformUtils::AddALinearStackOfUnaryExpressions
+//
+// Given two CExpressions, a "lower part" and a "stack", consisting of
+// zero or more CExpressions with a single logical child and optional scalar
+// children, make a copy of the stack, with the lower (excluded) end of the
+// stack ("exclusiveBottomOfStack") replaced by "lowerPartOfExpr".
+//
+// Input:
+//
+//      lowerPartOfExpr             topOfStack
+//          / | | \                     |
+//    (optional children)              ...
+//                                      |
+//                               lastIncludedNode
+//                                      |
+//                             exclusiveBottomOfStack
+//
+// Result:
+//
+//                topOfStack
+//                    |
+//                   ...
+//                    |
+//             lastIncludedNode
+//                    |
+//              lowerPartOfExpr
+//                  / | | \ .
+//            (optional children)
+//
+//---------------------------------------------------------------------------
+CExpression *
+CXformUtils::AddALinearStackOfUnaryExpressions(
+	CMemoryPool *mp, CExpression *lowerPartOfExpr, CExpression *topOfStack,
+	CExpression *exclusiveBottomOfStack)
+{
+	if (NULL == topOfStack || topOfStack == exclusiveBottomOfStack)
+	{
+		// nothing to add on top of lowerPartOfExpr
+		return lowerPartOfExpr;
+	}
+
+	ULONG arity = topOfStack->Arity();
+
+	// a stack must consist of logical nodes
+	GPOS_ASSERT(topOfStack->Pop()->FLogical());
+	GPOS_CHECK_STACK_SIZE;
+
+	// Recursively process the node just below topOfStack first, to build the new stack bottom-up.
+	// Note that if the stack ends here, the recursive call will return lowerPartOfExpr.
+	CExpression *processedRestOfStack = AddALinearStackOfUnaryExpressions(
+		mp, lowerPartOfExpr, (*topOfStack)[0], exclusiveBottomOfStack);
+
+	// now add a copy of node topOfStack
+	CExpressionArray *childrenArray = GPOS_NEW(mp) CExpressionArray(mp);
+	COperator *pop = topOfStack->Pop();
+
+	// the first, logical child becomes the copied rest of the stack
+	childrenArray->Append(processedRestOfStack);
+
+	// then copy the remaining (scalar) children, unmodified
+	for (ULONG ul = 1; ul < arity; ul++)
+	{
+		CExpression *scalarChild = (*topOfStack)[ul];
+
+		GPOS_ASSERT(scalarChild->Pop()->FScalar());
+		scalarChild->AddRef();
+		childrenArray->Append(scalarChild);
+	}
+
+	pop->AddRef();
+
+	return GPOS_NEW(mp) CExpression(mp, pop, childrenArray);
 }
 
 // EOF

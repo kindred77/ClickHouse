@@ -13,9 +13,11 @@
 
 #include "gpos/base.h"
 
+#include "gpopt/operators/CExpressionHandle.h"
+#include "gpopt/operators/CLogicalGbAgg.h"
+#include "gpopt/operators/CLogicalSequenceProject.h"
 #include "gpopt/operators/CNormalizer.h"
 #include "gpopt/operators/COperator.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/xforms/CSubqueryHandler.h"
 
 

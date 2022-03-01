@@ -13,7 +13,8 @@
 
 #include "gpos/base.h"
 
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalConstTableGet.h"
+#include "gpopt/operators/CPhysicalConstTableGet.h"
 
 using namespace gpopt;
 

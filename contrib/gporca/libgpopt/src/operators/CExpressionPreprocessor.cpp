@@ -24,11 +24,31 @@
 #include "gpopt/mdcache/CMDAccessor.h"
 #include "gpopt/operators/CExpressionFactorizer.h"
 #include "gpopt/operators/CExpressionUtils.h"
+#include "gpopt/operators/CLogicalCTEAnchor.h"
+#include "gpopt/operators/CLogicalCTEConsumer.h"
+#include "gpopt/operators/CLogicalCTEProducer.h"
+#include "gpopt/operators/CLogicalConstTableGet.h"
+#include "gpopt/operators/CLogicalGbAgg.h"
+#include "gpopt/operators/CLogicalInnerJoin.h"
+#include "gpopt/operators/CLogicalLimit.h"
+#include "gpopt/operators/CLogicalNAryJoin.h"
+#include "gpopt/operators/CLogicalProject.h"
+#include "gpopt/operators/CLogicalSequenceProject.h"
+#include "gpopt/operators/CLogicalSetOp.h"
+#include "gpopt/operators/CLogicalUnion.h"
+#include "gpopt/operators/CLogicalUnionAll.h"
 #include "gpopt/operators/CNormalizer.h"
 #include "gpopt/operators/CPredicateUtils.h"
+#include "gpopt/operators/CScalarCmp.h"
+#include "gpopt/operators/CScalarIdent.h"
 #include "gpopt/operators/CScalarNAryJoinPredList.h"
+#include "gpopt/operators/CScalarProjectElement.h"
+#include "gpopt/operators/CScalarProjectList.h"
+#include "gpopt/operators/CScalarSubquery.h"
+#include "gpopt/operators/CScalarSubqueryAny.h"
+#include "gpopt/operators/CScalarSubqueryExists.h"
+#include "gpopt/operators/CScalarSubqueryQuantified.h"
 #include "gpopt/operators/CWindowPreprocessor.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "gpopt/xforms/CXform.h"
 #include "naucrates/md/IMDScalarOp.h"
@@ -1336,11 +1356,8 @@ CExpressionPreprocessor::PexprOuterJoinToInnerJoin(CMemoryPool *mp,
 						PexprOuterJoinToInnerJoin(mp, (*pexprChild)[1]);
 					CExpression *pexprNewScalar =
 						PexprOuterJoinToInnerJoin(mp, (*pexprChild)[2]);
-					CExpression *pexprJoin =
-						CUtils::PexprLogicalJoin<CLogicalInnerJoin>(
-							mp, pexprNewOuter, pexprNewInner, pexprNewScalar);
-					pexprChild = PexprCollapseJoins(mp, pexprJoin);
-					pexprJoin->Release();
+					pexprChild = CUtils::PexprLogicalJoin<CLogicalInnerJoin>(
+						mp, pexprNewOuter, pexprNewInner, pexprNewScalar);
 					fNewChild = true;
 				}
 			}

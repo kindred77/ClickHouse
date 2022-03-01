@@ -13,6 +13,7 @@
 #include "gpos/base.h"
 #include "gpos/common/CAutoTimer.h"
 #include "gpos/common/syslibwrapper.h"
+#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/memory/CAutoMemoryPool.h"
 #include "gpos/string/CWStringDynamic.h"
@@ -39,6 +40,7 @@
 #include "gpopt/operators/CPhysicalMotionGather.h"
 #include "gpopt/operators/CPhysicalSort.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
+#include "gpopt/search/CBinding.h"
 #include "gpopt/search/CGroup.h"
 #include "gpopt/search/CGroupExpression.h"
 #include "gpopt/search/CGroupProxy.h"
@@ -61,6 +63,8 @@
 #define GPOPT_MEM_UNIT_NAME "MB"
 
 using namespace gpopt;
+
+FORCE_GENERATE_DBGSTR(CEngine);
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -2090,9 +2094,21 @@ CEngine::FCheckEnfdProps(CMemoryPool *mp, CGroupExpression *pgexpr,
 	BOOL fOrderReqd = !GPOS_FTRACE(EopttraceDisableSort) &&
 					  !prpp->Peo()->PosRequired()->IsEmpty();
 
+	// CPhysicalLeftOuterIndexNLJoin requires the inner child to be any
+	// distribution but random. The OR makes an exception in this case.
+	// This should be generalized when more physical operators require
+	// this pattern. We need an explicit check for CPhysicalLeftOuterIndexNLJoin
+	// when there are no motions, therefore we need to handle this exceptional
+	// case here.
+	//
+	// Similar exceptions should be OR'd into fDistributionReqdException to
+	// force checking EpetDistribution on the physical operation
+	BOOL fDistributionReqdException =
+		popPhysical->Eopid() == COperator::EopPhysicalLeftOuterIndexNLJoin;
 	BOOL fDistributionReqd =
 		!GPOS_FTRACE(EopttraceDisableMotions) &&
-		(CDistributionSpec::EdtAny != prpp->Ped()->PdsRequired()->Edt());
+		((CDistributionSpec::EdtAny != prpp->Ped()->PdsRequired()->Edt()) ||
+		 fDistributionReqdException);
 
 	BOOL fRewindabilityReqd = !GPOS_FTRACE(EopttraceDisableSpool) &&
 							  (prpp->Per()->PrsRequired()->IsCheckRequired());

@@ -308,6 +308,16 @@ set(SRCS
 
 add_library(gpxerces ${SRCS})
 
+configure_file(
+    "${GPXERCES_SOURCE_DIR}/xercesc/util/Xerces_autoconf_config.hpp.in"
+    "${GPXERCES_SOURCE_DIR}/xercesc/util/Xerces_autoconf_config.hpp"
+)
+        
+configure_file(
+    "${ClickHouse_BINARY_DIR}/contrib/gpxerces/config.h.in"
+    "${ClickHouse_BINARY_DIR}/contrib/gpxerces/config.h"
+)
+
 target_include_directories(gpxerces PUBLIC "${GPXERCES_SOURCE_DIR}")
 
 if(M_LIBRARY)

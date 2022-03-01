@@ -49,6 +49,7 @@ set(SRCS
 "${GPORCA_GPOS_SOURCE_DIR}/src/io/COstream.cpp"
 "${GPORCA_GPOS_SOURCE_DIR}/src/io/COstreamBasic.cpp"
 "${GPORCA_GPOS_SOURCE_DIR}/src/io/COstreamFile.cpp"
+"${GPORCA_GPOS_SOURCE_DIR}/src/io/COstreamStdString.cpp"
 "${GPORCA_GPOS_SOURCE_DIR}/src/io/COstreamString.cpp"
 "${GPORCA_GPOS_SOURCE_DIR}/src/io/ioutils.cpp"
 "${GPORCA_GPOS_SOURCE_DIR}/src/memory/CAutoMemoryPool.cpp"
@@ -77,7 +78,7 @@ set(SRCS
 "${GPORCA_GPOS_SOURCE_DIR}/src/test/CFSimulatorTestExt.cpp"
 "${GPORCA_GPOS_SOURCE_DIR}/src/test/CUnittest.cpp"
 "${GPORCA_GPOS_SOURCE_DIR}/src/utils.cpp"
-#source files in naucrates
+#naucrates
 "${GPORCA_NAUCRATES_SOURCE_DIR}/src/CCostModelConfigSerializer.cpp"
 "${GPORCA_NAUCRATES_SOURCE_DIR}/src/CDXLUtils.cpp"
 "${GPORCA_NAUCRATES_SOURCE_DIR}/src/CIdGenerator.cpp"
@@ -494,13 +495,13 @@ set(SRCS
 "${GPORCA_NAUCRATES_SOURCE_DIR}/src/xml/CDXLSections.cpp"
 "${GPORCA_NAUCRATES_SOURCE_DIR}/src/xml/CXMLSerializer.cpp"
 "${GPORCA_NAUCRATES_SOURCE_DIR}/src/xml/dxltokens.cpp"
-#source files in dbcost
+#gpdbcost
 "${GPORCA_GPDBCOST_SOURCE_DIR}/src/CCostModelGPDB.cpp"
 "${GPORCA_GPDBCOST_SOURCE_DIR}/src/CCostModelGPDBLegacy.cpp"
 "${GPORCA_GPDBCOST_SOURCE_DIR}/src/CCostModelParamsGPDB.cpp"
 "${GPORCA_GPDBCOST_SOURCE_DIR}/src/CCostModelParamsGPDBLegacy.cpp"
 "${GPORCA_GPDBCOST_SOURCE_DIR}/src/ICostModel.cpp"
-#source files in gpopt
+#gpopt
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CAutoOptCtxt.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CCTEInfo.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CCTEMap.cpp"
@@ -522,7 +523,6 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CCostContext.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CDatumSortedSet.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CDefaultComparator.cpp"
-"${GPORCA_GPOPT_SOURCE_DIR}/src/base/CDistributionSpecExternal.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CDistributionSpecHashed.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CDistributionSpecHashedNoOp.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CDistributionSpecNonSingleton.cpp"
@@ -559,7 +559,6 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CPartitionPropagationSpec.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CPrintPrefix.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CPropConstraint.cpp"
-"${GPORCA_GPOPT_SOURCE_DIR}/src/base/CPropSpec.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CQueryContext.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CRange.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/base/CReqdProp.cpp"
@@ -648,9 +647,11 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalLeftSemiJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalLimit.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalMaxOneRow.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalMultiExternalGet.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalNAryJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalPartitionSelector.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalProject.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalRightOuterJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalRowTrigger.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalSelect.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CLogicalSequence.cpp"
@@ -684,6 +685,7 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalHashAgg.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalHashAggDeduplicate.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalHashJoin.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalIndexOnlyScan.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalIndexScan.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalInnerHashJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalInnerIndexNLJoin.cpp"
@@ -704,10 +706,12 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalMotionHashDistribute.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalMotionRandom.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalMotionRoutedDistribute.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalMultiExternalScan.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalNLJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalParallelUnionAll.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalPartitionSelector.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalPartitionSelectorDML.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalRightOuterHashJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalRowTrigger.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalScalarAgg.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/operators/CPhysicalScan.cpp"
@@ -812,6 +816,7 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformDynamicGet2DynamicTableScan.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformDynamicIndexGet2DynamicIndexScan.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformEagerAgg.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformExpandDynamicGetWithExternalPartitions.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformExpandFullOuterJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformExpandNAryJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformExpandNAryJoinDP.cpp"
@@ -837,6 +842,7 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementDML.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementDynamicBitmapTableGet.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementFullOuterMergeJoin.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementInnerJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementLimit.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementPartitionSelector.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementRowTrigger.cpp"
@@ -847,6 +853,7 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementTVFNoArgs.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementUnionAll.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformImplementation.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformIndexGet2IndexOnlyScan.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformIndexGet2IndexScan.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformInlineCTEConsumer.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformInlineCTEConsumerUnderSelect.cpp"
@@ -859,6 +866,7 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformIntersect2Join.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformIntersectAll2LeftSemiJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformJoin2IndexApply.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformJoin2IndexApplyGeneric.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformJoinAssociativity.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformJoinCommutativity.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftAntiSemiApply2LeftAntiSemiJoin.cpp"
@@ -870,6 +878,7 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftAntiSemiJoin2NLJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftAntiSemiJoinNotIn2HashJoinNotIn.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftAntiSemiJoinNotIn2NLJoinNotIn.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftJoin2RightJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftOuter2InnerUnionAllLeftAntiSemiJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftOuterApply2LeftOuterJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftOuterApply2LeftOuterJoinNoCorrelations.cpp"
@@ -884,6 +893,7 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftSemiJoin2InnerJoinUnderGb.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformLeftSemiJoin2NLJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformMaxOneRow2Assert.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformMultiExternalGet2MultiExternalScan.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformProject2Apply.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformProject2ComputeScalar.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformPushDownLeftOuterJoin.cpp"
@@ -892,6 +902,7 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformPushGbWithHavingBelowJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformRemoveSubqDistinct.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformResult.cpp"
+"${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformRightOuterJoin2HashJoin.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformSelect2Apply.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformSelect2BitmapBoolOp.cpp"
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CXformSelect2DynamicIndexGet.cpp"
@@ -917,13 +928,21 @@ set(SRCS
 
 add_library(gporca ${SRCS})
 
+target_link_libraries(gporca PUBLIC ${GPXERCES_LIBRARY})
+target_include_directories (gporca SYSTEM PRIVATE "${GPXERCES_INCLUDE_DIR}")
+
+set(GPORCA_GPOS_INCLUDE "${GPORCA_GPOS_SOURCE_DIR}/include")
+set(GPORCA_NAUCRATES_INCLUDE "${GPORCA_NAUCRATES_SOURCE_DIR}/include")
+set(GPORCA_GPDBCOST_INCLUDE "${GPORCA_GPDBCOST_SOURCE_DIR}/include")
+set(GPORCA_GPOPT_INCLUDE "${GPORCA_GPOPT_SOURCE_DIR}/include")
+
 target_include_directories(gporca PUBLIC
-"${GPORCA_GPOS_SOURCE_DIR}/include"
-"${GPORCA_NAUCRATES_SOURCE_DIR}/include"
-"${GPORCA_GPDBCOST_SOURCE_DIR}/include"
-"${GPORCA_GPOPT_SOURCE_DIR}/include"
+"${GPORCA_GPOS_INCLUDE}"
+"${GPORCA_NAUCRATES_INCLUDE}"
+"${GPORCA_GPDBCOST_INCLUDE}"
+"${GPORCA_GPOPT_INCLUDE}"
 )
 
-if(M_LIBRARY)
-    target_link_libraries(gporca PRIVATE ${M_LIBRARY})
-endif()
+#if(M_LIBRARY)
+#    target_link_libraries(gporca PRIVATE ${M_LIBRARY})
+#endif()

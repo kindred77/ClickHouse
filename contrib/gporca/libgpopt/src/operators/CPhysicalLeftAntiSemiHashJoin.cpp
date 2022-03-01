@@ -14,7 +14,6 @@
 #include "gpos/base.h"
 
 #include "gpopt/base/CDistributionSpecHashed.h"
-#include "gpopt/base/CUtils.h"
 
 
 using namespace gpopt;
@@ -30,8 +29,10 @@ using namespace gpopt;
 //---------------------------------------------------------------------------
 CPhysicalLeftAntiSemiHashJoin::CPhysicalLeftAntiSemiHashJoin(
 	CMemoryPool *mp, CExpressionArray *pdrgpexprOuterKeys,
-	CExpressionArray *pdrgpexprInnerKeys)
-	: CPhysicalHashJoin(mp, pdrgpexprOuterKeys, pdrgpexprInnerKeys)
+	CExpressionArray *pdrgpexprInnerKeys, IMdIdArray *hash_opfamilies,
+	CXform::EXformId origin_xform)
+	: CPhysicalHashJoin(mp, pdrgpexprOuterKeys, pdrgpexprInnerKeys,
+						hash_opfamilies, origin_xform)
 {
 }
 

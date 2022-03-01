@@ -12,6 +12,7 @@
 
 #include "naucrates/dxl/parser/CParseHandlerLogicalDelete.h"
 
+#include "naucrates/dxl/operators/CDXLLogicalDelete.h"
 #include "naucrates/dxl/operators/CDXLOperatorFactory.h"
 #include "naucrates/dxl/parser/CParseHandlerFactory.h"
 #include "naucrates/dxl/parser/CParseHandlerTableDescr.h"

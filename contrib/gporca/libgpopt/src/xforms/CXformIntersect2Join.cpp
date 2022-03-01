@@ -16,8 +16,9 @@
 #include "gpopt/base/CColRefComputed.h"
 #include "gpopt/base/CUtils.h"
 #include "gpopt/exception.h"
+#include "gpopt/operators/CLogicalIntersect.h"
 #include "gpopt/operators/COperator.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CPatternLeaf.h"
 #include "gpopt/translate/CTranslatorDXLToExpr.h"
 #include "gpopt/xforms/CXformUtils.h"
 

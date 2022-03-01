@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 
+#include "gpos/error/CAutoTrace.h"
 #include "gpos/io/COstreamString.h"
 #include "gpos/string/CWStringDynamic.h"
 
@@ -210,9 +211,6 @@ CJoinCardinalityTest::EresUnittest_Join()
 		{"../data/dxl/statistics/Join-Statistics-DDistinct-Input.xml",
 		 "../data/dxl/statistics/Join-Statistics-DDistinct-Output.xml", false,
 		 PdrgpstatspredjoinSingleJoinPredicate},
-		{"../data/dxl/statistics/Join-Statistics-Text-Input.xml",
-		 "../data/dxl/statistics/Join-Statistics-Text-Output.xml", false,
-		 PdrgpstatspredjoinSingleJoinPredicate},
 	};
 
 	CColumnFactory *col_factory = COptCtxt::PoctxtFromTLS()->Pcf();
@@ -240,7 +238,7 @@ CJoinCardinalityTest::EresUnittest_Join()
 			// create column references for grouping columns
 			(void) col_factory->PcrCreate(
 				pmdtypeint4, default_type_modifier, NULL, ul /* attno */,
-				false /*IsNullable*/, id, CName(&str), 0);
+				false /*IsNullable*/, id, CName(&str), false /*IsDistCol*/, 0);
 		}
 	}
 	cols->Release();

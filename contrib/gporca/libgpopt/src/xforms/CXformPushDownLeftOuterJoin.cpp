@@ -14,9 +14,13 @@
 #include "gpos/base.h"
 
 #include "gpopt/base/CUtils.h"
+#include "gpopt/operators/CLogicalLeftOuterJoin.h"
+#include "gpopt/operators/CLogicalNAryJoin.h"
 #include "gpopt/operators/CNormalizer.h"
+#include "gpopt/operators/CPatternLeaf.h"
+#include "gpopt/operators/CPatternMultiLeaf.h"
+#include "gpopt/operators/CPatternTree.h"
 #include "gpopt/operators/CPredicateUtils.h"
-#include "gpopt/operators/ops.h"
 
 
 using namespace gpopt;
@@ -131,6 +135,14 @@ CXformPushDownLeftOuterJoin::Transform(CXformContext *pxfctxt,
 		{
 			pdrgpexprNAryJoinChildren->Append(pexprChild);
 		}
+	}
+
+	if (pdrgpexprLOJChildren->Size() == 0)
+	{
+		// cannot create a valid LOJ; bail
+		pdrgpexprLOJChildren->Release();
+		pdrgpexprNAryJoinChildren->Release();
+		return;
 	}
 
 	CExpression *pexprLOJOuterChild = (*pdrgpexprLOJChildren)[0];

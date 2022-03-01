@@ -57,7 +57,7 @@ CorrelatedLeftSemiNLJoinWithLimit PushFilterToSemiJoinLeftChild SubqOuterReferen
 
 CAntiSemiJoinTest:
 AntiSemiJoin2Select-1 AntiSemiJoin2Select-2 NOT-IN-NotNullBoth NOT-IN-NullInner NOT-IN-NullOuter
-Correlated-AntiSemiJoin CorrelatedAntiSemiJoin-True Correlated-LASJ-With-Outer-Col
+Correlated-AntiSemiJoin CorrelatedAntiSemiJoin-True Correlated-LASJ-With-Outer-Col NotInToLASJ
 Correlated-LASJ-With-Outer-Const Correlated-LASJ-With-Outer-Expr LeftOuter2InnerUnionAllAntiSemiJoin-Tpcds;
 
 CPredicateTest:
@@ -66,12 +66,13 @@ TranslateOneTimeFilterConjunctQuals TranslateFilterDisjunctQuals TranslateFilter
 InferPredicates InferPredicatesForLimit InferPredicatesBCC-vc-vc InferPredicatesBCC-vc-txt
 InferPredicatesBCC-txt-txt InferPredicatesBCC-oid-oid InferPredicatesBCC-vcpart-txt
 OR-WithIsNullPred Int2Predicate IN-Numeric DeduplicatePredicates
-AddEqualityPredicates AddPredsInSubqueries ExtractPredicateFromDisjWithComputedColumns
+AddEqualityPredicates EqualityPredicateOverDate AddPredsInSubqueries ExtractPredicateFromDisjWithComputedColumns
 Join-With-Subq-Preds-1 Non-Hashjoinable-Pred Non-Hashjoinable-Pred-2 Factorized-Preds IN OR AvoidConstraintDerivationForLike
 NLJ-DistCol-No-Broadcast NLJ-EqAllCol-No-Broadcast NLJ-EqDistCol-InEqNonDistCol-No-Broadcast
 NLJ-InEqDistCol-EqNonDistCol-Redistribute CorrelatedNLJWithTrueCondition InferPredicatesInnerOfLOJ
 InferredPredicatesConstraintSimplification NoPushdownPredicateWithCTEAnchor
-InferPredicatesForPartSQ InferPredicatesForQuantifiedSQ NotWellDefinedDisjunctConjunctPredicates;
+InferPredicatesForPartSQ InferPredicatesForQuantifiedSQ DoubleNDVCardinalityEquals
+NotWellDefinedDisjunctConjunctPredicates;
 
 CLikeIDFTest:
 LIKE-Pattern-green LIKE-Pattern-green-2 LIKE-Pattern-Empty Nested-Or-Predicates Join-IDF
@@ -114,7 +115,11 @@ IndexApply-InnerSelect-Basic IndexApply-InnerSelect-PartTable IndexApply-PartKey
 IndexApply-InnerSelect-Heterogeneous-DTS IndexApply-Heterogeneous-BothSidesPartitioned
 IndexApply-InnerSelect-PartTable2 IndexApply-ForPartialIndex CastedScalarIf-On-Index-Key
 IndexApply-MultiDistKey-WithComplexPreds IndexApply-MultiDistKeys-Bitmap
-IndexApply-MultiDistKeys-Bitmap-WithComplexPreds;
+IndexApply-MultiDistKeys-Bitmap-WithComplexPreds
+IndexApply-MultiDistKeys-IncompletePDS-3-DistCols
+BitmapIndexNLJWithProject BitmapIndexNLOJWithProject
+BitmapIndexNLJWithProjectNoFilt BtreeIndexNLJWithProjectNoPart
+BitmapIndexNLOJWithProjectNonPart BtreeIndexNLOJWithProject;
 
 CDynamicIndexScanTest:
 DynamicIndexScan-Homogenous DynamicIndexScan-BoolTrue DynamicIndexScan-BoolFalse
@@ -146,9 +151,14 @@ StatsFilter-AnyWithNewColStats EquiJoinOnExpr-Supported EquiJoinOnExpr-Unsupport
 
 CICGMiscTest:
 BroadcastSkewedHashjoin OrderByNullsFirst ConvertHashToRandomSelect ConvertHashToRandomInsert HJN-DeeperOuter CTAS CTAS-Random CheckAsUser
+CTAS-random-distributed-from-replicated-distributed-table
 ProjectRepeatedColumn1 ProjectRepeatedColumn2 NLJ-BC-Outer-Spool-Inner Self-Comparison Self-Comparison-Nullable
 SelectCheckConstraint ExpandJoinOrder SelectOnBpchar EqualityJoin EffectsOfJoinFilter InnerJoin-With-OuterRefs
-UDA-AnyElement-1 UDA-AnyElement-2 MinCardinalityNaryJoin Project-With-NonScalar-Func SixWayDPv2 MultipleDampedPredJoinCardinality MultipleIndependentPredJoinCardinality Join-Varchar-Equality;
+UDA-AnyElement-1 UDA-AnyElement-2 Project-With-NonScalar-Func SixWayDPv2 Join-Varchar-Equality;
+
+CJoinPredTest:
+MultipleDampedPredJoinCardinality MultipleIndependentPredJoinCardinality MultiDistKeyJoinCardinality
+MultiDistKeyWithOtherPredsJoinCardinality NoDistKeyMultiPredJoinCardinality OneDistKeyMultiPredJoinCardinality;
 
 CArrayCmpTest:
 ArrayConcat ArrayRef FoldedArrayCmp IN-ArrayCmp NOT-IN-ArrayCmp ArrayCmpAll
@@ -192,7 +202,7 @@ PartTbl-ComplexPredicate4 PartTbl-ComplexPredicate5 LargeMultiColumnInList;
 CPartTbl5Test:
 PartTbl-IsNullPredicate PartTbl-IsNotNullPredicate PartTbl-IndexOnDefPartOnly
 PartTbl-SubqueryOuterRef PartTbl-CSQ-PartKey PartTbl-CSQ-NonPartKey
-PartTbl-AggWithExistentialSubquery;
+PartTbl-AggWithExistentialSubquery PartPredsWithRandom;
 
 CPartTbl6Test:
 PartTbl-PredicateWithCast PartTbl-IDFList PartTbl-IDFNull
@@ -202,13 +212,20 @@ PartTbl-PredicateWithCastMultiLevelList PartTbl-WindowFuncPredPushDown
 PartTbl-WindowFuncPartialPredPushDown PartTbl-WindowFuncNoPredPushDown
 PartTbl-WindowFuncNoDisjunctPredPushDown PartTbl-WindowFuncSinglePredPushDown;
 
+CPartTableLossyCastTest:
+RangePartLossyCastLTEqOnEndPartitionRange RangePartLossyCastLTOnEndPartitionRange
+RangePartLossyCastEqOnEndPartitionRange RangePartLossyCastLTEqInPartitionRange
+RangePartLossyCastLTInPartitionRange RangePartLossyCastEqInPartitionRange
+ListPartLossyCastLT ListPartLossyCastEq ListPartLossyCastNEq MultiLevelPartLossyCastNEq;
+
 CPartTblDPETest:
 PartTbl-AvoidRangePred-DPE PartTbl-DPE-Correlated-NLOuter
 PartTbl-DPE PartTbl-DPE-WindowFunction PartTbl-DPE-GroupBy PartTbl-DPE-Limit
 DPE-with-unsupported-pred DPE-SemiJoin DPE-IN DPE-NOT-IN HJN-DPE-Bitmap-Outer-Child
 NLJ-Broadcast-DPE-Outer-Child PartTbl-MultiWayJoinWithDPE PartTbl-MultiWayJoinWithDPE-2
 PartTbl-LeftOuterHashJoin-DPE-IsNull PartTbl-LeftOuterNLJoin-DPE-IsNull
-PartTbl-List-DPE-Varchar-Predicates PartTbl-List-DPE-Int-Predicates;
+PartTbl-List-DPE-Varchar-Predicates PartTbl-List-DPE-Int-Predicates PartTbl-DPE-PartitionSelectorRewindability
+PartTbl-RightOuterHashJoin-DPE-IsNull SPE-IS-NULL JoinOrderDPE;
 
 CSetop1Test:
 ValueScanWithDuplicateAndSelfComparison PushGbBelowNaryUnionAll
@@ -218,7 +235,7 @@ MS-UnionAll-5 MS-UnionAll-6 MS-UnionAll-7 ManyTextUnionsInSubquery;
 CSetop2Test:
 Cascaded-UnionAll-Same-Cols-Order Cascaded-UnionAll-Differing-Cols
 Cascaded-UnionAll-Differing-Cols-Order Union-Over-UnionAll Nested-Setops
-Nested-Setops-2 Except IsNullUnionAllIsNotNull UnionAllWithTruncatedOutput
+Nested-Setops-2 Except InnerJoinOverJoinExcept InnerJoinOverJoinExceptAll IsNullUnionAllIsNotNull UnionAllWithTruncatedOutput
 Union-OuterRefs-Output Union-OuterRefs-Casting-Output
 Union-OuterRefs-InnerChild MS-UnionAll-2;
 
@@ -226,7 +243,7 @@ CSetop3Test:
 UnionWithOuterRefs UnionAll
 Union-Distributed-Table-With-Const-Table ExceptAllCompatibleDataType
 UnionAllCompatibleDataType UnionOfDQAQueries Union-Volatile-Func
-Intersect-Volatile-Func Except-Volatile-Func UnionWithCTE ExceptCast;
+Intersect-Volatile-Func Except-Volatile-Func UnionWithCTE;
 
 CSetop4Test:
 PushSelectDownUnionAllOfCTG Push-Subplan-Below-Union Intersect-OuterRefs
@@ -241,7 +258,7 @@ COuterJoin1Test:
 ExpandNAryJoinGreedyWithLOJOnly NaryWithLojAndNonLojChilds LOJ_bb_mpph LOJ-Condition-False
 LeftJoin-With-Pred-On-Inner LeftJoin-With-Pred-On-Inner2
 LeftJoin-With-Col-Const-Pred LeftJoin-With-Coalesce LOJWithFalsePred LeftJoin-DPv2-With-Select
-DPv2GreedyOnly DPv2MinCardOnly DPv2QueryOnly;
+DPv2GreedyOnly DPv2MinCardOnly DPv2QueryOnly LOJ-PushDown LeftJoinDPv2JoinOrder;
 
 COuterJoin2Test:
 LOJ-IsNullPred Select-Proj-OuterJoin OuterJoin-With-OuterRefs Join-Disj-Subqs
@@ -296,17 +313,45 @@ CGinIndexTest:
 GinIndex GinIndexPathOpfamily GinIndexSearchModeAll;
 
 CReplicatedTableTest:
-ReplicatedTableSelect ReplicatedTableInsert ReplicatedTable-CTAS ReplicatedHashJoinReplicated ReplicatedJoinHashDistributedTable ReplicatedJoinRandomDistributedTable ReplicatedLOJHashDistributedTable ReplicatedLOJRandomDistributedTable ReplicatedLOJReplicated ReplicatedNLJReplicated ReplicatedTableAggregate ReplicatedTableCTE ReplicatedTableGroupBy ReplicatedJoinPartitionedTable ReplicatedTableInClause;
+ReplicatedTableSelect ReplicatedTableInsert ReplicatedTable-CTAS
+ReplicatedHashJoinReplicated ReplicatedJoinHashDistributedTable
+ReplicatedJoinRandomDistributedTable ReplicatedLOJHashDistributedTable
+ReplicatedLOJRandomDistributedTable ReplicatedLOJReplicated
+ReplicatedNLJReplicated ReplicatedTableAggregate ReplicatedTableCTE
+ReplicatedTableGroupBy ReplicatedJoinPartitionedTable
+ReplicatedTableInClause ReplicatedTableSequenceInsert;
+
+CTaintedReplicatedTest:
+InsertNonSingleton NonSingleton TaintedReplicatedAgg TaintedReplicatedWindowAgg TaintedReplicatedLimit TaintedReplicatedFilter
+InsertReplicatedIntoSerialHashDistributedTable;
 
 CDqaTest:
 NonSplittableAgg DqaHavingMax DqaMax DqaMin DqaSubqueryMax DqaNoRedistribute;
 
 CMCVCardinalityTest:
-BpCharMCVCardinalityEquals BpCharMCVCardinalityGreaterThan TextMCVCardinalityEquals TextMCVCardinalityGreaterThan VarcharMCVCardinalityEquals VarcharMCVCardinalityGreaterThan Citext-Cardinality Name-Cardinality Char-Cardinality;
+BpCharMCVCardinalityEquals BpCharMCVCardinalityGreaterThan
+TextMCVCardinalityEquals TextMCVCardinalityGreaterThan
+VarcharMCVCardinalityEquals VarcharMCVCardinalityGreaterThan Citext-Cardinality
+Name-Cardinality Char-Cardinality;
+
+COpfamiliesTest:
+JoinCitextVarchar JoinDefaultOpfamiliesUsingNonDefaultOpfamilyOp
+MultiColumnAggWithDefaultOpfamilies JoinTinterval FullJoin-NonDefaultOpfamily
+JoinAbsEqWithoutOpfamilies 3WayJoinUsingOperatorsOfNonDefaultOpfamily
+Distinct-LegacyOpfamily;
 
 CSubquery2Test:
 Subq2PartialDecorrelate Subq2CorrSQInLOJOn Subq2NotInWhereLOJ Subq2OuterRef2InJoin Subq2OuterRefMultiLevelInOn
-Index-Join-With-Subquery-In-Pred NestedSubqLimitBindings
+Index-Join-With-Subquery-In-Pred NestedSubqLimitBindings;
+
+CIndexOnlyScanTest:
+IndexOnlyScan-NoDistKeyInIndex;
+
+CRightJoinTest:
+RightJoinHashed RightJoinRedistribute RightJoinReplicated RightJoinBothReplicated RightJoinDPS RightJoinNoDPSNonDistKey RightJoinTVF;
+
+CSqlFunctionTest:
+SqlFuncNullReject SqlFuncPredFactorize SqlFuncDmlScalar SqlFuncDmlTvf
 ")
 
 set(mdp_dir "../data/dxl/minidump/")
@@ -396,7 +441,6 @@ add_orca_test(CDXLUtilsTest)
 add_orca_test(CMDAccessorTest)
 add_orca_test(CMDProviderTest)
 add_orca_test(CArrayExpansionTest)
-add_orca_test(CPartitionSelectorRewindabilityTest)
 add_orca_test(CJoinOrderDPTest)
 add_orca_test(CMiniDumperDXLTest)
 add_orca_test(CExpressionPreprocessorTest)
@@ -447,9 +491,7 @@ add_orca_test(CCastTest)
 add_orca_test(CConstTblGetTest)
 add_orca_test(CScalarIsDistinctFromTest)
 
-if (GPOS_ARCH_BITS EQUAL 64)
-  add_orca_test(CSubqueryHandlerTest)
-endif()
+add_orca_test(CSubqueryHandlerTest)
 
 add_orca_test(CBindingTest)
 add_orca_test(CEngineTest)
@@ -465,9 +507,7 @@ add_orca_test(CRangeTest)
 add_orca_test(CPredicateUtilsTest)
 add_orca_test(CPartConstraintTest)
 
-if (NOT (${CMAKE_SYSTEM_NAME} MATCHES "SunOS"))
-  add_orca_test(CSearchStrategyTest)
-endif()
+add_orca_test(CSearchStrategyTest)
 
 add_orca_test(COptimizationJobsTest)
 add_orca_test(CStateMachineTest)

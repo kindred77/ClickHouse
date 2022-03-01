@@ -16,9 +16,12 @@
 
 #include "gpos/base.h"
 
+#include "naucrates/md/CGPDBTypeHelper.h"
 #include "naucrates/md/IMDTypeInt8.h"
 
 #define GPDB_INT8_OID OID(20)
+#define GPDB_INT8_OPFAMILY OID(1977)
+#define GPDB_INT8_LEGACY_OPFAMILY OID(7100)
 #define GPDB_INT8_LENGTH 8
 #define GPDB_INT8_EQ_OP OID(410)
 #define GPDB_INT8_NEQ_OP OID(411)
@@ -63,12 +66,16 @@ using namespace gpnaucrates;
 //---------------------------------------------------------------------------
 class CMDTypeInt8GPDB : public IMDTypeInt8
 {
+	friend class CGPDBTypeHelper<CMDTypeInt8GPDB>;
+
 private:
 	// memory pool
 	CMemoryPool *m_mp;
 
 	// type id
 	IMDId *m_mdid;
+	IMDId *m_distr_opfamily;
+	IMDId *m_legacy_distr_opfamily;
 
 	// mdids of different operators
 	IMDId *m_mdid_op_eq;
@@ -127,6 +134,8 @@ public:
 
 	// type id
 	virtual IMDId *MDId() const;
+
+	virtual IMDId *GetDistrOpfamilyMdid() const;
 
 	// type name
 	virtual CMDName Mdname() const;

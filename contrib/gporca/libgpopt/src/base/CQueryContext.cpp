@@ -12,6 +12,7 @@
 #include "gpopt/base/CQueryContext.h"
 
 #include "gpos/base.h"
+#include "gpos/error/CAutoTrace.h"
 
 #include "gpopt/base/CColRefSetIter.h"
 #include "gpopt/base/CColumnFactory.h"
@@ -21,6 +22,7 @@
 
 using namespace gpopt;
 
+FORCE_GENERATE_DBGSTR(CQueryContext);
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -33,8 +35,7 @@ using namespace gpopt;
 CQueryContext::CQueryContext(CMemoryPool *mp, CExpression *pexpr,
 							 CReqdPropPlan *prpp, CColRefArray *colref_array,
 							 CMDNameArray *pdrgpmdname, BOOL fDeriveStats)
-	: m_mp(mp),
-	  m_prpp(prpp),
+	: m_prpp(prpp),
 	  m_pdrgpcr(colref_array),
 	  m_pdrgpcrSystemCols(NULL),
 	  m_pdrgpmdname(pdrgpmdname),
@@ -143,7 +144,7 @@ CQueryContext::SetSystemCols(CMemoryPool *mp)
 	for (ULONG ul = 0; ul < ulReqdCols; ul++)
 	{
 		CColRef *colref = (*m_pdrgpcr)[ul];
-		if (colref->FSystemCol())
+		if (colref->IsSystemCol())
 		{
 			m_pdrgpcrSystemCols->Append(colref);
 		}
@@ -266,13 +267,6 @@ IOstream &
 CQueryContext::OsPrint(IOstream &os) const
 {
 	return os << *m_pexpr << std::endl << *m_prpp;
-}
-
-void
-CQueryContext::DbgPrint() const
-{
-	CAutoTrace at(m_mp);
-	(void) this->OsPrint(at.Os());
 }
 #endif	// GPOS_DEBUG
 

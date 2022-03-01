@@ -12,6 +12,7 @@
 #include "naucrates/statistics/CStatistics.h"
 
 #include "gpos/common/CBitSet.h"
+#include "gpos/error/CAutoTrace.h"
 #include "gpos/memory/CAutoMemoryPool.h"
 
 #include "gpopt/base/CColRefSet.h"
@@ -34,6 +35,8 @@
 using namespace gpmd;
 using namespace gpdxl;
 using namespace gpopt;
+
+FORCE_GENERATE_DBGSTR(CStatistics);
 
 // default number of rows in relation
 const CDouble CStatistics::DefaultRelationRows(1000.0);
@@ -63,9 +66,38 @@ CStatistics::CStatistics(CMemoryPool *mp,
 	  m_rows(rows),
 	  m_stats_estimation_risk(no_card_est_risk_default_val),
 	  m_empty(is_empty),
+	  m_relpages(0),
+	  m_relallvisible(0),
 	  m_num_rebinds(
 		  1.0),	 // by default, a stats object is rebound to parameters only once
 	  m_num_predicates(num_predicates),
+	  m_src_upper_bound_NDVs(NULL)
+{
+	GPOS_ASSERT(NULL != m_colid_histogram_mapping);
+	GPOS_ASSERT(NULL != m_colid_width_mapping);
+	GPOS_ASSERT(CDouble(0.0) <= m_rows);
+
+	// hash map for source id -> max source cardinality mapping
+	m_src_upper_bound_NDVs = GPOS_NEW(mp) CUpperBoundNDVPtrArray(mp);
+
+	m_stats_conf =
+		COptCtxt::PoctxtFromTLS()->GetOptimizerConfig()->GetStatsConf();
+}
+
+CStatistics::CStatistics(CMemoryPool *mp,
+						 UlongToHistogramMap *col_histogram_mapping,
+						 UlongToDoubleMap *colid_width_mapping, CDouble rows,
+						 BOOL is_empty, ULONG relpages, ULONG relallvisible)
+	: m_colid_histogram_mapping(col_histogram_mapping),
+	  m_colid_width_mapping(colid_width_mapping),
+	  m_rows(rows),
+	  m_stats_estimation_risk(no_card_est_risk_default_val),
+	  m_empty(is_empty),
+	  m_relpages(relpages),
+	  m_relallvisible(relallvisible),
+	  m_num_rebinds(
+		  1.0),	 // by default, a stats object is rebound to parameters only once
+	  m_num_predicates(0),
 	  m_src_upper_bound_NDVs(NULL)
 {
 	GPOS_ASSERT(NULL != m_colid_histogram_mapping);

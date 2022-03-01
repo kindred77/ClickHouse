@@ -11,8 +11,10 @@
 
 #include "naucrates/statistics/CJoinStatsProcessor.h"
 
+#include "gpopt/operators/CLogicalIndexApply.h"
+#include "gpopt/operators/CLogicalNAryJoin.h"
+#include "gpopt/operators/CPredicateUtils.h"
 #include "gpopt/operators/CScalarNAryJoinPredList.h"
-#include "gpopt/operators/ops.h"
 #include "gpopt/optimizer/COptimizerConfig.h"
 #include "naucrates/statistics/CFilterStatsProcessor.h"
 #include "naucrates/statistics/CLeftAntiSemiJoinStatsProcessor.h"
@@ -390,6 +392,7 @@ CJoinStatsProcessor::SetResultingJoinStats(
 		IMDId *mdid_outer = colref_outer->GetMdidTable();
 		IMDId *mdid_inner = colref_inner->GetMdidTable();
 		IMdIdArray *mdid_pair = NULL;
+		BOOL both_dist_keys = false;
 		if ((mdid_outer != NULL) && (mdid_inner != NULL))
 		{
 			// there should only be two tables involved in a join condition
@@ -404,11 +407,16 @@ CJoinStatsProcessor::SetResultingJoinStats(
 			mdid_pair->Append(mdid_outer);
 			mdid_pair->Append(mdid_inner);
 			mdid_pair->Sort();
+
+			if (colref_outer->IsDistCol() && colref_inner->IsDistCol())
+			{
+				both_dist_keys = true;
+			}
 		}
 
 		join_conds_scale_factors->Append(
-			GPOS_NEW(mp) CScaleFactorUtils::SJoinCondition(local_scale_factor,
-														   mdid_pair));
+			GPOS_NEW(mp) CScaleFactorUtils::SJoinCondition(
+				local_scale_factor, mdid_pair, both_dist_keys));
 	}
 
 
@@ -465,9 +473,12 @@ CJoinStatsProcessor::CalcJoinCardinality(
 {
 	GPOS_ASSERT(NULL != stats_config);
 	GPOS_ASSERT(NULL != join_conds_scale_factors);
+	CDouble limit_for_result_scale_factor(
+		std::max(left_num_rows.Get(), right_num_rows.Get()));
 
 	CDouble scale_factor = CScaleFactorUtils::CumulativeJoinScaleFactor(
-		mp, stats_config, join_conds_scale_factors);
+		mp, stats_config, join_conds_scale_factors,
+		limit_for_result_scale_factor);
 	CDouble cartesian_product_num_rows = left_num_rows * right_num_rows;
 
 	if (IStatistics::EsjtLeftAntiSemiJoin == join_type ||
@@ -554,7 +565,9 @@ CJoinStatsProcessor::DeriveJoinStats(CMemoryPool *mp,
 	COperator::EOperatorId op_id = exprhdl.Pop()->Eopid();
 	GPOS_ASSERT(COperator::EopLogicalLeftOuterJoin == op_id ||
 				COperator::EopLogicalInnerJoin == op_id ||
-				COperator::EopLogicalNAryJoin == op_id);
+				COperator::EopLogicalNAryJoin == op_id ||
+				COperator::EopLogicalFullOuterJoin == op_id ||
+				COperator::EopLogicalRightOuterJoin == op_id);
 #endif
 
 	// derive stats based on local join condition

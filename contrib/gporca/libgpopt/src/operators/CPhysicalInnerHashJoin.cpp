@@ -30,8 +30,10 @@ using namespace gpopt;
 //---------------------------------------------------------------------------
 CPhysicalInnerHashJoin::CPhysicalInnerHashJoin(
 	CMemoryPool *mp, CExpressionArray *pdrgpexprOuterKeys,
-	CExpressionArray *pdrgpexprInnerKeys)
-	: CPhysicalHashJoin(mp, pdrgpexprOuterKeys, pdrgpexprInnerKeys)
+	CExpressionArray *pdrgpexprInnerKeys, IMdIdArray *hash_opfamilies,
+	CXform::EXformId origin_xform)
+	: CPhysicalHashJoin(mp, pdrgpexprOuterKeys, pdrgpexprInnerKeys,
+						hash_opfamilies, origin_xform)
 {
 }
 
@@ -74,12 +76,16 @@ CPhysicalInnerHashJoin::PdshashedCreateMatching(
 	// NB: The matching spec is added at the beginning.
 	pdshashedMatching->Pdrgpexpr()->AddRef();
 	pdshashed->AddRef();
+	if (NULL != pdshashedMatching->Opfamilies())
+	{
+		pdshashedMatching->Opfamilies()->AddRef();
+	}
 	CDistributionSpecHashed *pdsHashedMatchingEquivalents =
 		GPOS_NEW(mp) CDistributionSpecHashed(
 			pdshashedMatching->Pdrgpexpr(),
 			pdshashedMatching->FNullsColocated(),
-			pdshashed  // matching distribution spec is equivalent to passed distribution spec
-		);
+			pdshashed,	// matching distribution spec is equivalent to passed distribution spec
+			pdshashedMatching->Opfamilies());
 	pdshashedMatching->Release();
 	return pdsHashedMatchingEquivalents;
 }
@@ -142,7 +148,7 @@ CPhysicalInnerHashJoin::PdsDeriveFromReplicatedOuter(
 {
 	GPOS_ASSERT(NULL != pdsOuter);
 	GPOS_ASSERT(NULL != pdsInner);
-	GPOS_ASSERT(CDistributionSpec::EdtReplicated == pdsOuter->Edt());
+	GPOS_ASSERT(CDistributionSpec::EdtStrictReplicated == pdsOuter->Edt());
 
 	// if outer child is replicated, join results distribution is defined by inner child
 	if (CDistributionSpec::EdtHashed == pdsInner->Edt())
@@ -233,7 +239,7 @@ CPhysicalInnerHashJoin::PdsDerive(CMemoryPool *mp,
 		}
 	}
 
-	if (CDistributionSpec::EdtReplicated == pdsOuter->Edt())
+	if (CDistributionSpec::EdtStrictReplicated == pdsOuter->Edt())
 	{
 		return PdsDeriveFromReplicatedOuter(mp, pdsOuter, pdsInner);
 	}

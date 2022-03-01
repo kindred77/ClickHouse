@@ -90,6 +90,8 @@ public:
 		return EmdtType;
 	}
 
+	virtual IMDId *GetDistrOpfamilyMdid() const = 0;
+
 	// md id of cache object
 	virtual IMDId *MDId() const = 0;
 

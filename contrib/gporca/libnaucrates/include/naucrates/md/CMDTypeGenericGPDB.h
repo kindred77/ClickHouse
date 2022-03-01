@@ -15,6 +15,7 @@
 #include "gpos/base.h"
 
 #include "naucrates/dxl/gpdb_types.h"
+#include "naucrates/md/CGPDBTypeHelper.h"
 #include "naucrates/md/CMDIdGPDB.h"
 #include "naucrates/md/IMDTypeGeneric.h"
 
@@ -48,6 +49,8 @@ using namespace gpos;
 //---------------------------------------------------------------------------
 class CMDTypeGenericGPDB : public IMDTypeGeneric
 {
+	friend class CGPDBTypeHelper<CMDTypeGenericGPDB>;
+
 private:
 	// memory pool
 	CMemoryPool *m_mp;
@@ -61,7 +64,7 @@ private:
 	// type name
 	CMDName *m_mdname;
 
-	// can type be redistributed
+	// can type be redistributed based on non-legacy distr opfamily
 	BOOL m_is_redistributable;
 
 	// is this a fixed-length type
@@ -72,6 +75,10 @@ private:
 
 	// is type passed by value or by reference
 	BOOL m_is_passed_by_value;
+
+	IMDId *m_distr_opfamily;
+
+	IMDId *m_legacy_distr_opfamily;
 
 	// id of equality operator for type
 	IMDId *m_mdid_op_eq;
@@ -138,17 +145,16 @@ private:
 
 public:
 	// ctor
-	CMDTypeGenericGPDB(CMemoryPool *mp, IMDId *mdid, CMDName *mdname,
-					   BOOL is_redistributable, BOOL is_fixed_length,
-					   ULONG length, BOOL is_passed_by_value, IMDId *mdid_op_eq,
-					   IMDId *mdid_op_neq, IMDId *mdid_op_lt,
-					   IMDId *mdid_op_leq, IMDId *mdid_op_gt,
-					   IMDId *mdid_op_geq, IMDId *mdid_op_cmp, IMDId *pmdidMin,
-					   IMDId *pmdidMax, IMDId *pmdidAvg, IMDId *pmdidSum,
-					   IMDId *pmdidCount, BOOL is_hashable,
-					   BOOL is_merge_joinable, BOOL is_composite_type,
-					   BOOL is_text_related, IMDId *mdid_base_relation,
-					   IMDId *mdid_type_array, INT gpdb_length);
+	CMDTypeGenericGPDB(
+		CMemoryPool *mp, IMDId *mdid, CMDName *mdname, BOOL is_redistributable,
+		BOOL is_fixed_length, ULONG length, BOOL is_passed_by_value,
+		IMDId *mdid_distr_opfamily, IMDId *mdid_legacy_distr_opfamily,
+		IMDId *mdid_op_eq, IMDId *mdid_op_neq, IMDId *mdid_op_lt,
+		IMDId *mdid_op_leq, IMDId *mdid_op_gt, IMDId *mdid_op_geq,
+		IMDId *mdid_op_cmp, IMDId *pmdidMin, IMDId *pmdidMax, IMDId *pmdidAvg,
+		IMDId *pmdidSum, IMDId *pmdidCount, BOOL is_hashable,
+		BOOL is_merge_joinable, BOOL is_composite_type, BOOL is_text_related,
+		IMDId *mdid_base_relation, IMDId *mdid_type_array, INT gpdb_length);
 
 	// dtor
 	virtual ~CMDTypeGenericGPDB();
@@ -164,11 +170,7 @@ public:
 
 	virtual CMDName Mdname() const;
 
-	virtual BOOL
-	IsRedistributable() const
-	{
-		return m_is_redistributable;
-	}
+	virtual BOOL IsRedistributable() const;
 
 	virtual BOOL
 	IsFixedLength() const
@@ -240,6 +242,8 @@ public:
 		return m_mdid_type_array;
 	}
 
+	virtual IMDId *GetDistrOpfamilyMdid() const;
+
 	// serialize object in DXL format
 	virtual void Serialize(gpdxl::CXMLSerializer *xml_serializer) const;
 
@@ -300,6 +304,10 @@ public:
 		CMemoryPool *mp, IMDId *mdid, INT type_modifier, BOOL is_null,
 		BYTE *byte_array, ULONG length, LINT lint_Value, CDouble double_Value);
 
+	// create a NULL constant for this type
+	virtual IDatum *CreateGenericNullDatum(CMemoryPool *mp,
+										   INT type_modifier) const;
+
 	// does a datum of this type need bytea to Lint mapping for statistics computation
 	static BOOL HasByte2IntMapping(const IMDType *mdtype);
 
@@ -308,6 +316,21 @@ public:
 
 	// is this a time-related type
 	static BOOL IsTimeRelatedType(const IMDId *mdid);
+
+	// is this a time-related type mappable to DOUBLE
+	static inline BOOL
+	IsTimeRelatedTypeMappableToDouble(const IMDId *mdid)
+	{
+		return IsTimeRelatedType(mdid) &&
+			   !IsTimeRelatedTypeMappableToLint(mdid);
+	}
+
+	// is this a time-related type mappable to LINT
+	static inline BOOL
+	IsTimeRelatedTypeMappableToLint(const IMDId *mdid)
+	{
+		return mdid->Equals(&CMDIdGPDB::m_mdid_date);
+	}
 
 	// is this a network-related type
 	static BOOL IsNetworkRelatedType(const IMDId *mdid);

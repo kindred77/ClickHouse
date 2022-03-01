@@ -16,9 +16,12 @@
 
 #include "gpos/base.h"
 
+#include "naucrates/md/CGPDBTypeHelper.h"
 #include "naucrates/md/IMDTypeInt2.h"
 
 #define GPDB_INT2_OID OID(21)
+#define GPDB_INT2_OPFAMILY OID(1977)
+#define GPDB_INT2_LEGACY_OPFAMILY OID(7100)
 #define GPDB_INT2_LENGTH 2
 #define GPDB_INT2_EQ_OP OID(94)
 #define GPDB_INT2_NEQ_OP OID(519)
@@ -62,12 +65,16 @@ using namespace gpnaucrates;
 //---------------------------------------------------------------------------
 class CMDTypeInt2GPDB : public IMDTypeInt2
 {
+	friend class CGPDBTypeHelper<CMDTypeInt2GPDB>;
+
 private:
 	// memory pool
 	CMemoryPool *m_mp;
 
 	// type id
 	IMDId *m_mdid;
+	IMDId *m_distr_opfamily;
+	IMDId *m_legacy_distr_opfamily;
 
 	// mdids of different operators
 	IMDId *m_mdid_op_eq;
@@ -127,6 +134,8 @@ public:
 
 	// accessor of metadata id
 	virtual IMDId *MDId() const;
+
+	virtual IMDId *GetDistrOpfamilyMdid() const;
 
 	// accessor of type name
 	virtual CMDName Mdname() const;

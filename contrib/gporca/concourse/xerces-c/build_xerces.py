@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tarfile
 import urllib2
+import hashlib
 
 XERCES_SOURCE_URL = "http://archive.apache.org/dist/xerces/c/3/sources/xerces-c-3.1.2.tar.gz"
 XERCES_SOURCE_DIR = "xerces-c-3.1.2"
@@ -32,15 +33,17 @@ def get_xerces_source():
     local_src = open("xerces_src.tar.gz", "w")
     local_src.write(remote_src.read())
     local_src.close()
+    file_hash = hashlib.sha256(open('xerces_src.tar.gz','rb').read()).hexdigest()
+    actual_hash = ""
+    with open('xerces_patch/concourse/xerces-c/xerces-c-3.1.2.tar.gz.sha256', 'r') as f:
+        actual_hash = f.read().strip()
+    if file_hash != actual_hash:
+        return 1
     tarball = tarfile.open("xerces_src.tar.gz", "r:gz")
     for item in tarball:
         tarball.extract(item, ".")
     tarball.close()
-    patchfile = open("xerces_patch/patches/xerces-c-gpdb.patch", "r")
-    return subprocess.call(
-        ["patch", "-p1"],
-        stdin = patchfile,
-        cwd = XERCES_SOURCE_DIR)
+    return 0
 
 def configure(cxx_compiler, cxxflags, cflags, output_dir):
     os.mkdir("build")

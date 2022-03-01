@@ -66,6 +66,8 @@ private:
 	// indices of distribution columns
 	ULongPtrArray *m_distr_col_array;
 
+	IMdIdArray *m_distr_opfamilies;
+
 	// do we need to consider a hash distributed table as random distributed
 	BOOL m_convert_hash_to_random;
 
@@ -80,6 +82,9 @@ private:
 
 	// array of check constraint mdids
 	IMdIdArray *m_mdid_check_constraint_array;
+
+	// partition constraint
+	IMDPartConstraint *m_mdpart_constraint;
 
 	// reject limit
 	INT m_reject_limit;
@@ -117,10 +122,11 @@ public:
 	CMDRelationExternalGPDB(
 		CMemoryPool *mp, IMDId *mdid, CMDName *mdname,
 		Ereldistrpolicy rel_distr_policy, CMDColumnArray *mdcol_array,
-		ULongPtrArray *distr_col_array, BOOL convert_hash_to_random,
-		ULongPtr2dArray *keyset_array, CMDIndexInfoArray *md_index_info_array,
-		IMdIdArray *mdid_triggers_array,
-		IMdIdArray *mdid_check_constraint_array, INT reject_limit,
+		ULongPtrArray *distr_col_array, IMdIdArray *distr_opfamilies,
+		BOOL convert_hash_to_random, ULongPtr2dArray *keyset_array,
+		CMDIndexInfoArray *md_index_info_array, IMdIdArray *mdid_triggers_array,
+		IMdIdArray *mdid_check_constraint_array,
+		IMDPartConstraint *mdpart_constraint, INT reject_limit,
 		BOOL is_reject_limit_in_rows, IMDId *mdid_fmt_err_table);
 
 	// dtor
@@ -187,6 +193,8 @@ public:
 	// retrieve the column at the given position in the distribution columns list for the relation
 	virtual const IMDColumn *GetDistrColAt(ULONG pos) const;
 
+	virtual IMDId *GetDistrOpfamilyAt(ULONG pos) const;
+
 	// number of indices
 	virtual ULONG IndexCount() const;
 
@@ -213,6 +221,9 @@ public:
 
 	// retrieve the id of the check constraint cache at the given position
 	virtual IMDId *CheckConstraintMDidAt(ULONG pos) const;
+
+	// Return the part constraint
+	virtual IMDPartConstraint *MDPartConstraint() const;
 
 #ifdef GPOS_DEBUG
 	// debug print of the metadata relation

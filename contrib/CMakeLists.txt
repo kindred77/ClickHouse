@@ -329,8 +329,8 @@ endif()
 
 add_subdirectory(fast_float)
 
-if (USE_GPORCA)
-    add_subdirectory (gpxerces-cmake)
-    add_subdirectory (gporca-cmake)
-endif()
+#if (USE_GPORCA)
+#    add_subdirectory (gpxerces-cmake)
+#    add_subdirectory (gporca-cmake)
+#endif()
 

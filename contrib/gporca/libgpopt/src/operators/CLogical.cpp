@@ -923,9 +923,8 @@ CLogical::DeriveFunctionProperties(CMemoryPool *mp,
 	IMDFunction::EFuncStbl efs =
 		EfsDeriveFromChildren(exprhdl, IMDFunction::EfsImmutable);
 
-	return GPOS_NEW(mp)
-		CFunctionProp(efs, IMDFunction::EfdaNoSQL,
-					  exprhdl.FChildrenHaveVolatileFuncScan(), false /*fScan*/);
+	return GPOS_NEW(mp) CFunctionProp(
+		efs, exprhdl.FChildrenHaveVolatileFuncScan(), false /*fScan*/);
 }
 
 //---------------------------------------------------------------------------
@@ -952,24 +951,16 @@ CLogical::DeriveTableDescriptor(CMemoryPool *, CExpressionHandle &) const
 //
 //---------------------------------------------------------------------------
 CFunctionProp *
-CLogical::PfpDeriveFromScalar(CMemoryPool *mp, CExpressionHandle &exprhdl,
-							  ULONG ulScalarIndex)
+CLogical::PfpDeriveFromScalar(CMemoryPool *mp, CExpressionHandle &exprhdl)
 {
 	GPOS_CHECK_ABORT;
-	GPOS_ASSERT(ulScalarIndex == exprhdl.Arity() - 1);
-	GPOS_ASSERT(exprhdl.FScalarChild(ulScalarIndex));
 
 	// collect stability from all children
 	IMDFunction::EFuncStbl efs =
 		EfsDeriveFromChildren(exprhdl, IMDFunction::EfsImmutable);
 
-	// get data access from scalar child
-	CFunctionProp *pfp = exprhdl.PfpChild(ulScalarIndex);
-	GPOS_ASSERT(NULL != pfp);
-	IMDFunction::EFuncDataAcc efda = pfp->Efda();
-
 	return GPOS_NEW(mp) CFunctionProp(
-		efs, efda, exprhdl.FChildrenHaveVolatileFuncScan(), false /*fScan*/);
+		efs, exprhdl.FChildrenHaveVolatileFuncScan(), false /*fScan*/);
 }
 
 //---------------------------------------------------------------------------
@@ -1069,7 +1060,8 @@ CLogical::Maxcard(CExpressionHandle &exprhdl, ULONG ulScalarIndex,
 
 		if ((CUtils::FScalarConstFalse(pexprScalar) &&
 			 COperator::EopLogicalFullOuterJoin != exprhdl.Pop()->Eopid() &&
-			 COperator::EopLogicalLeftOuterJoin != exprhdl.Pop()->Eopid()) ||
+			 COperator::EopLogicalLeftOuterJoin != exprhdl.Pop()->Eopid() &&
+			 COperator::EopLogicalRightOuterJoin != exprhdl.Pop()->Eopid()) ||
 			exprhdl.DerivePropertyConstraint()->FContradiction())
 		{
 			return CMaxCard(0 /*ull*/);
@@ -1389,10 +1381,6 @@ CLogical::PcrsDist(CMemoryPool *mp, const CTableDescriptor *ptabdesc,
 		CColumnDescriptor *pcoldesc = (*pdrgpcoldescDist)[ul2];
 		const INT attno = pcoldesc->AttrNum();
 		CColRef *pcrMapped = phmicr->Find(&attno);
-		// The distribution columns are not explicity referenced in the query but we
-		// still need to mark distribution columns as used since they are required
-		// to add motions
-		pcrMapped->MarkAsUsed();
 		GPOS_ASSERT(NULL != pcrMapped);
 		pcrsDist->Include(pcrMapped);
 	}

@@ -14,7 +14,9 @@
 #include "gpos/base.h"
 
 #include "gpopt/exception.h"
-#include "gpopt/operators/ops.h"
+#include "gpopt/operators/CLogicalDifferenceAll.h"
+#include "gpopt/operators/CLogicalLeftAntiSemiJoin.h"
+#include "gpopt/operators/CPatternMultiLeaf.h"
 #include "gpopt/xforms/CXformIntersectAll2LeftSemiJoin.h"
 #include "gpopt/xforms/CXformUtils.h"
 

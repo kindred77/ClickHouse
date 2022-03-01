@@ -33,8 +33,8 @@ using namespace gpmd;
 class CDXLScalarHashExpr : public CDXLScalar
 {
 private:
-	// catalog Oid of the expressions's data type
-	IMDId *m_mdid_type;
+	// catalog Oid of the distribution opfamily
+	IMDId *m_mdid_opfamily;
 
 	// private copy ctor
 	CDXLScalarHashExpr(CDXLScalarHashExpr &);
@@ -51,7 +51,7 @@ public:
 	// name of the operator
 	const CWStringConst *GetOpNameStr() const;
 
-	IMDId *MdidType() const;
+	IMDId *MdidOpfamily() const;
 
 	// serialize operator in DXL format
 	virtual void SerializeToDXL(CXMLSerializer *xml_serializer,

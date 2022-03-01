@@ -6,9 +6,16 @@
  */
 
 #include "TranslatorQueryToDXL.h"
+#include <common/logger_useful.h>
 
 namespace DB
 {
+
+TranslatorQueryToDXL::TranslatorQueryToDXL()
+        : log(&Poco::Logger::get("TranslatorQueryToDXL"))
+{
+    LOG_TRACE(log, "----0000----");
+}
 
 TranslatorQueryToDXL::TranslatorQueryToDXL(
     gpopt::CMDAccessor * metadata_accessor_,
@@ -17,7 +24,7 @@ TranslatorQueryToDXL::TranslatorQueryToDXL(
     , select_query(select_query_)
     , log(&Poco::Logger::get("TranslatorQueryToDXL"))
 {
-    LOG_TRACE(log, "----0000----");
+    LOG_TRACE(log, "----111----");
 }
 
 TranslatorQueryToDXL::~TranslatorQueryToDXL()
