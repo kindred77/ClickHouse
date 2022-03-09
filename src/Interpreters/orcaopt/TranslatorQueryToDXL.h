@@ -1,15 +1,14 @@
-/*
- * TranslatorQueryToDXL.h
- *
- *  Created on: Jan 11, 2022
- *      Author: kindred
- */
+#pragma once
 
-#ifndef SRC_INTERPRETERS_ORCAOPT_TRANSLATORQUERYTODXL_H_
-#define SRC_INTERPRETERS_ORCAOPT_TRANSLATORQUERYTODXL_H_
+#include <gpopt/mdcache/CMDAccessor.h>
 
 #include <naucrates/dxl/CDXLUtils.h>
+
+#include <Parsers/IAST_fwd.h>
 #include <Parsers/ASTSelectQuery.h>
+#include <Parsers/ASTTablesInSelectQuery.h>
+
+#include <Interpreters/orcaopt/ContextQueryToDXL.h>
 
 namespace Poco
 {
@@ -18,27 +17,45 @@ class Logger;
 
 namespace DB
 {
-class CDXLNode;
+
+class gpdxl::CDXLNode;
+
+using ASTsArr = std::vector<ASTs>;
 
 class TranslatorQueryToDXL {
 
+private:
+    gpopt::CMDAccessor * metadata_accessor;
+    ASTPtr select_query;
+    CMemoryPool * memory_pool;
+    ContextQueryToDXL * context;
+    Poco::Logger * log;
+    ASTsArr * splitWithCommaJoin(const ASTTablesInSelectQuery & tables_in_select);
 public:
     TranslatorQueryToDXL();
 
     TranslatorQueryToDXL(
+    	ContextQueryToDXL * context_,
         gpopt::CMDAccessor * metadata_accessor_,
         ASTPtr select_query_);
 
     virtual ~TranslatorQueryToDXL();
 
-    CDXLNode * translateSimpleSelectToDXL();
+    gpdxl::CDXLNode * translateSimpleSelectToDXL();
 
-private:
-    gpopt::CMDAccessor * metadata_accessor;
-    ASTPtr select_query;
+    gpdxl::CDXLNode * translateExprToDXL(ASTPtr expr);
 
-    Poco::Logger * log;
+    gpdxl::CDXLNode * translateTableExpressionToDXL(const ASTTableExpression * table_expression);
+    gpdxl::CDXLNode * translateTablesInSelectQueryElementToDXL(
+            const gpdxl::CDXLNode * previous_node,
+            const ASTTablesInSelectQueryElement * table_ele_in_select);
+    gpdxl::CDXLNode * translateFromAndWhereToDXL(
+            const ASTTablesInSelectQuery * tables_in_select);
+
+
+    static TranslatorQueryToDXL *QueryToDXLInstance(CMemoryPool * memory_pool_,
+            gpdxl::CMDAccessor * md_accessor_,
+            ASTPtr query);
 };
-}
 
-#endif /* SRC_INTERPRETERS_ORCAOPT_TRANSLATORQUERYTODXL_H_ */
+}
