@@ -1,4 +1,11 @@
 #pragma once
+
+#if defined(__clang__)
+    #pragma clang diagnostic ignored "-Wdeprecated"
+#elif defined (__GNUC__) && __GNUC__ >= 9
+    #pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
+
 #include <Columns/IColumn.h>
 #include <Columns/IColumnUnique.h>
 #include <Common/typeid_cast.h>

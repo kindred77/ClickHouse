@@ -1,5 +1,11 @@
 #pragma once
 
+#if defined(__clang__)
+    #pragma clang diagnostic ignored "-Wdeprecated"
+#elif defined (__GNUC__) && __GNUC__ >= 9
+    #pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
+
 #include <Common/COW.h>
 #include <Common/PODArray_fwd.h>
 #include <Common/Exception.h>
