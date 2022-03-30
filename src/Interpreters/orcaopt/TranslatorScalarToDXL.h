@@ -30,7 +30,7 @@ private:
     CMemoryPool * memory_pool;
     ContextQueryToDXL * context;
     Poco::Logger * log;
-
+    gpdxl::EdxlBoolExprType EdxlbooltypeFromGPDBBoolType(BoolExprType boolexprtype) const;
 public:
     TranslatorScalarToDXL();
 

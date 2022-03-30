@@ -9,6 +9,8 @@
 #include <Parsers/ASTTablesInSelectQuery.h>
 
 #include <Interpreters/orcaopt/ContextQueryToDXL.h>
+#include <Interpreters/orcaopt/MappingVarColId.h>
+#include <Interpreters/orcaopt/TranslatorScalarToDXL.h>
 
 namespace Poco
 {
@@ -22,7 +24,8 @@ class gpdxl::CDXLNode;
 
 using ASTsArr = std::vector<ASTs>;
 
-class TranslatorQueryToDXL {
+class TranslatorQueryToDXL
+{
 
 private:
     gpopt::CMDAccessor * metadata_accessor;
@@ -30,7 +33,11 @@ private:
     CMemoryPool * memory_pool;
     ContextQueryToDXL * context;
     Poco::Logger * log;
-    ASTsArr * splitWithCommaJoin(const ASTTablesInSelectQuery & tables_in_select);
+    // scalar translator used to convert scalar operation into DXL.
+	TranslatorScalarToDXL *m_scalar_translator;
+
+	// holds the var to col id information mapping
+	MappingVarColId *m_var_to_colid_map;
 public:
     TranslatorQueryToDXL();
 
@@ -50,7 +57,8 @@ public:
             const gpdxl::CDXLNode * previous_node,
             const ASTTablesInSelectQueryElement * table_ele_in_select);
     gpdxl::CDXLNode * translateFromAndWhereToDXL(
-            const ASTTablesInSelectQuery * tables_in_select);
+            const ASTTablesInSelectQuery * tables_in_select,
+            const ASTPtr where_expression);
 
 
     static TranslatorQueryToDXL *QueryToDXLInstance(CMemoryPool * memory_pool_,

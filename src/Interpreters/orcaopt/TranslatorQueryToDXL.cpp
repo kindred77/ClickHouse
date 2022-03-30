@@ -58,28 +58,14 @@ TranslatorQueryToDXL::translateSimpleSelectToDXL()
 
 }
 
-ASTsArr *
-TranslatorQueryToDXL::splitWithCommaJoin(const ASTTablesInSelectQuery & tables_in_select)
-{
-    for (const auto & child : tables_in_select.children)
-    {
-        if (const auto * tables_element = child->as<ASTTablesInSelectQueryElement>())
-        {
-            if ( auto table_join = tables_element->table_join
-                    && table_join->kind == ASTTableJoin::Kind::Comma)
-            {
-                is_have_comma_join = true;
-                break;
-
-            }
-        }
-    }
-}
-
 gpdxl::CDXLNode *
 TranslatorQueryToDXL::translateExprToDXL(ASTPtr expr)
 {
+    gpdxl::CDXLNode *scalar_dxlnode =
+		m_scalar_translator->translateExprToDXL(expr, m_var_to_colid_map);
+	GPOS_ASSERT(NULL != scalar_dxlnode);
 
+	return scalar_dxlnode;
 }
 
 gpdxl::CDXLNode *
@@ -132,8 +118,12 @@ TranslatorQueryToDXL::translateTablesInSelectQueryElementToDXL(
 }
 
 gpdxl::CDXLNode *
-TranslatorQueryToDXL::translateFromAndWhereToDXL(const ASTTablesInSelectQuery * tables_in_select)
+TranslatorQueryToDXL::translateFromAndWhereToDXL(
+    const ASTTablesInSelectQuery * tables_in_select,
+    const ASTPtr where_expression)
 {
+    gpdxl::CDXLNode * result = nullptr;
+
     gpdxl::CDXLNode * comma_join_nodes = nullptr;
     gpdxl::CDXLNode * normal_join_node = nullptr;
     for (const auto & child : tables_in_select->children)
@@ -153,14 +143,39 @@ TranslatorQueryToDXL::translateFromAndWhereToDXL(const ASTTablesInSelectQuery * 
         }
     }
 
+    gpdxl::CDXLNode *condition_dxlnode = nullptr;
+    if (where_expression)
+    {
+        condition_dxlnode = translateExprToDXL(where_expression);
+    }
+
+    //the where expression is a part of comma join
     if (comma_join_nodes)
     {
-        if (normal_join_node)
-        {
-            comma_join_nodes->AddChild(normal_join_node);
-        }
+        comma_join_nodes->AddChild(normal_join_node);
+        if (!condition_dxlnode)
+		{
+			// A cross join (the scalar condition is true)
+			condition_dxlnode = CreateDXLConstValueTrue();
+		}
+        comma_join_nodes->AddChild(condition_dxlnode);
+
+        result = comma_join_nodes;
     }
-    //if (normal_join_node)
+    else
+    {
+        if (!normal_join_node)
+        {
+            normal_join_node = DXLDummyConstTableGet();
+        }
+        gpdxl::CDXLNode *select_dxlnode = GPOS_NEW(m_mp)
+            CDXLNode(m_mp, GPOS_NEW(m_mp) CDXLLogicalSelect(m_mp));
+        select_dxlnode->AddChild(condition_dxlnode);
+        select_dxlnode->AddChild(normal_join_node);
+        result = select_dxlnode;
+    }
+
+    return result;
 }
 
 TranslatorQueryToDXL::~TranslatorQueryToDXL()

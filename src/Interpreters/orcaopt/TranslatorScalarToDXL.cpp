@@ -55,17 +55,56 @@ TranslatorScalarToDXL::TranslatorScalarToDXL(
     LOG_TRACE(log, "----111----");
 }
 
+gpdxl::EdxlBoolExprType
+TranslatorScalarToDXL::EdxlbooltypeFromGPDBBoolType(
+	BoolExprType boolexprtype) const
+{
+	static ULONG mapping[][2] = {
+		{NOT_EXPR, Edxlnot},
+		{AND_EXPR, Edxland},
+		{OR_EXPR, Edxlor},
+	};
+
+	EdxlBoolExprType type = EdxlBoolExprTypeSentinel;
+
+	const ULONG arity = GPOS_ARRAY_SIZE(mapping);
+	for (ULONG ul = 0; ul < arity; ul++)
+	{
+		ULONG *elem = mapping[ul];
+		if ((ULONG) boolexprtype == elem[0])
+		{
+			type = (EdxlBoolExprType) elem[1];
+			break;
+		}
+	}
+
+	GPOS_ASSERT(EdxlBoolExprTypeSentinel != type && "Invalid bool expr type");
+
+	return type;
+}
+
 gpdxl::CDXLNode *
 TranslatorScalarToDXL::translateAndOrNotExprToDXL(ASTPtr expr)
 {
+    gpdxl::CDXLNode * dxlnode = nullptr;
     if (auto & func = expr->as<ASTFunction &>())
     {
         const auto * list = func.arguments->as<ASTExpressionList>();
+        gpdxl::EdxlBoolExprType type = gpdxl::EdxlBoolExprTypeSentinel;
         if (func.name == "and" || func.name == "or")
         {
             if (list->children.size() < 2)
             {
                 throw Exception("Boolean Expression (OR / AND): Incorrect Number of Children.", ErrorCodes::SYNTAX_ERROR);
+            }
+
+            if (func.name == "and")
+            {
+                type = gpdxl::Edxland;
+            }
+            else
+            {
+                type = gpdxl::Edxlor;
             }
         }
         else if(func.name == "not")
@@ -74,22 +113,68 @@ TranslatorScalarToDXL::translateAndOrNotExprToDXL(ASTPtr expr)
             {
                 throw Exception("Boolean Expression (NOT): Incorrect Number of Children .", ErrorCodes::SYNTAX_ERROR);
             }
+            type = gpdxl::Edxlnot;
         }
 
-        gpdxl::CDXLNode *dxlnode = GPOS_NEW(memory_pool)
-                gpdxl::CDXLNode(memory_pool, GPOS_NEW(memory_pool) gpdxl::CDXLScalarBoolExpr(memory_pool, type));
+        dxlnode = GPOS_NEW(memory_pool)gpdxl::CDXLNode(memory_pool,
+            GPOS_NEW(memory_pool) gpdxl::CDXLScalarBoolExpr(memory_pool, type));
         for (auto const * exp : list->children)
         {
             gpdxl::CDXLNode child_node = translateExprToDXL(exp);
             dxlnode->AddChild(child_node);
         }
     }
+
+    return dxlnode;
 }
 
 gpdxl::CDXLNode *
 TranslatorScalarToDXL::translateOpExprToDXL(const ASTPtr expr)
 {
+    if (auto & func = expr->as<ASTFunction &>())
+    {
+        //+
+        if (func.name == "plus")
+        {
+            if (auto * args = func.arguments->as<ASTExpressionList *>())
+            {
+                for (auto arg : args->children)
+                {
+                    gpdxl::CDXLNode * arg_dxl_node = translateExprToDXL(arg);
+                }
+            }
+        }
+        //-
+        else if (func.name == "minus")
+        {
 
+        }
+        //*
+        else if (func.name == "multiply")
+        {
+
+        }
+        ///
+        else if (func.name == "divide")
+        {
+
+        }
+        //%
+        else if (func.name == "modulo")
+        {
+
+        }
+        //= or ==
+        else if (func.name == "equals")
+        {
+
+        }
+        //!= or <>
+        else if (func.name == "notEquals")
+        {
+
+        }
+    }
 }
 
 gpdxl::CDXLNode *
