@@ -38,6 +38,8 @@ private:
 
 	// holds the var to col id information mapping
 	MappingVarColId *m_var_to_colid_map;
+
+    ULONG m_query_level;
 public:
     TranslatorQueryToDXL();
 

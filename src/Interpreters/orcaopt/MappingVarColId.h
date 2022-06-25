@@ -2,6 +2,8 @@
 
 #include "gpos/base.h"
 
+#include <Parsers/ASTTablesInSelectQuery.h>
+
 namespace DB
 {
 
@@ -45,8 +47,34 @@ private:
 	// map from gpdb att to optimizer col
 	GPDBAttOptColHashMap *m_gpdb_att_opt_col_mapping;
 
+	// hash map structure to store gpdb att -> opt col information
+	typedef CHashMap<CKDBAttInfo, CKDBAttOptCol, HashCKDBAttInfo,
+					 EqualGCKBAttInfo, CleanupRelease, CleanupRelease>
+		CKDBAttOptColHashMap;
+
+	// iterator
+	typedef CHashMapIter<CKDBAttInfo, CKDBAttOptCol, HashCKDBAttInfo,
+						 EqualCKDBAttInfo, CleanupRelease, CleanupRelease>
+		CKDBAttOptColHashMapIter;
+
+	// map from gpdb att to optimizer col
+	CKDBAttOptColHashMap *m_ckdb_att_opt_col_mapping;
+	std::vector<CKDBAttOptColHashMap> m_ckdb_arr;
+
+	bool searchFor(
+		const ULONG current_query_level,
+		const ASTPtr var_exp,
+		ULONG & abs_query_level,
+		std::shared_ptr<CKDBAttInfo> & find_key,
+		std::shared_ptr<CKDBAttOptCol> & find_value
+	);
+
 	// insert mapping entry
 	void Insert(ULONG, ULONG, INT, ULONG, gpos::CWStringBase *str);
+
+	void Insert(ULONG, String * database_name, 
+		String * table_name, ULONG,
+		gpos::CWStringBase *str, OID type_oid, int typemod, int attno);
 
 	// no copy constructor
 	MappingVarColId(const MappingVarColId &);
@@ -55,6 +83,10 @@ private:
 	const GPDBAttOptCol *GetGPDBAttOptColMapping(
 		ULONG current_query_level, const Var *var,
 		EPlStmtPhysicalOpType plstmt_physical_op_type) const;
+
+	const GPDBAttOptCol *GetCKDBAttOptColMapping(
+		ULONG current_query_level, const ASTPtr *var_exp
+		/*EPlStmtPhysicalOpType plstmt_physical_op_type*/) const;
 
 public:
 	// ctor
@@ -71,9 +103,26 @@ public:
 		ULONG current_query_level, const Var *var,
 		EPlStmtPhysicalOpType plstmt_physical_op_type) const;
 
+	virtual const gpos::CWStringBase *GetOptColName(
+		ULONG current_query_level, const ASTPtr var_exp,
+		EPlStmtPhysicalOpType plstmt_physical_op_type) const;
+
 	// given a gpdb attribute, return column id
 	virtual ULONG GetColId(ULONG current_query_level, const Var *var,
 						   EPlStmtPhysicalOpType plstmt_physical_op_type) const;
+
+	virtual ULONG GetColId(ULONG current_query_level, const ASTPtr *var_exp,
+						   EPlStmtPhysicalOpType plstmt_physical_op_type) const;
+
+	bool GetColInfo(
+		ULONG current_query_level, const ASTPtr *var_exp,
+		//EPlStmtPhysicalOpType plstmt_physical_op_type,
+		gpos::CWStringBase & col_name,
+		ULONG & col_id,
+		Oid & type_oid,
+		int & typemod,
+		int & attno
+	);
 
 	// load up mapping information from an index
 	void LoadIndexColumns(ULONG query_level, ULONG RTE_index,
@@ -82,6 +131,10 @@ public:
 
 	// load up mapping information from table descriptor
 	void LoadTblColumns(ULONG query_level, ULONG RTE_index,
+						const CDXLTableDescr *table_descr);
+
+	// load up mapping information from table descriptor
+	void LoadTblColumns(ULONG query_level, const ASTTableExpression * table_expression,
 						const CDXLTableDescr *table_descr);
 
 	// load up column id mapping information from the array of column descriptors

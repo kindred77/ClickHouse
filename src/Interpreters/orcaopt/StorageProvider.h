@@ -21,7 +21,10 @@ private:
 	gpos::CMemoryPool *mp;
 public:
 	explicit StorageProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	StoragePtr getStorageByOID(OID oid);
+	StoragePtr getStorageByOID(OID oid) const;
+
+	std::pair<OID, StoragePtr>*
+	StorageProvider::getPairByDBAndTableName(const ASTPtr database_and_table_name) const;
 };
 
 }

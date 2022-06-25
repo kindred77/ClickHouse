@@ -2,8 +2,8 @@
 
 #include "gpos/common/CRefCount.h"
 
-#include "gpopt/translate/CGPDBAttInfo.h"
-#include "gpopt/translate/COptColInfo.h"
+#include "Interpreters/orcaopt/GPDBAttInfo.h"
+#include "Interpreters/orcaopt/OptColInfo.h"
 
 namespace DB
 {
@@ -54,6 +54,49 @@ public:
 
 	// accessor
 	const COptColInfo *
+	GetOptColInfo() const
+	{
+		return m_opt_col_info;
+	}
+};
+
+class CKDBAttOptCol : public gpos::CRefCount
+{
+private:
+	// gpdb att info
+	CKDBAttInfo *m_gpdb_att_info;
+
+	// optimizer col info
+	OptColInfo *m_opt_col_info;
+
+	// copy c'tor
+	CKDBAttOptCol(const CKDBAttOptCol &);
+
+public:
+	// ctor
+	CKDBAttOptCol(CKDBAttInfo *gpdb_att_info, OptColInfo *opt_col_info)
+		: m_gpdb_att_info(gpdb_att_info), m_opt_col_info(opt_col_info)
+	{
+		GPOS_ASSERT(NULL != m_gpdb_att_info);
+		GPOS_ASSERT(NULL != m_opt_col_info);
+	}
+
+	// d'tor
+	virtual ~CKDBAttOptCol()
+	{
+		m_gpdb_att_info->Release();
+		m_opt_col_info->Release();
+	}
+
+	// accessor
+	const CKDBAttInfo *
+	GetCKDBAttInfo() const
+	{
+		return m_gpdb_att_info;
+	}
+
+	// accessor
+	const OptColInfo *
 	GetOptColInfo() const
 	{
 		return m_opt_col_info;

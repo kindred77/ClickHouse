@@ -50,6 +50,20 @@ public:
     void restoreTable();  // TODO(ilezhankin): get rid of this
     std::shared_ptr<ASTTableIdentifier> createTable() const;  // returns |nullptr| if identifier is not table.
 
+    const String & operator[] (const size_t idx) const
+    {
+        if (idx < name_parts.size())
+        {
+            return name_parts[idx];
+        }
+
+        return {};
+    }
+
+    const size_t field_size() const
+    {
+        return name_parts.size();
+    }
 protected:
     String full_name;
     std::vector<String> name_parts;

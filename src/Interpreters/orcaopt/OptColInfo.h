@@ -24,12 +24,26 @@ private:
 	// column name
 	gpos::CWStringBase *m_str;
 
+	OID type_oid;
+
+	int typemod;
+
+	int attno;
+
 	// private copy c'tor
 	OptColInfo(const OptColInfo &);
 
 public:
 	// ctor
-	OptColInfo(ULONG colid, gpos::CWStringBase *str) : m_colid(colid), m_str(str)
+	OptColInfo(ULONG colid, gpos::CWStringBase *str,
+		OID type_oid_ = InvalidOid, int typemod_ = -1,
+		int attno_ = -1
+	)
+	: m_colid(colid)
+	, m_str(str)
+	, type_oid(type_oid_)
+	, typemod(typemod_)
+	, attno(attno_)
 	{
 		GPOS_ASSERT(m_str);
 	}
@@ -51,6 +65,24 @@ public:
 	GetOptColName() const
 	{
 		return m_str;
+	}
+	
+	OID
+	GetTypeOid() const
+	{
+		return type_oid;
+	}
+
+	int 
+	GetTypeMod() const
+	{
+		return typemod;
+	}
+
+	int 
+	GetAttNo() const
+	{
+		return attno;
 	}
 
 	// equality check

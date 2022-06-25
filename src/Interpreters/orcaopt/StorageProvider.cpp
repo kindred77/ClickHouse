@@ -1,7 +1,7 @@
 /*
  * StorageProvider.cpp
  *
- *  Created on: 2022Äê3ÔÂ2ÈÕ
+ *  Created on: 2022ï¿½ï¿½3ï¿½ï¿½2ï¿½ï¿½
  *      Author: tangye
  */
 
@@ -20,6 +20,15 @@ StorageProvider::StorageProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
 
 StoragePtr
 StorageProvider::getStorageByOID(OID oid)
+{
+	auto it = oid_storageid_map.find(oid);
+	if (it == oid_storageid_map.end())
+	    return {};
+	return it->second;
+}
+
+std::pair<OID, StoragePtr>*
+StorageProvider::getPairByDBAndTableName(const ASTPtr database_and_table_name)
 {
 	auto it = oid_storageid_map.find(oid);
 	if (it == oid_storageid_map.end())

@@ -29,7 +29,39 @@ using TypeProviderPtr = std::shared_ptr<const TypeProvider>;
 
 class TypeProvider
 {
+public:
+	explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	static IMDTypePtr getTypeByOID(OID oid);
+	static IMDTypePtr getType(Field::Types::Which which);
 private:
+
+	static int TYPE_OID_ID;
+	static std::pair<OID, IMDTypePtr> TYPE_FLOAT32;
+	static std::pair<OID, IMDTypePtr> TYPE_FLOAT64;
+	static std::pair<OID, IMDTypePtr> TYPE_BOOLEAN;
+	static std::pair<OID, IMDTypePtr> TYPE_UINT8;
+	static std::pair<OID, IMDTypePtr> TYPE_UINT16;
+	static std::pair<OID, IMDTypePtr> TYPE_UINT32;
+	static std::pair<OID, IMDTypePtr> TYPE_UINT64;
+	static std::pair<OID, IMDTypePtr> TYPE_UINT128;
+	static std::pair<OID, IMDTypePtr> TYPE_UINT256;
+	static std::pair<OID, IMDTypePtr> TYPE_INT8;
+	static std::pair<OID, IMDTypePtr> TYPE_INT16;
+	static std::pair<OID, IMDTypePtr> TYPE_INT32;
+	static std::pair<OID, IMDTypePtr> TYPE_INT64;
+	static std::pair<OID, IMDTypePtr> TYPE_INT128;
+	static std::pair<OID, IMDTypePtr> TYPE_INT256;
+	static std::pair<OID, IMDTypePtr> TYPE_STRING;
+	static std::pair<OID, IMDTypePtr> TYPE_ARRAY;
+	static std::pair<OID, IMDTypePtr> TYPE_TUPLE;
+	static std::pair<OID, IMDTypePtr> TYPE_DECIMAL32;
+	static std::pair<OID, IMDTypePtr> TYPE_DECIMAL64;
+	static std::pair<OID, IMDTypePtr> TYPE_DECIMAL128;
+	static std::pair<OID, IMDTypePtr> TYPE_DECIMAL256;
+	static std::pair<OID, IMDTypePtr> TYPE_AGGFUNCSTATE;
+	static std::pair<OID, IMDTypePtr> TYPE_MAP;
+	static std::pair<OID, IMDTypePtr> TYPE_UUID;
+
 	using Map = std::map<OID, IMDTypePtr>;
 
 	Map oid_types_map;
@@ -38,9 +70,6 @@ private:
 
 	gpos::CMDName *
 	CreateMDName(gpos::CMemoryPool *mp, const char *name_str);
-public:
-	explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	IMDTypePtr getTypeByOID(OID oid);
 };
 
 }
