@@ -25,6 +25,7 @@
 #include <Processors/Merges/Algorithms/AggregatingSortedAlgorithm.h>
 #include <Processors/Merges/Algorithms/VersionedCollapsingAlgorithm.h>
 #include <Processors/Merges/Algorithms/GraphiteRollupSortedAlgorithm.h>
+#include <Processors/Merges/Algorithms/PartialReplacingSortedAlgorithm.h>
 #include <Processors/Sources/SourceFromSingleChunk.h>
 
 namespace ProfileEvents
@@ -230,6 +231,10 @@ Block MergeTreeDataWriter::mergeBlock(const Block & block, SortDescription sort_
             case MergeTreeData::MergingParams::Graphite:
                 return std::make_shared<GraphiteRollupSortedAlgorithm>(
                     block, 1, sort_description, block_size + 1, data.merging_params.graphite_params, time(nullptr));
+            case MergeTreeData::MergingParams::PartialReplacing:
+                return std::make_shared<PartialReplacingSortedAlgorithm>(
+                    block, 1, sort_description, data.merging_params.part_cols_indexes_column, 
+                    data.merging_params.primary_keys, data.merging_params.all_column_names, block_size + 1);
         }
 
         __builtin_unreachable();

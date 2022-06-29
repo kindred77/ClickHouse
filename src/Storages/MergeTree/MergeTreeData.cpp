@@ -603,6 +603,10 @@ void MergeTreeData::MergingParams::check(const StorageInMemoryMetadata & metadat
         throw Exception("List of columns to sum for MergeTree cannot be specified in all modes except Summing.",
                         ErrorCodes::LOGICAL_ERROR);
 
+    if (!part_cols_indexes_column.empty() && mode != MergingParams::PartialReplacing)
+        throw Exception("Partial column indexes column for MergeTree cannot be specified in modes except PartialReplacing.",
+                        ErrorCodes::LOGICAL_ERROR);
+
     /// Check that if the sign column is needed, it exists and is of type Int8.
     auto check_sign_column = [this, & columns](bool is_optional, const std::string & storage)
     {
@@ -659,6 +663,34 @@ void MergeTreeData::MergingParams::check(const StorageInMemoryMetadata & metadat
             throw Exception("Version column " + version_column + " does not exist in table declaration.", ErrorCodes::NO_SUCH_COLUMN_IN_TABLE);
     };
 
+    /// that if the part_col_indexes_column column is needed, it exists and is of Int16 array.
+    auto check_part_col_indexes_column = [this, & columns](bool is_optional, const std::string & storage)
+    {
+        if (part_cols_indexes_column.empty())
+        {
+            if (is_optional)
+                return;
+
+            throw Exception("Logical error: Partial column indexes column for storage " + storage + " is empty", ErrorCodes::LOGICAL_ERROR);
+        }
+
+        bool miss_column = true;
+        for (const auto & column : columns)
+        {
+            if (column.name == part_cols_indexes_column)
+            {
+                if (!typeid_cast<const DataTypeArray *>(column.type.get())
+                        ||!typeid_cast<const DataTypeUInt16 *>(typeid_cast<const DataTypeArray *>(column.type.get())->getNestedType().get()))
+                    throw Exception("Partial column indexes column (" + part_cols_indexes_column + ") for storage " + storage + " must have type Array UInt16."
+                        " Provided column of type " + column.type->getName() + ".", ErrorCodes::BAD_TYPE_OF_FIELD);
+                miss_column = false;
+                break;
+            }
+        }
+        if (miss_column)
+            throw Exception("Partial column indexes column " + part_cols_indexes_column + " does not exist in table declaration.", ErrorCodes::NO_SUCH_COLUMN_IN_TABLE);
+    };
+
     if (mode == MergingParams::Collapsing)
         check_sign_column(false, "CollapsingMergeTree");
 
@@ -700,6 +732,9 @@ void MergeTreeData::MergingParams::check(const StorageInMemoryMetadata & metadat
         check_sign_column(false, "VersionedCollapsingMergeTree");
         check_version_column(false, "VersionedCollapsingMergeTree");
     }
+
+    if (mode == MergingParams::PartialReplacing)
+        check_part_col_indexes_column(false, "PartialReplacingMergeTree");
 
     /// TODO Checks for Graphite mode.
 }
@@ -810,6 +845,7 @@ String MergeTreeData::MergingParams::getModeName() const
         case Replacing:     return "Replacing";
         case Graphite:      return "Graphite";
         case VersionedCollapsing: return "VersionedCollapsing";
+        case PartialReplacing: return "PartialReplacing";
     }
 
     __builtin_unreachable();

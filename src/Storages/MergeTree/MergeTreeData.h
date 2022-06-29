@@ -313,6 +313,7 @@ public:
             Replacing           = 5,
             Graphite            = 6,
             VersionedCollapsing = 7,
+            PartialReplacing    = 8,
         };
 
         Mode mode;
@@ -325,6 +326,13 @@ public:
 
         /// For Replacing and VersionedCollapsing mode. Can be empty for Replacing.
         String version_column;
+
+        /// For Partial Replacing mode.
+        String part_cols_indexes_column;
+
+        Names primary_keys;
+
+        Names all_column_names;
 
         /// For Graphite mode.
         Graphite::Params graphite_params;
@@ -385,7 +393,8 @@ public:
             || merging_params.mode == MergingParams::Summing
             || merging_params.mode == MergingParams::Aggregating
             || merging_params.mode == MergingParams::Replacing
-            || merging_params.mode == MergingParams::VersionedCollapsing;
+            || merging_params.mode == MergingParams::VersionedCollapsing
+            || merging_params.mode == MergingParams::PartialReplacing;
     }
 
     bool supportsSubcolumns() const override { return true; }

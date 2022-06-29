@@ -316,6 +316,8 @@ static StoragePtr create(const StorageFactory::Arguments & args)
         merging_params.mode = MergeTreeData::MergingParams::Graphite;
     else if (name_part == "VersionedCollapsing")
         merging_params.mode = MergeTreeData::MergingParams::VersionedCollapsing;
+    else if (name_part == "PartialReplacing")
+        merging_params.mode = MergeTreeData::MergingParams::PartialReplacing;
     else if (!name_part.empty())
         throw Exception(
             "Unknown storage " + args.engine_name + getMergeTreeVerboseHelp(is_extended_storage_def), ErrorCodes::UNKNOWN_STORAGE);
@@ -384,6 +386,9 @@ static StoragePtr create(const StorageFactory::Arguments & args)
             add_mandatory_param("version");
             break;
         }
+        case MergeTreeData::MergingParams::PartialReplacing:
+            add_mandatory_param("partial columns indexes column");
+            break;
     }
 
     ASTs & engine_args = args.engine_args;
@@ -624,6 +629,18 @@ static StoragePtr create(const StorageFactory::Arguments & args)
         /// sorting key.
         merging_param_key_arg = merging_params.version_column;
     }
+    else if (merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
+    {
+            /// If the last element is not index_granularity or replica_name (a literal), then this is the name of the partial columns indexes column.
+        if (arg_cnt && !engine_args[arg_cnt - 1]->as<ASTLiteral>())
+        {
+            if (!tryGetIdentifierNameInto(engine_args[arg_cnt - 1], merging_params.part_cols_indexes_column))
+                throw Exception(
+                    "Partial columns indexes column name must be an unquoted string" + getMergeTreeVerboseHelp(is_extended_storage_def),
+                    ErrorCodes::BAD_ARGUMENTS);
+            --arg_cnt;
+        }
+    }
 
     String date_column_name;
 
@@ -780,6 +797,15 @@ static StoragePtr create(const StorageFactory::Arguments & args)
     if (arg_num != arg_cnt)
         throw Exception("Wrong number of engine arguments.", ErrorCodes::BAD_ARGUMENTS);
 
+    if (merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
+    {
+        merging_params.primary_keys = metadata.primary_key.column_names;
+        for (auto col : metadata.columns.getAllPhysical())
+        {
+            merging_params.all_column_names.push_back(col.name);
+        }
+    }
+
     if (replicated)
         return StorageReplicatedMergeTree::create(
             zookeeper_path,
@@ -826,6 +852,7 @@ void registerStorageMergeTree(StorageFactory & factory)
     factory.registerStorage("SummingMergeTree", create, features);
     factory.registerStorage("GraphiteMergeTree", create, features);
     factory.registerStorage("VersionedCollapsingMergeTree", create, features);
+    factory.registerStorage("PartialReplacingMergeTree", create, features);
 
     features.supports_replication = true;
     features.supports_deduplication = true;
@@ -837,6 +864,7 @@ void registerStorageMergeTree(StorageFactory & factory)
     factory.registerStorage("ReplicatedSummingMergeTree", create, features);
     factory.registerStorage("ReplicatedGraphiteMergeTree", create, features);
     factory.registerStorage("ReplicatedVersionedCollapsingMergeTree", create, features);
+    factory.registerStorage("ReplicatedPartialReplacingMergeTree", create, features);
 }
 
 }
