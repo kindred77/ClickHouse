@@ -92,7 +92,7 @@ bool PartialReplacingSortedAlgorithm::hasEqualPrimaryKeyColumnsWithBaseRow(SortC
     return true;
 }
 
-Indexes PartialReplacingSortedAlgorithm::extractIndexesFromColumnArray(const IColumn* column_ptr, size_t row)
+PartialReplacingSortedAlgorithm::Indexes PartialReplacingSortedAlgorithm::extractIndexesFromColumnArray(const IColumn* column_ptr, size_t row)
 {
     Indexes result;
     size_t part_col_indexes_size = sizeAt(column_ptr, row);
