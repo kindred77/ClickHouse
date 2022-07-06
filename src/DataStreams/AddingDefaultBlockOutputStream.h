@@ -19,6 +19,8 @@ class Context;
   * 3. Columns that materialized from other columns (materialized columns)
   * Also the stream can substitute NULL into DEFAULT value in case of INSERT SELECT query (null_as_default) if according setting is 1.
   * All three types of columns are materialized (not constants).
+  * 
+  * Added partial columns indexes array column for automatically generating for PartialReplacingMergeTree
   */
 class AddingDefaultBlockOutputStream : public IBlockOutputStream
 {
@@ -28,7 +30,8 @@ public:
         const Block & header_,
         const ColumnsDescription & columns_,
         ContextPtr context_,
-        bool null_as_default_ = false);
+        bool null_as_default_ = false,
+        const String & partial_col_idxes_arr_name = "");
 
     Block getHeader() const override { return header; }
     void write(const Block & block) override;

@@ -22,8 +22,10 @@
 #include <Processors/Transforms/ExpressionTransform.h>
 #include <Storages/StorageDistributed.h>
 #include <Storages/StorageMaterializedView.h>
+#include <Storages/MergeTree/MergeTreeData.h>
 #include <TableFunctions/TableFunctionFactory.h>
 #include <Common/checkStackSize.h>
+#include <common/logger_useful.h>
 #include <Interpreters/QueryLog.h>
 #include <Interpreters/TranslateQualifiedNamesVisitor.h>
 #include <Interpreters/getTableExpressions.h>
@@ -287,8 +289,33 @@ BlockIO InterpreterInsertQuery::execute()
 
             /// Actually we don't know structure of input blocks from query/table,
             /// because some clients break insertion protocol (columns != header)
-            out = std::make_shared<AddingDefaultBlockOutputStream>(
-                out, query_sample_block, metadata_snapshot->getColumns(), getContext(), null_as_default);
+            auto partial_replacing_auto_gen = getContext()->getSettingsRef().partial_replacing_merge_tree_auto_gen_col_idxes;
+            String part_cols_indexes_column_name;
+            if (partial_replacing_auto_gen)
+            {
+                if (auto merge_tree = dynamic_cast<const MergeTreeData *>(table.get());
+                    merge_tree && merge_tree->merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
+                {
+                    part_cols_indexes_column_name = merge_tree->merging_params.part_cols_indexes_column;
+                }
+                else
+                {
+                    partial_replacing_auto_gen = false;
+                }
+            }
+
+            if (partial_replacing_auto_gen)
+            {
+                out = std::make_shared<AddingDefaultBlockOutputStream>(
+                    out, query_sample_block, metadata_snapshot->getColumns(),
+                    getContext(), null_as_default, part_cols_indexes_column_name);
+            }
+            else
+            {
+                out = std::make_shared<AddingDefaultBlockOutputStream>(
+                    out, query_sample_block, metadata_snapshot->getColumns(), getContext(), null_as_default);
+            }
+            
 
             /// It's important to squash blocks as early as possible (before other transforms),
             ///  because other transforms may work inefficient if block size is small.

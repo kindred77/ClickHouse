@@ -27,4 +27,10 @@ using ActionsDAGPtr = std::shared_ptr<ActionsDAG>;
 ActionsDAGPtr addMissingDefaults(
     const Block & header, const NamesAndTypesList & required_columns,
     const ColumnsDescription & columns, ContextPtr context, bool null_as_default = false);
-}
+
+ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
+    const String & rep_col_idxes_arr_name,
+    const Block & in_header, const Block & out_header,
+    const ColumnsDescription & columns, ContextPtr context, bool null_as_default = false);
+
+};
