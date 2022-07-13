@@ -1,10 +1,13 @@
 #include <Storages/IStorage.h>
+#include <Storages/StorageDistributed.h>
 #include <Parsers/ASTOptimizeQuery.h>
+#include <Parsers/queryToString.h>
 #include <Interpreters/Context.h>
 #include <Interpreters/executeDDLQueryOnCluster.h>
 #include <Interpreters/InterpreterOptimizeQuery.h>
 #include <Access/AccessRightsElement.h>
 #include <Common/typeid_cast.h>
+#include <common/logger_useful.h>
 #include <Parsers/ASTExpressionList.h>
 
 #include <Interpreters/processColumnTransformers.h>
@@ -31,6 +34,21 @@ BlockIO InterpreterOptimizeQuery::execute()
 
     auto table_id = getContext()->resolveStorageID(ast, Context::ResolveOrdinary);
     StoragePtr table = DatabaseCatalog::instance().getTable(table_id, getContext());
+    LOG_INFO(&Poco::Logger::get("InterpreterOptimizeQuery"), "---------------0000000");
+    // will be rewrite to optimize on cluster in distributed table with support_ddl_optimize_rewrite on
+    if (const StorageDistributed * distributed_table = table->as<const StorageDistributed>();
+        distributed_table && distributed_table->supportsOptimizeRewrite())
+    {
+        auto query_clone = query_ptr->clone();
+        auto * optimize_ast_ptr = query_clone->as<ASTOptimizeQuery>();
+        //change distributed table to remote table
+        optimize_ast_ptr->database = distributed_table->getRemoteDatabaseName();
+        optimize_ast_ptr->table = distributed_table->getRemoteTableName();
+        //add on cluster
+        optimize_ast_ptr->cluster = distributed_table->getClusterName();
+        LOG_INFO(&Poco::Logger::get("InterpreterOptimizeQuery"), "---------------{}", queryToString(*optimize_ast_ptr));
+        return executeDDLQueryOnCluster(query_clone, getContext(), getRequiredAccess());
+    }
     auto metadata_snapshot = table->getInMemoryMetadataPtr();
 
     // Empty list of names means we deduplicate by all columns, but user can explicitly state which columns to use.

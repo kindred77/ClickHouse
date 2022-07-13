@@ -52,6 +52,7 @@ public:
     bool supportsFinal() const override { return true; }
     bool supportsPrewhere() const override { return true; }
     bool supportsSubcolumns() const override { return true; }
+    bool supportsOptimizeRewrite() const { return distributed_settings.support_ddl_optimize_rewrite; }
     StoragePolicyPtr getStoragePolicy() const override;
 
     bool isRemote() const override { return true; }
