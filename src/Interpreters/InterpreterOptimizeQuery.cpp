@@ -34,7 +34,6 @@ BlockIO InterpreterOptimizeQuery::execute()
 
     auto table_id = getContext()->resolveStorageID(ast, Context::ResolveOrdinary);
     StoragePtr table = DatabaseCatalog::instance().getTable(table_id, getContext());
-    LOG_INFO(&Poco::Logger::get("InterpreterOptimizeQuery"), "---------------0000000");
     // will be rewrite to optimize on cluster in distributed table with support_ddl_optimize_rewrite on
     if (const StorageDistributed * distributed_table = table->as<const StorageDistributed>();
         distributed_table && distributed_table->supportsOptimizeRewrite())
@@ -46,7 +45,6 @@ BlockIO InterpreterOptimizeQuery::execute()
         optimize_ast_ptr->table = distributed_table->getRemoteTableName();
         //add on cluster
         optimize_ast_ptr->cluster = distributed_table->getClusterName();
-        LOG_INFO(&Poco::Logger::get("InterpreterOptimizeQuery"), "---------------{}", queryToString(*optimize_ast_ptr));
         return executeDDLQueryOnCluster(query_clone, getContext(), getRequiredAccess());
     }
     auto metadata_snapshot = table->getInMemoryMetadataPtr();
