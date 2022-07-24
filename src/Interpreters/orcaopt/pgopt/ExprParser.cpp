@@ -1,12 +1,14 @@
 #include <ExprParser.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
 
-duckdb_libpgquery::PGNode *
-ExprParser::transformExpr(PGParseState *pstate, duckdb_libpgquery::PGNode *expr, PGParseExprKind exprKind)
+PGNode *
+ExprParser::transformExpr(PGParseState *pstate, PGNode *expr, PGParseExprKind exprKind)
 {
-    duckdb_libpgquery::PGNode	   *result;
+    PGNode	   *result;
 	PGParseExprKind sv_expr_kind;
 
 	/* Save and restore identity of expression type we're parsing */
@@ -21,10 +23,10 @@ ExprParser::transformExpr(PGParseState *pstate, duckdb_libpgquery::PGNode *expr,
 	return result;
 };
 
-duckdb_libpgquery::PGNode *
-ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode *expr)
+PGNode *
+ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 {
-    duckdb_libpgquery::PGNode *result;
+    PGNode *result;
 
 	if (expr == NULL)
 		return NULL;
@@ -34,26 +36,26 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 
 	switch (nodeTag(expr))
 	{
-		case duckdb_libpgquery::T_PGColumnRef:
-			result = transformColumnRef(pstate, (duckdb_libpgquery::PGColumnRef *) expr);
+		case T_PGColumnRef:
+			result = transformColumnRef(pstate, (PGColumnRef *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGParamRef:
-			result = transformParamRef(pstate, (duckdb_libpgquery::PGParamRef *) expr);
+		case T_PGParamRef:
+			result = transformParamRef(pstate, (PGParamRef *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGAConst:
+		case T_PGAConst:
 			{
-				duckdb_libpgquery::PGAConst    *con = (duckdb_libpgquery::PGAConst *) expr;
-				duckdb_libpgquery::PGValue	   *val = &con->val;
+				PGAConst    *con = (PGAConst *) expr;
+				PGValue	   *val = &con->val;
 
-				result = (duckdb_libpgquery::PGNode *) make_const(pstate, val, con->location);
+				result = (PGNode *) make_const(pstate, val, con->location);
 				break;
 			}
 
-		case duckdb_libpgquery::T_PGAIndirection:
+		case T_PGAIndirection:
 			{
-				duckdb_libpgquery::PGAIndirection *ind = (duckdb_libpgquery::PGAIndirection *) expr;
+				PGAIndirection *ind = (PGAIndirection *) expr;
 
 				result = transformExprRecurse(pstate, ind->arg);
 				result = transformIndirection(pstate, result,
@@ -61,14 +63,14 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 				break;
 			}
 
-		case duckdb_libpgquery::T_PGAArrayExpr:
-			result = transformArrayExpr(pstate, (duckdb_libpgquery::PGAArrayExpr *) expr,
+		case T_PGAArrayExpr:
+			result = transformArrayExpr(pstate, (PGAArrayExpr *) expr,
 										InvalidOid, InvalidOid, -1);
 			break;
 
-		case duckdb_libpgquery::T_PGTypeCast:
+		case T_PGTypeCast:
 			{
-				duckdb_libpgquery::PGTypeCast   *tc = (duckdb_libpgquery::PGTypeCast *) expr;
+				PGTypeCast   *tc = (PGTypeCast *) expr;
 
 				/*
 				 * If the subject of the typecast is an ARRAY[] construct and
@@ -77,7 +79,7 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 				 * type information.  This avoids some cases where
 				 * transformArrayExpr() might not infer the correct type.
 				 */
-				if (IsA(tc->arg, duckdb_libpgquery::PGAArrayExpr))
+				if (IsA(tc->arg, PGAArrayExpr))
 				{
 					Oid			targetType;
 					Oid			elementType;
@@ -99,7 +101,7 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 					{
 						tc = copyObject(tc);
 						tc->arg = transformArrayExpr(pstate,
-													 (duckdb_libpgquery::PGAArrayExpr *) tc->arg,
+													 (PGAArrayExpr *) tc->arg,
 													 targetType,
 													 elementType,
 													 targetTypmod);
@@ -110,44 +112,44 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 				break;
 			}
 
-		case duckdb_libpgquery::T_PGCollateClause:
-			result = transformCollateClause(pstate, (duckdb_libpgquery::PGCollateClause *) expr);
+		case T_PGCollateClause:
+			result = transformCollateClause(pstate, (PGCollateClause *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGAExpr:
+		case T_PGAExpr:
 			{
-				duckdb_libpgquery::PGAExpr	   *a = (duckdb_libpgquery::PGAExpr *) expr;
+				PGAExpr	   *a = (PGAExpr *) expr;
 
 				switch (a->kind)
 				{
-					case duckdb_libpgquery::PG_AEXPR_OP:
+					case PG_AEXPR_OP:
 						result = transformAExprOp(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_AND:
+					case PG_AEXPR_AND:
 						result = transformAExprAnd(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_OR:
+					case PG_AEXPR_OR:
 						result = transformAExprOr(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_NOT:
+					case PG_AEXPR_NOT:
 						result = transformAExprNot(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_OP_ANY:
+					case PG_AEXPR_OP_ANY:
 						result = transformAExprOpAny(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_OP_ALL:
+					case PG_AEXPR_OP_ALL:
 						result = transformAExprOpAll(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_DISTINCT:
+					case PG_AEXPR_DISTINCT:
 						result = transformAExprDistinct(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_NULLIF:
+					case PG_AEXPR_NULLIF:
 						result = transformAExprNullIf(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_OF:
+					case PG_AEXPR_OF:
 						result = transformAExprOf(pstate, a);
 						break;
-					case duckdb_libpgquery::PG_AEXPR_IN:
+					case PG_AEXPR_IN:
 						result = transformAExprIn(pstate, a);
 						break;
 					default:
@@ -158,87 +160,87 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 				break;
 			}
 
-		case duckdb_libpgquery::T_PGFuncCall:
-			result = transformFuncCall(pstate, (duckdb_libpgquery::PGFuncCall *) expr);
+		case T_PGFuncCall:
+			result = transformFuncCall(pstate, (PGFuncCall *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGNamedArgExpr:
+		case T_PGNamedArgExpr:
 			{
-				duckdb_libpgquery::PGNamedArgExpr *na = (duckdb_libpgquery::PGNamedArgExpr *) expr;
+				PGNamedArgExpr *na = (PGNamedArgExpr *) expr;
 
-				na->arg = (duckdb_libpgquery::PGExpr *) transformExprRecurse(pstate, (duckdb_libpgquery::PGNode *) na->arg);
+				na->arg = (PGExpr *) transformExprRecurse(pstate, (PGNode *) na->arg);
 				result = expr;
 				break;
 			}
 
-		case duckdb_libpgquery::T_PGSubLink:
-			result = transformSubLink(pstate, (duckdb_libpgquery::PGSubLink *) expr);
+		case T_PGSubLink:
+			result = transformSubLink(pstate, (PGSubLink *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGCaseExpr:
-			result = transformCaseExpr(pstate, (duckdb_libpgquery::PGCaseExpr *) expr);
+		case T_PGCaseExpr:
+			result = transformCaseExpr(pstate, (PGCaseExpr *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGRowExpr:
-			result = transformRowExpr(pstate, (duckdb_libpgquery::PGRowExpr *) expr);
+		case T_PGRowExpr:
+			result = transformRowExpr(pstate, (PGRowExpr *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGTableValueExpr:
-			result = transformTableValueExpr(pstate, (duckdb_libpgquery::PGTableValueExpr *) expr);
+		case T_PGTableValueExpr:
+			result = transformTableValueExpr(pstate, (PGTableValueExpr *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGCoalesceExpr:
-			result = transformCoalesceExpr(pstate, (duckdb_libpgquery::PGCoalesceExpr *) expr);
+		case T_PGCoalesceExpr:
+			result = transformCoalesceExpr(pstate, (PGCoalesceExpr *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGMinMaxExpr:
-			result = transformMinMaxExpr(pstate, (duckdb_libpgquery::PGMinMaxExpr *) expr);
+		case T_PGMinMaxExpr:
+			result = transformMinMaxExpr(pstate, (PGMinMaxExpr *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGXmlExpr:
-			result = transformXmlExpr(pstate, (duckdb_libpgquery::PGXmlExpr *) expr);
+		case T_PGXmlExpr:
+			result = transformXmlExpr(pstate, (PGXmlExpr *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGXmlSerialize:
-			result = transformXmlSerialize(pstate, (duckdb_libpgquery::PGXmlSerialize *) expr);
+		case T_PGXmlSerialize:
+			result = transformXmlSerialize(pstate, (PGXmlSerialize *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGNullTest:
+		case T_PGNullTest:
 			{
-				duckdb_libpgquery::PGNullTest   *n = (duckdb_libpgquery::PGNullTest *) expr;
+				PGNullTest   *n = (PGNullTest *) expr;
 
-				n->arg = (duckdb_libpgquery::PGExpr *) transformExprRecurse(pstate, (duckdb_libpgquery::PGNode *) n->arg);
+				n->arg = (PGExpr *) transformExprRecurse(pstate, (PGNode *) n->arg);
 				/* the argument can be any type, so don't coerce it */
-				n->argisrow = type_is_rowtype(duckdb_libpgquery::exprType((duckdb_libpgquery::PGNode *) n->arg));
+				n->argisrow = type_is_rowtype(exprType((PGNode *) n->arg));
 				result = expr;
 				break;
 			}
 
-		case duckdb_libpgquery::T_PGBooleanTest:
-			result = transformBooleanTest(pstate, (duckdb_libpgquery::PGBooleanTest *) expr);
+		case T_PGBooleanTest:
+			result = transformBooleanTest(pstate, (PGBooleanTest *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGCurrentOfExpr:
-			result = transformCurrentOfExpr(pstate, (duckdb_libpgquery::PGCurrentOfExpr *) expr);
+		case T_PGCurrentOfExpr:
+			result = transformCurrentOfExpr(pstate, (PGCurrentOfExpr *) expr);
 			break;
 
-		case duckdb_libpgquery::T_PGGroupingFunc:
+		case T_PGGroupingFunc:
 			{
-				duckdb_libpgquery::PGGroupingFunc *gf = (duckdb_libpgquery::PGGroupingFunc *)expr;
+				PGGroupingFunc *gf = (PGGroupingFunc *)expr;
 				result = transformGroupingFunc(pstate, gf);
 				break;
 			}
 
-		case duckdb_libpgquery::T_PGPartitionBoundSpec:
+		case T_PGPartitionBoundSpec:
 			{
-				duckdb_libpgquery::PGPartitionBoundSpec *in = (duckdb_libpgquery::PGPartitionBoundSpec *)expr;
-				duckdb_libpgquery::PGPartitionRangeItem *ri;
-				duckdb_libpgquery::PGList *out = NIL;
-				duckdb_libpgquery::PGListCell *lc;
+				PGPartitionBoundSpec *in = (PGPartitionBoundSpec *)expr;
+				PGPartitionRangeItem *ri;
+				PGList *out = NIL;
+				PGListCell *lc;
 
 				if (in->partStart)
 				{
-					ri = (duckdb_libpgquery::PGPartitionRangeItem *)in->partStart;
+					ri = (PGPartitionRangeItem *)in->partStart;
 
 					/* ALTER TABLE ... ADD PARTITION might feed
 					 * "pre-cooked" expressions into the boundspec for
@@ -249,7 +251,7 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 
 						foreach(lc, ri->partRangeVal)
 						{
-							duckdb_libpgquery::PGNode *n = lfirst(lc);
+							PGNode *n = lfirst(lc);
 							out = lappend(out, transformExpr(pstate, n,
 															 EXPR_KIND_PARTITION_EXPRESSION));
 						}
@@ -259,17 +261,17 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 				}
 				if (in->partEnd)
 				{
-					ri = (duckdb_libpgquery::PGPartitionRangeItem *)in->partEnd;
+					ri = (PGPartitionRangeItem *)in->partEnd;
 
 					/* ALTER TABLE ... ADD PARTITION might feed
 					 * "pre-cooked" expressions into the boundspec for
 					 * range items (which are Lists) 
 					 */
 					{
-						Assert(IsA(in->partEnd, duckdb_libpgquery::PGPartitionRangeItem));
+						Assert(IsA(in->partEnd, PGPartitionRangeItem));
 						foreach(lc, ri->partRangeVal)
 						{
-							duckdb_libpgquery::PGNode *n = lfirst(lc);
+							PGNode *n = lfirst(lc);
 							out = lappend(out, transformExpr(pstate, n,
 															 EXPR_KIND_PARTITION_EXPRESSION));
 						}
@@ -279,18 +281,18 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 				}
 				if (in->partEvery)
 				{
-					ri = (duckdb_libpgquery::PGPartitionRangeItem *)in->partEvery;
-					Assert(IsA(in->partEvery, duckdb_libpgquery::PGPartitionRangeItem));
+					ri = (PGPartitionRangeItem *)in->partEvery;
+					Assert(IsA(in->partEvery, PGPartitionRangeItem));
 					foreach(lc, ri->partRangeVal)
 					{
-						duckdb_libpgquery::PGNode *n = lfirst(lc);
+						PGNode *n = lfirst(lc);
 						out = lappend(out, transformExpr(pstate, n,
 														 EXPR_KIND_PARTITION_EXPRESSION));
 					}
 					ri->partRangeVal = out;
 				}
 
-				result = (duckdb_libpgquery::PGNode *)in;
+				result = (PGNode *)in;
 			}
 			break;
 
@@ -302,33 +304,33 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 			 * taking a conservative approach, and only accepting node
 			 * types that are demonstrably necessary to accept.
 			 *********************************************/
-		case duckdb_libpgquery::T_PGVar:
-		case duckdb_libpgquery::T_PGConst:
-		case duckdb_libpgquery::T_PGParam:
-		case duckdb_libpgquery::T_PGAggref:
-		case duckdb_libpgquery::T_PGArrayRef:
-		case duckdb_libpgquery::T_PGFuncExpr:
-		case duckdb_libpgquery::T_PGOpExpr:
-		case duckdb_libpgquery::T_PGDistinctExpr:
-		case duckdb_libpgquery::T_PGNullIfExpr:
-		case duckdb_libpgquery::T_PGScalarArrayOpExpr:
-		case duckdb_libpgquery::T_PGBoolExpr:
-		case duckdb_libpgquery::T_PGFieldSelect:
-		case duckdb_libpgquery::T_PGFieldStore:
-		case duckdb_libpgquery::T_PGRelabelType:
-		case duckdb_libpgquery::T_PGCoerceViaIO:
-		case duckdb_libpgquery::T_PGArrayCoerceExpr:
-		case duckdb_libpgquery::T_PGConvertRowtypeExpr:
-		case duckdb_libpgquery::T_PGCollateExpr:
-		case duckdb_libpgquery::T_PGCaseTestExpr:
-		case duckdb_libpgquery::T_PGArrayExpr:
-		case duckdb_libpgquery::T_PGCoerceToDomain:
-		case duckdb_libpgquery::T_PGCoerceToDomainValue:
-		case duckdb_libpgquery::T_PGSetToDefault:
-		case duckdb_libpgquery::T_PGGroupId:
-		case duckdb_libpgquery::T_PGInteger:
+		case T_PGVar:
+		case T_PGConst:
+		case T_PGParam:
+		case T_PGAggref:
+		case T_PGArrayRef:
+		case T_PGFuncExpr:
+		case T_PGOpExpr:
+		case T_PGDistinctExpr:
+		case T_PGNullIfExpr:
+		case T_PGScalarArrayOpExpr:
+		case T_PGBoolExpr:
+		case T_PGFieldSelect:
+		case T_PGFieldStore:
+		case T_PGRelabelType:
+		case T_PGCoerceViaIO:
+		case T_PGArrayCoerceExpr:
+		case T_PGConvertRowtypeExpr:
+		case T_PGCollateExpr:
+		case T_PGCaseTestExpr:
+		case T_PGArrayExpr:
+		case T_PGCoerceToDomain:
+		case T_PGCoerceToDomainValue:
+		case T_PGSetToDefault:
+		case T_PGGroupId:
+		case T_PGInteger:
 			{
-				result = (duckdb_libpgquery::PGNode *) expr;
+				result = (PGNode *) expr;
 				break;
 			}
 
@@ -342,14 +344,14 @@ ExprParser::transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode
 	return result;
 };
 
-duckdb_libpgquery::PGNode *
-ExprParser::transformColumnRef(PGParseState *pstate, duckdb_libpgquery::PGColumnRef *cref)
+PGNode *
+ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 {
-    duckdb_libpgquery::PGNode	   *node = NULL;
+    PGNode	   *node = NULL;
 	char	   *nspname = NULL;
 	char	   *relname = NULL;
 	char	   *colname = NULL;
-	duckdb_libpgquery::PGRangeTblEntry *rte;
+	PGRangeTblEntry *rte;
 	int			levels_up;
 	enum
 	{
@@ -397,7 +399,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, duckdb_libpgquery::PGColumn
 	{
 		case 1:
 			{
-				duckdb_libpgquery::PGNode *field1 = (duckdb_libpgquery::PGNode *) linitial(cref->fields);
+				PGNode *field1 = (PGNode *) linitial(cref->fields);
 
 				Assert(IsA(field1, String));
 				colname = strVal(field1);

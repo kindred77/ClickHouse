@@ -1,10 +1,12 @@
 #include <TargetParser.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
 
-duckdb_libpgquery::PGList *
-    ExpandSingleTable(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte,
+PGList *
+    ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 				  int location, bool make_target_entry)
 {
 	int			sublevels_up;
@@ -20,8 +22,8 @@ duckdb_libpgquery::PGList *
 	}
 	else
 	{
-		duckdb_libpgquery::PGList	   *vars;
-		duckdb_libpgquery::PGListCell   *l;
+		PGList	   *vars;
+		PGListCell   *l;
 
 		expandRTE(rte, rtindex, sublevels_up, location, false,
 				  NULL, &vars);
@@ -36,7 +38,7 @@ duckdb_libpgquery::PGList *
 		/* Require read access to each column */
 		foreach(l, vars)
 		{
-			duckdb_libpgquery::PGVar		   *var = (Var *) lfirst(l);
+			PGVar		   *var = (Var *) lfirst(l);
 
 			markVarForSelectPriv(pstate, var, rte);
 		}
@@ -45,11 +47,11 @@ duckdb_libpgquery::PGList *
 	}
 };
 
-duckdb_libpgquery::PGList *
-    ExpandColumnRefStar(PGParseState *pstate, duckdb_libpgquery::PGColumnRef *cref,
+PGList *
+    ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 					bool make_target_entry)
 {
-	duckdb_libpgquery::PGList	   *fields = cref->fields;
+	PGList	   *fields = cref->fields;
 	int			numnames = list_length(fields);
 
 	if (numnames == 1)
@@ -85,7 +87,7 @@ duckdb_libpgquery::PGList *
 		 */
 		char	   *nspname = NULL;
 		char	   *relname = NULL;
-		duckdb_libpgquery::PGRangeTblEntry *rte = NULL;
+		PGRangeTblEntry *rte = NULL;
 		int			levels_up;
 		enum
 		{
@@ -100,7 +102,7 @@ duckdb_libpgquery::PGList *
 		 */
 		if (pstate->p_pre_columnref_hook != NULL)
 		{
-			duckdb_libpgquery::PGNode	   *node;
+			PGNode	   *node;
 
 			node = (*pstate->p_pre_columnref_hook) (pstate, cref);
 			if (node != NULL)
@@ -155,10 +157,10 @@ duckdb_libpgquery::PGList *
 		 */
 		if (pstate->p_post_columnref_hook != NULL)
 		{
-			duckdb_libpgquery::PGNode	   *node;
+			PGNode	   *node;
 
 			node = (*pstate->p_post_columnref_hook) (pstate, cref,
-													 (duckdb_libpgquery::PGNode *) rte);
+													 (PGNode *) rte);
 			if (node != NULL)
 			{
 				if (rte != NULL)
@@ -179,7 +181,7 @@ duckdb_libpgquery::PGList *
 			switch (crserr)
 			{
 				case CRSERR_NO_RTE:
-					errorMissingRTE(pstate, duckdb_libpgquery::makeRangeVar(nspname, relname,
+					errorMissingRTE(pstate, makeRangeVar(nspname, relname,
 														 cref->location));
 					break;
 				case CRSERR_WRONG_DB:
@@ -206,20 +208,20 @@ duckdb_libpgquery::PGList *
 	}
 };
 
-duckdb_libpgquery::PGList *
-TargetParser::transformTargetList(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist,
+PGList *
+TargetParser::transformTargetList(PGParseState *pstate, PGList *targetlist,
 					PGParseExprKind exprKind)
 {
-	duckdb_libpgquery::PGList	   *p_target = NIL;
+	PGList	   *p_target = NIL;
 	bool		expand_star;
-	duckdb_libpgquery::PGListCell   *o_target;
+	PGListCell   *o_target;
 
 	/* Expand "something.*" in SELECT and RETURNING, but not UPDATE */
 	expand_star = (exprKind != EXPR_KIND_UPDATE_SOURCE);
 
 	foreach(o_target, targetlist)
 	{
-		duckdb_libpgquery::PGResTarget  *res = (duckdb_libpgquery::PGResTarget *) lfirst(o_target);
+		PGResTarget  *res = (PGResTarget *) lfirst(o_target);
 
 		/*
 		 * Check for "something.*".  Depending on the complexity of the
@@ -228,11 +230,11 @@ TargetParser::transformTargetList(PGParseState *pstate, duckdb_libpgquery::PGLis
 		 */
 		if (expand_star)
 		{
-			if (IsA(res->val, duckdb_libpgquery::PGColumnRef))
+			if (IsA(res->val, PGColumnRef))
 			{
-				duckdb_libpgquery::PGColumnRef  *cref = (duckdb_libpgquery::PGColumnRef *) res->val;
+				PGColumnRef  *cref = (PGColumnRef *) res->val;
 
-				if (IsA(llast(cref->fields), duckdb_libpgquery::PGAStar))
+				if (IsA(llast(cref->fields), PGAStar))
 				{
 					/* It is something.*, expand into multiple items */
 					p_target = list_concat(p_target,
@@ -242,11 +244,11 @@ TargetParser::transformTargetList(PGParseState *pstate, duckdb_libpgquery::PGLis
 					continue;
 				}
 			}
-			else if (IsA(res->val, duckdb_libpgquery::PGAIndirection))
+			else if (IsA(res->val, PGAIndirection))
 			{
-				duckdb_libpgquery::PGAIndirection *ind = (duckdb_libpgquery::PGAIndirection *) res->val;
+				PGAIndirection *ind = (PGAIndirection *) res->val;
 
-				if (IsA(llast(ind->indirection), duckdb_libpgquery::PGAStar))
+				if (IsA(llast(ind->indirection), PGAStar))
 				{
 					/* It is something.*, expand into multiple items */
 					p_target = list_concat(p_target,
@@ -276,27 +278,27 @@ TargetParser::transformTargetList(PGParseState *pstate, duckdb_libpgquery::PGLis
 };
 
 void
-TargetParser::markTargetListOrigins(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist)
+TargetParser::markTargetListOrigins(PGParseState *pstate, PGList *targetlist)
 {
-	duckdb_libpgquery::PGListCell   *l;
+	PGListCell   *l;
 
 	foreach(l, targetlist)
 	{
-		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(l);
+		PGTargetEntry *tle = (PGTargetEntry *) lfirst(l);
 
-		markTargetListOrigin(pstate, tle, (duckdb_libpgquery::PGVar *) tle->expr, 0);
+		markTargetListOrigin(pstate, tle, (PGVar *) tle->expr, 0);
 	}
 };
 
 void
-TargetParser::markTargetListOrigin(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
-					 duckdb_libpgquery::PGVar *var, int levelsup)
+TargetParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
+					 PGVar *var, int levelsup)
 {
 	int			netlevelsup;
-	duckdb_libpgquery::PGRangeTblEntry *rte;
+	PGRangeTblEntry *rte;
 	PGAttrNumber	attnum;
 
-	if (var == NULL || !IsA(var, duckdb_libpgquery::PGVar))
+	if (var == NULL || !IsA(var, PGVar))
 		return;
 	netlevelsup = var->varlevelsup + levelsup;
 	rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
@@ -304,16 +306,16 @@ TargetParser::markTargetListOrigin(PGParseState *pstate, duckdb_libpgquery::PGTa
 
 	switch (rte->rtekind)
 	{
-		case duckdb_libpgquery::PG_RTE_RELATION:
+		case PG_RTE_RELATION:
 			/* It's a table or view, report it */
 			tle->resorigtbl = rte->relid;
 			tle->resorigcol = attnum;
 			break;
-		case duckdb_libpgquery::PG_RTE_SUBQUERY:
+		case PG_RTE_SUBQUERY:
 			/* Subselect-in-FROM: copy up from the subselect */
 			if (attnum != InvalidAttrNumber)
 			{
-				duckdb_libpgquery::PGTargetEntry *ste = get_tle_by_resno(rte->subquery->targetList,
+				PGTargetEntry *ste = get_tle_by_resno(rte->subquery->targetList,
 													attnum);
 
 				if (ste == NULL || ste->resjunk)
@@ -323,25 +325,25 @@ TargetParser::markTargetListOrigin(PGParseState *pstate, duckdb_libpgquery::PGTa
 				tle->resorigcol = ste->resorigcol;
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_JOIN:
+		case PG_RTE_JOIN:
 			/* Join RTE --- recursively inspect the alias variable */
 			if (attnum != InvalidAttrNumber)
 			{
-				duckdb_libpgquery::PGVar		   *aliasvar;
+				PGVar		   *aliasvar;
 
 				Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
-				aliasvar = (duckdb_libpgquery::PGVar *) list_nth(rte->joinaliasvars, attnum - 1);
+				aliasvar = (PGVar *) list_nth(rte->joinaliasvars, attnum - 1);
 				/* We intentionally don't strip implicit coercions here */
 				markTargetListOrigin(pstate, tle, aliasvar, netlevelsup);
 			}
 			break;
-		//case duckdb_libpgquery::PG_RTE_TABLEFUNCTION:
-		case duckdb_libpgquery::PG_RTE_FUNCTION:
-		case duckdb_libpgquery::PG_RTE_VALUES:
-		//case duckdb_libpgquery::PG_RTE_VOID:
+		//case PG_RTE_TABLEFUNCTION:
+		case PG_RTE_FUNCTION:
+		case PG_RTE_VALUES:
+		//case PG_RTE_VOID:
 			/* not a simple relation, leave it unmarked */
 			break;
-		case duckdb_libpgquery::PG_RTE_CTE:
+		case PG_RTE_CTE:
 
 			/*
 			 * CTE reference: copy up from the subquery, if possible. If the
@@ -353,8 +355,8 @@ TargetParser::markTargetListOrigin(PGParseState *pstate, duckdb_libpgquery::PGTa
 			 */
 			if (attnum != InvalidAttrNumber && !rte->self_reference)
 			{
-				duckdb_libpgquery::PGCommonTableExpr *cte = GetCTEForRTE(pstate, rte, netlevelsup);
-				duckdb_libpgquery::PGTargetEntry *ste;
+				PGCommonTableExpr *cte = GetCTEForRTE(pstate, rte, netlevelsup);
+				PGTargetEntry *ste;
 
 				ste = get_tle_by_resno(GetCTETargetList(cte), attnum);
 				if (ste == NULL || ste->resjunk)
@@ -367,10 +369,10 @@ TargetParser::markTargetListOrigin(PGParseState *pstate, duckdb_libpgquery::PGTa
 	}
 };
 
-duckdb_libpgquery::PGTargetEntry *
+PGTargetEntry *
 TargetParser::transformTargetEntry(PGParseState *pstate,
-					 duckdb_libpgquery::PGNode *node,
-					 duckdb_libpgquery::PGNode *expr,
+					 PGNode *node,
+					 PGNode *expr,
 					 PGParseExprKind exprKind,
 					 char *colname,
 					 bool resjunk)
@@ -395,7 +397,7 @@ TargetParser::transformTargetEntry(PGParseState *pstate,
 };
 
 char *
-TargetParser::FigureColname(duckdb_libpgquery::PGNode *node)
+TargetParser::FigureColname(PGNode *node)
 {
 	char	   *name = NULL;
 
@@ -406,7 +408,7 @@ TargetParser::FigureColname(duckdb_libpgquery::PGNode *node)
 	return "?column?";
 };
 
-int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name)
+int FigureColnameInternal(PGNode *node, char **name)
 {
 	int			strength = 0;
 
@@ -415,15 +417,15 @@ int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name)
 
 	switch (nodeTag(node))
 	{
-		case duckdb_libpgquery::T_PGColumnRef:
+		case T_PGColumnRef:
 			{
 				char	   *fname = NULL;
-				duckdb_libpgquery::PGListCell   *l;
+				PGListCell   *l;
 
 				/* find last field name, if any, ignoring "*" */
-				foreach(l, ((duckdb_libpgquery::PGColumnRef *) node)->fields)
+				foreach(l, ((PGColumnRef *) node)->fields)
 				{
-					duckdb_libpgquery::PGNode	   *i = lfirst(l);
+					PGNode	   *i = lfirst(l);
 
 					if (IsA(i, String))
 						fname = strVal(i);
@@ -435,16 +437,16 @@ int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name)
 				}
 			}
 			break;
-		case duckdb_libpgquery::T_PGAIndirection:
+		case T_PGAIndirection:
 			{
-				duckdb_libpgquery::PGAIndirection *ind = (duckdb_libpgquery::PGAIndirection *) node;
+				PGAIndirection *ind = (PGAIndirection *) node;
 				char	   *fname = NULL;
-				duckdb_libpgquery::PGListCell   *l;
+				PGListCell   *l;
 
 				/* find last field name, if any, ignoring "*" and subscripts */
 				foreach(l, ind->indirection)
 				{
-					duckdb_libpgquery::PGNode	   *i = lfirst(l);
+					PGNode	   *i = lfirst(l);
 
 					if (IsA(i, String))
 						fname = strVal(i);
@@ -457,45 +459,45 @@ int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name)
 				return FigureColnameInternal(ind->arg, name);
 			}
 			break;
-		case duckdb_libpgquery::T_PGFuncCall:
-			*name = strVal(llast(((duckdb_libpgquery::PGFuncCall *) node)->funcname));
+		case T_PGFuncCall:
+			*name = strVal(llast(((PGFuncCall *) node)->funcname));
 			return 2;
-		case duckdb_libpgquery::T_PGAExpr:
+		case T_PGAExpr:
 			/* make nullif() act like a regular function */
-			if (((duckdb_libpgquery::PGAExpr *) node)->kind == AEXPR_NULLIF)
+			if (((PGAExpr *) node)->kind == AEXPR_NULLIF)
 			{
 				*name = "nullif";
 				return 2;
 			}
 			break;
-		case duckdb_libpgquery::T_PGTypeCast:
-			strength = FigureColnameInternal(((duckdb_libpgquery::PGTypeCast *) node)->arg,
+		case T_PGTypeCast:
+			strength = FigureColnameInternal(((PGTypeCast *) node)->arg,
 											 name);
 			if (strength <= 1)
 			{
-				if (((duckdb_libpgquery::PGTypeCast *) node)->typeName != NULL)
+				if (((PGTypeCast *) node)->typeName != NULL)
 				{
-					*name = strVal(llast(((duckdb_libpgquery::PGTypeCast *) node)->typeName->names));
+					*name = strVal(llast(((PGTypeCast *) node)->typeName->names));
 					return 1;
 				}
 			}
 			break;
-		case duckdb_libpgquery::T_PGCollateClause:
-			return FigureColnameInternal(((duckdb_libpgquery::PGCollateClause *) node)->arg, name);
-		case duckdb_libpgquery::T_PGSubLink:
-			switch (((duckdb_libpgquery::PGSubLink *) node)->subLinkType)
+		case T_PGCollateClause:
+			return FigureColnameInternal(((PGCollateClause *) node)->arg, name);
+		case T_PGSubLink:
+			switch (((PGSubLink *) node)->subLinkType)
 			{
-				case duckdb_libpgquery::PG_EXISTS_SUBLINK:
+				case PG_EXISTS_SUBLINK:
 					*name = "exists";
 					return 2;
-				case duckdb_libpgquery::PG_ARRAY_SUBLINK:
+				case PG_ARRAY_SUBLINK:
 					*name = "array";
 					return 2;
-				case duckdb_libpgquery::PG_EXPR_SUBLINK:
+				case PG_EXPR_SUBLINK:
 					{
 						/* Get column name of the subquery's single target */
-						duckdb_libpgquery::PGSubLink    *sublink = (duckdb_libpgquery::PGSubLink *) node;
-						duckdb_libpgquery::PGQuery	   *query = (duckdb_libpgquery::PGQuery *) sublink->subselect;
+						PGSubLink    *sublink = (PGSubLink *) node;
+						PGQuery	   *query = (PGQuery *) sublink->subselect;
 
 						/*
 						 * The subquery has probably already been transformed,
@@ -504,9 +506,9 @@ int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name)
 						 * transformSubLink is lazy and modifies the SubLink
 						 * node in-place.)
 						 */
-						if (IsA(query, duckdb_libpgquery::PGQuery))
+						if (IsA(query, PGQuery))
 						{
-							duckdb_libpgquery::PGTargetEntry *te = (duckdb_libpgquery::PGTargetEntry *) linitial(query->targetList);
+							PGTargetEntry *te = (PGTargetEntry *) linitial(query->targetList);
 
 							if (te->resname)
 							{
@@ -518,17 +520,17 @@ int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name)
 					break;
 
 					/* As with other operator-like nodes, these have no names */
-				case duckdb_libpgquery::PG_ALL_SUBLINK:
-				case duckdb_libpgquery::PG_ANY_SUBLINK:
-				case duckdb_libpgquery::PG_ROWCOMPARE_SUBLINK:
-				case duckdb_libpgquery::PG_CTE_SUBLINK:
-				case duckdb_libpgquery::PG_INITPLAN_FUNC_SUBLINK:
-				case duckdb_libpgquery::PG_NOT_EXISTS_SUBLINK:
+				case PG_ALL_SUBLINK:
+				case PG_ANY_SUBLINK:
+				case PG_ROWCOMPARE_SUBLINK:
+				case PG_CTE_SUBLINK:
+				case PG_INITPLAN_FUNC_SUBLINK:
+				case PG_NOT_EXISTS_SUBLINK:
 					break;
 			}
 			break;
-		case duckdb_libpgquery::T_PGCaseExpr:
-			strength = FigureColnameInternal((duckdb_libpgquery::PGNode *) ((duckdb_libpgquery::PGCaseExpr *) node)->defresult,
+		case T_PGCaseExpr:
+			strength = FigureColnameInternal((PGNode *) ((PGCaseExpr *) node)->defresult,
 											 name);
 			if (strength <= 1)
 			{
@@ -536,31 +538,31 @@ int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name)
 				return 1;
 			}
 			break;
-		case duckdb_libpgquery::T_PGAArrayExpr:
+		case T_PGAArrayExpr:
 			/* make ARRAY[] act like a function */
 			*name = "array";
 			return 2;
-		case duckdb_libpgquery::T_PGRowExpr:
+		case T_PGRowExpr:
 			/* make ROW() act like a function */
 			*name = "row";
 			return 2;
-		case duckdb_libpgquery::T_PGCoalesceExpr:
+		case T_PGCoalesceExpr:
 			/* make coalesce() act like a regular function */
 			*name = "coalesce";
 			return 2;
-		case duckdb_libpgquery::T_PGMinMaxExpr:
+		case T_PGMinMaxExpr:
 			/* make greatest/least act like a regular function */
-			switch (((duckdb_libpgquery::PGMinMaxExpr *) node)->op)
+			switch (((PGMinMaxExpr *) node)->op)
 			{
-				case duckdb_libpgquery::PG_IS_GREATEST:
+				case PG_IS_GREATEST:
 					*name = "greatest";
 					return 2;
-				case duckdb_libpgquery::PG_IS_LEAST:
+				case PG_IS_LEAST:
 					*name = "least";
 					return 2;
 			}
 			break;
-		case duckdb_libpgquery::T_PGXmlExpr:
+		case T_PGXmlExpr:
 			/* make SQL/XML functions act like a regular function */
 			switch (((XmlExpr *) node)->op)
 			{
@@ -590,10 +592,10 @@ int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name)
 					break;
 			}
 			break;
-		case duckdb_libpgquery::T_PGXmlSerialize:
+		case T_PGXmlSerialize:
 			*name = "xmlserialize";
 			return 2;
-		case duckdb_libpgquery::T_PGGroupingFunc:
+		case T_PGGroupingFunc:
 			*name = "grouping";
 			return 2;
 		default:

@@ -22,7 +22,7 @@ typedef enum CoercionPathType
 class CoerceParser
 {
 private:
-
+	RelationParser relation_parser;
 public:
 	explicit CoerceParser();
 
@@ -35,6 +35,29 @@ public:
 					  Oid *funcid);
 
     void fixup_unknown_vars_in_targetlist(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist);
+
+	void
+	fixup_unknown_vars_in_exprlist(PGParseState *pstate, duckdb_libpgquery::PGList *exprlist);
+
+	duckdb_libpgquery::PGVar *
+	coerce_unknown_var(PGParseState *pstate, duckdb_libpgquery::PGVar *var,
+                   Oid targetTypeId, int32 targetTypeMod,
+			       duckdb_libpgquery::PGCoercionContext ccontext,
+				   duckdb_libpgquery::PGCoercionForm cformat,
+                   int levelsup);
+	
+	duckdb_libpgquery::PGNode *
+	coerce_type(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+			Oid inputTypeId, Oid targetTypeId, int32 targetTypeMod,
+			duckdb_libpgquery::PGCoercionContext ccontext, duckdb_libpgquery::PGCoercionForm cformat, int location);
+	
+	duckdb_libpgquery::PGNode *
+	coerce_to_boolean(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+				  const char *constructName);
+	
+	Oid select_common_type(PGParseState *pstate,
+		duckdb_libpgquery::PGList *exprs, const char *context,
+		duckdb_libpgquery::PGNode **which_expr);
 
 };
 

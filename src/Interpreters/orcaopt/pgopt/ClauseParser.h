@@ -24,7 +24,7 @@ public:
     duckdb_libpgquery::PGNode *
     transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::PGNode *n,
         duckdb_libpgquery::PGRangeTblEntry **top_rte, int *top_rti,
-        duckdb_libpgquery::PGList **namespace);
+        duckdb_libpgquery::PGList **namespace_ptr);
     
     duckdb_libpgquery::PGRangeTblEntry *
     transformCTEReference(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *r,
@@ -33,7 +33,7 @@ public:
     duckdb_libpgquery::PGRangeTblEntry *
     transformRangeSubselect(PGParseState *pstate, duckdb_libpgquery::PGRangeSubselect *r);
     
-    void setNamespaceLateralState(duckdb_libpgquery::PGList *namespace, bool lateral_only, bool lateral_ok);
+    void setNamespaceLateralState(duckdb_libpgquery::PGList *namespace_ptr, bool lateral_only, bool lateral_ok);
 
     duckdb_libpgquery::PGRangeTblEntry *
     transformTableEntry(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *r);
@@ -54,7 +54,7 @@ public:
 						 duckdb_libpgquery::PGList *leftVars, duckdb_libpgquery::PGList *rightVars);
     
     duckdb_libpgquery::PGNode *
-    transformJoinOnClause(PGParseState *pstate, duckdb_libpgquery::PGJoinExpr *j, duckdb_libpgquery::PGList *namespace);
+    transformJoinOnClause(PGParseState *pstate, duckdb_libpgquery::PGJoinExpr *j, duckdb_libpgquery::PGList *namespace_ptr);
 
     duckdb_libpgquery::PGNode *
     transformWhereClause(PGParseState *pstate, duckdb_libpgquery::PGNode *clause,
@@ -150,6 +150,13 @@ public:
     transformFrameOffset(PGParseState *pstate, int frameOptions, duckdb_libpgquery::PGNode *clause,
 					 duckdb_libpgquery::PGList *orderClause, duckdb_libpgquery::PGList *targetlist, bool isFollowing,
 					 int location);
+    
+    void extractRemainingColumns(duckdb_libpgquery::PGList *common_colnames,
+						duckdb_libpgquery::PGList *src_colnames, duckdb_libpgquery::PGList *src_colvars,
+						duckdb_libpgquery::PGList **res_colnames, duckdb_libpgquery::PGList **res_colvars);
+
+    void
+    setNamespaceColumnVisibility(duckdb_libpgquery::PGList *namespace_ptr, bool cols_visible);
 };
 
 }

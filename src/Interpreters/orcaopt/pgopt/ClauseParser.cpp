@@ -1,13 +1,15 @@
 #include <ClauseParser.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
 
-duckdb_libpgquery::PGRangeTblEntry *
-ClauseParser::transformCTEReference(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *r,
-					  duckdb_libpgquery::PGCommonTableExpr *cte, Index levelsup)
+PGRangeTblEntry *
+ClauseParser::transformCTEReference(PGParseState *pstate, PGRangeVar *r,
+					  PGCommonTableExpr *cte, Index levelsup)
 {
-	duckdb_libpgquery::PGRangeTblEntry *rte;
+	PGRangeTblEntry *rte;
 
 	rte = relation_parser.addRangeTableEntryForCTE(pstate, cte, levelsup, r, true);
 
@@ -15,11 +17,11 @@ ClauseParser::transformCTEReference(PGParseState *pstate, duckdb_libpgquery::PGR
 };
 
 void
-ClauseParser::setNamespaceLateralState(duckdb_libpgquery::PGList *namespace, bool lateral_only, bool lateral_ok)
+ClauseParser::setNamespaceLateralState(PGList *namespace_ptr, bool lateral_only, bool lateral_ok)
 {
-	duckdb_libpgquery::PGListCell   *lc;
+	PGListCell   *lc;
 
-	foreach(lc, namespace)
+	foreach(lc, namespace_ptr)
 	{
 		PGParseNamespaceItem *nsitem = (PGParseNamespaceItem *) lfirst(lc);
 
@@ -28,14 +30,17 @@ ClauseParser::setNamespaceLateralState(duckdb_libpgquery::PGList *namespace, boo
 	}
 };
 
-duckdb_libpgquery::PGRangeTblEntry *
-ClauseParser::transformTableEntry(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *r)
+PGRangeTblEntry *
+ClauseParser::transformTableEntry(PGParseState *pstate, PGRangeVar *r)
 {
-	duckdb_libpgquery::PGRangeTblEntry *rte;
+	PGRangeTblEntry *rte;
 
 	/* We need only build a range table entry */
+	//rte = relation_parser.addRangeTableEntry(pstate, r, r->alias,
+							 //interpretInhOption(r->inhOpt), true);
+	
 	rte = relation_parser.addRangeTableEntry(pstate, r, r->alias,
-							 interpretInhOption(r->inhOpt), true);
+							 false, true);
 
 	return rte;
 };
@@ -56,9 +61,9 @@ bool ClauseParser::interpretInhOption(InhOption inhOpt)
 }
 
 void
-ClauseParser::transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGList *frmList)
+ClauseParser::transformFromClause(PGParseState *pstate, PGList *frmList)
 {
-	duckdb_libpgquery::PGListCell   *fl;
+	PGListCell   *fl;
 
 	/*
 	 * The grammar will have produced a list of RangeVars, RangeSubselects,
@@ -71,23 +76,23 @@ ClauseParser::transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGLis
 	 */
 	foreach(fl, frmList)
 	{
-		duckdb_libpgquery::PGNode	   *n = lfirst(fl);
-		duckdb_libpgquery::PGRangeTblEntry *rte = NULL;
+		PGNode *n = reinterpret_cast<PGNode*>(lfirst(fl));
+		PGRangeTblEntry *rte = NULL;
 		int			rtindex = 0;
-		duckdb_libpgquery::PGList * namespace = NULL;
+		PGList * namespace_ptr = NULL;
 
 		n = transformFromClauseItem(pstate, n,
 									&rte,
 									&rtindex,
-									&namespace);
+									&namespace_ptr);
 
-		relation_parser.checkNameSpaceConflicts(pstate, pstate->p_namespace, namespace);
+		relation_parser.checkNameSpaceConflicts(pstate, pstate->p_namespace, namespace_ptr);
 
 		/* Mark the new namespace items as visible only to LATERAL */
-		setNamespaceLateralState(namespace, true, true);
+		setNamespaceLateralState(namespace_ptr, true, true);
 
 		pstate->p_joinlist = lappend(pstate->p_joinlist, n);
-		pstate->p_namespace = list_concat(pstate->p_namespace, namespace);
+		pstate->p_namespace = list_concat(pstate->p_namespace, namespace_ptr);
 	}
 
 	/*
@@ -100,7 +105,7 @@ ClauseParser::transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGLis
 };
 
 PGParseNamespaceItem *
-ClauseParser::makeNamespaceItem(duckdb_libpgquery::PGRangeTblEntry *rte, bool rel_visible, bool cols_visible,
+ClauseParser::makeNamespaceItem(PGRangeTblEntry *rte, bool rel_visible, bool cols_visible,
 				  bool lateral_only, bool lateral_ok)
 {
 	PGParseNamespaceItem *nsitem;
@@ -115,11 +120,11 @@ ClauseParser::makeNamespaceItem(duckdb_libpgquery::PGRangeTblEntry *rte, bool re
 	return nsitem;
 }
 
-duckdb_libpgquery::PGRangeTblEntry *
-ClauseParser::transformRangeSubselect(PGParseState *pstate, duckdb_libpgquery::PGRangeSubselect *r)
+PGRangeTblEntry *
+ClauseParser::transformRangeSubselect(PGParseState *pstate, PGRangeSubselect *r)
 {
-	duckdb_libpgquery::PGQuery	   *query;
-	duckdb_libpgquery::PGRangeTblEntry *rte;
+	PGQuery	   *query;
+	PGRangeTblEntry *rte;
 
 	/*
 	 * We require user to supply an alias for a subselect, per SQL92. To relax
@@ -161,8 +166,8 @@ ClauseParser::transformRangeSubselect(PGParseState *pstate, duckdb_libpgquery::P
 	 * Check that we got something reasonable.  Many of these conditions are
 	 * impossible given restrictions of the grammar, but check 'em anyway.
 	 */
-	if (!IsA(query, duckdb_libpgquery::PGQuery) ||
-		query->commandType != duckdb_libpgquery::PG_CMD_SELECT ||
+	if (!IsA(query, PGQuery) ||
+		query->commandType != PG_CMD_SELECT ||
 		query->utilityStmt != NULL)
 		elog(ERROR, "unexpected non-SELECT command in subquery in FROM");
 
@@ -178,25 +183,65 @@ ClauseParser::transformRangeSubselect(PGParseState *pstate, duckdb_libpgquery::P
 	return rte;
 }
 
-duckdb_libpgquery::PGNode *
-ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::PGNode *n,
-        duckdb_libpgquery::PGRangeTblEntry **top_rte, int *top_rti,
-        duckdb_libpgquery::PGList **namespace)
+void
+ClauseParser::extractRemainingColumns(PGList *common_colnames,
+						PGList *src_colnames, PGList *src_colvars,
+						PGList **res_colnames, PGList **res_colvars)
 {
-    duckdb_libpgquery::PGNode *result;
+	PGList	   *new_colnames = NIL;
+	PGList	   *new_colvars = NIL;
+	PGListCell   *lnames,
+			   *lvars;
 
-	if (IsA(n, duckdb_libpgquery::PGRangeVar))
+	Assert(list_length(src_colnames) == list_length(src_colvars));
+
+	forboth(lnames, src_colnames, lvars, src_colvars)
+	{
+		char	   *colname = strVal(lfirst(lnames));
+		bool		match = false;
+		PGListCell   *cnames;
+
+		foreach(cnames, common_colnames)
+		{
+			char	   *ccolname = strVal(lfirst(cnames));
+
+			if (strcmp(colname, ccolname) == 0)
+			{
+				match = true;
+				break;
+			}
+		}
+
+		if (!match)
+		{
+			new_colnames = lappend(new_colnames, lfirst(lnames));
+			new_colvars = lappend(new_colvars, lfirst(lvars));
+		}
+	}
+
+	*res_colnames = new_colnames;
+	*res_colvars = new_colvars;
+}
+
+PGNode *
+ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
+        PGRangeTblEntry **top_rte, int *top_rti,
+        PGList **namespace_ptr)
+{
+    PGNode *result;
+
+	if (IsA(n, PGRangeVar))
 	{
 		/* Plain relation reference, or perhaps a CTE reference */
-		duckdb_libpgquery::PGRangeVar   *rv = (duckdb_libpgquery::PGRangeVar *) n;
-		duckdb_libpgquery::PGRangeTblRef *rtr;
-		duckdb_libpgquery::PGRangeTblEntry *rte = NULL;
+		PGRangeVar   *rv = (PGRangeVar *) n;
+		PGRangeTblRef *rtr;
+		PGRangeTblEntry *rte = NULL;
 		int			rtindex;
 
 		/* if it is an unqualified name, it might be a CTE reference */
 		if (!rv->schemaname)
 		{
-			duckdb_libpgquery::PGCommonTableExpr *cte;
+			PGCommonTableExpr *cte;
 			unsigned int levelsup;
 
 			cte = relation_parser.scanNameSpaceForCTE(pstate, rv->relname, &levelsup);
@@ -213,56 +258,56 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 		Assert(rte == rt_fetch(rtindex, pstate->p_rtable));
 		*top_rte = rte;
 		*top_rti = rtindex;
-		*namespace = list_make1(makeNamespaceItem(rte));
-		rtr = makeNode(duckdb_libpgquery::PGRangeTblRef);
+		*namespace_ptr = list_make1(makeNamespaceItem(rte));
+		rtr = makeNode(PGRangeTblRef);
 		rtr->rtindex = rtindex;
-		result = (duckdb_libpgquery::PGNode *) rtr;
+		result = (PGNode *) rtr;
 	}
-	else if (IsA(n, duckdb_libpgquery::PGRangeSubselect))
+	else if (IsA(n, PGRangeSubselect))
 	{
 		/* sub-SELECT is like a plain relation */
-		duckdb_libpgquery::PGRangeTblRef *rtr;
-		duckdb_libpgquery::PGRangeTblEntry *rte;
+		PGRangeTblRef *rtr;
+		PGRangeTblEntry *rte;
 		int			rtindex;
 
-		rte = transformRangeSubselect(pstate, (duckdb_libpgquery::PGRangeSubselect *) n);
+		rte = transformRangeSubselect(pstate, (PGRangeSubselect *) n);
 		/* assume new rte is at end */
 		rtindex = list_length(pstate->p_rtable);
 		Assert(rte == rt_fetch(rtindex, pstate->p_rtable));
 		*top_rte = rte;
 		*top_rti = rtindex;
-		*namespace = list_make1(makeNamespaceItem(rte));
-		rtr = makeNode(duckdb_libpgquery::PGRangeTblRef);
+		*namespace_ptr = list_make1(makeNamespaceItem(rte));
+		rtr = makeNode(PGRangeTblRef);
 		rtr->rtindex = rtindex;
-		result = (duckdb_libpgquery::PGNode *) rtr;
+		result = (PGNode *) rtr;
 	}
-	// else if (IsA(n, duckdb_libpgquery::PGRangeFunction))
+	// else if (IsA(n, PGRangeFunction))
 	// {
 	// 	/* function is like a plain relation */
-	// 	duckdb_libpgquery::PGRangeTblRef *rtr;
-	// 	duckdb_libpgquery::PGRangeTblEntry *rte;
+	// 	PGRangeTblRef *rtr;
+	// 	PGRangeTblEntry *rte;
 	// 	int			rtindex;
 
-	// 	rte = transformRangeFunction(pstate, (duckdb_libpgquery::PGRangeFunction *) n);
+	// 	rte = transformRangeFunction(pstate, (PGRangeFunction *) n);
 	// 	/* assume new rte is at end */
 	// 	rtindex = list_length(pstate->p_rtable);
 	// 	Assert(rte == rt_fetch(rtindex, pstate->p_rtable));
 	// 	*top_rte = rte;
 	// 	*top_rti = rtindex;
 	// 	*namespace = list_make1(makeNamespaceItem(rte));
-	// 	rtr = makeNode(duckdb_libpgquery::PGRangeTblRef);
+	// 	rtr = makeNode(PGRangeTblRef);
 	// 	rtr->rtindex = rtindex;
-	// 	result = (duckdb_libpgquery::PGNode *) rtr;
+	// 	result = (PGNode *) rtr;
 	// }
-	else if (IsA(n, duckdb_libpgquery::PGJoinExpr))
+	else if (IsA(n, PGJoinExpr))
 	{
 		/* A newfangled join expression */
-		duckdb_libpgquery::PGJoinExpr   *j = (duckdb_libpgquery::PGJoinExpr *) n;
-		duckdb_libpgquery::PGRangeTblEntry *l_rte;
-		duckdb_libpgquery::PGRangeTblEntry *r_rte;
+		PGJoinExpr   *j = (PGJoinExpr *) n;
+		PGRangeTblEntry *l_rte;
+		PGRangeTblEntry *r_rte;
 		int			l_rtindex;
 		int			r_rtindex;
-		duckdb_libpgquery::PGList	   *l_namespace,
+		PGList	   *l_namespace,
 				   *r_namespace,
 				   *my_namespace,
 				   *l_colnames,
@@ -273,7 +318,7 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 				   *res_colvars;
 		bool		lateral_ok;
 		int			sv_namespace_length;
-		duckdb_libpgquery::PGRangeTblEntry *rte;
+		PGRangeTblEntry *rte;
 		int			k;
 
 		/*
@@ -300,7 +345,7 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 		 * NB: this coding relies on the fact that list_concat is not
 		 * destructive to its second argument.
 		 */
-		lateral_ok = (j->jointype == duckdb_libpgquery::PGJoinType::PG_JOIN_INNER || j->jointype == duckdb_libpgquery::PGJoinType::PG_JOIN_LEFT);
+		lateral_ok = (j->jointype == PGJoinType::PG_JOIN_INNER || j->jointype == PGJoinType::PG_JOIN_LEFT);
 		setNamespaceLateralState(l_namespace, true, lateral_ok);
 
 		sv_namespace_length = list_length(pstate->p_namespace);
@@ -349,8 +394,8 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 		 */
 		if (j->isNatural)
 		{
-			duckdb_libpgquery::PGList	   *rlist = NIL;
-			duckdb_libpgquery::PGListCell   *lx,
+			PGList	   *rlist = NIL;
+			PGListCell   *lx,
 					   *rx;
 
 			Assert(j->usingClause == NIL);		/* shouldn't have USING() too */
@@ -358,15 +403,15 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 			foreach(lx, l_colnames)
 			{
 				char	   *l_colname = strVal(lfirst(lx));
-				duckdb_libpgquery::PGValue	   *m_name = NULL;
+				PGValue	   *m_name = NULL;
 
 				foreach(rx, r_colnames)
 				{
 					char	   *r_colname = strVal(lfirst(rx));
 
-					if (strcmp(l_colname, r_colname) == 0)
+					if (std::strcmp(l_colname, r_colname) == 0)
 					{
-						m_name = duckdb_libpgquery::makeString(l_colname);
+						m_name = makeString(l_colname);
 						break;
 					}
 				}
@@ -392,21 +437,21 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 			 * the list into an explicit ON-condition, and generate a list of
 			 * merged result columns.
 			 */
-			duckdb_libpgquery::PGList	   *ucols = j->usingClause;
-			duckdb_libpgquery::PGList	   *l_usingvars = NIL;
-			duckdb_libpgquery::PGList	   *r_usingvars = NIL;
-			duckdb_libpgquery::PGListCell   *ucol;
+			PGList	   *ucols = j->usingClause;
+			PGList	   *l_usingvars = NIL;
+			PGList	   *r_usingvars = NIL;
+			PGListCell   *ucol;
 
 			Assert(j->quals == NULL);	/* shouldn't have ON() too */
 
 			foreach(ucol, ucols)
 			{
 				char	   *u_colname = strVal(lfirst(ucol));
-				duckdb_libpgquery::PGListCell   *col;
+				PGListCell   *col;
 				int			ndx;
 				int			l_index = -1;
 				int			r_index = -1;
-				duckdb_libpgquery::PGVar		   *l_colvar,
+				PGVar		   *l_colvar,
 						   *r_colvar;
 
 				/* Check for USING(foo,foo) */
@@ -467,9 +512,9 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 							 errmsg("column \"%s\" specified in USING clause does not exist in right table",
 									u_colname)));
 
-				l_colvar = list_nth(l_colvars, l_index);
+				l_colvar = reinterpret_cast<PGVar*>(list_nth(l_colvars, l_index));
 				l_usingvars = lappend(l_usingvars, l_colvar);
-				r_colvar = list_nth(r_colvars, r_index);
+				r_colvar = reinterpret_cast<PGVar*>(list_nth(r_colvars, r_index));
 				r_usingvars = lappend(r_usingvars, r_colvar);
 
 				res_colnames = lappend(res_colnames, lfirst(ucol));
@@ -526,7 +571,7 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 		/*
 		 * Now build an RTE for the result of the join
 		 */
-		rte = addRangeTableEntryForJoin(pstate,
+		rte = relation_parser.addRangeTableEntryForJoin(pstate,
 										res_colnames,
 										j->jointype,
 										res_colvars,
@@ -566,14 +611,14 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 		 * The join RTE itself is always made visible for unqualified column
 		 * names.  It's visible as a relation name only if it has an alias.
 		 */
-		*namespace = lappend(my_namespace,
+		*namespace_ptr = lappend(my_namespace,
 							 makeNamespaceItem(rte,
 											   (j->alias != NULL),
 											   true,
 											   false,
 											   true));
 
-		result = (duckdb_libpgquery::PGNode *) j;
+		result = (PGNode *) j;
 	}
 	else
     {
@@ -584,13 +629,26 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::P
 	return result;
 };
 
-duckdb_libpgquery::PGNode *
-ClauseParser::transformJoinUsingClause(PGParseState *pstate,
-						 duckdb_libpgquery::PGRangeTblEntry *leftRTE, duckdb_libpgquery::PGRangeTblEntry *rightRTE,
-						 duckdb_libpgquery::PGList *leftVars, duckdb_libpgquery::PGList *rightVars)
+void
+ClauseParser::setNamespaceColumnVisibility(PGList *namespace_ptr, bool cols_visible)
 {
-	duckdb_libpgquery::PGNode	   *result = NULL;
-	duckdb_libpgquery::PGListCell   *lvars,
+	PGListCell   *lc;
+
+	foreach(lc, namespace_ptr)
+	{
+		PGParseNamespaceItem *nsitem = (PGParseNamespaceItem *) lfirst(lc);
+
+		nsitem->p_cols_visible = cols_visible;
+	}
+};
+
+PGNode *
+ClauseParser::transformJoinUsingClause(PGParseState *pstate,
+						 PGRangeTblEntry *leftRTE, PGRangeTblEntry *rightRTE,
+						 PGList *leftVars, PGList *rightVars)
+{
+	PGNode	   *result = NULL;
+	PGListCell   *lvars,
 			   *rvars;
 
 	/*
@@ -602,29 +660,29 @@ ClauseParser::transformJoinUsingClause(PGParseState *pstate,
 	 */
 	forboth(lvars, leftVars, rvars, rightVars)
 	{
-		duckdb_libpgquery::PGVar		   *lvar = (duckdb_libpgquery::PGVar *) lfirst(lvars);
-		duckdb_libpgquery::PGVar		   *rvar = (duckdb_libpgquery::PGVar *) lfirst(rvars);
-		duckdb_libpgquery::PGAExpr	   *e;
+		PGVar		   *lvar = (PGVar *) lfirst(lvars);
+		PGVar		   *rvar = (PGVar *) lfirst(rvars);
+		PGAExpr	   *e;
 
 		/* Require read access to the join variables */
 		relation_parser.markVarForSelectPriv(pstate, lvar, leftRTE);
 		relation_parser.markVarForSelectPriv(pstate, rvar, rightRTE);
 
 		/* Now create the lvar = rvar join condition */
-		e = duckdb_libpgquery::makeSimpleAExpr(duckdb_libpgquery::PG_AEXPR_OP, "=",
-							 reinterpret_cast<duckdb_libpgquery::PGNode *>(duckdb_libpgquery::copyObject((void*)lvar)),
-							 reinterpret_cast<duckdb_libpgquery::PGNode *>(duckdb_libpgquery::copyObject((void*)rvar)),
+		e = makeSimpleAExpr(PG_AEXPR_OP, "=",
+							 reinterpret_cast<PGNode *>(copyObject((void*)lvar)),
+							 reinterpret_cast<PGNode *>(copyObject((void*)rvar)),
 							 -1);
 
 		/* And combine into an AND clause, if multiple join columns */
 		if (result == NULL)
-			result = (duckdb_libpgquery::PGNode *) e;
+			result = (PGNode *) e;
 		else
 		{
-			duckdb_libpgquery::PGAExpr	   *a;
+			PGAExpr	   *a;
 
-			a = duckdb_libpgquery::makeAExpr(duckdb_libpgquery::PG_AEXPR_AND, NIL, result, (duckdb_libpgquery::PGNode *) e, -1);
-			result = (duckdb_libpgquery::PGNode *) a;
+			a = makeAExpr(PG_AEXPR_AND, NIL, result, (PGNode *) e, -1);
+			result = (PGNode *) a;
 		}
 	}
 
@@ -641,11 +699,11 @@ ClauseParser::transformJoinUsingClause(PGParseState *pstate,
 	return result;
 };
 
-duckdb_libpgquery::PGNode *
-ClauseParser::transformJoinOnClause(PGParseState *pstate, duckdb_libpgquery::PGJoinExpr *j, duckdb_libpgquery::PGList *namespace)
+PGNode *
+ClauseParser::transformJoinOnClause(PGParseState *pstate, PGJoinExpr *j, PGList *namespace_ptr)
 {
-	duckdb_libpgquery::PGNode	   *result;
-	duckdb_libpgquery::PGList	   *save_namespace;
+	PGNode	   *result;
+	PGList	   *save_namespace;
 
 	/*
 	 * The namespace that the join expression should see is just the two
@@ -655,10 +713,10 @@ ClauseParser::transformJoinOnClause(PGParseState *pstate, duckdb_libpgquery::PGJ
 	 * already did.)  All namespace items are marked visible regardless of
 	 * LATERAL state.
 	 */
-	setNamespaceLateralState(namespace, false, true);
+	setNamespaceLateralState(namespace_ptr, false, true);
 
 	save_namespace = pstate->p_namespace;
-	pstate->p_namespace = namespace;
+	pstate->p_namespace = namespace_ptr;
 
 	result = transformWhereClause(pstate, j->quals,
 								  EXPR_KIND_JOIN_ON, "JOIN/ON");
@@ -668,11 +726,11 @@ ClauseParser::transformJoinOnClause(PGParseState *pstate, duckdb_libpgquery::PGJ
 	return result;
 };
 
-duckdb_libpgquery::PGNode *
-ClauseParser::transformWhereClause(PGParseState *pstate, duckdb_libpgquery::PGNode *clause,
+PGNode *
+ClauseParser::transformWhereClause(PGParseState *pstate, PGNode *clause,
 					 PGParseExprKind exprKind, const char *constructName)
 {
-	duckdb_libpgquery::PGNode	   *qual;
+	PGNode	   *qual;
 
 	if (clause == NULL)
 		return NULL;
@@ -684,13 +742,13 @@ ClauseParser::transformWhereClause(PGParseState *pstate, duckdb_libpgquery::PGNo
 	return qual;
 };
 
-duckdb_libpgquery::PGNode *
-ClauseParser::buildMergedJoinVar(PGParseState *pstate, duckdb_libpgquery::PGJoinType jointype,
-				   duckdb_libpgquery::PGVar *l_colvar, duckdb_libpgquery::PGVar *r_colvar)
+PGNode *
+ClauseParser::buildMergedJoinVar(PGParseState *pstate, PGJoinType jointype,
+				   PGVar *l_colvar, PGVar *r_colvar)
 {
 	Oid			outcoltype;
 	int32		outcoltypmod;
-	duckdb_libpgquery::PGNode	   *l_node,
+	PGNode	   *l_node,
 			   *r_node,
 			   *res_node;
 
@@ -701,7 +759,7 @@ ClauseParser::buildMergedJoinVar(PGParseState *pstate, duckdb_libpgquery::PGJoin
 	outcoltypmod = l_colvar->vartypmod;
 	if (outcoltype != r_colvar->vartype)
 	{
-		outcoltype = select_common_type(pstate,
+		outcoltype = coerce_parser.select_common_type(pstate,
 										list_make2(l_colvar, r_colvar),
 										"JOIN/USING",
 										NULL);
@@ -720,67 +778,67 @@ ClauseParser::buildMergedJoinVar(PGParseState *pstate, duckdb_libpgquery::PGJoin
 	 * not same as input.  We never need coerce_type_typmod.
 	 */
 	if (l_colvar->vartype != outcoltype)
-		l_node = coerce_type(pstate, (duckdb_libpgquery::PGNode *) l_colvar, l_colvar->vartype,
+		l_node = coerce_parser.coerce_type(pstate, (PGNode *) l_colvar, l_colvar->vartype,
 							 outcoltype, outcoltypmod,
-							 duckdb_libpgquery::PG_COERCION_IMPLICIT, duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST, -1);
+							 PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 	else if (l_colvar->vartypmod != outcoltypmod)
-		l_node = (duckdb_libpgquery::PGNode *) makeRelabelType((duckdb_libpgquery::PGExpr *) l_colvar,
+		l_node = (PGNode *) makeRelabelType((PGExpr *) l_colvar,
 										  outcoltype, outcoltypmod,
 										  InvalidOid,	/* fixed below */
-										  duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST);
+										  PG_COERCE_IMPLICIT_CAST);
 	else
-		l_node = (duckdb_libpgquery::PGNode *) l_colvar;
+		l_node = (PGNode *) l_colvar;
 
 	if (r_colvar->vartype != outcoltype)
-		r_node = coerce_type(pstate, (duckdb_libpgquery::PGNode *) r_colvar, r_colvar->vartype,
+		r_node = coerce_parser.coerce_type(pstate, (PGNode *) r_colvar, r_colvar->vartype,
 							 outcoltype, outcoltypmod,
-							 duckdb_libpgquery::PG_COERCION_IMPLICIT, duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST, -1);
+							 PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 	else if (r_colvar->vartypmod != outcoltypmod)
-		r_node = (duckdb_libpgquery::PGNode *) makeRelabelType((duckdb_libpgquery::PGExpr *) r_colvar,
+		r_node = (PGNode *) makeRelabelType((PGExpr *) r_colvar,
 										  outcoltype, outcoltypmod,
 										  InvalidOid,	/* fixed below */
-										  duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST);
+										  PG_COERCE_IMPLICIT_CAST);
 	else
-		r_node = (duckdb_libpgquery::PGNode *) r_colvar;
+		r_node = (PGNode *) r_colvar;
 
 	/*
 	 * Choose what to emit
 	 */
 	switch (jointype)
 	{
-		case duckdb_libpgquery::PG_JOIN_INNER:
+		case PG_JOIN_INNER:
 
 			/*
 			 * We can use either var; prefer non-coerced one if available.
 			 */
-			if (IsA(l_node, duckdb_libpgquery::PGVar))
+			if (IsA(l_node, PGVar))
 				res_node = l_node;
-			else if (IsA(r_node, duckdb_libpgquery::PGVar))
+			else if (IsA(r_node, PGVar))
 				res_node = r_node;
 			else
 				res_node = l_node;
 			break;
-		case duckdb_libpgquery::PG_JOIN_LEFT:
+		case PG_JOIN_LEFT:
 			/* Always use left var */
 			res_node = l_node;
 			break;
-		case duckdb_libpgquery::PG_JOIN_RIGHT:
+		case PG_JOIN_RIGHT:
 			/* Always use right var */
 			res_node = r_node;
 			break;
-		case duckdb_libpgquery::PG_JOIN_FULL:
+		case PG_JOIN_FULL:
 			{
 				/*
 				 * Here we must build a COALESCE expression to ensure that the
 				 * join output is non-null if either input is.
 				 */
-				duckdb_libpgquery::PGCoalesceExpr *c = makeNode(duckdb_libpgquery::PGCoalesceExpr);
+				PGCoalesceExpr *c = makeNode(PGCoalesceExpr);
 
 				c->coalescetype = outcoltype;
 				/* coalescecollid will get set below */
 				c->args = list_make2(l_node, r_node);
 				c->location = -1;
-				res_node = (duckdb_libpgquery::PGNode *) c;
+				res_node = (PGNode *) c;
 				break;
 			}
 		default:
@@ -799,21 +857,21 @@ ClauseParser::buildMergedJoinVar(PGParseState *pstate, duckdb_libpgquery::PGJoin
 	return res_node;
 };
 
-duckdb_libpgquery::PGList *
+PGList *
 ClauseParser::transformSortClause(PGParseState *pstate,
-					duckdb_libpgquery::PGList *orderlist,
-					duckdb_libpgquery::PGList **targetlist,
+					PGList *orderlist,
+					PGList **targetlist,
 					PGParseExprKind exprKind,
 					bool resolveUnknown,
 					bool useSQL99)
 {
-	duckdb_libpgquery::PGList	   *sortlist = NIL;
-	duckdb_libpgquery::PGListCell   *olitem;
+	PGList	   *sortlist = NIL;
+	PGListCell   *olitem;
 
 	foreach(olitem, orderlist)
 	{
-		duckdb_libpgquery::PGSortBy	   *sortby = (duckdb_libpgquery::PGSortBy *) lfirst(olitem);
-		duckdb_libpgquery::PGTargetEntry *tle;
+		PGSortBy	   *sortby = (PGSortBy *) lfirst(olitem);
+		PGTargetEntry *tle;
 
 		if (useSQL99)
 			tle = findTargetlistEntrySQL99(pstate, sortby->node,
@@ -830,13 +888,13 @@ ClauseParser::transformSortClause(PGParseState *pstate,
 	return sortlist;
 };
 
-duckdb_libpgquery::PGTargetEntry *
-ClauseParser::findTargetlistEntrySQL99(PGParseState *pstate, duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList **tlist,
+PGTargetEntry *
+ClauseParser::findTargetlistEntrySQL99(PGParseState *pstate, PGNode *node, PGList **tlist,
 						 PGParseExprKind exprKind)
 {
-	duckdb_libpgquery::PGTargetEntry *target_result;
-	duckdb_libpgquery::PGListCell   *tl;
-	duckdb_libpgquery::PGNode	   *expr;
+	PGTargetEntry *target_result;
+	PGListCell   *tl;
+	PGNode	   *expr;
 
 	/*
 	 * Convert the untransformed node to a transformed expression, and search
@@ -849,8 +907,8 @@ ClauseParser::findTargetlistEntrySQL99(PGParseState *pstate, duckdb_libpgquery::
 
 	foreach(tl, *tlist)
 	{
-		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(tl);
-		duckdb_libpgquery::PGNode	   *texpr;
+		PGTargetEntry *tle = (PGTargetEntry *) lfirst(tl);
+		PGNode	   *texpr;
 
 		/*
 		 * Ignore any implicit cast on the existing tlist expression.
@@ -861,7 +919,7 @@ ClauseParser::findTargetlistEntrySQL99(PGParseState *pstate, duckdb_libpgquery::
 		 * tlist at this stage, but the case does arise with ORDER BY in an
 		 * aggregate function.
 		 */
-		texpr = strip_implicit_coercions((duckdb_libpgquery::PGNode *) tle->expr);
+		texpr = strip_implicit_coercions((PGNode *) tle->expr);
 
 		if (equal(expr, texpr))
 			return tle;
@@ -880,11 +938,11 @@ ClauseParser::findTargetlistEntrySQL99(PGParseState *pstate, duckdb_libpgquery::
 	return target_result;
 };
 
-duckdb_libpgquery::PGTargetEntry *
-ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList **tlist,
+PGTargetEntry *
+ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGList **tlist,
 						 PGParseExprKind exprKind)
 {
-	duckdb_libpgquery::PGListCell   *tl;
+	PGListCell   *tl;
 
 	/*----------
 	 * Handle two special cases as mandated by the SQL92 spec:
@@ -924,12 +982,12 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::
 	 * an expression per SQL99.
 	 *----------
 	 */
-	if (IsA(node, duckdb_libpgquery::PGColumnRef) &&
-		list_length(((duckdb_libpgquery::PGColumnRef *) node)->fields) == 1 &&
-		IsA(linitial(((duckdb_libpgquery::PGColumnRef *) node)->fields), String))
+	if (IsA(node, PGColumnRef) &&
+		list_length(((PGColumnRef *) node)->fields) == 1 &&
+		IsA(linitial(((PGColumnRef *) node)->fields), String))
 	{
-		char	   *name = strVal(linitial(((duckdb_libpgquery::PGColumnRef *) node)->fields));
-		int			location = ((duckdb_libpgquery::PGColumnRef *) node)->location;
+		char	   *name = strVal(linitial(((PGColumnRef *) node)->fields));
+		int			location = ((PGColumnRef *) node)->location;
 
 		if (exprKind == EXPR_KIND_GROUP_BY)
 		{
@@ -955,11 +1013,11 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::
 
 		if (name != NULL)
 		{
-			duckdb_libpgquery::PGTargetEntry *target_result = NULL;
+			PGTargetEntry *target_result = NULL;
 
 			foreach(tl, *tlist)
 			{
-				duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(tl);
+				PGTargetEntry *tle = (PGTargetEntry *) lfirst(tl);
 
 				if (!tle->resjunk &&
 					strcmp(tle->resname, name) == 0)
@@ -990,10 +1048,10 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::
 			}
 		}
 	}
-	if (IsA(node, duckdb_libpgquery::PGAConst))
+	if (IsA(node, PGAConst))
 	{
-		duckdb_libpgquery::PGValue	   *val = &((duckdb_libpgquery::PGAConst *) node)->val;
-		int			location = ((duckdb_libpgquery::PGAConst *) node)->location;
+		PGValue	   *val = &((PGAConst *) node)->val;
+		int			location = ((PGAConst *) node)->location;
 		int			targetlist_pos = 0;
 		int			target_pos;
 
@@ -1008,7 +1066,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::
 		target_pos = intVal(val);
 		foreach(tl, *tlist)
 		{
-			duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(tl);
+			PGTargetEntry *tle = (PGTargetEntry *) lfirst(tl);
 
 			if (!tle->resjunk)
 			{
@@ -1035,7 +1093,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::
 };
 
 void
-ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
+ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle,
 						  PGParseExprKind exprKind)
 {
 	switch (exprKind)
@@ -1043,23 +1101,23 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery:
 		case EXPR_KIND_GROUP_BY:
 			/* reject aggregates and window functions */
 			if (pstate->p_hasAggs &&
-				contain_aggs_of_level((duckdb_libpgquery::PGNode *) tle->expr, 0))
+				contain_aggs_of_level((PGNode *) tle->expr, 0))
 				ereport(ERROR,
 						(errcode(ERRCODE_GROUPING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("aggregate functions are not allowed in %s",
 								ParseExprKindName(exprKind)),
 						 parser_errposition(pstate,
-							   locate_agg_of_level((duckdb_libpgquery::PGNode *) tle->expr, 0))));
+							   locate_agg_of_level((PGNode *) tle->expr, 0))));
 			if (pstate->p_hasWindowFuncs &&
-				contain_windowfuncs((duckdb_libpgquery::PGNode *) tle->expr))
+				contain_windowfuncs((PGNode *) tle->expr))
 				ereport(ERROR,
 						(errcode(ERRCODE_WINDOWING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("window functions are not allowed in %s",
 								ParseExprKindName(exprKind)),
 						 parser_errposition(pstate,
-									locate_windowfunc((duckdb_libpgquery::PGNode *) tle->expr))));
+									locate_windowfunc((PGNode *) tle->expr))));
 			break;
 		case EXPR_KIND_ORDER_BY:
 			/* no extra checks needed */
@@ -1073,12 +1131,12 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery:
 	}
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::addTargetToSortList(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
-					duckdb_libpgquery::PGList *sortlist, duckdb_libpgquery::PGList *targetlist, duckdb_libpgquery::PGSortBy *sortby,
+PGList *
+ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
+					PGList *sortlist, PGList *targetlist, PGSortBy *sortby,
 					bool resolveUnknown)
 {
-	Oid			restype = duckdb_libpgquery::exprType((duckdb_libpgquery::PGNode *) tle->expr);
+	Oid			restype = exprType((PGNode *) tle->expr);
 	Oid			sortop;
 	Oid			eqop;
 	bool		hashable;
@@ -1089,11 +1147,11 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, duckdb_libpgquery::PGTar
 	/* if tlist item is an UNKNOWN literal, change it to TEXT */
 	if (restype == UNKNOWNOID && resolveUnknown)
 	{
-		tle->expr = (duckdb_libpgquery::PGExpr *) coerce_type(pstate, (duckdb_libpgquery::PGNode *) tle->expr,
+		tle->expr = (PGExpr *) coerce_type(pstate, (PGNode *) tle->expr,
 										 restype, TEXTOID, -1,
-										 duckdb_libpgquery::PG_COERCION_IMPLICIT,
-										 duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST,
-										 exprLocation((duckdb_libpgquery::PGNode *) tle->expr));
+										 PG_COERCION_IMPLICIT,
+										 PG_COERCE_IMPLICIT_CAST,
+										 exprLocation((PGNode *) tle->expr));
 		restype = TEXTOID;
 	}
 
@@ -1113,22 +1171,22 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, duckdb_libpgquery::PGTar
 	/* determine the sortop, eqop, and directionality */
 	switch (sortby->sortby_dir)
 	{
-		case duckdb_libpgquery::PG_SORTBY_DEFAULT:
-		case duckdb_libpgquery::PG_SORTBY_ASC:
+		case PG_SORTBY_DEFAULT:
+		case PG_SORTBY_ASC:
 			get_sort_group_operators(restype,
 									 true, true, false,
 									 &sortop, &eqop, NULL,
 									 &hashable);
 			reverse = false;
 			break;
-		case duckdb_libpgquery::PG_SORTBY_DESC:
+		case PG_SORTBY_DESC:
 			get_sort_group_operators(restype,
 									 false, true, true,
 									 NULL, &eqop, &sortop,
 									 &hashable);
 			reverse = true;
 			break;
-		case duckdb_libpgquery::PG_SORTBY_USING:
+		case PG_SORTBY_USING:
 			Assert(sortby->useOp != NIL);
 			sortop = compatible_oper_opid(sortby->useOp,
 										  restype,
@@ -1167,7 +1225,7 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, duckdb_libpgquery::PGTar
 	/* avoid making duplicate sortlist entries */
 	if (!targetIsInSortList(tle, sortop, sortlist))
 	{
-		duckdb_libpgquery::PGSortGroupClause *sortcl = makeNode(duckdb_libpgquery::PGSortGroupClause);
+		PGSortGroupClause *sortcl = makeNode(PGSortGroupClause);
 
 		sortcl->tleSortGroupRef = assignSortGroupRef(tle, targetlist);
 
@@ -1177,14 +1235,14 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, duckdb_libpgquery::PGTar
 
 		switch (sortby->sortby_nulls)
 		{
-			case duckdb_libpgquery::PG_SORTBY_NULLS_DEFAULT:
+			case PG_SORTBY_NULLS_DEFAULT:
 				/* NULLS FIRST is default for DESC; other way for ASC */
 				sortcl->nulls_first = reverse;
 				break;
-			case duckdb_libpgquery::PG_SORTBY_NULLS_FIRST:
+			case PG_SORTBY_NULLS_FIRST:
 				sortcl->nulls_first = true;
 				break;
-			case duckdb_libpgquery::PG_SORTBY_NULLS_LAST:
+			case PG_SORTBY_NULLS_LAST:
 				sortcl->nulls_first = false;
 				break;
 			default:
@@ -1200,10 +1258,10 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, duckdb_libpgquery::PGTar
 };
 
 bool
-ClauseParser::targetIsInSortList(duckdb_libpgquery::PGTargetEntry *tle, Oid sortop, duckdb_libpgquery::PGList *sortgroupList)
+ClauseParser::targetIsInSortList(PGTargetEntry *tle, Oid sortop, PGList *sortgroupList)
 {
 	Index		ref = tle->ressortgroupref;
-	duckdb_libpgquery::PGListCell   *l;
+	PGListCell   *l;
 
 	/* no need to scan list if tle has no marker */
 	if (ref == 0)
@@ -1211,15 +1269,15 @@ ClauseParser::targetIsInSortList(duckdb_libpgquery::PGTargetEntry *tle, Oid sort
 
 	foreach(l, sortgroupList)
 	{
-		duckdb_libpgquery::PGNode *node = (duckdb_libpgquery::PGNode *) lfirst(l);
+		PGNode *node = (PGNode *) lfirst(l);
 
 		/* Skip the empty grouping set */
 		if (node == NULL)
 			continue;
 
-		if (IsA(node, duckdb_libpgquery::PGSortGroupClause))
+		if (IsA(node, PGSortGroupClause))
 		{
-			duckdb_libpgquery::PGSortGroupClause *scl = (duckdb_libpgquery::PGSortGroupClause *) node;
+			PGSortGroupClause *scl = (PGSortGroupClause *) node;
 
 			if (scl->tleSortGroupRef == ref &&
 				(sortop == InvalidOid ||
@@ -1232,10 +1290,10 @@ ClauseParser::targetIsInSortList(duckdb_libpgquery::PGTargetEntry *tle, Oid sort
 };
 
 Index
-ClauseParser::assignSortGroupRef(duckdb_libpgquery::PGTargetEntry *tle, duckdb_libpgquery::PGList *tlist)
+ClauseParser::assignSortGroupRef(PGTargetEntry *tle, PGList *tlist)
 {
 	Index		maxRef;
-	duckdb_libpgquery::PGListCell   *l;
+	PGListCell   *l;
 
 	if (tle->ressortgroupref)	/* already has one? */
 		return tle->ressortgroupref;
@@ -1244,7 +1302,7 @@ ClauseParser::assignSortGroupRef(duckdb_libpgquery::PGTargetEntry *tle, duckdb_l
 	maxRef = 0;
 	foreach(l, tlist)
 	{
-		Index		ref = ((duckdb_libpgquery::PGTargetEntry *) lfirst(l))->ressortgroupref;
+		Index		ref = ((PGTargetEntry *) lfirst(l))->ressortgroupref;
 
 		if (ref > maxRef)
 			maxRef = ref;
@@ -1253,41 +1311,41 @@ ClauseParser::assignSortGroupRef(duckdb_libpgquery::PGTargetEntry *tle, duckdb_l
 	return tle->ressortgroupref;
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGList *grouplist,
-					 duckdb_libpgquery::PGList **targetlist, duckdb_libpgquery::PGList *sortClause,
+PGList *
+ClauseParser::transformGroupClause(PGParseState *pstate, PGList *grouplist,
+					 PGList **targetlist, PGList *sortClause,
 					 PGParseExprKind exprKind, bool useSQL99)
 {
-	duckdb_libpgquery::PGList	   *result = NIL;
-	duckdb_libpgquery::PGList	   *tle_list = NIL;
-	duckdb_libpgquery::PGListCell   *l;
-	duckdb_libpgquery::PGList       *reorder_grouplist = NIL;
+	PGList	   *result = NIL;
+	PGList	   *tle_list = NIL;
+	PGListCell   *l;
+	PGList       *reorder_grouplist = NIL;
 
 	/* Preprocess the grouping clause, lookup TLEs */
 	foreach(l, grouplist)
 	{
-		duckdb_libpgquery::PGList        *tl;
-		duckdb_libpgquery::PGListCell    *tl_cell;
-		duckdb_libpgquery::PGTargetEntry *tle;
+		PGList        *tl;
+		PGListCell    *tl_cell;
+		PGTargetEntry *tle;
 		Oid			restype;
-		duckdb_libpgquery::PGNode        *node;
+		PGNode        *node;
 
-		node = (duckdb_libpgquery::PGNode*)lfirst(l);
+		node = (PGNode*)lfirst(l);
 		tl = findListTargetlistEntries(pstate, node, targetlist, false, false, 
                                        exprKind, useSQL99);
 
 		foreach(tl_cell, tl)
 		{
-			tle = (duckdb_libpgquery::PGTargetEntry*)lfirst(tl_cell);
+			tle = (PGTargetEntry*)lfirst(tl_cell);
 
 			/* if tlist item is an UNKNOWN literal, change it to TEXT */
-			restype = exprType((duckdb_libpgquery::PGNode *) tle->expr);
+			restype = exprType((PGNode *) tle->expr);
 
 			if (restype == UNKNOWNOID)
-				tle->expr = (duckdb_libpgquery::PGExpr *) coerce_type(pstate, (duckdb_libpgquery::PGNode *) tle->expr,
+				tle->expr = (PGExpr *) coerce_type(pstate, (PGNode *) tle->expr,
 												 restype, TEXTOID, -1,
-												 duckdb_libpgquery::PG_COERCION_IMPLICIT,
-												 duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST,
+												 PG_COERCION_IMPLICIT,
+												 PG_COERCE_IMPLICIT_CAST,
 												 -1);
 
 			/*
@@ -1296,14 +1354,14 @@ ClauseParser::transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGLi
 			 * GroupingClause or tle->expr is not a RowExpr.
 			 */
 			 if (node != NULL &&
-				 !IsA(node, duckdb_libpgquery::PGGroupingClause) &&
-				 !IsA(tle->expr, duckdb_libpgquery::PGRowExpr))
+				 !IsA(node, PGGroupingClause) &&
+				 !IsA(tle->expr, PGRowExpr))
 				 tle_list = lappend(tle_list, tle);
 		}
 	}
 
 	/* create first group clauses based on sort clauses */
-	duckdb_libpgquery::PGList *tle_list_remainder = NIL;
+	PGList *tle_list_remainder = NIL;
 	result = create_group_clause(tle_list,
 								*targetlist,
 								sortClause,
@@ -1329,12 +1387,12 @@ ClauseParser::transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGLi
 
 	foreach(l, reorder_grouplist)
 	{
-		duckdb_libpgquery::PGNode *node = (duckdb_libpgquery::PGNode*) lfirst(l);
+		PGNode *node = (PGNode*) lfirst(l);
 
 		if (node == NULL) /* the empty grouping set */
 			result = list_concat(result, list_make1(NIL));
 
-		// else if (IsA(node, duckdb_libpgquery::PGGroupingClause))
+		// else if (IsA(node, PGGroupingClause))
 		// {
 		// 	GroupingClause *tmp = make_grouping_clause(pstate,
 		// 											   (GroupingClause*)node,
@@ -1342,7 +1400,7 @@ ClauseParser::transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGLi
 		// 	result = lappend(result, tmp);
 		// }
 
-		else if (IsA(node, duckdb_libpgquery::PGRowExpr))
+		else if (IsA(node, PGRowExpr))
 		{
 			/* The top level RowExprs are handled differently with other expressions.
 			 * We convert each argument into GroupClause and append them
@@ -1351,14 +1409,14 @@ ClauseParser::transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGLi
 			 * Note that RowExprs are not added into the final targetlist.
 			 */
 			result =
-				transformRowExprToGroupClauses(pstate, (duckdb_libpgquery::PGRowExpr *)node,
+				transformRowExprToGroupClauses(pstate, (PGRowExpr *)node,
 											   result, *targetlist);
 		}
 
 		else
 		{
-			duckdb_libpgquery::PGTargetEntry *tle;
-			duckdb_libpgquery::PGSortGroupClause *gc;
+			PGTargetEntry *tle;
+			PGSortGroupClause *gc;
 			Oid			sortop;
 			Oid			eqop;
 			bool		hashable;
@@ -1380,7 +1438,7 @@ ClauseParser::transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGLi
 			if (targetIsInSortList(tle, InvalidOid, result))
 				continue;
 
-			get_sort_group_operators(exprType((duckdb_libpgquery::PGNode *) tle->expr),
+			get_sort_group_operators(exprType((PGNode *) tle->expr),
 									 true, true, false,
 									 &sortop, &eqop, NULL, &hashable);
 			gc = make_group_clause(tle, *targetlist, eqop, sortop, false, hashable);
@@ -1392,7 +1450,7 @@ ClauseParser::transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGLi
 	 * extensions.
 	 */
 	{
-		duckdb_libpgquery::PGListCell *lc;
+		PGListCell *lc;
 
 		/*
 		 * Find all unique target entries appeared in reorder_grouplist.
@@ -1416,14 +1474,14 @@ ClauseParser::transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGLi
 	return result;
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::findListTargetlistEntries(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
-									   duckdb_libpgquery::PGList **tlist, bool in_grpext,
+PGList *
+ClauseParser::findListTargetlistEntries(PGParseState *pstate, PGNode *node,
+									   PGList **tlist, bool in_grpext,
 									   bool ignore_in_grpext,
 									   PGParseExprKind exprKind,
                                        bool useSQL99)
 {
-	duckdb_libpgquery::PGList *result_list = NIL;
+	PGList *result_list = NIL;
 
 	/*
 	 * In GROUP BY clauses, empty grouping set () is supported as 'NIL'
@@ -1434,12 +1492,12 @@ ClauseParser::findListTargetlistEntries(PGParseState *pstate, duckdb_libpgquery:
 
 	// if (IsA(node, GroupingClause))
 	// {
-	// 	duckdb_libpgquery::PGListCell *gl;
+	// 	PGListCell *gl;
 	// 	GroupingClause *gc = (GroupingClause*)node;
 
 	// 	foreach(gl, gc->groupsets)
 	// 	{
-	// 		duckdb_libpgquery::PGList *subresult_list;
+	// 		PGList *subresult_list;
 
 	// 		subresult_list = findListTargetlistEntries(pstate, lfirst(gl),
 	// 												   tlist, true, 
@@ -1462,15 +1520,15 @@ ClauseParser::findListTargetlistEntries(PGParseState *pstate, duckdb_libpgquery:
 	 * However, if ignore_in_grpext is set, we will always append
 	 * these target enties.
 	 */
-	if (IsA(node, duckdb_libpgquery::PGRowExpr))
+	if (IsA(node, PGRowExpr))
 	{
-		duckdb_libpgquery::PGList *args = ((duckdb_libpgquery::PGRowExpr *)node)->args;
-		duckdb_libpgquery::PGListCell *lc;
+		PGList *args = ((PGRowExpr *)node)->args;
+		PGListCell *lc;
 
 		foreach (lc, args)
 		{
-			duckdb_libpgquery::PGNode *rowexpr_arg = lfirst(lc);
-			duckdb_libpgquery::PGTargetEntry *tle;
+			PGNode *rowexpr_arg = lfirst(lc);
+			PGTargetEntry *tle;
 
             if (useSQL99)
                 tle = findTargetlistEntrySQL99(pstate, rowexpr_arg, tlist,
@@ -1489,7 +1547,7 @@ ClauseParser::findListTargetlistEntries(PGParseState *pstate, duckdb_libpgquery:
 
 	else
 	{
-		duckdb_libpgquery::PGTargetEntry *tle;
+		PGTargetEntry *tle;
 
         if (useSQL99)
             tle = findTargetlistEntrySQL99(pstate, node, tlist, exprKind);
@@ -1502,13 +1560,13 @@ ClauseParser::findListTargetlistEntries(PGParseState *pstate, duckdb_libpgquery:
 	return result_list;
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::create_group_clause(duckdb_libpgquery::PGList *tlist_group, duckdb_libpgquery::PGList *targetlist,
-					duckdb_libpgquery::PGList *sortClause, duckdb_libpgquery::PGList **tlist_remainder)
+PGList *
+ClauseParser::create_group_clause(PGList *tlist_group, PGList *targetlist,
+					PGList *sortClause, PGList **tlist_remainder)
 {
-	duckdb_libpgquery::PGList	   *result = NIL;
-	duckdb_libpgquery::PGListCell   *l;
-	duckdb_libpgquery::PGList *tlist = list_copy(tlist_group);
+	PGList	   *result = NIL;
+	PGListCell   *l;
+	PGList *tlist = list_copy(tlist_group);
 
 	/*
 	 * Iterate through the ORDER BY clause. If we find a grouping element
@@ -1519,23 +1577,23 @@ ClauseParser::create_group_clause(duckdb_libpgquery::PGList *tlist_group, duckdb
 	 */
 	foreach(l, sortClause)
 	{
-		duckdb_libpgquery::PGSortGroupClause *sc = (duckdb_libpgquery::PGSortGroupClause *) lfirst(l);
-		duckdb_libpgquery::PGListCell   *prev = NULL;
-		duckdb_libpgquery::PGListCell   *tl = NULL;
+		PGSortGroupClause *sc = (PGSortGroupClause *) lfirst(l);
+		PGListCell   *prev = NULL;
+		PGListCell   *tl = NULL;
 		bool		found = false;
 
 		foreach(tl, tlist)
 		{
-			duckdb_libpgquery::PGNode        *node = (duckdb_libpgquery::PGNode*)lfirst(tl);
+			PGNode        *node = (PGNode*)lfirst(tl);
 
-			if (IsA(node, duckdb_libpgquery::PGTargetEntry))
+			if (IsA(node, PGTargetEntry))
 			{
-				duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(tl);
+				PGTargetEntry *tle = (PGTargetEntry *) lfirst(tl);
 
 				if (!tle->resjunk &&
 					sc->tleSortGroupRef == tle->ressortgroupref)
 				{
-					duckdb_libpgquery::PGSortGroupClause *gc;
+					PGSortGroupClause *gc;
 
 					tlist = list_delete_cell(tlist, tl, prev);
 
@@ -1562,13 +1620,13 @@ ClauseParser::create_group_clause(duckdb_libpgquery::PGList *tlist_group, duckdb
 	return result;
 };
 
-duckdb_libpgquery::PGSortGroupClause *
-ClauseParser::make_group_clause(duckdb_libpgquery::PGTargetEntry *tle, duckdb_libpgquery::PGList *targetlist,
+PGSortGroupClause *
+ClauseParser::make_group_clause(PGTargetEntry *tle, PGList *targetlist,
 				  Oid eqop, Oid sortop, bool nulls_first, bool hashable)
 {
-	duckdb_libpgquery::PGSortGroupClause *result;
+	PGSortGroupClause *result;
 
-	result = makeNode(duckdb_libpgquery::PGSortGroupClause);
+	result = makeNode(PGSortGroupClause);
 	result->tleSortGroupRef = assignSortGroupRef(tle, targetlist);
 	result->eqop = eqop;
 	result->sortop = sortop;
@@ -1578,16 +1636,16 @@ ClauseParser::make_group_clause(duckdb_libpgquery::PGTargetEntry *tle, duckdb_li
 	return result;
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::reorderGroupList(duckdb_libpgquery::PGList *grouplist)
+PGList *
+ClauseParser::reorderGroupList(PGList *grouplist)
 {
-	duckdb_libpgquery::PGList *result = NIL;
-	duckdb_libpgquery::PGListCell *gl;
-	duckdb_libpgquery::PGList *sub_list = NIL;
+	PGList *result = NIL;
+	PGListCell *gl;
+	PGList *sub_list = NIL;
 
 	foreach(gl, grouplist)
 	{
-		duckdb_libpgquery::PGNode *node = (duckdb_libpgquery::PGNode*)lfirst(gl);
+		PGNode *node = (PGNode*)lfirst(gl);
 
 		if (node == NULL)
 		{
@@ -1607,7 +1665,7 @@ ClauseParser::reorderGroupList(duckdb_libpgquery::PGList *grouplist)
 		// }
 		else
 		{
-			duckdb_libpgquery::PGNode *new_node = (duckdb_libpgquery::PGNode *)copyObject(node);
+			PGNode *new_node = (PGNode *)copyObject(node);
 			result = lappend(result, new_node);
 		}
 	}
@@ -1616,20 +1674,20 @@ ClauseParser::reorderGroupList(duckdb_libpgquery::PGList *grouplist)
 	return result;
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::transformRowExprToGroupClauses(PGParseState *pstate, duckdb_libpgquery::PGRowExpr *rowexpr,
-							   duckdb_libpgquery::PGList *groupsets, duckdb_libpgquery::PGList *targetList)
+PGList *
+ClauseParser::transformRowExprToGroupClauses(PGParseState *pstate, PGRowExpr *rowexpr,
+							   PGList *groupsets, PGList *targetList)
 {
-	duckdb_libpgquery::PGList *args = rowexpr->args;
-	duckdb_libpgquery::PGListCell *arglc;
+	PGList *args = rowexpr->args;
+	PGListCell *arglc;
 
 	foreach (arglc, args)
 	{
-		duckdb_libpgquery::PGNode *node = lfirst(arglc);
+		PGNode *node = lfirst(arglc);
 
-		if (IsA(node, duckdb_libpgquery::PGRowExpr))
+		if (IsA(node, PGRowExpr))
 		{
-			transformRowExprToGroupClauses(pstate, (duckdb_libpgquery::PGRowExpr *)node,
+			transformRowExprToGroupClauses(pstate, (PGRowExpr *)node,
 										   groupsets, targetList);
 		}
 
@@ -1638,14 +1696,14 @@ ClauseParser::transformRowExprToGroupClauses(PGParseState *pstate, duckdb_libpgq
 			/* Find the TargetEntry for this argument. This should have been
 			 * generated in findListTargetlistEntries().
 			 */
-			duckdb_libpgquery::PGTargetEntry *arg_tle =
+			PGTargetEntry *arg_tle =
 				findTargetlistEntrySQL92(pstate, node, &targetList,
 										 EXPR_KIND_GROUP_BY);
 			Oid			sortop;
 			Oid			eqop;
 			bool		hashable;
 
-			get_sort_group_operators(exprType((duckdb_libpgquery::PGNode *) arg_tle->expr),
+			get_sort_group_operators(exprType((PGNode *) arg_tle->expr),
 									 true, true, false,
 									 &sortop, &eqop, NULL, &hashable);
 
@@ -1661,13 +1719,13 @@ ClauseParser::transformRowExprToGroupClauses(PGParseState *pstate, duckdb_libpgq
 	return groupsets;
 };
 
-duckdb_libpgquery::PGList *
+PGList *
 ClauseParser::transformScatterClause(PGParseState *pstate,
-					   duckdb_libpgquery::PGList *scatterlist,
-					   duckdb_libpgquery::PGList **targetlist)
+					   PGList *scatterlist,
+					   PGList **targetlist)
 {
-	duckdb_libpgquery::PGList	   *outlist = NIL;
-	duckdb_libpgquery::PGListCell   *olitem;
+	PGList	   *outlist = NIL;
+	PGListCell   *olitem;
 
 	/* Special case handling for SCATTER RANDOMLY */
 	if (list_length(scatterlist) == 1 && linitial(scatterlist) == NULL)
@@ -1676,19 +1734,19 @@ ClauseParser::transformScatterClause(PGParseState *pstate,
 	/* preprocess the scatter clause, lookup TLEs */
 	foreach(olitem, scatterlist)
 	{
-		duckdb_libpgquery::PGNode			*node = lfirst(olitem);
-		duckdb_libpgquery::PGTargetEntry		*tle;
+		PGNode			*node = lfirst(olitem);
+		PGTargetEntry		*tle;
 
 		tle = findTargetlistEntrySQL99(pstate, node, targetlist,
 									   EXPR_KIND_SCATTER_BY);
 
 		/* coerce unknown to text */
-		if (duckdb_libpgquery::exprType((duckdb_libpgquery::PGNode *) tle->expr) == UNKNOWNOID)
+		if (exprType((PGNode *) tle->expr) == UNKNOWNOID)
 		{
-			tle->expr = (duckdb_libpgquery::PGExpr *) coerce_type(pstate, (duckdb_libpgquery::PGNode *) tle->expr,
+			tle->expr = (PGExpr *) coerce_type(pstate, (PGNode *) tle->expr,
 											 UNKNOWNOID, TEXTOID, -1,
-											 duckdb_libpgquery::PG_COERCION_IMPLICIT,
-											 duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST,
+											 PG_COERCION_IMPLICIT,
+											 PG_COERCE_IMPLICIT_CAST,
 											 -1);
 		}
 
@@ -1697,17 +1755,17 @@ ClauseParser::transformScatterClause(PGParseState *pstate,
 	return outlist;
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::transformDistinctToGroupBy(PGParseState *pstate, duckdb_libpgquery::PGList **targetlist,
-							duckdb_libpgquery::PGList **sortClause, duckdb_libpgquery::PGList **groupClause)
+PGList *
+ClauseParser::transformDistinctToGroupBy(PGParseState *pstate, PGList **targetlist,
+							PGList **sortClause, PGList **groupClause)
 {
-	duckdb_libpgquery::PGList *group_tlist = list_copy(*targetlist);
+	PGList *group_tlist = list_copy(*targetlist);
 
 	/*
 	 * create first group clauses based on matching sort clauses, if any
 	 */
-	duckdb_libpgquery::PGList *group_tlist_remainder = NIL;
-	duckdb_libpgquery::PGList *group_clause_list = create_group_clause(group_tlist,
+	PGList *group_tlist_remainder = NIL;
+	PGList *group_clause_list = create_group_clause(group_tlist,
 												*targetlist,
 												*sortClause,
 												&group_tlist_remainder);
@@ -1717,21 +1775,21 @@ ClauseParser::transformDistinctToGroupBy(PGParseState *pstate, duckdb_libpgquery
 		/*
 		 * append remaining group clauses to the end of group clause list
 		 */
-		duckdb_libpgquery::PGListCell *lc = NULL;
+		PGListCell *lc = NULL;
 
 		foreach(lc, group_tlist_remainder)
 		{
-			duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(lc);
+			PGTargetEntry *tle = (PGTargetEntry *) lfirst(lc);
 			if (!tle->resjunk)
 			{
-				duckdb_libpgquery::PGSortBy sortby;
+				PGSortBy sortby;
 
-				sortby.type = duckdb_libpgquery::T_PGSortBy;
-				sortby.sortby_dir = duckdb_libpgquery::PG_SORTBY_DEFAULT;
-				sortby.sortby_nulls = duckdb_libpgquery::PG_SORTBY_NULLS_DEFAULT;
+				sortby.type = T_PGSortBy;
+				sortby.sortby_dir = PG_SORTBY_DEFAULT;
+				sortby.sortby_nulls = PG_SORTBY_NULLS_DEFAULT;
 				sortby.useOp = NIL;
 				sortby.location = -1;
-				sortby.node = (duckdb_libpgquery::PGNode *) tle->expr;
+				sortby.node = (PGNode *) tle->expr;
 				group_clause_list = addTargetToSortList(pstate, tle,
 														group_clause_list, *targetlist,
 														&sortby, true);
@@ -1750,13 +1808,13 @@ ClauseParser::transformDistinctToGroupBy(PGParseState *pstate, duckdb_libpgquery
 	return NIL;
 };
 
-duckdb_libpgquery::PGList *
+PGList *
 ClauseParser::transformDistinctClause(PGParseState *pstate,
-						duckdb_libpgquery::PGList **targetlist, duckdb_libpgquery::PGList *sortClause, bool is_agg)
+						PGList **targetlist, PGList *sortClause, bool is_agg)
 {
-	duckdb_libpgquery::PGList	   *result = NIL;
-	duckdb_libpgquery::PGListCell   *slitem;
-	duckdb_libpgquery::PGListCell   *tlitem;
+	PGList	   *result = NIL;
+	PGListCell   *slitem;
+	PGListCell   *tlitem;
 
 	/*
 	 * The distinctClause should consist of all ORDER BY items followed by all
@@ -1775,8 +1833,8 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 	 */
 	foreach(slitem, sortClause)
 	{
-		duckdb_libpgquery::PGSortGroupClause *scl = (duckdb_libpgquery::PGSortGroupClause *) lfirst(slitem);
-		duckdb_libpgquery::PGTargetEntry *tle = get_sortgroupclause_tle(scl, *targetlist);
+		PGSortGroupClause *scl = (PGSortGroupClause *) lfirst(slitem);
+		PGTargetEntry *tle = get_sortgroupclause_tle(scl, *targetlist);
 
 		if (tle->resjunk)
 			ereport(ERROR,
@@ -1785,7 +1843,7 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 					 errmsg("in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list") :
 					 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
 					 parser_errposition(pstate,
-										exprLocation((duckdb_libpgquery::PGNode *) tle->expr))));
+										exprLocation((PGNode *) tle->expr))));
 		result = lappend(result, copyObject(scl));
 	}
 
@@ -1795,13 +1853,13 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 	 */
 	foreach(tlitem, *targetlist)
 	{
-		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(tlitem);
+		PGTargetEntry *tle = (PGTargetEntry *) lfirst(tlitem);
 
 		if (tle->resjunk)
 			continue;			/* ignore junk */
 		result = addTargetToGroupList(pstate, tle,
 									  result, *targetlist,
-									  exprLocation((duckdb_libpgquery::PGNode *) tle->expr),
+									  exprLocation((PGNode *) tle->expr),
 									  true);
 	}
 
@@ -1822,20 +1880,20 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 	return result;
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::addTargetToGroupList(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
-					 duckdb_libpgquery::PGList *grouplist, duckdb_libpgquery::PGList *targetlist, int location,
+PGList *
+ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
+					 PGList *grouplist, PGList *targetlist, int location,
 					 bool resolveUnknown)
 {
-	Oid			restype = duckdb_libpgquery::exprType((duckdb_libpgquery::PGNode *) tle->expr);
+	Oid			restype = exprType((PGNode *) tle->expr);
 
 	/* if tlist item is an UNKNOWN literal, change it to TEXT */
 	if (restype == UNKNOWNOID && resolveUnknown)
 	{
-		tle->expr = (duckdb_libpgquery::PGExpr *) coerce_parser.coerce_type(pstate, (duckdb_libpgquery::PGNode *) tle->expr,
+		tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
 										 restype, TEXTOID, -1,
-										 duckdb_libpgquery::PG_COERCION_IMPLICIT,
-										 duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST,
+										 PG_COERCION_IMPLICIT,
+										 PG_COERCE_IMPLICIT_CAST,
 										 -1);
 		restype = TEXTOID;
 	}
@@ -1843,7 +1901,7 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, duckdb_libpgquery::PGTa
 	/* avoid making duplicate grouplist entries */
 	if (!targetIsInSortList(tle, InvalidOid, grouplist))
 	{
-		duckdb_libpgquery::PGSortGroupClause *grpcl = makeNode(duckdb_libpgquery::PGSortGroupClause);
+		PGSortGroupClause *grpcl = makeNode(PGSortGroupClause);
 		Oid			sortop;
 		Oid			eqop;
 		bool		hashable;
@@ -1871,15 +1929,15 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, duckdb_libpgquery::PGTa
 	return grouplist;
 };
 
-duckdb_libpgquery::PGList *
-ClauseParser::transformDistinctOnClause(PGParseState *pstate, duckdb_libpgquery::PGList *distinctlist,
-						  duckdb_libpgquery::PGList **targetlist, duckdb_libpgquery::PGList *sortClause)
+PGList *
+ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctlist,
+						  PGList **targetlist, PGList *sortClause)
 {
-	duckdb_libpgquery::PGList	   *result = NIL;
-	duckdb_libpgquery::PGList	   *sortgrouprefs = NIL;
+	PGList	   *result = NIL;
+	PGList	   *sortgrouprefs = NIL;
 	bool		skipped_sortitem;
-	duckdb_libpgquery::PGListCell   *lc;
-	duckdb_libpgquery::PGListCell   *lc2;
+	PGListCell   *lc;
+	PGListCell   *lc2;
 
 	/*
 	 * Add all the DISTINCT ON expressions to the tlist (if not already
@@ -1891,9 +1949,9 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, duckdb_libpgquery:
 	 */
 	foreach(lc, distinctlist)
 	{
-		duckdb_libpgquery::PGNode	   *dexpr = (duckdb_libpgquery::PGNode *) lfirst(lc);
+		PGNode	   *dexpr = (PGNode *) lfirst(lc);
 		int			sortgroupref;
-		duckdb_libpgquery::PGTargetEntry *tle;
+		PGTargetEntry *tle;
 
 		tle = findTargetlistEntrySQL92(pstate, dexpr, targetlist,
 									   EXPR_KIND_DISTINCT_ON);
@@ -1912,7 +1970,7 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, duckdb_libpgquery:
 	skipped_sortitem = false;
 	foreach(lc, sortClause)
 	{
-		duckdb_libpgquery::PGSortGroupClause *scl = (duckdb_libpgquery::PGSortGroupClause *) lfirst(lc);
+		PGSortGroupClause *scl = (PGSortGroupClause *) lfirst(lc);
 
 		if (list_member_int(sortgrouprefs, scl->tleSortGroupRef))
 		{
@@ -1942,9 +2000,9 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, duckdb_libpgquery:
 	 */
 	forboth(lc, distinctlist, lc2, sortgrouprefs)
 	{
-		duckdb_libpgquery::PGNode	   *dexpr = (duckdb_libpgquery::PGNode *) lfirst(lc);
+		PGNode	   *dexpr = (PGNode *) lfirst(lc);
 		int			sortgroupref = lfirst_int(lc2);
-		duckdb_libpgquery::PGTargetEntry *tle = get_sortgroupref_tle(sortgroupref, *targetlist);
+		PGTargetEntry *tle = get_sortgroupref_tle(sortgroupref, *targetlist);
 
 		if (targetIsInSortList(tle, InvalidOid, result))
 			continue;			/* already in list (with some semantics) */
@@ -1968,11 +2026,11 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, duckdb_libpgquery:
 	return result;
 };
 
-duckdb_libpgquery::PGNode *
-ClauseParser::transformLimitClause(PGParseState *pstate, duckdb_libpgquery::PGNode *clause,
+PGNode *
+ClauseParser::transformLimitClause(PGParseState *pstate, PGNode *clause,
 					 PGParseExprKind exprKind, const char *constructName)
 {
-	duckdb_libpgquery::PGNode	   *qual;
+	PGNode	   *qual;
 
 	if (clause == NULL)
 		return NULL;
@@ -1987,14 +2045,14 @@ ClauseParser::transformLimitClause(PGParseState *pstate, duckdb_libpgquery::PGNo
 	return qual;
 };
 
-duckdb_libpgquery::PGList *
+PGList *
 ClauseParser::transformWindowDefinitions(PGParseState *pstate,
-						   duckdb_libpgquery::PGList *windowdefs,
-						   duckdb_libpgquery::PGList **targetlist)
+						   PGList *windowdefs,
+						   PGList **targetlist)
 {
-	duckdb_libpgquery::PGList	   *result = NIL;
+	PGList	   *result = NIL;
 	Index		winref = 0;
-	duckdb_libpgquery::PGListCell   *lc;
+	PGListCell   *lc;
 
 	/*
 	 * We have two lists of window specs: one in the ParseState -- put there
@@ -2008,11 +2066,11 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 	 */
 	foreach(lc, windowdefs)
 	{
-		duckdb_libpgquery::PGWindowDef  *windef = lfirst(lc);
-		duckdb_libpgquery::PGWindowClause *refwc = NULL;
-		duckdb_libpgquery::PGList	   *partitionClause;
-		duckdb_libpgquery::PGList	   *orderClause;
-		duckdb_libpgquery::PGWindowClause *wc;
+		PGWindowDef  *windef = lfirst(lc);
+		PGWindowClause *refwc = NULL;
+		PGList	   *partitionClause;
+		PGList	   *orderClause;
+		PGWindowClause *wc;
 
 		winref++;
 
@@ -2061,7 +2119,7 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		/*
 		 * And prepare the new WindowClause.
 		 */
-		wc = makeNode(duckdb_libpgquery::PGWindowClause);
+		wc = makeNode(PGWindowClause);
 		wc->name = windef->name;
 		wc->refname = windef->refname;
 
@@ -2191,13 +2249,13 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 	return result;
 };
 
-duckdb_libpgquery::PGNode *
-ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckdb_libpgquery::PGNode *clause,
-					 duckdb_libpgquery::PGList *orderClause, duckdb_libpgquery::PGList *targetlist, bool isFollowing,
+PGNode *
+ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNode *clause,
+					 PGList *orderClause, PGList *targetlist, bool isFollowing,
 					 int location)
 {
 	const char *constructName = NULL;
-	duckdb_libpgquery::PGNode	   *node;
+	PGNode	   *node;
 
 	/* Quick exit if no offset expression */
 	if (clause == NULL)
@@ -2216,13 +2274,13 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckd
 	}
 	else if (frameOptions & FRAMEOPTION_RANGE)
 	{
-		duckdb_libpgquery::PGTargetEntry *te;
+		PGTargetEntry *te;
 		Oid			otype;
 		Oid			rtype;
 		Oid			newrtype;
-		duckdb_libpgquery::PGSortGroupClause *sort;
+		PGSortGroupClause *sort;
 		Oid			oprresult;
-		duckdb_libpgquery::PGList	   *oprname;
+		PGList	   *oprname;
 		Operator	tup;
 		int32		typmod;
 
@@ -2247,11 +2305,11 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckd
 					 errmsg("only one ORDER BY column may be specified when RANGE is used in a window specification"),
 					 parser_errposition(pstate, location)));
 
-		typmod = duckdb_libpgquery::exprTypmod(node);
+		typmod = exprTypmod(node);
 
-		if (IsA(node, duckdb_libpgquery::PGConst))
+		if (IsA(node, PGConst))
 		{
-			duckdb_libpgquery::PGConst *con = (duckdb_libpgquery::PGConst *) node;
+			PGConst *con = (PGConst *) node;
 
 			if (con->constisnull)
 				ereport(ERROR,
@@ -2260,17 +2318,17 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckd
 						 parser_errposition(pstate, con->location)));
 		}
 
-		sort = (duckdb_libpgquery::PGSortGroupClause *) linitial(orderClause);
+		sort = (PGSortGroupClause *) linitial(orderClause);
 		te = getTargetBySortGroupRef(sort->tleSortGroupRef,
 									 targetlist);
-		otype = duckdb_libpgquery::exprType((duckdb_libpgquery::PGNode *)te->expr);
-		rtype = duckdb_libpgquery::exprType(node);
+		otype = exprType((PGNode *)te->expr);
+		rtype = exprType(node);
 
 		/* XXX: Reverse these if user specified DESC */
 		if (isFollowing)
-			oprname = lappend(NIL, duckdb_libpgquery::makeString("+"));
+			oprname = lappend(NIL, makeString("+"));
 		else
-			oprname = lappend(NIL, duckdb_libpgquery::makeString("-"));
+			oprname = lappend(NIL, makeString("-"));
 
 		tup = oper(pstate, oprname, otype, rtype, true, 0);
 
@@ -2294,13 +2352,13 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckd
 			/* XXX: we assume that the typmod for the new RHS type
 			 * is the same as before... is that safe?
 			 */
-			duckdb_libpgquery::PGExpr *expr =
-				(duckdb_libpgquery::PGExpr *)coerce_to_target_type(NULL,
+			PGExpr *expr =
+				(PGExpr *)coerce_to_target_type(NULL,
 											  node,
 											  rtype,
 											  newrtype, typmod,
-											  duckdb_libpgquery::PG_COERCION_EXPLICIT,
-											  duckdb_libpgquery::PG_COERCE_IMPLICIT_CAST,
+											  PG_COERCION_EXPLICIT,
+											  PG_COERCE_IMPLICIT_CAST,
 											  -1);
 			if (!PointerIsValid(expr))
 			{
@@ -2312,10 +2370,10 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckd
 								 "the ORDER BY column and RANGE parameter "
 								 "must result in a data type which can be "
 								 "cast back to the ORDER BY column type"),
-						 parser_errposition(pstate, exprLocation((duckdb_libpgquery::PGNode *) expr))));
+						 parser_errposition(pstate, exprLocation((PGNode *) expr))));
 			}
 
-			node = (duckdb_libpgquery::PGNode *) expr;
+			node = (PGNode *) expr;
 		}
 
 		if (oprresult != otype)
@@ -2327,7 +2385,7 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckd
 			 *
 			 * XXX: Why not do it here?
 			 */
-			if (!can_coerce_type(1, &oprresult, &otype, duckdb_libpgquery::PG_COERCION_EXPLICIT))
+			if (!can_coerce_type(1, &oprresult, &otype, PG_COERCION_EXPLICIT))
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("invalid RANGE parameter"),
@@ -2337,7 +2395,7 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckd
 								 "cast back to the ORDER BY column type")));
 		}
 
-		if (IsA(node, duckdb_libpgquery::PGConst))
+		if (IsA(node, PGConst))
 		{
 			/*
 			 * see if RANGE parameter is negative
@@ -2346,7 +2404,7 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, duckd
 			 * case that the parameter is not a Const. Make sure it uses
 			 * the same logic!
 			 */
-			duckdb_libpgquery::PGConst *con = (duckdb_libpgquery::PGConst *) node;
+			PGConst *con = (PGConst *) node;
 			Oid			sortop;
 
 			get_sort_group_operators(newrtype,

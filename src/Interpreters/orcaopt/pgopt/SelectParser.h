@@ -2,6 +2,7 @@
 
 #include <parser_common.h>
 #include <ClauseParser.h>
+#include <CoerceParser.h>
 #include <TargetParser.h>
 
 namespace DB
@@ -23,9 +24,7 @@ public:
     duckdb_libpgquery::PGQuery *parse_sub_analyze(duckdb_libpgquery::PGNode *parseTree, PGParseState *parentParseState,
 				  duckdb_libpgquery::PGCommonTableExpr *parentCTE,
 				  duckdb_libpgquery::PGLockingClause *lockclause_from_parent);
-    
-    std::shared_ptr<PGParseState> make_parsestate(PGParseState *parentParseState);
-
+                  
     duckdb_libpgquery::PGQuery *
     transformStmt(PGParseState *pstate, duckdb_libpgquery::PGNode *parseTree);
 };

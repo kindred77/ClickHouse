@@ -1,6 +1,6 @@
 #include <nodes/parsenodes.hpp>
 #include <nodes/makefuncs.hpp>
-#include <nodes/nodefuncs.hpp>
+#include <nodes/nodeFuncs.hpp>
 #include <nodes/nodes.hpp>
 #include <nodes/pg_list.hpp>
 #include <nodes/bitmapset.hpp>
@@ -121,5 +121,41 @@ typedef signed int int32;
 
 #define ERROR		20
 
+#define AGGKIND_NORMAL			'n'
+#define AGGKIND_ORDERED_SET		'o'
+#define AGGKIND_HYPOTHETICAL	'h'
+
 #define rt_fetch(rangetable_index, rangetable) \
 	((duckdb_libpgquery::PGRangeTblEntry *) list_nth(rangetable, (rangetable_index)-1))
+
+
+PGParseState *
+make_parsestate(PGParseState *parentParseState)
+{
+	auto pstate = new PGParseState();
+
+	pstate->parentParseState = parentParseState;
+
+	/* Fill in fields that don't start at null/false/zero */
+	pstate->p_next_resno = 1;
+
+	if (parentParseState)
+	{
+		pstate->p_sourcetext = parentParseState->p_sourcetext;
+		/* all hooks are copied from parent */
+		//pstate->p_pre_columnref_hook = parentParseState->p_pre_columnref_hook;
+		//pstate->p_post_columnref_hook = parentParseState->p_post_columnref_hook;
+		//pstate->p_paramref_hook = parentParseState->p_paramref_hook;
+		//pstate->p_coerce_param_hook = parentParseState->p_coerce_param_hook;
+		pstate->p_ref_hook_state = parentParseState->p_ref_hook_state;
+	}
+
+	return pstate;
+};
+
+void
+free_parsestate(PGParseState *pstate)
+{
+	delete pstate;
+	pstate = NULL;
+}

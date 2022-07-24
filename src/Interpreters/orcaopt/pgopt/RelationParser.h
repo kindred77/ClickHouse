@@ -82,6 +82,17 @@ public:
 
 	duckdb_libpgquery::PGCommonTableExpr *
 	GetCTEForRTE(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int rtelevelsup);
+
+	duckdb_libpgquery::PGRangeTblEntry *
+	addRangeTableEntryForJoin(PGParseState *pstate,
+						  duckdb_libpgquery::PGList *colnames,
+						  duckdb_libpgquery::PGJoinType jointype,
+						  duckdb_libpgquery::PGList *aliasvars,
+						  duckdb_libpgquery::PGAlias *alias,
+						  bool inFromCl);
+	
+	duckdb_libpgquery::PGTargetEntry *
+	get_tle_by_resno(duckdb_libpgquery::PGList *tlist, PGAttrNumber resno);
 };
 
 }

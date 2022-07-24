@@ -1,12 +1,14 @@
 #include <RelationParser.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
 
-int RelationParser::RTERangeTablePosn(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int *sublevels_up)
+int RelationParser::RTERangeTablePosn(PGParseState *pstate, PGRangeTblEntry *rte, int *sublevels_up)
 {
 	int			index;
-	duckdb_libpgquery::PGListCell   *l;
+	PGListCell   *l;
 
 	if (sublevels_up)
 		*sublevels_up = 0;
@@ -16,7 +18,7 @@ int RelationParser::RTERangeTablePosn(PGParseState *pstate, duckdb_libpgquery::P
 		index = 1;
 		foreach(l, pstate->p_rtable)
 		{
-			if (rte == (duckdb_libpgquery::PGRangeTblEntry *) lfirst(l))
+			if (rte == (PGRangeTblEntry *) lfirst(l))
 				return index;
 			index++;
 		}
@@ -31,12 +33,12 @@ int RelationParser::RTERangeTablePosn(PGParseState *pstate, duckdb_libpgquery::P
 	return 0;					/* keep compiler quiet */
 };
 
-void RelationParser::expandTupleDesc(TupleDesc tupdesc, duckdb_libpgquery::PGAlias *eref, int count, int offset,
+void RelationParser::expandTupleDesc(TupleDesc tupdesc, PGAlias *eref, int count, int offset,
 				int rtindex, int sublevels_up,
 				int location, bool include_dropped,
-				duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars)
+				PGList **colnames, PGList **colvars)
 {
-	duckdb_libpgquery::PGListCell   *aliascell = list_head(eref->colnames);
+	PGListCell   *aliascell = list_head(eref->colnames);
 	int			varattno;
 
 	if (colnames)
@@ -60,7 +62,7 @@ void RelationParser::expandTupleDesc(TupleDesc tupdesc, duckdb_libpgquery::PGAli
 			if (include_dropped)
 			{
 				if (colnames)
-					*colnames = lappend(*colnames, duckdb_libpgquery::makeString(duckdb_libpgquery::pstrdup("")));
+					*colnames = lappend(*colnames, makeString(pstrdup("")));
 				if (colvars)
 				{
 					/*
@@ -68,7 +70,7 @@ void RelationParser::expandTupleDesc(TupleDesc tupdesc, duckdb_libpgquery::PGAli
 					 * what type the Const claims to be.
 					 */
 					*colvars = lappend(*colvars,
-									 duckdb_libpgquery::makeNullConst(INT4OID, -1, InvalidOid));
+									 makeNullConst(INT4OID, -1, InvalidOid));
 				}
 			}
 			if (aliascell)
@@ -90,14 +92,14 @@ void RelationParser::expandTupleDesc(TupleDesc tupdesc, duckdb_libpgquery::PGAli
 				/* If we run out of aliases, use the underlying name */
 				label = attr->attname.data;
 			}
-			*colnames = lappend(*colnames, duckdb_libpgquery::makeString(duckdb_libpgquery::pstrdup(label)));
+			*colnames = lappend(*colnames, makeString(pstrdup(label)));
 		}
 
 		if (colvars)
 		{
-			duckdb_libpgquery::PGVar		   *varnode;
+			PGVar		   *varnode;
 
-			varnode = duckdb_libpgquery::makeVar(rtindex, varattno + offset + 1,
+			varnode = makeVar(rtindex, varattno + offset + 1,
 							  attr->atttypid, attr->atttypmod,
 							  attr->attcollation,
 							  sublevels_up);
@@ -108,9 +110,9 @@ void RelationParser::expandTupleDesc(TupleDesc tupdesc, duckdb_libpgquery::PGAli
 	}
 };
 
-void RelationParser::expandRelation(Oid relid, duckdb_libpgquery::PGAlias *eref, int rtindex, int sublevels_up,
+void RelationParser::expandRelation(Oid relid, PGAlias *eref, int rtindex, int sublevels_up,
 			   int location, bool include_dropped,
-			   duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars)
+			   PGList **colnames, PGList **colvars)
 {
 	Relation	rel;
 
@@ -124,9 +126,9 @@ void RelationParser::expandRelation(Oid relid, duckdb_libpgquery::PGAlias *eref,
 };
 
 void
-RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, int sublevels_up,
+RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 		  int location, bool include_dropped,
-		  duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars)
+		  PGList **colnames, PGList **colvars)
 {
 	int			varattno;
 
@@ -137,22 +139,22 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 
 	switch (rte->rtekind)
 	{
-		case duckdb_libpgquery::PG_RTE_RELATION:
+		case PG_RTE_RELATION:
 			/* Ordinary relation RTE */
 			expandRelation(rte->relid, rte->eref,
 						   rtindex, sublevels_up, location,
 						   include_dropped, colnames, colvars);
 			break;
-		case duckdb_libpgquery::PG_RTE_SUBQUERY:
+		case PG_RTE_SUBQUERY:
 			{
 				/* Subquery RTE */
-				duckdb_libpgquery::PGListCell   *aliasp_item = list_head(rte->eref->colnames);
-				duckdb_libpgquery::PGListCell   *tlistitem;
+				PGListCell   *aliasp_item = list_head(rte->eref->colnames);
+				PGListCell   *tlistitem;
 
 				varattno = 0;
 				foreach(tlistitem, rte->subquery->targetList)
 				{
-					duckdb_libpgquery::PGTargetEntry *te = (duckdb_libpgquery::PGTargetEntry *) lfirst(tlistitem);
+					PGTargetEntry *te = (PGTargetEntry *) lfirst(tlistitem);
 
 					if (te->resjunk)
 						continue;
@@ -174,17 +176,17 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 					{
 						char	   *label = strVal(lfirst(aliasp_item));
 
-						*colnames = lappend(*colnames, duckdb_libpgquery::makeString(duckdb_libpgquery::pstrdup(label)));
+						*colnames = lappend(*colnames, makeString(pstrdup(label)));
 					}
 
 					if (colvars)
 					{
-						duckdb_libpgquery::PGVar		   *varnode;
+						PGVar		   *varnode;
 
-						varnode = duckdb_libpgquery::makeVar(rtindex, varattno,
-										  duckdb_libpgquery::exprType((duckdb_libpgquery::PGNode *) te->expr),
-										  duckdb_libpgquery::exprTypmod((duckdb_libpgquery::PGNode *) te->expr),
-										  duckdb_libpgquery::exprCollation((duckdb_libpgquery::PGNode *) te->expr),
+						varnode = makeVar(rtindex, varattno,
+										  exprType((PGNode *) te->expr),
+										  exprTypmod((PGNode *) te->expr),
+										  exprCollation((PGNode *) te->expr),
 										  sublevels_up);
 						varnode->location = location;
 
@@ -195,16 +197,16 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 				}
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_TABLEFUNC:
-		case duckdb_libpgquery::PG_RTE_FUNCTION:
+		case PG_RTE_TABLEFUNC:
+		case PG_RTE_FUNCTION:
 			{
 				/* Function RTE */
 				int			atts_done = 0;
-				duckdb_libpgquery::PGListCell   *lc;
+				PGListCell   *lc;
 
 				foreach(lc, rte->functions)
 				{
-					duckdb_libpgquery::PGRangeTblFunction *rtfunc = (duckdb_libpgquery::PGRangeTblFunction *) lfirst(lc);
+					PGRangeTblFunction *rtfunc = (PGRangeTblFunction *) lfirst(lc);
 					TypeFuncClass functypclass;
 					Oid			funcrettype;
 					TupleDesc	tupdesc;
@@ -231,11 +233,11 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 
 						if (colvars)
 						{
-							duckdb_libpgquery::PGVar		   *varnode;
+							PGVar		   *varnode;
 
-							varnode = duckdb_libpgquery::makeVar(rtindex, atts_done + 1,
+							varnode = makeVar(rtindex, atts_done + 1,
 											  funcrettype, -1,
-											  duckdb_libpgquery::exprCollation(rtfunc->funcexpr),
+											  exprCollation(rtfunc->funcexpr),
 											  sublevels_up);
 							varnode->location = location;
 
@@ -246,7 +248,7 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 					{
 						if (colnames)
 						{
-							duckdb_libpgquery::PGList	   *namelist;
+							PGList	   *namelist;
 
 							/* extract appropriate subset of column list */
 							namelist = list_copy_tail(rte->eref->colnames,
@@ -258,9 +260,9 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 
 						if (colvars)
 						{
-							duckdb_libpgquery::PGListCell   *l1;
-							duckdb_libpgquery::PGListCell   *l2;
-							duckdb_libpgquery::PGListCell   *l3;
+							PGListCell   *l1;
+							PGListCell   *l2;
+							PGListCell   *l3;
 							int			attnum = atts_done;
 
 							forthree(l1, rtfunc->funccoltypes,
@@ -270,10 +272,10 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 								Oid			attrtype = lfirst_oid(l1);
 								int32		attrtypmod = lfirst_int(l2);
 								Oid			attrcollation = lfirst_oid(l3);
-								duckdb_libpgquery::PGVar		   *varnode;
+								PGVar		   *varnode;
 
 								attnum++;
-								varnode = duckdb_libpgquery::makeVar(rtindex,
+								varnode = makeVar(rtindex,
 												  attnum,
 												  attrtype,
 												  attrtypmod,
@@ -301,7 +303,7 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 
 					if (colvars)
 					{
-						duckdb_libpgquery::PGVar      *varnode = duckdb_libpgquery::makeVar(rtindex,
+						PGVar      *varnode = makeVar(rtindex,
 													  atts_done + 1,
 													  INT8OID,
 													  -1,
@@ -313,13 +315,13 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 				}
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_VALUES:
+		case PG_RTE_VALUES:
 			{
 				/* Values RTE */
-				duckdb_libpgquery::PGListCell   *aliasp_item = list_head(rte->eref->colnames);
+				PGListCell   *aliasp_item = list_head(rte->eref->colnames);
 				int32	   *coltypmods;
-				duckdb_libpgquery::PGListCell   *lcv;
-				duckdb_libpgquery::PGListCell   *lcc;
+				PGListCell   *lcv;
+				PGListCell   *lcc;
 
 				/*
 				 * It's okay to extract column types from the expressions in
@@ -337,7 +339,7 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 				forboth(lcv, (List *) linitial(rte->values_lists),
 						lcc, rte->values_collations)
 				{
-					duckdb_libpgquery::PGNode	   *col = (duckdb_libpgquery::PGNode *) lfirst(lcv);
+					PGNode	   *col = (PGNode *) lfirst(lcv);
 					Oid			colcollation = lfirst_oid(lcc);
 
 					varattno++;
@@ -347,16 +349,16 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 						char	   *label = strVal(lfirst(aliasp_item));
 
 						*colnames = lappend(*colnames,
-											duckdb_libpgquery::makeString(duckdb_libpgquery::pstrdup(label)));
+											makeString(pstrdup(label)));
 						aliasp_item = lnext(aliasp_item);
 					}
 
 					if (colvars)
 					{
-						duckdb_libpgquery::PGVar		   *varnode;
+						PGVar		   *varnode;
 
-						varnode = duckdb_libpgquery::makeVar(rtindex, varattno,
-										  duckdb_libpgquery::exprType(col),
+						varnode = makeVar(rtindex, varattno,
+										  exprType(col),
 										  coltypmods[varattno - 1],
 										  colcollation,
 										  sublevels_up);
@@ -368,18 +370,18 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 					pfree(coltypmods);
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_JOIN:
+		case PG_RTE_JOIN:
 			{
 				/* Join RTE */
-				duckdb_libpgquery::PGListCell   *colname;
-				duckdb_libpgquery::PGListCell   *aliasvar;
+				PGListCell   *colname;
+				PGListCell   *aliasvar;
 
 				Assert(list_length(rte->eref->colnames) == list_length(rte->joinaliasvars));
 
 				varattno = 0;
 				forboth(colname, rte->eref->colnames, aliasvar, rte->joinaliasvars)
 				{
-					duckdb_libpgquery::PGNode	   *avar = (duckdb_libpgquery::PGNode *) lfirst(aliasvar);
+					PGNode	   *avar = (PGNode *) lfirst(aliasvar);
 
 					varattno++;
 
@@ -397,7 +399,7 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 						{
 							if (colnames)
 								*colnames = lappend(*colnames,
-													duckdb_libpgquery::makeString(duckdb_libpgquery::pstrdup("")));
+													makeString(pstrdup("")));
 							if (colvars)
 							{
 								/*
@@ -406,7 +408,7 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 								 * what type the Const claims to be.
 								 */
 								*colvars = lappend(*colvars,
-												   duckdb_libpgquery::makeNullConst(INT4OID, -1,
+												   makeNullConst(INT4OID, -1,
 																 InvalidOid));
 							}
 						}
@@ -418,17 +420,17 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 						char	   *label = strVal(lfirst(colname));
 
 						*colnames = lappend(*colnames,
-											duckdb_libpgquery::makeString(duckdb_libpgquery::pstrdup(label)));
+											makeString(pstrdup(label)));
 					}
 
 					if (colvars)
 					{
-						duckdb_libpgquery::PGVar		   *varnode;
+						PGVar		   *varnode;
 
-						varnode = duckdb_libpgquery::makeVar(rtindex, varattno,
-										  duckdb_libpgquery::exprType(avar),
-										  duckdb_libpgquery::exprTypmod(avar),
-										  duckdb_libpgquery::exprCollation(avar),
+						varnode = makeVar(rtindex, varattno,
+										  exprType(avar),
+										  exprTypmod(avar),
+										  exprCollation(avar),
 										  sublevels_up);
 						varnode->location = location;
 
@@ -437,12 +439,12 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 				}
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_CTE:
+		case PG_RTE_CTE:
 			{
-				duckdb_libpgquery::PGListCell   *aliasp_item = list_head(rte->eref->colnames);
-				duckdb_libpgquery::PGListCell   *lct;
-				duckdb_libpgquery::PGListCell   *lcm;
-				duckdb_libpgquery::PGListCell   *lcc;
+				PGListCell   *aliasp_item = list_head(rte->eref->colnames);
+				PGListCell   *lct;
+				PGListCell   *lcm;
+				PGListCell   *lcc;
 
 				varattno = 0;
 				forthree(lct, rte->ctecoltypes,
@@ -460,15 +462,15 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 						/* Assume there is one alias per output column */
 						char	   *label = strVal(lfirst(aliasp_item));
 
-						*colnames = lappend(*colnames, duckdb_libpgquery::makeString(duckdb_libpgquery::pstrdup(label)));
+						*colnames = lappend(*colnames, makeString(pstrdup(label)));
 						aliasp_item = lnext(aliasp_item);
 					}
 
 					if (colvars)
 					{
-						duckdb_libpgquery::PGVar		   *varnode;
+						PGVar		   *varnode;
 
-						varnode = duckdb_libpgquery::makeVar(rtindex, varattno,
+						varnode = makeVar(rtindex, varattno,
 										  coltype, coltypmod, colcoll,
 										  sublevels_up);
 						varnode->location = location;
@@ -484,17 +486,17 @@ RelationParser::expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, 
 };
 
 void
-RelationParser::checkNameSpaceConflicts(PGParseState *pstate, duckdb_libpgquery::PGList *namespace1,
-						duckdb_libpgquery::PGList *namespace2)
+RelationParser::checkNameSpaceConflicts(PGParseState *pstate, PGList *namespace1,
+						PGList *namespace2)
 {
-	duckdb_libpgquery::PGListCell   *l1;
+	PGListCell   *l1;
 
 	foreach(l1, namespace1)
 	{
 		PGParseNamespaceItem *nsitem1 = (PGParseNamespaceItem *) lfirst(l1);
-		duckdb_libpgquery::PGRangeTblEntry *rte1 = nsitem1->p_rte;
+		PGRangeTblEntry *rte1 = nsitem1->p_rte;
 		const char *aliasname1 = rte1->eref->aliasname;
-		duckdb_libpgquery::PGListCell   *l2;
+		PGListCell   *l2;
 
 		if (!nsitem1->p_rel_visible)
 			continue;
@@ -502,14 +504,14 @@ RelationParser::checkNameSpaceConflicts(PGParseState *pstate, duckdb_libpgquery:
 		foreach(l2, namespace2)
 		{
 			PGParseNamespaceItem *nsitem2 = (PGParseNamespaceItem *) lfirst(l2);
-			duckdb_libpgquery::PGRangeTblEntry *rte2 = nsitem2->p_rte;
+			PGRangeTblEntry *rte2 = nsitem2->p_rte;
 
 			if (!nsitem2->p_rel_visible)
 				continue;
 			if (strcmp(rte2->eref->aliasname, aliasname1) != 0)
 				continue;		/* definitely no conflict */
-			if (rte1->rtekind == duckdb_libpgquery::PGRTEKind::PG_RTE_RELATION && rte1->alias == NULL &&
-				rte2->rtekind == duckdb_libpgquery::PGRTEKind::PG_RTE_RELATION && rte2->alias == NULL &&
+			if (rte1->rtekind == PGRTEKind::PG_RTE_RELATION && rte1->alias == NULL &&
+				rte2->rtekind == PGRTEKind::PG_RTE_RELATION && rte2->alias == NULL &&
 				rte1->relid != rte2->relid)
 				continue;		/* no conflict per SQL rule */
 			ereport(ERROR,
@@ -520,27 +522,27 @@ RelationParser::checkNameSpaceConflicts(PGParseState *pstate, duckdb_libpgquery:
 	}
 };
 
-duckdb_libpgquery::PGRangeTblEntry *
+PGRangeTblEntry *
 RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
-						 duckdb_libpgquery::PGCommonTableExpr *cte,
+						 PGCommonTableExpr *cte,
 						 Index levelsup,
-						 duckdb_libpgquery::PGRangeVar *rv,
+						 PGRangeVar *rv,
 						 bool inFromCl)
 {
-	duckdb_libpgquery::PGRangeTblEntry *rte = makeNode(duckdb_libpgquery::PGRangeTblEntry);
-	duckdb_libpgquery::PGAlias	   *alias = rv->alias;
+	PGRangeTblEntry *rte = makeNode(PGRangeTblEntry);
+	PGAlias	   *alias = rv->alias;
 	char	   *refname = alias ? alias->aliasname : cte->ctename;
-	duckdb_libpgquery::PGAlias	   *eref;
+	PGAlias	   *eref;
 	int			numaliases;
 	int			varattno;
-	duckdb_libpgquery::PGListCell   *lc;
+	PGListCell   *lc;
 
-	rte->rtekind = RTE_CTE;
+	rte->rtekind = PG_RTE_CTE;
 	rte->ctename = cte->ctename;
 	rte->ctelevelsup = levelsup;
 
 	/* Self-reference if and only if CTE's parse analysis isn't completed */
-	rte->self_reference = !IsA(cte->ctequery, duckdb_libpgquery::PGQuery);
+	rte->self_reference = !IsA(cte->ctequery, PGQuery);
 	Assert(cte->cterecursive || !rte->self_reference);
 	/* Bump the CTE's refcount if this isn't a self-reference */
 	if (!rte->self_reference)
@@ -551,11 +553,11 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 	 * This won't get checked in case of a self-reference, but that's OK
 	 * because data-modifying CTEs aren't allowed to be recursive anyhow.
 	 */
-	if (IsA(cte->ctequery, duckdb_libpgquery::PGQuery))
+	if (IsA(cte->ctequery, PGQuery))
 	{
-		duckdb_libpgquery::PGQuery *ctequery = (duckdb_libpgquery::PGQuery *) cte->ctequery;
+		PGQuery *ctequery = (PGQuery *) cte->ctequery;
 
-		if (ctequery->commandType != duckdb_libpgquery::PGCmdType::PG_CMD_SELECT &&
+		if (ctequery->commandType != PGCmdType::PG_CMD_SELECT &&
 			ctequery->returningList == NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -615,7 +617,7 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 	return rte;
 };
 
-duckdb_libpgquery::PGCommonTableExpr *
+PGCommonTableExpr *
 RelationParser::scanNameSpaceForCTE(PGParseState *pstate, const char *refname,
 					Index *ctelevelsup)
 {
@@ -625,11 +627,11 @@ RelationParser::scanNameSpaceForCTE(PGParseState *pstate, const char *refname,
 		 pstate != NULL;
 		 pstate = pstate->parentParseState, levelsup++)
 	{
-		duckdb_libpgquery::PGListCell   *lc;
+		PGListCell   *lc;
 
 		foreach(lc, pstate->p_ctenamespace)
 		{
-			duckdb_libpgquery::PGCommonTableExpr *cte = (duckdb_libpgquery::PGCommonTableExpr *) lfirst(lc);
+			PGCommonTableExpr *cte = (PGCommonTableExpr *) lfirst(lc);
 
 			if (strcmp(cte->ctename, refname) == 0)
 			{
@@ -642,12 +644,12 @@ RelationParser::scanNameSpaceForCTE(PGParseState *pstate, const char *refname,
 };
 
 void
-RelationParser::get_rte_attribute_type(duckdb_libpgquery::PGRangeTblEntry *rte, PGAttrNumber attnum,
+RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum,
 					   Oid *vartype, int32 *vartypmod, Oid *varcollid)
 {
 	switch (rte->rtekind)
 	{
-		case duckdb_libpgquery::PG_RTE_RELATION:
+		case PG_RTE_RELATION:
 			{
 				/* Plain relation RTE --- get the attribute's type info */
 				HeapTuple	tp;
@@ -677,31 +679,31 @@ RelationParser::get_rte_attribute_type(duckdb_libpgquery::PGRangeTblEntry *rte, 
 				ReleaseSysCache(tp);
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_SUBQUERY:
+		case PG_RTE_SUBQUERY:
 			{
 				/* Subselect RTE --- get type info from subselect's tlist */
-				duckdb_libpgquery::PGTargetEntry *te = get_tle_by_resno(rte->subquery->targetList,
+				PGTargetEntry *te = get_tle_by_resno(rte->subquery->targetList,
 												   attnum);
 
 				if (te == NULL || te->resjunk)
 					elog(ERROR, "subquery %s does not have attribute %d",
 						 rte->eref->aliasname, attnum);
-				*vartype = duckdb_libpgquery::exprType((duckdb_libpgquery::PGNode *) te->expr);
-				*vartypmod = duckdb_libpgquery::exprTypmod((duckdb_libpgquery::PGNode *) te->expr);
-				*varcollid = duckdb_libpgquery::exprCollation((duckdb_libpgquery::PGNode *) te->expr);
+				*vartype = exprType((PGNode *) te->expr);
+				*vartypmod = exprTypmod((PGNode *) te->expr);
+				*varcollid = exprCollation((PGNode *) te->expr);
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_TABLEFUNCTION:
-		case duckdb_libpgquery::PG_RTE_FUNCTION:
+		case PG_RTE_TABLEFUNCTION:
+		case PG_RTE_FUNCTION:
 			{
 				/* Function RTE */
-				duckdb_libpgquery::PGListCell   *lc;
+				PGListCell   *lc;
 				int			atts_done = 0;
 
 				/* Identify which function covers the requested column */
 				foreach(lc, rte->functions)
 				{
-					duckdb_libpgquery::PGRangeTblFunction *rtfunc = (duckdb_libpgquery::PGRangeTblFunction *) lfirst(lc);
+					PGRangeTblFunction *rtfunc = (PGRangeTblFunction *) lfirst(lc);
 
 					if (attnum > atts_done &&
 						attnum <= atts_done + rtfunc->funccolcount)
@@ -784,7 +786,7 @@ RelationParser::get_rte_attribute_type(duckdb_libpgquery::PGRangeTblEntry *rte, 
 								rte->eref->aliasname)));
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_VALUES:
+		case PG_RTE_VALUES:
 			{
 				/*
 				 * Values RTE --- we can get type info from first sublist, but
@@ -793,36 +795,36 @@ RelationParser::get_rte_attribute_type(duckdb_libpgquery::PGRangeTblEntry *rte, 
 				 * but this path is taken so seldom for VALUES that it's not
 				 * worth writing extra code.
 				 */
-				duckdb_libpgquery::PGList	   *collist = (List *) linitial(rte->values_lists);
-				duckdb_libpgquery::PGNode	   *col;
+				PGList	   *collist = (List *) linitial(rte->values_lists);
+				PGNode	   *col;
 				int32	   *coltypmods = getValuesTypmods(rte);
 
 				if (attnum < 1 || attnum > list_length(collist))
 					elog(ERROR, "values list %s does not have attribute %d",
 						 rte->eref->aliasname, attnum);
-				col = (duckdb_libpgquery::PGNode *) list_nth(collist, attnum - 1);
-				*vartype = duckdb_libpgquery::exprType(col);
+				col = (PGNode *) list_nth(collist, attnum - 1);
+				*vartype = exprType(col);
 				*vartypmod = coltypmods[attnum - 1];
 				*varcollid = list_nth_oid(rte->values_collations, attnum - 1);
 				pfree(coltypmods);
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_JOIN:
+		case PG_RTE_JOIN:
 			{
 				/*
 				 * Join RTE --- get type info from join RTE's alias variable
 				 */
-				duckdb_libpgquery::PGNode	   *aliasvar;
+				PGNode	   *aliasvar;
 
 				Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
-				aliasvar = (duckdb_libpgquery::PGNode *) list_nth(rte->joinaliasvars, attnum - 1);
+				aliasvar = (PGNode *) list_nth(rte->joinaliasvars, attnum - 1);
 				Assert(aliasvar != NULL);
 				*vartype = exprType(aliasvar);
 				*vartypmod = exprTypmod(aliasvar);
 				*varcollid = exprCollation(aliasvar);
 			}
 			break;
-		case duckdb_libpgquery::PG_RTE_CTE:
+		case PG_RTE_CTE:
 			{
 				/* CTE RTE --- get type info from lists in the RTE */
 				Assert(attnum > 0 && attnum <= list_length(rte->ctecoltypes));
@@ -836,10 +838,10 @@ RelationParser::get_rte_attribute_type(duckdb_libpgquery::PGRangeTblEntry *rte, 
 	}
 }
 
-duckdb_libpgquery::PGVar *
-RelationParser::make_var(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int attrno, int location)
+PGVar *
+RelationParser::make_var(PGParseState *pstate, PGRangeTblEntry *rte, int attrno, int location)
 {
-	duckdb_libpgquery::PGVar		   *result;
+	PGVar		   *result;
 	int			vnum,
 				sublevels_up;
 	Oid			vartypeid;
@@ -848,19 +850,19 @@ RelationParser::make_var(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntr
 
 	vnum = RTERangeTablePosn(pstate, rte, &sublevels_up);
 	get_rte_attribute_type(rte, attrno, &vartypeid, &type_mod, &varcollid);
-	result = duckdb_libpgquery::makeVar(vnum, attrno, vartypeid, type_mod, varcollid, sublevels_up);
+	result = makeVar(vnum, attrno, vartypeid, type_mod, varcollid, sublevels_up);
 	result->location = location;
 	return result;
 }
 
-duckdb_libpgquery::PGNode *
-RelationParser::scanRTEForColumn(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, char *colname,
+PGNode *
+RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, char *colname,
 				 int location)
 {
-	duckdb_libpgquery::PGNode	   *result = NULL;
+	PGNode	   *result = NULL;
 	int			attnum = 0;
-	duckdb_libpgquery::PGVar		   *var;
-	duckdb_libpgquery::PGListCell   *c;
+	PGVar		   *var;
+	PGListCell   *c;
 
 	/*
 	 * Scan the user column names (or aliases) for a match. Complain if
@@ -889,7 +891,7 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, duckdb_libpgquery::PGRang
 			var = make_var(pstate, rte, attnum, location);
 			/* Require read access to the column */
 			markVarForSelectPriv(pstate, var, rte);
-			result = (duckdb_libpgquery::PGNode *) var;
+			result = (PGNode *) var;
 		}
 	}
 
@@ -903,7 +905,7 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, duckdb_libpgquery::PGRang
 	/*
 	 * If the RTE represents a real table, consider system column names.
 	 */
-	if (rte->rtekind == duckdb_libpgquery::PG_RTE_RELATION)
+	if (rte->rtekind == PG_RTE_RELATION)
 	{
 		/* In GPDB, system columns like gp_segment_id, ctid, xmin/xmax seem to be
 		 * ambiguous for replicated table, replica in each segment has different
@@ -951,7 +953,7 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, duckdb_libpgquery::PGRang
 				var = make_var(pstate, rte, attnum, location);
 				/* Require read access to the column */
 				markVarForSelectPriv(pstate, var, rte);
-				result = (duckdb_libpgquery::PGNode *) var;
+				result = (PGNode *) var;
 			}
 		}
 	}
@@ -959,22 +961,22 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, duckdb_libpgquery::PGRang
 	return result;
 };
 
-duckdb_libpgquery::PGRangeTblEntry *
+PGRangeTblEntry *
 RelationParser::addRangeTableEntry(PGParseState *pstate,
-				   duckdb_libpgquery::PGRangeVar *relation,
-				   duckdb_libpgquery::PGAlias *alias,
+				   PGRangeVar *relation,
+				   PGAlias *alias,
 				   bool inh,
 				   bool inFromCl)
 {
-	duckdb_libpgquery::PGRangeTblEntry *rte = makeNode(duckdb_libpgquery::PGRangeTblEntry);
+	PGRangeTblEntry *rte = makeNode(PGRangeTblEntry);
 	char	   *refname = alias ? alias->aliasname : relation->relname;
 	LOCKMODE	lockmode = AccessShareLock;
-	duckdb_libpgquery::PGLockingClause *locking;
+	PGLockingClause *locking;
 	Relation	rel;
 	ParseCallbackState pcbstate;
 
 	rte->alias = alias;
-	rte->rtekind = duckdb_libpgquery::PG_RTE_RELATION;
+	rte->rtekind = PG_RTE_RELATION;
 
 	/*
 	 * CDB: lock promotion around the locking clause is a little different
@@ -1061,33 +1063,33 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
 	return rte;
 };
 
-duckdb_libpgquery::PGRangeTblEntry *
+PGRangeTblEntry *
 RelationParser::addRangeTableEntryForSubquery(PGParseState *pstate,
-							  duckdb_libpgquery::PGQuery *subquery,
-							  duckdb_libpgquery::PGAlias *alias,
+							  PGQuery *subquery,
+							  PGAlias *alias,
 							  bool lateral,
 							  bool inFromCl)
 {
-	duckdb_libpgquery::PGRangeTblEntry *rte = makeNode(duckdb_libpgquery::PGRangeTblEntry);
+	PGRangeTblEntry *rte = makeNode(PGRangeTblEntry);
 	char	   *refname = alias->aliasname;
-	duckdb_libpgquery::PGAlias	   *eref;
+	PGAlias	   *eref;
 	int			numaliases;
 	int			varattno;
-	duckdb_libpgquery::PGListCell   *tlistitem;
+	PGListCell   *tlistitem;
 
-	rte->rtekind = duckdb_libpgquery::PG_RTE_SUBQUERY;
+	rte->rtekind = PG_RTE_SUBQUERY;
 	rte->relid = InvalidOid;
 	rte->subquery = subquery;
 	rte->alias = alias;
 
-	eref = reinterpret_cast<duckdb_libpgquery::PGAlias*>(copyObject(alias));
+	eref = reinterpret_cast<PGAlias*>(copyObject(alias));
 	numaliases = list_length(eref->colnames);
 
 	/* fill in any unspecified alias columns */
 	varattno = 0;
 	foreach(tlistitem, subquery->targetList)
 	{
-		duckdb_libpgquery::PGTargetEntry *te = (duckdb_libpgquery::PGTargetEntry *) lfirst(tlistitem);
+		PGTargetEntry *te = (PGTargetEntry *) lfirst(tlistitem);
 
 		if (te->resjunk)
 			continue;
@@ -1097,8 +1099,8 @@ RelationParser::addRangeTableEntryForSubquery(PGParseState *pstate,
 		{
 			char	   *attrname;
 
-			attrname = duckdb_libpgquery::pstrdup(te->resname);
-			eref->colnames = lappend(eref->colnames, duckdb_libpgquery::makeString(attrname));
+			attrname = pstrdup(te->resname);
+			eref->colnames = lappend(eref->colnames, makeString(attrname));
 		}
 	}
 	if (varattno < numaliases)
@@ -1133,21 +1135,21 @@ RelationParser::addRangeTableEntryForSubquery(PGParseState *pstate,
 	return rte;
 }
 
-void RelationParser::markRTEForSelectPriv(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte,
+void RelationParser::markRTEForSelectPriv(PGParseState *pstate, PGRangeTblEntry *rte,
 					 int rtindex, PGAttrNumber col)
 {
 	if (rte == NULL)
 		rte = rt_fetch(rtindex, pstate->p_rtable);
 
-	if (rte->rtekind == duckdb_libpgquery::PG_RTE_RELATION)
+	if (rte->rtekind == PG_RTE_RELATION)
 	{
 		/* Make sure the rel as a whole is marked for SELECT access */
-		rte->requiredPerms |= duckdb_libpgquery::PG_ACL_SELECT;
+		rte->requiredPerms |= PG_ACL_SELECT;
 		/* Must offset the attnum to fit in a bitmapset */
-		rte->selectedCols = duckdb_libpgquery::bms_add_member(rte->selectedCols,
+		rte->selectedCols = bms_add_member(rte->selectedCols,
 								   col - FirstLowInvalidHeapAttributeNumber);
 	}
-	else if (rte->rtekind == duckdb_libpgquery::PG_RTE_JOIN)
+	else if (rte->rtekind == PG_RTE_JOIN)
 	{
 		if (col == InvalidAttrNumber)
 		{
@@ -1155,41 +1157,41 @@ void RelationParser::markRTEForSelectPriv(PGParseState *pstate, duckdb_libpgquer
 			 * A whole-row reference to a join has to be treated as whole-row
 			 * references to the two inputs.
 			 */
-			duckdb_libpgquery::PGJoinExpr   *j;
+			PGJoinExpr   *j;
 
 			if (rtindex > 0 && rtindex <= list_length(pstate->p_joinexprs))
-				j = (duckdb_libpgquery::PGJoinExpr *) list_nth(pstate->p_joinexprs, rtindex - 1);
+				j = (PGJoinExpr *) list_nth(pstate->p_joinexprs, rtindex - 1);
 			else
 				j = NULL;
 			if (j == NULL)
 				elog(ERROR, "could not find JoinExpr for whole-row reference");
-			Assert(IsA(j, duckdb_libpgquery::PGJoinExpr));
+			Assert(IsA(j, PGJoinExpr));
 
 			/* Note: we can't see FromExpr here */
-			if (IsA(j->larg, duckdb_libpgquery::PGRangeTblRef))
+			if (IsA(j->larg, PGRangeTblRef))
 			{
-				int			varno = ((duckdb_libpgquery::PGRangeTblRef *) j->larg)->rtindex;
+				int			varno = ((PGRangeTblRef *) j->larg)->rtindex;
 
 				markRTEForSelectPriv(pstate, NULL, varno, InvalidAttrNumber);
 			}
-			else if (IsA(j->larg, duckdb_libpgquery::PGJoinExpr))
+			else if (IsA(j->larg, PGJoinExpr))
 			{
-				int			varno = ((duckdb_libpgquery::PGJoinExpr *) j->larg)->rtindex;
+				int			varno = ((PGJoinExpr *) j->larg)->rtindex;
 
 				markRTEForSelectPriv(pstate, NULL, varno, InvalidAttrNumber);
 			}
 			else
 				elog(ERROR, "unrecognized node type: %d",
 					 (int) nodeTag(j->larg));
-			if (IsA(j->rarg, duckdb_libpgquery::PGRangeTblRef))
+			if (IsA(j->rarg, PGRangeTblRef))
 			{
-				int			varno = ((duckdb_libpgquery::PGRangeTblRef *) j->rarg)->rtindex;
+				int			varno = ((PGRangeTblRef *) j->rarg)->rtindex;
 
 				markRTEForSelectPriv(pstate, NULL, varno, InvalidAttrNumber);
 			}
-			else if (IsA(j->rarg, duckdb_libpgquery::PGJoinExpr))
+			else if (IsA(j->rarg, PGJoinExpr))
 			{
-				int			varno = ((duckdb_libpgquery::PGJoinExpr *) j->rarg)->rtindex;
+				int			varno = ((PGJoinExpr *) j->rarg)->rtindex;
 
 				markRTEForSelectPriv(pstate, NULL, varno, InvalidAttrNumber);
 			}
@@ -1220,33 +1222,33 @@ void RelationParser::markRTEForSelectPriv(PGParseState *pstate, duckdb_libpgquer
 };
 
 void 
-RelationParser::markVarForSelectPriv(PGParseState *pstate, duckdb_libpgquery::PGVar *var, duckdb_libpgquery::PGRangeTblEntry *rte)
+RelationParser::markVarForSelectPriv(PGParseState *pstate, PGVar *var, PGRangeTblEntry *rte)
 {
 	Index		lv;
 
-	Assert(IsA(var, duckdb_libpgquery::PGVar));
+	Assert(IsA(var, PGVar));
 	/* Find the appropriate pstate if it's an uplevel Var */
 	for (lv = 0; lv < var->varlevelsup; lv++)
 		pstate = pstate->parentParseState;
 	markRTEForSelectPriv(pstate, rte, var->varno, var->varattno);
 }
 
-duckdb_libpgquery::PGNode *
+PGNode *
 RelationParser::colNameToVar(PGParseState *pstate, char *colname, bool localonly,
 			 int location)
 {
-	duckdb_libpgquery::PGNode	   *result = NULL;
+	PGNode	   *result = NULL;
 	PGParseState *orig_pstate = pstate;
 
 	while (pstate != NULL)
 	{
-		duckdb_libpgquery::PGListCell   *l;
+		PGListCell   *l;
 
 		foreach(l, pstate->p_namespace)
 		{
 			PGParseNamespaceItem *nsitem = (PGParseNamespaceItem *) lfirst(l);
-			duckdb_libpgquery::PGRangeTblEntry *rte = nsitem->p_rte;
-			duckdb_libpgquery::PGNode	   *newresult;
+			PGRangeTblEntry *rte = nsitem->p_rte;
+			PGNode	   *newresult;
 
 			/* Ignore table-only items */
 			if (!nsitem->p_cols_visible)
@@ -1280,7 +1282,7 @@ RelationParser::colNameToVar(PGParseState *pstate, char *colname, bool localonly
 	return result;
 };
 
-duckdb_libpgquery::PGRangeTblEntry *
+PGRangeTblEntry *
 RelationParser::GetRTEByRangeTablePosn(PGParseState *pstate,
 					   int varno,
 					   int sublevels_up)
@@ -1294,17 +1296,17 @@ RelationParser::GetRTEByRangeTablePosn(PGParseState *pstate,
 	return rt_fetch(varno, pstate->p_rtable);
 };
 
-duckdb_libpgquery::PGCommonTableExpr *
-RelationParser::GetCTEForRTE(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int rtelevelsup)
+PGCommonTableExpr *
+RelationParser::GetCTEForRTE(PGParseState *pstate, PGRangeTblEntry *rte, int rtelevelsup)
 {
 	Index		levelsup;
-	duckdb_libpgquery::PGListCell   *lc;
+	PGListCell   *lc;
 
 	/* Determine RTE's levelsup if caller didn't know it */
 	if (rtelevelsup < 0)
 		(void) RTERangeTablePosn(pstate, rte, &rtelevelsup);
 
-	Assert(rte->rtekind == duckdb_libpgquery::PG_RTE_CTE);
+	Assert(rte->rtekind == PG_RTE_CTE);
 	levelsup = rte->ctelevelsup + rtelevelsup;
 	while (levelsup-- > 0)
 	{
@@ -1314,7 +1316,7 @@ RelationParser::GetCTEForRTE(PGParseState *pstate, duckdb_libpgquery::PGRangeTbl
 	}
 	foreach(lc, pstate->p_ctenamespace)
 	{
-		duckdb_libpgquery::PGCommonTableExpr *cte = (duckdb_libpgquery::PGCommonTableExpr *) lfirst(lc);
+		PGCommonTableExpr *cte = (PGCommonTableExpr *) lfirst(lc);
 
 		if (strcmp(cte->ctename, rte->ctename) == 0)
 			return cte;
@@ -1322,6 +1324,87 @@ RelationParser::GetCTEForRTE(PGParseState *pstate, duckdb_libpgquery::PGRangeTbl
 	/* shouldn't happen */
 	elog(ERROR, "could not find CTE \"%s\"", rte->ctename);
 	return NULL;				/* keep compiler quiet */
+};
+
+PGRangeTblEntry *
+RelationParser::addRangeTableEntryForJoin(PGParseState *pstate,
+						  PGList *colnames,
+						  PGJoinType jointype,
+						  PGList *aliasvars,
+						  PGAlias *alias,
+						  bool inFromCl)
+{
+	PGRangeTblEntry *rte = makeNode(PGRangeTblEntry);
+	PGAlias	   *eref;
+	int			numaliases;
+
+	/*
+	 * Fail if join has too many columns --- we must be able to reference any
+	 * of the columns with an AttrNumber.
+	 */
+	if (list_length(aliasvars) > MaxAttrNumber)
+		ereport(ERROR,
+				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				 errmsg("joins can have at most %d columns",
+						MaxAttrNumber)));
+
+	rte->rtekind = PG_RTE_JOIN;
+	rte->relid = InvalidOid;
+	rte->subquery = NULL;
+	rte->jointype = jointype;
+	rte->joinaliasvars = aliasvars;
+	rte->alias = alias;
+
+	/* transform any Vars of type UNKNOWNOID if we can */
+	fixup_unknown_vars_in_exprlist(pstate, rte->joinaliasvars);
+
+	eref = alias ? (PGAlias *) copyObject(alias) : makeAlias("unnamed_join", NIL);
+	numaliases = list_length(eref->colnames);
+
+	/* fill in any unspecified alias columns */
+	if (numaliases < list_length(colnames))
+		eref->colnames = list_concat(eref->colnames,
+									 list_copy_tail(colnames, numaliases));
+
+	rte->eref = eref;
+
+	/*
+	 * Set flags and access permissions.
+	 *
+	 * Joins are never checked for access rights.
+	 */
+	rte->lateral = false;
+	rte->inh = false;			/* never true for joins */
+	rte->inFromCl = inFromCl;
+
+	// rte->requiredPerms = 0;
+	// rte->checkAsUser = InvalidOid;
+	// rte->selectedCols = NULL;
+	// rte->modifiedCols = NULL;
+
+	/*
+	 * Add completed RTE to pstate's range table list, but not to join list
+	 * nor namespace --- caller must do that if appropriate.
+	 */
+	if (pstate != NULL)
+		pstate->p_rtable = lappend(pstate->p_rtable, rte);
+
+	return rte;
+};
+
+PGTargetEntry *
+RelationParser::get_tle_by_resno(PGList *tlist, PGAttrNumber resno)
+{
+	PGListCell   *l;
+
+	foreach(l, tlist)
+	{
+		PGTargetEntry *tle = (PGTargetEntry *) lfirst(l);
+
+		if (tle->resno == resno)
+			return tle;
+	}
+	return NULL;
 };
 
 }

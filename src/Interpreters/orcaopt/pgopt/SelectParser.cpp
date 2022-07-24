@@ -1,36 +1,14 @@
 #include <SelectParser.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
 
-std::shared_ptr<PGParseState>
-SelectParser::make_parsestate(PGParseState *parentParseState)
+PGQuery *
+SelectParser::transformStmt(PGParseState *pstate, PGNode *parseTree)
 {
-	auto pstate = std::make_shared<PGParseState>();
-
-	pstate->parentParseState = parentParseState;
-
-	/* Fill in fields that don't start at null/false/zero */
-	pstate->p_next_resno = 1;
-
-	if (parentParseState)
-	{
-		pstate->p_sourcetext = parentParseState->p_sourcetext;
-		/* all hooks are copied from parent */
-		//pstate->p_pre_columnref_hook = parentParseState->p_pre_columnref_hook;
-		//pstate->p_post_columnref_hook = parentParseState->p_post_columnref_hook;
-		//pstate->p_paramref_hook = parentParseState->p_paramref_hook;
-		//pstate->p_coerce_param_hook = parentParseState->p_coerce_param_hook;
-		pstate->p_ref_hook_state = parentParseState->p_ref_hook_state;
-	}
-
-	return pstate;
-};
-
-duckdb_libpgquery::PGQuery *
-SelectParser::transformStmt(PGParseState *pstate, duckdb_libpgquery::PGNode *parseTree)
-{
-	duckdb_libpgquery::PGQuery	   *result;
+	PGQuery	   *result;
 
 	switch (nodeTag(parseTree))
 	{
@@ -49,15 +27,15 @@ SelectParser::transformStmt(PGParseState *pstate, duckdb_libpgquery::PGNode *par
 			result = transformUpdateStmt(pstate, (UpdateStmt *) parseTree);
 			break;*/
 
-		case duckdb_libpgquery::T_PGSelectStmt:
+		case T_PGSelectStmt:
 			{
-				duckdb_libpgquery::PGSelectStmt *n = (duckdb_libpgquery::PGSelectStmt *) parseTree;
+				PGSelectStmt *n = (PGSelectStmt *) parseTree;
 
-				if (n->op == duckdb_libpgquery::PG_SETOP_NONE)
+				if (n->op == PG_SETOP_NONE)
 					result = transformSelectStmt(pstate, n);
 				/*if (n->valuesLists)
 					result = transformValuesClause(pstate, n);
-				else if (n->op == duckdb_libpgquery::PG_SETOP_NONE)
+				else if (n->op == PG_SETOP_NONE)
 					result = transformSelectStmt(pstate, n);
 				else
 					result = transformSetOperationStmt(pstate, n);*/
@@ -88,14 +66,14 @@ SelectParser::transformStmt(PGParseState *pstate, duckdb_libpgquery::PGNode *par
 			 * other statements don't require any transformation; just return
 			 * the original parsetree with a Query node plastered on top.
 			 */
-			result = makeNode(duckdb_libpgquery::PGQuery);
-			result->commandType = duckdb_libpgquery::PG_CMD_UTILITY;
-			result->utilityStmt = (duckdb_libpgquery::PGNode *) parseTree;
+			result = makeNode(PGQuery);
+			result->commandType = PG_CMD_UTILITY;
+			result->utilityStmt = (PGNode *) parseTree;
 			break;
 	}
 
 	/* Mark as original query until we learn differently */
-	result->querySource = duckdb_libpgquery::PG_QSRC_ORIGINAL;
+	result->querySource = PG_QSRC_ORIGINAL;
 	result->canSetTag = true;
 
 	//if (pstate->p_hasDynamicFunction)
@@ -104,13 +82,13 @@ SelectParser::transformStmt(PGParseState *pstate, duckdb_libpgquery::PGNode *par
 	return result;
 };
 
-duckdb_libpgquery::PGQuery *
-SelectParser::parse_sub_analyze(duckdb_libpgquery::PGNode *parseTree, PGParseState *parentParseState,
-				  duckdb_libpgquery::PGCommonTableExpr *parentCTE,
-				  duckdb_libpgquery::PGLockingClause *lockclause_from_parent)
+PGQuery *
+SelectParser::parse_sub_analyze(PGNode *parseTree, PGParseState *parentParseState,
+				  PGCommonTableExpr *parentCTE,
+				  PGLockingClause *lockclause_from_parent)
 {
-	PGParseState *pstate = make_parsestate(parentParseState).get();
-	duckdb_libpgquery::PGQuery	   *query;
+	PGParseState *pstate = make_parsestate(parentParseState);
+	PGQuery	   *query;
 
 	pstate->p_parent_cte = parentCTE;
 	pstate->p_lockclause_from_parent = lockclause_from_parent;
@@ -120,14 +98,14 @@ SelectParser::parse_sub_analyze(duckdb_libpgquery::PGNode *parseTree, PGParseSta
 	return query;
 };
 
-duckdb_libpgquery::PGQuery *
-SelectParser::transformSelectStmt(PGParseState *pstate, duckdb_libpgquery::PGSelectStmt *stmt)
+PGQuery *
+SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 {
-    duckdb_libpgquery::PGQuery	   *qry = makeNode(duckdb_libpgquery::PGQuery);
-	duckdb_libpgquery::PGNode	   *qual;
-	duckdb_libpgquery::PGListCell   *l;
+    PGQuery	   *qry = makeNode(PGQuery);
+	PGNode	   *qual;
+	PGListCell   *l;
 
-	qry->commandType = duckdb_libpgquery::PGCmdType::PG_CMD_SELECT;
+	qry->commandType = PGCmdType::PG_CMD_SELECT;
 
 	/* process the WITH clause independently of all else */
 	/*if (stmt->withClause)
@@ -143,7 +121,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, duckdb_libpgquery::PGSel
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT ... INTO is not allowed here"),
 				 parser_errposition(pstate,
-								  exprLocation((duckdb_libpgquery::PGNodeNode *) stmt->intoClause))));*/
+								  exprLocation((PGNodeNode *) stmt->intoClause))));*/
 
 	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
 	pstate->p_locking_clause = stmt->lockingClause;
@@ -207,7 +185,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, duckdb_libpgquery::PGSel
 	 * possible due to grammar restrictions on where a SCATTER clause is
 	 * allowed.
 	 */
-	Insist(!(stmt->scatterClause && stmt->intoClause));
+	//Insist(!(stmt->scatterClause && stmt->intoClause));
 	// qry->scatterClause = clause_parser.transformScatterClause(pstate,
 	// 											stmt->scatterClause,
 	// 											&qry->targetList);
@@ -259,9 +237,9 @@ SelectParser::transformSelectStmt(PGParseState *pstate, duckdb_libpgquery::PGSel
 										   EXPR_KIND_LIMIT, "LIMIT");
 
 	/* transform window clauses after we have seen all window functions */
-	qry->windowClause = transformWindowDefinitions(pstate,
-												   pstate->p_windowdefs,
-												   &qry->targetList);
+	//qry->windowClause = transformWindowDefinitions(pstate,
+												   //pstate->p_windowdefs,
+												   //&qry->targetList);
 
 	//processExtendedGrouping(pstate, qry->havingQual, qry->windowClause, qry->targetList);
 
