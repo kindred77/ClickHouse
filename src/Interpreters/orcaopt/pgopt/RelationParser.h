@@ -93,6 +93,9 @@ public:
 	
 	duckdb_libpgquery::PGTargetEntry *
 	get_tle_by_resno(duckdb_libpgquery::PGList *tlist, PGAttrNumber resno);
+
+	void buildRelationAliases(TupleDesc tupdesc,
+		duckdb_libpgquery::PGAlias *alias, duckdb_libpgquery::PGAlias *eref);
 };
 
 }

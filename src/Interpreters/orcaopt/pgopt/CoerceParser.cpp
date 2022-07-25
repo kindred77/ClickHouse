@@ -134,9 +134,9 @@ CoerceParser::find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
 	*funcid = InvalidOid;
 
 	/* Perhaps the types are domains; if so, look at their base types */
-	if (OidIsValid(sourceTypeId))
+	if (sourceTypeId != InvalidOid)
 		sourceTypeId = getBaseType(sourceTypeId);
-	if (OidIsValid(targetTypeId))
+	if (targetTypeId != InvalidOid)
 		targetTypeId = getBaseType(targetTypeId);
 
 	/* Domains are always coercible to and from their base type */
@@ -168,8 +168,9 @@ CoerceParser::find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
 				castcontext = COERCION_EXPLICIT;
 				break;
 			default:
-				elog(ERROR, "unrecognized castcontext: %d",
-					 (int) castForm->castcontext);
+				// elog(ERROR, "unrecognized castcontext: %d",
+				// 	 (int) castForm->castcontext);
+				throw Exception(ERROR, "unrecognized castcontext: {}", (int) castForm->castcontext);
 				castcontext = 0;	/* keep compiler quiet */
 				break;
 		}
@@ -190,9 +191,10 @@ CoerceParser::find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
 					result = COERCION_PATH_RELABELTYPE;
 					break;
 				default:
-					elog(ERROR, "unrecognized castmethod: %d",
-						 (int) castForm->castmethod);
-					break;
+					// elog(ERROR, "unrecognized castmethod: %d",
+					// 	 (int) castForm->castmethod);
+					throw Exception(ERROR, "unrecognized castmethod: {}", (int) castForm->castmethod);
+					//break;
 			}
 		}
 
@@ -486,9 +488,10 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 			Oid elemoid = get_element_type(inputTypeId);
 
 			if(elemoid == InvalidOid)
-				ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH), 
-					 errmsg("Cannot convert non-Array type to ANYARRAY")));
+				// ereport(ERROR,
+				// 	(errcode(ERRCODE_DATATYPE_MISMATCH), 
+				// 	 errmsg("Cannot convert non-Array type to ANYARRAY")));
+				throw Exception(ERROR, "Cannot convert non-Array type to ANYARRAY");
 
 			memcpy(newcon, con, sizeof(PGConst));
 			newcon->consttype = ANYARRAYOID;
@@ -842,8 +845,10 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		return (PGNode *) r;
 	}
 	/* If we get here, caller blew it */
-	elog(ERROR, "failed to find conversion function from %s to %s",
-		 format_type_be(inputTypeId), format_type_be(targetTypeId));
+	// elog(ERROR, "failed to find conversion function from %s to %s",
+	// 	 format_type_be(inputTypeId), format_type_be(targetTypeId));
+	throw Exception(ERROR, "failed to find conversion function from {} to {}",
+			format_type_be(inputTypeId), format_type_be(targetTypeId));
 	return NULL;				/* keep compiler quiet */
 };
 
@@ -863,22 +868,26 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 										PG_COERCE_IMPLICIT_CAST,
 										-1);
 		if (newnode == NULL)
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-			/* translator: first %s is name of a SQL construct, eg WHERE */
-				   errmsg("argument of %s must be type boolean, not type %s",
-						  constructName, format_type_be(inputTypeId)),
-					 parser_errposition(pstate, exprLocation(node))));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_DATATYPE_MISMATCH),
+			// /* translator: first %s is name of a SQL construct, eg WHERE */
+			// 	   errmsg("argument of %s must be type boolean, not type %s",
+			// 			  constructName, format_type_be(inputTypeId)),
+			// 		 parser_errposition(pstate, exprLocation(node))));
+			throw Exception(ERROR, "argument of {} must be type boolean, not type {}",
+				constructName, format_type_be(inputTypeId));
 		node = newnode;
 	}
 
 	if (expression_returns_set(node))
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-		/* translator: %s is name of a SQL construct, eg WHERE */
-				 errmsg("argument of %s must not return a set",
-						constructName),
-				 parser_errposition(pstate, exprLocation(node))));
+		// ereport(ERROR,
+		// 		(errcode(ERRCODE_DATATYPE_MISMATCH),
+		// /* translator: %s is name of a SQL construct, eg WHERE */
+		// 		 errmsg("argument of %s must not return a set",
+		// 				constructName),
+		// 		 parser_errposition(pstate, exprLocation(node))));
+		throw Exception(ERROR, "argument of {} must not return a set",
+				constructName);
 
 	return node;
 };
@@ -957,15 +966,17 @@ CoerceParser::select_common_type(PGParseState *pstate,
 				 */
 				if (context == NULL)
 					return InvalidOid;
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-				/*------
-				  translator: first %s is name of a SQL construct, eg CASE */
-						 errmsg("%s types %s and %s cannot be matched",
-								context,
-								format_type_be(ptype),
-								format_type_be(ntype)),
-						 parser_errposition(pstate, exprLocation(nexpr))));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_DATATYPE_MISMATCH),
+				// /*------
+				//   translator: first %s is name of a SQL construct, eg CASE */
+				// 		 errmsg("%s types %s and %s cannot be matched",
+				// 				context,
+				// 				format_type_be(ptype),
+				// 				format_type_be(ntype)),
+				// 		 parser_errposition(pstate, exprLocation(nexpr))));
+				throw Exception(ERROR, "{} types {} and {} cannot be matched",
+					context, format_type_be(ptype), format_type_be(ntype));
 			}
 			else if (!pispreferred &&
 					 can_coerce_type(1, &ptype, &ntype, PG_COERCION_IMPLICIT) &&

@@ -5,6 +5,7 @@
 #include <RelationParser.h>
 #include <SelectParser.h>
 #include <ExprParser.h>
+#include <CollationParser.h>
 
 namespace DB
 {
@@ -17,6 +18,7 @@ private:
     CoerceParser coerce_parser;
     ExprParser expr_parser;
     TargetParser target_parser;
+    CollationParser collation_parser;
 public:
 	explicit ClauseParser();
     void transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGList *frmList);

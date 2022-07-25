@@ -315,61 +315,61 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 				}
 			}
 			break;
-		case PG_RTE_VALUES:
-			{
-				/* Values RTE */
-				PGListCell   *aliasp_item = list_head(rte->eref->colnames);
-				int32	   *coltypmods;
-				PGListCell   *lcv;
-				PGListCell   *lcc;
+		// case PG_RTE_VALUES:
+		// 	{
+		// 		/* Values RTE */
+		// 		PGListCell   *aliasp_item = list_head(rte->eref->colnames);
+		// 		int32	   *coltypmods;
+		// 		PGListCell   *lcv;
+		// 		PGListCell   *lcc;
 
-				/*
-				 * It's okay to extract column types from the expressions in
-				 * the first row, since all rows will have been coerced to the
-				 * same types.  Their typmods might not be the same though, so
-				 * we potentially need to examine all rows to compute those.
-				 * Column collations are pre-computed in values_collations.
-				 */
-				if (colvars)
-					coltypmods = getValuesTypmods(rte);
-				else
-					coltypmods = NULL;
+		// 		/*
+		// 		 * It's okay to extract column types from the expressions in
+		// 		 * the first row, since all rows will have been coerced to the
+		// 		 * same types.  Their typmods might not be the same though, so
+		// 		 * we potentially need to examine all rows to compute those.
+		// 		 * Column collations are pre-computed in values_collations.
+		// 		 */
+		// 		if (colvars)
+		// 			coltypmods = getValuesTypmods(rte);
+		// 		else
+		// 			coltypmods = NULL;
 
-				varattno = 0;
-				forboth(lcv, (List *) linitial(rte->values_lists),
-						lcc, rte->values_collations)
-				{
-					PGNode	   *col = (PGNode *) lfirst(lcv);
-					Oid			colcollation = lfirst_oid(lcc);
+		// 		varattno = 0;
+		// 		forboth(lcv, (PGList *) linitial(rte->values_lists),
+		// 				lcc, rte->values_collations)
+		// 		{
+		// 			PGNode	   *col = (PGNode *) lfirst(lcv);
+		// 			Oid			colcollation = lfirst_oid(lcc);
 
-					varattno++;
-					if (colnames)
-					{
-						/* Assume there is one alias per column */
-						char	   *label = strVal(lfirst(aliasp_item));
+		// 			varattno++;
+		// 			if (colnames)
+		// 			{
+		// 				/* Assume there is one alias per column */
+		// 				char	   *label = strVal(lfirst(aliasp_item));
 
-						*colnames = lappend(*colnames,
-											makeString(pstrdup(label)));
-						aliasp_item = lnext(aliasp_item);
-					}
+		// 				*colnames = lappend(*colnames,
+		// 									makeString(pstrdup(label)));
+		// 				aliasp_item = lnext(aliasp_item);
+		// 			}
 
-					if (colvars)
-					{
-						PGVar		   *varnode;
+		// 			if (colvars)
+		// 			{
+		// 				PGVar		   *varnode;
 
-						varnode = makeVar(rtindex, varattno,
-										  exprType(col),
-										  coltypmods[varattno - 1],
-										  colcollation,
-										  sublevels_up);
-						varnode->location = location;
-						*colvars = lappend(*colvars, varnode);
-					}
-				}
-				if (coltypmods)
-					pfree(coltypmods);
-			}
-			break;
+		// 				varnode = makeVar(rtindex, varattno,
+		// 								  exprType(col),
+		// 								  coltypmods[varattno - 1],
+		// 								  colcollation,
+		// 								  sublevels_up);
+		// 				varnode->location = location;
+		// 				*colvars = lappend(*colvars, varnode);
+		// 			}
+		// 		}
+		// 		if (coltypmods)
+		// 			pfree(coltypmods);
+		// 	}
+		// 	break;
 		case PG_RTE_JOIN:
 			{
 				/* Join RTE */
@@ -481,7 +481,8 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 			}
 			break;
 		default:
-			elog(ERROR, "unrecognized RTE kind: %d", (int) rte->rtekind);
+			//elog(ERROR, "unrecognized RTE kind: %d", (int) rte->rtekind);
+			throw Exception(ERROR, "unrecognized RTE kind: {}", rte->rtekind);
 	}
 };
 
@@ -514,10 +515,11 @@ RelationParser::checkNameSpaceConflicts(PGParseState *pstate, PGList *namespace1
 				rte2->rtekind == PGRTEKind::PG_RTE_RELATION && rte2->alias == NULL &&
 				rte1->relid != rte2->relid)
 				continue;		/* no conflict per SQL rule */
-			ereport(ERROR,
-					(errcode(ERRCODE_DUPLICATE_ALIAS),
-					 errmsg("table name \"%s\" specified more than once",
-							aliasname1)));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_DUPLICATE_ALIAS),
+			// 		 errmsg("table name \"%s\" specified more than once",
+			// 				aliasname1)));
+			throw Exception(ERROR, "table name {} specified more than once", aliasname1);
 		}
 	}
 };
@@ -559,11 +561,12 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 
 		if (ctequery->commandType != PGCmdType::PG_CMD_SELECT &&
 			ctequery->returningList == NIL)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("WITH query \"%s\" does not have a RETURNING clause",
-						cte->ctename),
-					 parser_errposition(pstate, rv->location)));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			// 	 errmsg("WITH query \"%s\" does not have a RETURNING clause",
+			// 			cte->ctename),
+			// 		 parser_errposition(pstate, rv->location)));
+			throw Exception(ERROR, "WITH query {} does not have a RETURNING clause", cte->ctename);
 	}
 
 	rte->ctecoltypes = cte->ctecoltypes;
@@ -572,7 +575,7 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 
 	rte->alias = alias;
 	if (alias)
-		eref = copyObject(alias);
+		eref = reinterpret_cast<PGAlias *>(copyObject(alias));
 	else
 		eref = makeAlias(refname, NIL);
 	numaliases = list_length(eref->colnames);
@@ -586,10 +589,11 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 			eref->colnames = lappend(eref->colnames, lfirst(lc));
 	}
 	if (varattno < numaliases)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-				 errmsg("table \"%s\" has %d columns available but %d columns specified",
-						refname, varattno, numaliases)));
+		// ereport(ERROR,
+		// 		(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+		// 		 errmsg("table \"%s\" has %d columns available but %d columns specified",
+		// 				refname, varattno, numaliases)));
+		throw Exception(ERROR, "table {} has {} columns available but {} columns specified", refname, varattno, numaliases);
 
 	rte->eref = eref;
 
@@ -693,7 +697,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 				*varcollid = exprCollation((PGNode *) te->expr);
 			}
 			break;
-		case PG_RTE_TABLEFUNCTION:
+		//case PG_RTE_TABLEFUNCTION:
 		case PG_RTE_FUNCTION:
 			{
 				/* Function RTE */
@@ -731,11 +735,12 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 							 * notes in scanRTEForColumn.
 							 */
 							if (att_tup->attisdropped)
-								ereport(ERROR,
-										(errcode(ERRCODE_UNDEFINED_COLUMN),
-										 errmsg("column \"%s\" of relation \"%s\" does not exist",
-												NameStr(att_tup->attname),
-												rte->eref->aliasname)));
+								// ereport(ERROR,
+								// 		(errcode(ERRCODE_UNDEFINED_COLUMN),
+								// 		 errmsg("column \"%s\" of relation \"%s\" does not exist",
+								// 				NameStr(att_tup->attname),
+								// 				rte->eref->aliasname)));
+								throw Exception(ERROR, "column {} of relation {} does not exist", att_tup->attname.data, rte->eref->aliasname);
 							*vartype = att_tup->atttypid;
 							*vartypmod = att_tup->atttypmod;
 							*varcollid = att_tup->attcollation;
@@ -762,7 +767,8 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 							 * addRangeTableEntryForFunction should've caught
 							 * this
 							 */
-							elog(ERROR, "function in FROM has unsupported return type");
+							//elog(ERROR, "function in FROM has unsupported return type");
+							throw Exception(ERROR, "function in FROM has unsupported return type");
 						}
 						return;
 					}
@@ -779,11 +785,13 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 				}
 
 				/* this probably can't happen ... */
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_COLUMN),
-						 errmsg("column %d of relation \"%s\" does not exist",
-								attnum,
-								rte->eref->aliasname)));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_UNDEFINED_COLUMN),
+				// 		 errmsg("column %d of relation \"%s\" does not exist",
+				// 				attnum,
+				// 				rte->eref->aliasname)));
+				throw Exception(ERROR, "column %d of relation \"%s\" does not exist",
+					attnum, rte->eref->aliasname);
 			}
 			break;
 		case PG_RTE_VALUES:
@@ -795,7 +803,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 				 * but this path is taken so seldom for VALUES that it's not
 				 * worth writing extra code.
 				 */
-				PGList	   *collist = (List *) linitial(rte->values_lists);
+				PGList	   *collist = (PGList *) linitial(rte->values_lists);
 				PGNode	   *col;
 				int32	   *coltypmods = getValuesTypmods(rte);
 
@@ -824,17 +832,18 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 				*varcollid = exprCollation(aliasvar);
 			}
 			break;
-		case PG_RTE_CTE:
-			{
-				/* CTE RTE --- get type info from lists in the RTE */
-				Assert(attnum > 0 && attnum <= list_length(rte->ctecoltypes));
-				*vartype = list_nth_oid(rte->ctecoltypes, attnum - 1);
-				*vartypmod = list_nth_int(rte->ctecoltypmods, attnum - 1);
-				*varcollid = list_nth_oid(rte->ctecolcollations, attnum - 1);
-			}
-			break;
+		// case PG_RTE_CTE:
+		// 	{
+		// 		/* CTE RTE --- get type info from lists in the RTE */
+		// 		Assert(attnum > 0 && attnum <= list_length(rte->ctecoltypes));
+		// 		*vartype = list_nth_oid(rte->ctecoltypes, attnum - 1);
+		// 		*vartypmod = list_nth_int(rte->ctecoltypmods, attnum - 1);
+		// 		*varcollid = list_nth_oid(rte->ctecolcollations, attnum - 1);
+		// 	}
+		// 	break;
 		default:
-			elog(ERROR, "unrecognized RTE kind: %d", (int) rte->rtekind);
+			//elog(ERROR, "unrecognized RTE kind: %d", (int) rte->rtekind);
+			throw Exception(ERROR, "unrecognized RTE kind: {}", (int) rte->rtekind);
 	}
 }
 
@@ -883,11 +892,12 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, cha
 		if (strcmp(strVal(lfirst(c)), colname) == 0)
 		{
 			if (result)
-				ereport(ERROR,
-						(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-						 errmsg("column reference \"%s\" is ambiguous",
-								colname),
-						 parser_errposition(pstate, location)));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_AMBIGUOUS_COLUMN),
+				// 		 errmsg("column reference \"%s\" is ambiguous",
+				// 				colname),
+				// 		 parser_errposition(pstate, location)));
+				throw Exception(ERROR, "column reference {} is ambiguous", colname);
 			var = make_var(pstate, rte, attnum, location);
 			/* Require read access to the column */
 			markVarForSelectPriv(pstate, var, rte);
@@ -930,11 +940,12 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, cha
 		 */
 		if (pstate->p_expr_kind == EXPR_KIND_CHECK_CONSTRAINT &&
 			attnum < InvalidAttrNumber /* && attnum != TableOidAttributeNumber */)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("system column \"%s\" reference in check constraint is invalid",
-							colname),
-					 parser_errposition(pstate, location)));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+			// 		 errmsg("system column \"%s\" reference in check constraint is invalid",
+			// 				colname),
+			// 		 parser_errposition(pstate, location)));
+			throw Exception(ERROR, "system column {} reference in check constraint is invalid", colname);
 
 		if (attnum != InvalidAttrNumber)
 		{
@@ -959,6 +970,70 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, cha
 	}
 
 	return result;
+};
+
+void
+RelationParser::buildRelationAliases(TupleDesc tupdesc,
+		PGAlias *alias, PGAlias *eref)
+{
+	int			maxattrs = tupdesc->natts;
+	PGListCell   *aliaslc;
+	int			numaliases;
+	int			varattno;
+	int			numdropped = 0;
+
+	Assert(eref->colnames == NIL);
+
+	if (alias)
+	{
+		aliaslc = list_head(alias->colnames);
+		numaliases = list_length(alias->colnames);
+		/* We'll rebuild the alias colname list */
+		alias->colnames = NIL;
+	}
+	else
+	{
+		aliaslc = NULL;
+		numaliases = 0;
+	}
+
+	for (varattno = 0; varattno < maxattrs; varattno++)
+	{
+		Form_pg_attribute attr = tupdesc->attrs[varattno];
+		PGValue	   *attrname;
+
+		if (attr->attisdropped)
+		{
+			/* Always insert an empty string for a dropped column */
+			attrname = makeString(pstrdup(""));
+			if (aliaslc)
+				alias->colnames = lappend(alias->colnames, attrname);
+			numdropped++;
+		}
+		else if (aliaslc)
+		{
+			/* Use the next user-supplied alias */
+			attrname = (PGValue *) lfirst(aliaslc);
+			aliaslc = lnext(aliaslc);
+			alias->colnames = lappend(alias->colnames, attrname);
+		}
+		else
+		{
+			attrname = makeString(pstrdup(attr->attname.data));
+			/* we're done with the alias if any */
+		}
+
+		eref->colnames = lappend(eref->colnames, attrname);
+	}
+
+	/* Too many user-supplied aliases? */
+	if (aliaslc)
+		// ereport(ERROR,
+		// 		(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+		// 		 errmsg("table \"%s\" has %d columns available but %d columns specified",
+		// 				eref->aliasname, maxattrs - numdropped, numaliases)));
+		throw Exception(ERROR, "table {} has {} columns available but {} columns specified",
+			eref->aliasname, maxattrs - numdropped, numaliases);
 };
 
 PGRangeTblEntry *
@@ -995,13 +1070,15 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
 
 			rel = try_heap_open(relid, NoLock, true);
 			if (!rel)
-				elog(ERROR, "open relation(%u) fail", relid);
+				//elog(ERROR, "open relation(%u) fail", relid);
+				throw Exception(ERROR, "open relation({}) fail", relid);
 
 			if (rel->rd_rel->relkind == RELKIND_MATVIEW)
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-								errmsg("cannot lock rows in materialized view \"%s\"",
-									   RelationGetRelationName(rel))));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				// 				errmsg("cannot lock rows in materialized view \"%s\"",
+				// 					   RelationGetRelationName(rel))));
+				throw Exception(ERROR, "cannot lock rows in materialized view {}", RelationGetRelationName(rel));
 
 			lockmode = IsSystemRelation(rel) ? RowExclusiveLock : ExclusiveLock;
 			heap_close(rel, NoLock);
@@ -1104,10 +1181,12 @@ RelationParser::addRangeTableEntryForSubquery(PGParseState *pstate,
 		}
 	}
 	if (varattno < numaliases)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-				 errmsg("table \"%s\" has %d columns available but %d columns specified",
-						refname, varattno, numaliases)));
+		//ereport(ERROR,
+				//(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+				 //errmsg("table \"%s\" has %d columns available but %d columns specified",
+						//refname, varattno, numaliases)));
+		throw Exception(ERROR, "table {} has {} columns available but {} columns specified.",
+			refname, varattno, numaliases);
 
 	rte->eref = eref;
 
@@ -1144,10 +1223,10 @@ void RelationParser::markRTEForSelectPriv(PGParseState *pstate, PGRangeTblEntry 
 	if (rte->rtekind == PG_RTE_RELATION)
 	{
 		/* Make sure the rel as a whole is marked for SELECT access */
-		rte->requiredPerms |= PG_ACL_SELECT;
+		//rte->requiredPerms |= PG_ACL_SELECT;
 		/* Must offset the attnum to fit in a bitmapset */
-		rte->selectedCols = bms_add_member(rte->selectedCols,
-								   col - FirstLowInvalidHeapAttributeNumber);
+		//rte->selectedCols = bms_add_member(rte->selectedCols,
+								   //col - FirstLowInvalidHeapAttributeNumber);
 	}
 	else if (rte->rtekind == PG_RTE_JOIN)
 	{
@@ -1164,7 +1243,8 @@ void RelationParser::markRTEForSelectPriv(PGParseState *pstate, PGRangeTblEntry 
 			else
 				j = NULL;
 			if (j == NULL)
-				elog(ERROR, "could not find JoinExpr for whole-row reference");
+				//elog(ERROR, "could not find JoinExpr for whole-row reference");
+				throw Exception(ERROR, "could not find JoinExpr for whole-row reference");
 			Assert(IsA(j, PGJoinExpr));
 
 			/* Note: we can't see FromExpr here */
@@ -1181,8 +1261,9 @@ void RelationParser::markRTEForSelectPriv(PGParseState *pstate, PGRangeTblEntry 
 				markRTEForSelectPriv(pstate, NULL, varno, InvalidAttrNumber);
 			}
 			else
-				elog(ERROR, "unrecognized node type: %d",
-					 (int) nodeTag(j->larg));
+				// elog(ERROR, "unrecognized node type: %d",
+				// 	 (int) nodeTag(j->larg));
+				throw Exception(ERROR, "unrecognized node type: {}", (int) nodeTag(j->larg));
 			if (IsA(j->rarg, PGRangeTblRef))
 			{
 				int			varno = ((PGRangeTblRef *) j->rarg)->rtindex;
@@ -1196,8 +1277,9 @@ void RelationParser::markRTEForSelectPriv(PGParseState *pstate, PGRangeTblEntry 
 				markRTEForSelectPriv(pstate, NULL, varno, InvalidAttrNumber);
 			}
 			else
-				elog(ERROR, "unrecognized node type: %d",
-					 (int) nodeTag(j->rarg));
+				// elog(ERROR, "unrecognized node type: %d",
+				// 	 (int) nodeTag(j->rarg));
+				throw Exception(ERROR, "unrecognized node type: {}", (int) nodeTag(j->larg));
 		}
 		else
 		{
@@ -1210,12 +1292,12 @@ void RelationParser::markRTEForSelectPriv(PGParseState *pstate, PGRangeTblEntry 
 			 * JOIN clause.  So we need only be concerned with the Var case.
 			 * But we do need to drill down through implicit coercions.
 			 */
-			Var		   *aliasvar;
+			PGVar		   *aliasvar;
 
 			Assert(col > 0 && col <= list_length(rte->joinaliasvars));
-			aliasvar = (Var *) list_nth(rte->joinaliasvars, col - 1);
-			aliasvar = (Var *) strip_implicit_coercions((Node *) aliasvar);
-			if (aliasvar && IsA(aliasvar, Var))
+			aliasvar = (PGVar *) list_nth(rte->joinaliasvars, col - 1);
+			aliasvar = (PGVar *) strip_implicit_coercions((PGNode *) aliasvar);
+			if (aliasvar && IsA(aliasvar, PGVar))
 				markVarForSelectPriv(pstate, aliasvar, NULL);
 		}
 	}
@@ -1263,11 +1345,13 @@ RelationParser::colNameToVar(PGParseState *pstate, char *colname, bool localonly
 			if (newresult)
 			{
 				if (result)
-					ereport(ERROR,
-							(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-							 errmsg("column reference \"%s\" is ambiguous",
-									colname),
-							 parser_errposition(pstate, location)));
+					//ereport(ERROR,
+							//(errcode(ERRCODE_AMBIGUOUS_COLUMN),
+							// errmsg("column reference \"%s\" is ambiguous",
+							//		colname),
+							// parser_errposition(pstate, location)));
+				throw Exception(ERROR, "column reference {} is ambiguous.",
+					colname);
 				check_lateral_ref_ok(pstate, nsitem, location);
 				result = newresult;
 			}
@@ -1312,7 +1396,8 @@ RelationParser::GetCTEForRTE(PGParseState *pstate, PGRangeTblEntry *rte, int rte
 	{
 		pstate = pstate->parentParseState;
 		if (!pstate)			/* shouldn't happen */
-			elog(ERROR, "bad levelsup for CTE \"%s\"", rte->ctename);
+			//elog(ERROR, "bad levelsup for CTE \"%s\"", rte->ctename);
+			throw Exception(ERROR, "bad levelsup for CTE {}", rte->ctename);
 	}
 	foreach(lc, pstate->p_ctenamespace)
 	{
@@ -1322,8 +1407,9 @@ RelationParser::GetCTEForRTE(PGParseState *pstate, PGRangeTblEntry *rte, int rte
 			return cte;
 	}
 	/* shouldn't happen */
-	elog(ERROR, "could not find CTE \"%s\"", rte->ctename);
-	return NULL;				/* keep compiler quiet */
+	//elog(ERROR, "could not find CTE \"%s\"", rte->ctename);
+	throw Exception(ERROR, "could not find CTE {}", rte->ctename);
+	//return NULL;				/* keep compiler quiet */
 };
 
 PGRangeTblEntry *
@@ -1343,10 +1429,11 @@ RelationParser::addRangeTableEntryForJoin(PGParseState *pstate,
 	 * of the columns with an AttrNumber.
 	 */
 	if (list_length(aliasvars) > MaxAttrNumber)
-		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("joins can have at most %d columns",
-						MaxAttrNumber)));
+		// ereport(ERROR,
+		// 		(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+		// 		 errmsg("joins can have at most %d columns",
+		// 				MaxAttrNumber)));
+		throw Exception(ERROR, "joins can have at most {} columns", MaxAttrNumber);
 
 	rte->rtekind = PG_RTE_JOIN;
 	rte->relid = InvalidOid;

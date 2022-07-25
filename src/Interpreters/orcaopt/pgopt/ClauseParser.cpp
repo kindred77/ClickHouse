@@ -155,8 +155,9 @@ ClauseParser::transformRangeSubselect(PGParseState *pstate, PGRangeSubselect *r)
 	/*
 	 * Analyze and transform the subquery.
 	 */
-	query = select_parser.parse_sub_analyze(r->subquery, pstate, NULL,
-							  getLockedRefname(pstate, r->alias->aliasname));
+	//query = select_parser.parse_sub_analyze(r->subquery, pstate, NULL,
+							  //getLockedRefname(pstate, r->alias->aliasname));
+	query = select_parser.parse_sub_analyze(r->subquery, pstate, NULL, NULL);
 
 	/* Restore state */
 	pstate->p_lateral_active = false;
@@ -409,7 +410,7 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 				{
 					char	   *r_colname = strVal(lfirst(rx));
 
-					if (std::strcmp(l_colname, r_colname) == 0)
+					if (strcmp(l_colname, r_colname) == 0)
 					{
 						m_name = makeString(l_colname);
 						break;
@@ -460,10 +461,12 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 					char	   *res_colname = strVal(lfirst(col));
 
 					if (strcmp(res_colname, u_colname) == 0)
-						ereport(ERROR,
-								(errcode(ERRCODE_DUPLICATE_COLUMN),
-								 errmsg("column name \"%s\" appears more than once in USING clause",
-										u_colname)));
+						throw Exception(ERROR, "column name {} appears more than once in USING clause",
+							u_colname);
+						//ereport(ERROR,
+								//(errcode(ERRCODE_DUPLICATE_COLUMN),
+								 //errmsg("column name \"%s\" appears more than once in USING clause",
+										//u_colname)));
 				}
 
 				/* Find it in left input */
@@ -475,19 +478,23 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 					if (strcmp(l_colname, u_colname) == 0)
 					{
 						if (l_index >= 0)
-							ereport(ERROR,
-									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-									 errmsg("common column name \"%s\" appears more than once in left table",
-											u_colname)));
+							//ereport(ERROR,
+									//(errcode(ERRCODE_AMBIGUOUS_COLUMN),
+									 //errmsg("common column name \"%s\" appears more than once in left table",
+											//u_colname)));
+							throw Exception(ERROR, "common column name {} appears more than once in left table",
+								u_colname);
 						l_index = ndx;
 					}
 					ndx++;
 				}
 				if (l_index < 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_COLUMN),
-							 errmsg("column \"%s\" specified in USING clause does not exist in left table",
-									u_colname)));
+					//ereport(ERROR,
+							//(errcode(ERRCODE_UNDEFINED_COLUMN),
+							 //errmsg("column \"%s\" specified in USING clause does not exist in left table",
+									//u_colname)));
+					throw Exception(ERROR, "column {} specified in USING clause does not exist in left table",
+								u_colname);
 
 				/* Find it in right input */
 				ndx = 0;
@@ -498,19 +505,23 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 					if (strcmp(r_colname, u_colname) == 0)
 					{
 						if (r_index >= 0)
-							ereport(ERROR,
-									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-									 errmsg("common column name \"%s\" appears more than once in right table",
-											u_colname)));
+							//ereport(ERROR,
+									//(errcode(ERRCODE_AMBIGUOUS_COLUMN),
+									 //errmsg("common column name \"%s\" appears more than once in right table",
+											//u_colname)));
+							throw Exception(ERROR, "common column name {} appears more than once in right table",
+								u_colname);
 						r_index = ndx;
 					}
 					ndx++;
 				}
 				if (r_index < 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_COLUMN),
-							 errmsg("column \"%s\" specified in USING clause does not exist in right table",
-									u_colname)));
+					//ereport(ERROR,
+							//(errcode(ERRCODE_UNDEFINED_COLUMN),
+							 //errmsg("column \"%s\" specified in USING clause does not exist in right table",
+									//u_colname)));
+					throw Exception(ERROR, "column {} specified in USING clause does not exist in right table",
+								u_colname);
 
 				l_colvar = reinterpret_cast<PGVar*>(list_nth(l_colvars, l_index));
 				l_usingvars = lappend(l_usingvars, l_colvar);
@@ -561,10 +572,12 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 			if (j->alias->colnames != NIL)
 			{
 				if (list_length(j->alias->colnames) > list_length(res_colnames))
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("column alias list for \"%s\" has too many entries",
-									j->alias->aliasname)));
+					//ereport(ERROR,
+							//(errcode(ERRCODE_SYNTAX_ERROR),
+							 //errmsg("column alias list for \"%s\" has too many entries",
+									//j->alias->aliasname)));
+					throw Exception(ERROR, "column alias list for {} has too many entries",
+								j->alias->aliasname);
 			}
 		}
 
@@ -681,8 +694,10 @@ ClauseParser::transformJoinUsingClause(PGParseState *pstate,
 		{
 			PGAExpr	   *a;
 
-			a = makeAExpr(PG_AEXPR_AND, NIL, result, (PGNode *) e, -1);
-			result = (PGNode *) a;
+			//a = makeAExpr(PG_AEXPR_AND, NIL, result, (PGNode *) e, -1);
+			//result = (PGNode *) a;
+
+			result = (PGNode *) makeBoolExpr(PG_AND_EXPR, list_make2(result, (PGNode *) e), -1);
 		}
 	}
 
@@ -852,7 +867,7 @@ ClauseParser::buildMergedJoinVar(PGParseState *pstate, PGJoinType jointype,
 	 * coercion and CoalesceExpr nodes, if we made any.  This must be done now
 	 * so that the join node's alias vars show correct collation info.
 	 */
-	assign_expr_collations(pstate, res_node);
+	collation_parser.assign_expr_collations(pstate, res_node);
 
 	return res_node;
 };
@@ -984,7 +999,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 	 */
 	if (IsA(node, PGColumnRef) &&
 		list_length(((PGColumnRef *) node)->fields) == 1 &&
-		IsA(linitial(((PGColumnRef *) node)->fields), String))
+		IsA(linitial(((PGColumnRef *) node)->fields), PGString))
 	{
 		char	   *name = strVal(linitial(((PGColumnRef *) node)->fields));
 		int			location = ((PGColumnRef *) node)->location;
@@ -1025,15 +1040,17 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 					if (target_result != NULL)
 					{
 						if (!equal(target_result->expr, tle->expr))
-							ereport(ERROR,
-									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
+							//ereport(ERROR,
+									//(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 
 							/*------
 							  translator: first %s is name of a SQL construct, eg ORDER BY */
-									 errmsg("%s \"%s\" is ambiguous",
-											ParseExprKindName(exprKind),
-											name),
-									 parser_errposition(pstate, location)));
+									 //errmsg("%s \"%s\" is ambiguous",
+											//ParseExprKindName(exprKind),
+											//name),
+									 //parser_errposition(pstate, location)));
+							throw Exception(ERROR, "{} {} is ambiguous",
+								exprKind, name);
 					}
 					else
 						target_result = tle;
@@ -1055,13 +1072,15 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 		int			targetlist_pos = 0;
 		int			target_pos;
 
-		if (!IsA(val, Integer))
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
+		if (!IsA(val, PGInteger))
+			//ereport(ERROR,
+					//(errcode(ERRCODE_SYNTAX_ERROR),
 			/* translator: %s is name of a SQL construct, eg ORDER BY */
-					 errmsg("non-integer constant in %s",
-							ParseExprKindName(exprKind)),
-					 parser_errposition(pstate, location)));
+					 //errmsg("non-integer constant in %s",
+							//ParseExprKindName(exprKind)),
+					 //parser_errposition(pstate, location)));
+			throw Exception(ERROR, "non-integer constant in {}",
+								exprKind);
 
 		target_pos = intVal(val);
 		foreach(tl, *tlist)
@@ -1078,12 +1097,14 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 				}
 			}
 		}
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+		//ereport(ERROR,
+				//(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 		/* translator: %s is name of a SQL construct, eg ORDER BY */
-				 errmsg("%s position %d is not in select list",
-						ParseExprKindName(exprKind), target_pos),
-				 parser_errposition(pstate, location)));
+				 //errmsg("%s position %d is not in select list",
+						//ParseExprKindName(exprKind), target_pos),
+				 //parser_errposition(pstate, location)));
+		throw Exception(ERROR, "{} position {} is not in select list",
+								exprKind, target_pos);
 	}
 
 	/*
@@ -1102,22 +1123,26 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 			/* reject aggregates and window functions */
 			if (pstate->p_hasAggs &&
 				contain_aggs_of_level((PGNode *) tle->expr, 0))
-				ereport(ERROR,
-						(errcode(ERRCODE_GROUPING_ERROR),
+				//ereport(ERROR,
+						//(errcode(ERRCODE_GROUPING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
-						 errmsg("aggregate functions are not allowed in %s",
-								ParseExprKindName(exprKind)),
-						 parser_errposition(pstate,
-							   locate_agg_of_level((PGNode *) tle->expr, 0))));
+						 //errmsg("aggregate functions are not allowed in %s",
+								//ParseExprKindName(exprKind)),
+						 //parser_errposition(pstate,
+							   //locate_agg_of_level((PGNode *) tle->expr, 0))));
+				throw Exception(ERROR, "aggregate functions are not allowed in {}",
+								exprKind);
 			if (pstate->p_hasWindowFuncs &&
 				contain_windowfuncs((PGNode *) tle->expr))
-				ereport(ERROR,
-						(errcode(ERRCODE_WINDOWING_ERROR),
+				//ereport(ERROR,
+						//(errcode(ERRCODE_WINDOWING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
-						 errmsg("window functions are not allowed in %s",
-								ParseExprKindName(exprKind)),
-						 parser_errposition(pstate,
-									locate_windowfunc((PGNode *) tle->expr))));
+						 //errmsg("window functions are not allowed in %s",
+								//ParseExprKindName(exprKind)),
+						 //parser_errposition(pstate,
+									//locate_windowfunc((PGNode *) tle->expr))));
+				throw Exception(ERROR, "window functions are not allowed in {}",
+								exprKind);
 			break;
 		case EXPR_KIND_ORDER_BY:
 			/* no extra checks needed */
@@ -1126,8 +1151,8 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 			/* no extra checks needed */
 			break;
 		default:
-			elog(ERROR, "unexpected exprKind in checkTargetlistEntrySQL92");
-			break;
+			//elog(ERROR, "unexpected exprKind in checkTargetlistEntrySQL92");
+			throw Exception(ERROR, "unexpected exprKind in checkTargetlistEntrySQL92");
 	}
 };
 
@@ -1147,7 +1172,7 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 	/* if tlist item is an UNKNOWN literal, change it to TEXT */
 	if (restype == UNKNOWNOID && resolveUnknown)
 	{
-		tle->expr = (PGExpr *) coerce_type(pstate, (PGNode *) tle->expr,
+		tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
 										 restype, TEXTOID, -1,
 										 PG_COERCION_IMPLICIT,
 										 PG_COERCE_IMPLICIT_CAST,
@@ -1186,31 +1211,31 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 									 &hashable);
 			reverse = true;
 			break;
-		case PG_SORTBY_USING:
-			Assert(sortby->useOp != NIL);
-			sortop = compatible_oper_opid(sortby->useOp,
-										  restype,
-										  restype,
-										  false);
+		// case PG_SORTBY_USING:
+		// 	Assert(sortby->useOp != NIL);
+		// 	sortop = compatible_oper_opid(sortby->useOp,
+		// 								  restype,
+		// 								  restype,
+		// 								  false);
 
-			/*
-			 * Verify it's a valid ordering operator, fetch the corresponding
-			 * equality operator, and determine whether to consider it like
-			 * ASC or DESC.
-			 */
-			eqop = get_equality_op_for_ordering_op(sortop, &reverse);
-			if (!OidIsValid(eqop))
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					   errmsg("operator %s is not a valid ordering operator",
-							  strVal(llast(sortby->useOp))),
-						 errhint("Ordering operators must be \"<\" or \">\" members of btree operator families.")));
+		// 	/*
+		// 	 * Verify it's a valid ordering operator, fetch the corresponding
+		// 	 * equality operator, and determine whether to consider it like
+		// 	 * ASC or DESC.
+		// 	 */
+		// 	eqop = get_equality_op_for_ordering_op(sortop, &reverse);
+		// 	if (eqop == InvalidOid)
+		// 		ereport(ERROR,
+		// 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+		// 			   errmsg("operator %s is not a valid ordering operator",
+		// 					  strVal(llast(sortby->useOp))),
+		// 				 errhint("Ordering operators must be \"<\" or \">\" members of btree operator families.")));
 
-			/*
-			 * Also see if the equality operator is hashable.
-			 */
-			hashable = op_hashjoinable(eqop, restype);
-			break;
+		// 	/*
+		// 	 * Also see if the equality operator is hashable.
+		// 	 */
+		// 	hashable = op_hashjoinable(eqop, restype);
+		// 	break;
 		default:
 			elog(ERROR, "unrecognized sortby_dir: %d", sortby->sortby_dir);
 			sortop = InvalidOid;	/* keep compiler quiet */
@@ -1246,9 +1271,10 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 				sortcl->nulls_first = false;
 				break;
 			default:
-				elog(ERROR, "unrecognized sortby_nulls: %d",
-					 sortby->sortby_nulls);
-				break;
+				//elog(ERROR, "unrecognized sortby_nulls: %d",
+					 //sortby->sortby_nulls);
+				//break;
+				throw Exception(ERROR, "unrecognized sortby_nulls: {}", sortby->sortby_nulls);
 		}
 
 		sortlist = lappend(sortlist, sortcl);
@@ -1342,7 +1368,7 @@ ClauseParser::transformGroupClause(PGParseState *pstate, PGList *grouplist,
 			restype = exprType((PGNode *) tle->expr);
 
 			if (restype == UNKNOWNOID)
-				tle->expr = (PGExpr *) coerce_type(pstate, (PGNode *) tle->expr,
+				tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
 												 restype, TEXTOID, -1,
 												 PG_COERCION_IMPLICIT,
 												 PG_COERCE_IMPLICIT_CAST,
@@ -1461,7 +1487,7 @@ ClauseParser::transformGroupClause(PGParseState *pstate, PGList *grouplist,
 		{
 			pstate->p_grp_tles = list_concat_unique(
 				pstate->p_grp_tles,
-				findListTargetlistEntries(pstate, lfirst(lc),
+				findListTargetlistEntries(pstate, reinterpret_cast<PGNode *>(lfirst(lc)),
 										  targetlist, false, true,
 										  exprKind, useSQL99));
 		}
@@ -1527,7 +1553,7 @@ ClauseParser::findListTargetlistEntries(PGParseState *pstate, PGNode *node,
 
 		foreach (lc, args)
 		{
-			PGNode *rowexpr_arg = lfirst(lc);
+			PGNode *rowexpr_arg = reinterpret_cast<PGNode *>(lfirst(lc));
 			PGTargetEntry *tle;
 
             if (useSQL99)
@@ -1683,7 +1709,7 @@ ClauseParser::transformRowExprToGroupClauses(PGParseState *pstate, PGRowExpr *ro
 
 	foreach (arglc, args)
 	{
-		PGNode *node = lfirst(arglc);
+		PGNode *node = reinterpret_cast<PGNode *>(lfirst(arglc));
 
 		if (IsA(node, PGRowExpr))
 		{
@@ -1734,7 +1760,7 @@ ClauseParser::transformScatterClause(PGParseState *pstate,
 	/* preprocess the scatter clause, lookup TLEs */
 	foreach(olitem, scatterlist)
 	{
-		PGNode			*node = lfirst(olitem);
+		PGNode			*node = reinterpret_cast<PGNode *>(lfirst(olitem));
 		PGTargetEntry		*tle;
 
 		tle = findTargetlistEntrySQL99(pstate, node, targetlist,
@@ -1743,7 +1769,7 @@ ClauseParser::transformScatterClause(PGParseState *pstate,
 		/* coerce unknown to text */
 		if (exprType((PGNode *) tle->expr) == UNKNOWNOID)
 		{
-			tle->expr = (PGExpr *) coerce_type(pstate, (PGNode *) tle->expr,
+			tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
 											 UNKNOWNOID, TEXTOID, -1,
 											 PG_COERCION_IMPLICIT,
 											 PG_COERCE_IMPLICIT_CAST,
@@ -1837,13 +1863,15 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 		PGTargetEntry *tle = get_sortgroupclause_tle(scl, *targetlist);
 
 		if (tle->resjunk)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 is_agg ?
-					 errmsg("in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list") :
-					 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
-					 parser_errposition(pstate,
-										exprLocation((PGNode *) tle->expr))));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+			// 		 is_agg ?
+			// 		 errmsg("in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list") :
+			// 		 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
+			// 		 parser_errposition(pstate,
+			// 							exprLocation((PGNode *) tle->expr))));
+			throw Exception(ERROR, is_agg ? "in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list" :
+				"for SELECT DISTINCT, ORDER BY expressions must appear in select list");
 		result = lappend(result, copyObject(scl));
 	}
 
@@ -1871,11 +1899,13 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 	 * but we check anyway.
 	 */
 	if (result == NIL)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 is_agg ?
-		errmsg("an aggregate with DISTINCT must have at least one argument") :
-				 errmsg("SELECT DISTINCT must have at least one column")));
+		// ereport(ERROR,
+		// 		(errcode(ERRCODE_SYNTAX_ERROR),
+		// 		 is_agg ?
+		// errmsg("an aggregate with DISTINCT must have at least one argument") :
+		// 		 errmsg("SELECT DISTINCT must have at least one column")));
+		throw Exception(ERROR, is_agg ? "an aggregate with DISTINCT must have at least one argument" :
+				"SELECT DISTINCT must have at least one column");
 
 	return result;
 };
@@ -1975,13 +2005,14 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctli
 		if (list_member_int(sortgrouprefs, scl->tleSortGroupRef))
 		{
 			if (skipped_sortitem)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-						 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
-						 parser_errposition(pstate,
-								  get_matching_location(scl->tleSortGroupRef,
-														sortgrouprefs,
-														distinctlist))));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+				// 		 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
+				// 		 parser_errposition(pstate,
+				// 				  get_matching_location(scl->tleSortGroupRef,
+				// 										sortgrouprefs,
+				// 										distinctlist))));
+				throw Exception(ERROR, "SELECT DISTINCT ON expressions must match initial ORDER BY expressions");
 			else
 				result = lappend(result, copyObject(scl));
 		}
@@ -2007,10 +2038,11 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctli
 		if (targetIsInSortList(tle, InvalidOid, result))
 			continue;			/* already in list (with some semantics) */
 		if (skipped_sortitem)
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
-					 parser_errposition(pstate, exprLocation(dexpr))));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+			// 		 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
+			// 		 parser_errposition(pstate, exprLocation(dexpr))));
+			throw Exception(ERROR, "SELECT DISTINCT ON expressions must match initial ORDER BY expressions");
 		result = addTargetToGroupList(pstate, tle,
 									  result, *targetlist,
 									  exprLocation(dexpr),
@@ -2066,7 +2098,7 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 	 */
 	foreach(lc, windowdefs)
 	{
-		PGWindowDef  *windef = lfirst(lc);
+		PGWindowDef  *windef = reinterpret_cast<PGWindowDef *>(lfirst(lc));
 		PGWindowClause *refwc = NULL;
 		PGList	   *partitionClause;
 		PGList	   *orderClause;
@@ -2079,10 +2111,11 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		 */
 		if (windef->name &&
 			findWindowClause(result, windef->name) != NULL)
-			ereport(ERROR,
-					(errcode(ERRCODE_WINDOWING_ERROR),
-					 errmsg("window \"%s\" is already defined", windef->name),
-					 parser_errposition(pstate, windef->location)));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_WINDOWING_ERROR),
+			// 		 errmsg("window \"%s\" is already defined", windef->name),
+			// 		 parser_errposition(pstate, windef->location)));
+			throw Exception(ERROR, "window {} is already defined", windef->name);
 
 		/*
 		 * If it references a previous window, look that up.
@@ -2091,11 +2124,12 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		{
 			refwc = findWindowClause(result, windef->refname);
 			if (refwc == NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
-						 errmsg("window \"%s\" does not exist",
-								windef->refname),
-						 parser_errposition(pstate, windef->location)));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_UNDEFINED_OBJECT),
+				// 		 errmsg("window \"%s\" does not exist",
+				// 				windef->refname),
+				// 		 parser_errposition(pstate, windef->location)));
+				throw Exception(ERROR, "window {} does not exist", windef->name);
 		}
 
 		/*
@@ -2140,23 +2174,25 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		if (refwc)
 		{
 			if (partitionClause)
-				ereport(ERROR,
-						(errcode(ERRCODE_WINDOWING_ERROR),
-				errmsg("cannot override PARTITION BY clause of window \"%s\"",
-					   windef->refname),
-						 parser_errposition(pstate, windef->location)));
-			wc->partitionClause = copyObject(refwc->partitionClause);
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_WINDOWING_ERROR),
+				// errmsg("cannot override PARTITION BY clause of window \"%s\"",
+				// 	   windef->refname),
+				// 		 parser_errposition(pstate, windef->location)));
+				throw Exception(ERROR, "cannot override PARTITION BY clause of window {}", windef->refname);
+			wc->partitionClause = reinterpret_cast<PGList *>(copyObject(refwc->partitionClause));
 		}
 		else
 			wc->partitionClause = partitionClause;
 		if (refwc)
 		{
 			if (orderClause && refwc->orderClause)
-				ereport(ERROR,
-						(errcode(ERRCODE_WINDOWING_ERROR),
-				   errmsg("cannot override ORDER BY clause of window \"%s\"",
-						  windef->refname),
-						 parser_errposition(pstate, windef->location)));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_WINDOWING_ERROR),
+				//    errmsg("cannot override ORDER BY clause of window \"%s\"",
+				// 		  windef->refname),
+				// 		 parser_errposition(pstate, windef->location)));
+				throw Exception(ERROR, "cannot override ORDER BY clause of window {}", windef->refname);
 			if (orderClause)
 			{
 				wc->orderClause = orderClause;
@@ -2164,7 +2200,7 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 			}
 			else
 			{
-				wc->orderClause = copyObject(refwc->orderClause);
+				wc->orderClause = reinterpret_cast<PGList *>(copyObject(refwc->orderClause));
 				wc->copiedOrder = true;
 			}
 		}
@@ -2182,18 +2218,20 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 			 */
 			if (windef->name ||
 				orderClause || windef->frameOptions != FRAMEOPTION_DEFAULTS)
-				ereport(ERROR,
-						(errcode(ERRCODE_WINDOWING_ERROR),
-						 errmsg("cannot copy window \"%s\" because it has a frame clause",
-								windef->refname),
-						 parser_errposition(pstate, windef->location)));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_WINDOWING_ERROR),
+				// 		 errmsg("cannot copy window \"%s\" because it has a frame clause",
+				// 				windef->refname),
+				// 		 parser_errposition(pstate, windef->location)));
+				throw Exception(ERROR, "cannot copy window {} because it has a frame clause", windef->refname);
 			/* Else this clause is just OVER (foo), so say this: */
-			ereport(ERROR,
-					(errcode(ERRCODE_WINDOWING_ERROR),
-					 errmsg("cannot copy window \"%s\" because it has a frame clause",
-							windef->refname),
-					 errhint("Omit the parentheses in this OVER clause."),
-					 parser_errposition(pstate, windef->location)));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_WINDOWING_ERROR),
+			// 		 errmsg("cannot copy window \"%s\" because it has a frame clause",
+			// 				windef->refname),
+			// 		 errhint("Omit the parentheses in this OVER clause."),
+			// 		 parser_errposition(pstate, windef->location)));
+			throw Exception(ERROR, "cannot copy window {} because it has a frame clause", windef->refname);
 		}
 
 		/*
@@ -2295,15 +2333,17 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 
 		/* caller should've checked this already, but better safe than sorry */
 		if (list_length(orderClause) == 0)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("window specifications with a framing clause must have an ORDER BY clause"),
-					 parser_errposition(pstate, location)));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_SYNTAX_ERROR),
+			// 		 errmsg("window specifications with a framing clause must have an ORDER BY clause"),
+			// 		 parser_errposition(pstate, location)));
+			throw Exception(ERROR, "window specifications with a framing clause must have an ORDER BY clause");
 		if (list_length(orderClause) > 1)
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("only one ORDER BY column may be specified when RANGE is used in a window specification"),
-					 parser_errposition(pstate, location)));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_SYNTAX_ERROR),
+			// 		 errmsg("only one ORDER BY column may be specified when RANGE is used in a window specification"),
+			// 		 parser_errposition(pstate, location)));
+			throw Exception(ERROR, "only one ORDER BY column may be specified when RANGE is used in a window specification");
 
 		typmod = exprTypmod(node);
 
@@ -2312,10 +2352,11 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 			PGConst *con = (PGConst *) node;
 
 			if (con->constisnull)
-				ereport(ERROR,
-						(errcode(ERRCODE_WINDOWING_ERROR),
-						 errmsg("RANGE parameter cannot be NULL"),
-						 parser_errposition(pstate, con->location)));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_WINDOWING_ERROR),
+				// 		 errmsg("RANGE parameter cannot be NULL"),
+				// 		 parser_errposition(pstate, con->location)));
+				throw Exception(ERROR, "RANGE parameter cannot be NULL");
 		}
 
 		sort = (PGSortGroupClause *) linitial(orderClause);
@@ -2333,9 +2374,10 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 		tup = oper(pstate, oprname, otype, rtype, true, 0);
 
 		if (!HeapTupleIsValid(tup))
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("window specification RANGE parameter type must be coercible to ORDER BY column type")));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_SYNTAX_ERROR),
+			// 		 errmsg("window specification RANGE parameter type must be coercible to ORDER BY column type")));
+			throw Exception(ERROR, "window specification RANGE parameter type must be coercible to ORDER BY column type");
 
 		oprresult = ((Form_pg_operator)GETSTRUCT(tup))->oprresult;
 		newrtype = ((Form_pg_operator)GETSTRUCT(tup))->oprright;
@@ -2353,7 +2395,7 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 			 * is the same as before... is that safe?
 			 */
 			PGExpr *expr =
-				(PGExpr *)coerce_to_target_type(NULL,
+				(PGExpr *)coerce_parser.coerce_to_target_type(NULL,
 											  node,
 											  rtype,
 											  newrtype, typmod,
@@ -2362,15 +2404,17 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 											  -1);
 			if (!PointerIsValid(expr))
 			{
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("type mismatch between ORDER BY and RANGE "
-								"parameter in window specification"),
-						 errhint("Operations between window specification "
-								 "the ORDER BY column and RANGE parameter "
-								 "must result in a data type which can be "
-								 "cast back to the ORDER BY column type"),
-						 parser_errposition(pstate, exprLocation((PGNode *) expr))));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_SYNTAX_ERROR),
+				// 		 errmsg("type mismatch between ORDER BY and RANGE "
+				// 				"parameter in window specification"),
+				// 		 errhint("Operations between window specification "
+				// 				 "the ORDER BY column and RANGE parameter "
+				// 				 "must result in a data type which can be "
+				// 				 "cast back to the ORDER BY column type"),
+				// 		 parser_errposition(pstate, exprLocation((PGNode *) expr))));
+				throw Exception(ERROR, "type mismatch between ORDER BY and RANGE "
+					"parameter in window specification");
 			}
 
 			node = (PGNode *) expr;
@@ -2385,14 +2429,15 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 			 *
 			 * XXX: Why not do it here?
 			 */
-			if (!can_coerce_type(1, &oprresult, &otype, PG_COERCION_EXPLICIT))
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("invalid RANGE parameter"),
-						 errhint("Operations between window specification "
-								 "the ORDER BY column and RANGE parameter "
-								 "must result in a data type which can be "
-								 "cast back to the ORDER BY column type")));
+			if (!coerce_parser.can_coerce_type(1, &oprresult, &otype, PG_COERCION_EXPLICIT))
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_SYNTAX_ERROR),
+				// 		 errmsg("invalid RANGE parameter"),
+				// 		 errhint("Operations between window specification "
+				// 				 "the ORDER BY column and RANGE parameter "
+				// 				 "must result in a data type which can be "
+				// 				 "cast back to the ORDER BY column type")));
+				throw Exception(ERROR, "invalid RANGE parameter");
 		}
 
 		if (IsA(node, PGConst))
@@ -2411,7 +2456,7 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 									 false, false, false,
 									 &sortop, NULL, NULL, NULL);
 
-			if (OidIsValid(sortop))
+			if (sortop != InvalidOid)
 			{
 				Type typ = typeidType(newrtype);
 				Oid funcoid = get_opcode(sortop);
@@ -2428,10 +2473,11 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 				result = OidFunctionCall2(funcoid, con->constvalue, zero);
 
 				if (result)
-					ereport(ERROR,
-							(errcode(ERRCODE_WINDOWING_ERROR),
-							 errmsg("RANGE parameter cannot be negative"),
-							 parser_errposition(pstate, con->location)));
+					// ereport(ERROR,
+					// 		(errcode(ERRCODE_WINDOWING_ERROR),
+					// 		 errmsg("RANGE parameter cannot be negative"),
+					// 		 parser_errposition(pstate, con->location)));
+					throw Exception(ERROR, "RANGE parameter cannot be negative");
 
 				ReleaseSysCache(typ);
 			}

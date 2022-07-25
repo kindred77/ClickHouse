@@ -67,7 +67,7 @@ CollationParser::assign_collations_walker(PGNode *node, assign_collations_contex
 											  (void *) &loccontext);
 
 				collation = expr->collOid;
-				Assert(OidIsValid(collation));
+				Assert(collation != InvalidOid);
 				strength = COLLATE_EXPLICIT;
 				location = expr->location;
 			}
@@ -88,7 +88,7 @@ CollationParser::assign_collations_walker(PGNode *node, assign_collations_contex
 											  assign_collations_walker,
 											  (void *) &loccontext);
 
-				if (OidIsValid(expr->resultcollid))
+				if (expr->resultcollid != InvalidOid)
 				{
 					/* Node's result type is collatable. */
 					/* Pass up field's collation as an implicit choice. */
@@ -174,7 +174,7 @@ CollationParser::assign_collations_walker(PGNode *node, assign_collations_contex
 											  assign_collations_walker,
 											  (void *) &loccontext);
 
-				if (OidIsValid(typcollation))
+				if (typcollation != InvalidOid)
 				{
 					/* Node's result type is collatable. */
 					if (typcollation == DEFAULT_COLLATION_OID)
@@ -239,14 +239,17 @@ CollationParser::assign_collations_walker(PGNode *node, assign_collations_contex
 			 */
 			if (strength == COLLATE_CONFLICT &&
 				((PGTargetEntry *) node)->ressortgroupref != 0)
-				ereport(ERROR,
-						(errcode(ERRCODE_COLLATION_MISMATCH),
-						 errmsg("collation mismatch between implicit collations \"%s\" and \"%s\"",
-								get_collation_name(loccontext.collation),
-								get_collation_name(loccontext.collation2)),
-						 errhint("You can choose the collation by applying the COLLATE clause to one or both expressions."),
-						 parser_errposition(context->pstate,
-											loccontext.location2)));
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_COLLATION_MISMATCH),
+				// 		 errmsg("collation mismatch between implicit collations \"%s\" and \"%s\"",
+				// 				get_collation_name(loccontext.collation),
+				// 				get_collation_name(loccontext.collation2)),
+				// 		 errhint("You can choose the collation by applying the COLLATE clause to one or both expressions."),
+				// 		 parser_errposition(context->pstate,
+				// 							loccontext.location2)));
+				throw Exception(ERROR, "collation mismatch between implicit collations {} and {}",
+					get_collation_name(loccontext.collation),
+					get_collation_name(loccontext.collation2));
 			break;
 		case T_PGRangeTblRef:
 		case T_PGJoinExpr:
@@ -335,7 +338,7 @@ CollationParser::assign_collations_walker(PGNode *node, assign_collations_contex
 			 * the Var.
 			 */
 
-			if (OidIsValid(collation))
+			if (collation != InvalidOid)
 				strength = COLLATE_IMPLICIT;
 			else
 				strength = COLLATE_NONE;
@@ -457,7 +460,7 @@ CollationParser::assign_collations_walker(PGNode *node, assign_collations_contex
 				 * Now figure out what collation to assign to this node.
 				 */
 				typcollation = get_typcollation(exprType(node));
-				if (OidIsValid(typcollation))
+				if (typcollation != InvalidOid)
 				{
 					/* Node's result is collatable; what about its input? */
 					if (loccontext.strength > COLLATE_NONE)
@@ -622,14 +625,17 @@ CollationParser::assign_hypothetical_collations(PGAggref *aggref,
 
 		/* deal with collation conflict */
 		if (paircontext.strength == COLLATE_CONFLICT)
-			ereport(ERROR,
-					(errcode(ERRCODE_COLLATION_MISMATCH),
-					 errmsg("collation mismatch between implicit collations \"%s\" and \"%s\"",
-							get_collation_name(paircontext.collation),
-							get_collation_name(paircontext.collation2)),
-					 errhint("You can choose the collation by applying the COLLATE clause to one or both expressions."),
-					 parser_errposition(paircontext.pstate,
-										paircontext.location2)));
+			// ereport(ERROR,
+			// 		(errcode(ERRCODE_COLLATION_MISMATCH),
+			// 		 errmsg("collation mismatch between implicit collations \"%s\" and \"%s\"",
+			// 				get_collation_name(paircontext.collation),
+			// 				get_collation_name(paircontext.collation2)),
+			// 		 errhint("You can choose the collation by applying the COLLATE clause to one or both expressions."),
+			// 		 parser_errposition(paircontext.pstate,
+			// 							paircontext.location2)));
+			throw Exception(ERROR, "collation mismatch between implicit collations {} and {}",
+				get_collation_name(paircontext.collation),
+				get_collation_name(paircontext.collation2));
 
 		/*
 		 * At this point paircontext.collation can be InvalidOid only if the
@@ -650,7 +656,7 @@ CollationParser::assign_hypothetical_collations(PGAggref *aggref,
 		 * COLLATE clause for a RelabelType, and probably on some other
 		 * fragile behaviors.
 		 */
-		if (OidIsValid(paircontext.collation) &&
+		if (paircontext.collation != InvalidOid) &&
 			paircontext.collation != exprCollation((PGNode *) s_tle->expr))
 		{
 			s_tle->expr = (PGExpr *)
@@ -753,12 +759,15 @@ CollationParser::merge_collation_state(Oid collation,
 					 * the SQL standard says to do, and there's no good reason
 					 * to be less strict.
 					 */
-					ereport(ERROR,
-							(errcode(ERRCODE_COLLATION_MISMATCH),
-							 errmsg("collation mismatch between explicit collations \"%s\" and \"%s\"",
-									get_collation_name(context->collation),
-									get_collation_name(collation)),
-							 parser_errposition(context->pstate, location)));
+					// ereport(ERROR,
+					// 		(errcode(ERRCODE_COLLATION_MISMATCH),
+					// 		 errmsg("collation mismatch between explicit collations \"%s\" and \"%s\"",
+					// 				get_collation_name(context->collation),
+					// 				get_collation_name(collation)),
+					// 		 parser_errposition(context->pstate, location)));
+					throw Exception(ERROR, "collation mismatch between explicit collations {} and {}",
+						get_collation_name(context->collation),
+						get_collation_name(collation));
 				}
 				break;
 		}

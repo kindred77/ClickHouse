@@ -7,6 +7,10 @@
 #include <pg_functions.hpp>
 #include <access/attnum.hpp>
 
+#include <Common/Exception.h>
+
+#include<string.h>
+
 typedef enum PGParseExprKind
 {
 	EXPR_KIND_NONE = 0,			/* "not in an expression" */
@@ -125,6 +129,12 @@ typedef signed int int32;
 #define AGGKIND_ORDERED_SET		'o'
 #define AGGKIND_HYPOTHETICAL	'h'
 
+#define InvalidOid		((Oid) 0)
+#define UNKNOWNOID		705
+#define TEXTOID			25
+#define INT8OID			20
+#define INT4OID			23
+
 #define rt_fetch(rangetable_index, rangetable) \
 	((duckdb_libpgquery::PGRangeTblEntry *) list_nth(rangetable, (rangetable_index)-1))
 
@@ -158,4 +168,4 @@ free_parsestate(PGParseState *pstate)
 {
 	delete pstate;
 	pstate = NULL;
-}
+};
