@@ -11,7 +11,7 @@
 
 #include<string.h>
 
-typedef enum PGParseExprKind
+enum class PGParseExprKind
 {
 	EXPR_KIND_NONE = 0,			/* "not in an expression" */
 	EXPR_KIND_OTHER,			/* reserved for extensions */
@@ -50,9 +50,9 @@ typedef enum PGParseExprKind
 
 	/* GPDB additions */
 	EXPR_KIND_SCATTER_BY		/* SCATTER BY expression */
-} PGParseExprKind;
+};
 
-typedef struct PGParseState
+struct PGParseState
 {
 	struct PGParseState *parentParseState;		/* stack link */
 	const char *p_sourcetext;	/* source text, or NULL if not available */
@@ -97,27 +97,27 @@ typedef struct PGParseState
 	//ParseParamRefHook p_paramref_hook;
 	//CoerceParamHook p_coerce_param_hook;
 	void	   *p_ref_hook_state;		/* common passthrough link for above */
-} PGParseState;
+};
 
-typedef struct PGParseNamespaceItem
+struct PGParseNamespaceItem
 {
 	duckdb_libpgquery::PGRangeTblEntry *p_rte;		/* The relation's rangetable entry */
 	bool		p_rel_visible;	/* Relation name is visible? */
 	bool		p_cols_visible; /* Column names visible as unqualified refs? */
 	bool		p_lateral_only; /* Is only visible to LATERAL expressions? */
 	bool		p_lateral_ok;	/* If so, does join type allow use? */
-} PGParseNamespaceItem;
+};
 
 typedef unsigned int Index;
 
 typedef unsigned int Oid;
 
-typedef enum InhOption
+enum class InhOption
 {
 	INH_NO,						/* Do NOT scan child tables */
 	INH_YES,					/* DO scan child tables */
 	INH_DEFAULT					/* Use current SQL_inheritance option */
-} InhOption;
+};
 
 bool		SQL_inheritance = true;
 
@@ -129,7 +129,7 @@ typedef signed int int32;
 #define AGGKIND_ORDERED_SET		'o'
 #define AGGKIND_HYPOTHETICAL	'h'
 
-#define InvalidOid		((Oid) 0)
+//#define InvalidOid		((Oid) 0)
 #define UNKNOWNOID		705
 #define TEXTOID			25
 #define INT8OID			20
