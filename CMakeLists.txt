@@ -540,6 +540,8 @@ include (cmake/find/rocksdb.cmake)
 include (cmake/find/libpqxx.cmake)
 include (cmake/find/nuraft.cmake)
 include (cmake/find/yaml-cpp.cmake)
+
+include (cmake/find/libpgquery.cmake)
 include (cmake/find/gporca.cmake)
 
 if(NOT USE_INTERNAL_PARQUET_LIBRARY)

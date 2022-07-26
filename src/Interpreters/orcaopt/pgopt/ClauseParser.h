@@ -1,11 +1,11 @@
 #pragma once
 
-#include <parser_common.h>
+#include <Interpreters/orcaopt/pgopt/parser_common.h>
 
-#include <RelationParser.h>
-#include <SelectParser.h>
-#include <ExprParser.h>
-#include <CollationParser.h>
+#include <Interpreters/orcaopt/pgopt/RelationParser.h>
+#include <Interpreters/orcaopt/pgopt/SelectParser.h>
+#include <Interpreters/orcaopt/pgopt/ExprParser.h>
+#include <Interpreters/orcaopt/pgopt/CollationParser.h>
 
 namespace DB
 {

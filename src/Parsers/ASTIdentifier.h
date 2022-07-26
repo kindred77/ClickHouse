@@ -60,7 +60,7 @@ public:
         return {};
     }
 
-    const size_t field_size() const
+    size_t field_size() const
     {
         return name_parts.size();
     }

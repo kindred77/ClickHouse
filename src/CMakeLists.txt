@@ -188,7 +188,8 @@ add_object_library(clickhouse_interpreters_mysql Interpreters/MySQL)
 add_object_library(clickhouse_interpreters_clusterproxy Interpreters/ClusterProxy)
 add_object_library(clickhouse_interpreters_jit Interpreters/JIT)
 
-add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt)
+#add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt)
+add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/pgopt)
 
 add_object_library(clickhouse_columns Columns)
 add_object_library(clickhouse_storages Storages)
@@ -478,11 +479,17 @@ endif()
     #dbms_target_include_directories(PRIVATE ${GPORCA_NAUCRATES_INCLUDE})
     #dbms_target_include_directories(PRIVATE ${GPORCA_GPDBCOST_INCLUDE})
     #dbms_target_include_directories(PRIVATE ${GPORCA_GPOPT_INCLUDE})
+
+    message(STATUS "pg_query include: ${LIBPGQUERY_INCLUDE_DIR}, lib: ${LIBPGQUERY_LIBRARY}")
+
+    dbms_target_link_libraries(PUBLIC ${LIBPGQUERY_LIBRARY})
+    dbms_target_include_directories(SYSTEM BEFORE PUBLIC ${LIBPGQUERY_INCLUDE_DIR})
     
     message(STATUS "gpdbcost include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPDBCOST}")
     message(STATUS "gpopt include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPOPT}")
     message(STATUS "gpos include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPOS}")
     message(STATUS "naucrates include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_NAUCRATES}")
+
     dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPDBCOST})
     dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPOPT})
     dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPOS})

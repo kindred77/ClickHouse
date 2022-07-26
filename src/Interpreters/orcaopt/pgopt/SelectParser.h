@@ -1,9 +1,9 @@
 #pragma once
 
-#include <parser_common.h>
-#include <ClauseParser.h>
-#include <CoerceParser.h>
-#include <TargetParser.h>
+#include <Interpreters/orcaopt/pgopt/parser_common.h>
+#include <Interpreters/orcaopt/pgopt/ClauseParser.h>
+#include <Interpreters/orcaopt/pgopt/CoerceParser.h>
+#include <Interpreters/orcaopt/pgopt/TargetParser.h>
 
 namespace DB
 {
