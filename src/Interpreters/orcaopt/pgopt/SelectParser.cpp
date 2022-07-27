@@ -137,18 +137,18 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 
 	/* transform targetlist */
 	qry->targetList = target_parser.transformTargetList(pstate, stmt->targetList,
-										  EXPR_KIND_SELECT_TARGET);
+										  PGParseExprKind::EXPR_KIND_SELECT_TARGET);
 
 	/* mark column origins */
 	target_parser.markTargetListOrigins(pstate, qry->targetList);
 
 	/* transform WHERE */
 	qual = clause_parser.transformWhereClause(pstate, stmt->whereClause,
-								EXPR_KIND_WHERE, "WHERE");
+								PGParseExprKind::EXPR_KIND_WHERE, "WHERE");
 
 	/* initial processing of HAVING clause is much like WHERE clause */
 	qry->havingQual = clause_parser.transformWhereClause(pstate, stmt->havingClause,
-										   EXPR_KIND_HAVING, "HAVING");
+										   PGParseExprKind::EXPR_KIND_HAVING, "HAVING");
 
     /*
      * CDB: Untyped Const or Param nodes in a subquery in the FROM clause
@@ -166,7 +166,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	qry->sortClause = clause_parser.transformSortClause(pstate,
 										  stmt->sortClause,
 										  &qry->targetList,
-										  EXPR_KIND_ORDER_BY,
+										  PGParseExprKind::EXPR_KIND_ORDER_BY,
 										  true /* fix unknowns */ ,
 										  false /* allow SQL92 rules */ );
 
@@ -174,7 +174,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 											stmt->groupClause,
 											&qry->targetList,
 											qry->sortClause,
-											EXPR_KIND_GROUP_BY,
+											PGParseExprKind::EXPR_KIND_GROUP_BY,
 											false /* allow SQL92 rules */ );
 
 	/*
@@ -232,9 +232,9 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 
 	/* transform LIMIT */
 	qry->limitOffset = clause_parser.transformLimitClause(pstate, stmt->limitOffset,
-											EXPR_KIND_OFFSET, "OFFSET");
+											PGParseExprKind::EXPR_KIND_OFFSET, "OFFSET");
 	qry->limitCount = clause_parser.transformLimitClause(pstate, stmt->limitCount,
-										   EXPR_KIND_LIMIT, "LIMIT");
+										   PGParseExprKind::EXPR_KIND_LIMIT, "LIMIT");
 
 	/* transform window clauses after we have seen all window functions */
 	//qry->windowClause = transformWindowDefinitions(pstate,

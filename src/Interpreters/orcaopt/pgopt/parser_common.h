@@ -1,3 +1,5 @@
+#pragma once
+
 #include <nodes/parsenodes.hpp>
 #include <nodes/makefuncs.hpp>
 #include <nodes/nodeFuncs.hpp>
@@ -134,6 +136,7 @@ typedef signed int int32;
 #define TEXTOID			25
 #define INT8OID			20
 #define INT4OID			23
+#define BOOLOID         16
 
 #define rt_fetch(rangetable_index, rangetable) \
 	((duckdb_libpgquery::PGRangeTblEntry *) list_nth(rangetable, (rangetable_index)-1))
@@ -169,3 +172,43 @@ free_parsestate(PGParseState *pstate)
 	delete pstate;
 	pstate = NULL;
 };
+
+duckdb_libpgquery::PGTargetEntry *
+get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)
+{
+	duckdb_libpgquery::PGListCell   *l;
+
+	foreach(l, targetList)
+	{
+		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(l);
+
+		if (tle->ressortgroupref == sortref)
+			return tle;
+	}
+
+	/*
+	 * XXX: we probably should catch this earlier, but we have a
+	 * few queries in the regression suite that hit this.
+	 */
+	ereport(ERROR,
+			(errcode(ERRCODE_SYNTAX_ERROR),
+			 errmsg("ORDER/GROUP BY expression not found in targetlist")));
+	return NULL;				/* keep compiler quiet */
+};
+
+duckdb_libpgquery::PGTargetEntry *
+get_sortgroupclause_tle(duckdb_libpgquery::PGSortGroupClause *sgClause,
+						duckdb_libpgquery::PGList *targetList)
+{
+	return get_sortgroupref_tle(sgClause->tleSortGroupRef, targetList);
+};
+
+duckdb_libpgquery::PGNode *
+get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause *sgClause,
+	duckdb_libpgquery::PGList *targetList)
+{
+	duckdb_libpgquery::PGTargetEntry *tle = get_sortgroupclause_tle(sgClause, targetList);
+
+	return (duckdb_libpgquery::PGNode *) tle->expr;
+};
+

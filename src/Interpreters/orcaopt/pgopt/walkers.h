@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Interpreters/orcaopt/pgopt/parser_common.h>
 
 typedef struct
@@ -538,5 +540,32 @@ contain_aggs_of_level(duckdb_libpgquery::PGNode *node, int levelsup)
 	return query_or_expression_tree_walker(node,
 										   contain_aggs_of_level_walker,
 										   (void *) &context,
+										   0);
+};
+
+bool
+contain_windowfuncs_walker(duckdb_libpgquery::PGNode *node, void *context)
+{
+	using duckdb_libpgquery::PGWindowFunc;
+	using duckdb_libpgquery::PGNode;
+	if (node == NULL)
+		return false;
+	if (IsA(node, PGWindowFunc))
+		return true;			/* abort the tree traversal and return true */
+	/* Mustn't recurse into subselects */
+	return expression_tree_walker(node, contain_windowfuncs_walker,
+								  (void *) context);
+};
+
+bool
+contain_windowfuncs(duckdb_libpgquery::PGNode *node)
+{
+	/*
+	 * Must be prepared to start with a Query or a bare expression tree; if
+	 * it's a Query, we don't want to increment sublevels_up.
+	 */
+	return query_or_expression_tree_walker(node,
+										   contain_windowfuncs_walker,
+										   NULL,
 										   0);
 };

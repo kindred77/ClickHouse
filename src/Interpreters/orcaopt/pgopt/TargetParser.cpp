@@ -38,7 +38,7 @@ PGList *
 		/* Require read access to each column */
 		foreach(l, vars)
 		{
-			PGVar		   *var = (Var *) lfirst(l);
+			PGVar		   *var = (PGVar *) lfirst(l);
 
 			markVarForSelectPriv(pstate, var, rte);
 		}
@@ -217,7 +217,7 @@ TargetParser::transformTargetList(PGParseState *pstate, PGList *targetlist,
 	PGListCell   *o_target;
 
 	/* Expand "something.*" in SELECT and RETURNING, but not UPDATE */
-	expand_star = (exprKind != EXPR_KIND_UPDATE_SOURCE);
+	expand_star = (exprKind != PGParseExprKind::EXPR_KIND_UPDATE_SOURCE);
 
 	foreach(o_target, targetlist)
 	{
@@ -390,8 +390,8 @@ TargetParser::transformTargetEntry(PGParseState *pstate,
 		colname = FigureColname(node);
 	}
 
-	return makeTargetEntry((Expr *) expr,
-						   (AttrNumber) pstate->p_next_resno++,
+	return makeTargetEntry((PGExpr *) expr,
+						   (PGAttrNumber) pstate->p_next_resno++,
 						   colname,
 						   resjunk);
 };
@@ -425,9 +425,9 @@ int FigureColnameInternal(PGNode *node, char **name)
 				/* find last field name, if any, ignoring "*" */
 				foreach(l, ((PGColumnRef *) node)->fields)
 				{
-					PGNode	   *i = lfirst(l);
+					PGNode	   *i = reinterpret_cast<PGNode*>(lfirst(l));
 
-					if (IsA(i, String))
+					if (IsA(i, PGString))
 						fname = strVal(i);
 				}
 				if (fname)
@@ -446,9 +446,9 @@ int FigureColnameInternal(PGNode *node, char **name)
 				/* find last field name, if any, ignoring "*" and subscripts */
 				foreach(l, ind->indirection)
 				{
-					PGNode	   *i = lfirst(l);
+					PGNode	   *i = reinterpret_cast<PGNode*>(lfirst(l));
 
-					if (IsA(i, String))
+					if (IsA(i, PGString))
 						fname = strVal(i);
 				}
 				if (fname)
@@ -464,7 +464,7 @@ int FigureColnameInternal(PGNode *node, char **name)
 			return 2;
 		case T_PGAExpr:
 			/* make nullif() act like a regular function */
-			if (((PGAExpr *) node)->kind == AEXPR_NULLIF)
+			if (((PGAExpr *) node)->kind == PG_AEXPR_NULLIF)
 			{
 				*name = "nullif";
 				return 2;
@@ -557,7 +557,7 @@ int FigureColnameInternal(PGNode *node, char **name)
 				case PG_IS_GREATEST:
 					*name = "greatest";
 					return 2;
-				case PG_IS_LEAST:
+				case IS_LEAST:
 					*name = "least";
 					return 2;
 			}
@@ -603,6 +603,59 @@ int FigureColnameInternal(PGNode *node, char **name)
 	}
 
 	return strength;
+};
+
+PGList *
+TargetParser::transformExpressionList(PGParseState *pstate, PGList *exprlist,
+						PGParseExprKind exprKind)
+{
+	PGList	   *result = NIL;
+	PGListCell   *lc;
+
+	foreach(lc, exprlist)
+	{
+		PGNode	   *e = (PGNode *) lfirst(lc);
+
+		/*
+		 * Check for "something.*".  Depending on the complexity of the
+		 * "something", the star could appear as the last field in ColumnRef,
+		 * or as the last indirection item in A_Indirection.
+		 */
+		if (IsA(e, PGColumnRef))
+		{
+			PGColumnRef  *cref = (PGColumnRef *) e;
+
+			if (IsA(llast(cref->fields), PGAStar))
+			{
+				/* It is something.*, expand into multiple items */
+				result = list_concat(result,
+									 ExpandColumnRefStar(pstate, cref,
+														 false));
+				continue;
+			}
+		}
+		else if (IsA(e, PGAIndirection))
+		{
+			PGAIndirection *ind = (PGAIndirection *) e;
+
+			if (IsA(llast(ind->indirection), PGAStar))
+			{
+				/* It is something.*, expand into multiple items */
+				result = list_concat(result,
+									 ExpandIndirectionStar(pstate, ind,
+														   false, exprKind));
+				continue;
+			}
+		}
+
+		/*
+		 * Not "something.*", so transform as a single expression
+		 */
+		result = lappend(result,
+						 expr_parser.transformExpr(pstate, e, exprKind));
+	}
+
+	return result;
 };
 
 }

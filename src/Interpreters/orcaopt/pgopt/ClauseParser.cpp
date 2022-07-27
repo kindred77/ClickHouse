@@ -1,4 +1,5 @@
 #include <Interpreters/orcaopt/pgopt/ClauseParser.h>
+#include <Interpreters/orcaopt/pgopt/walkers.h>
 
 using namespace duckdb_libpgquery;
 
@@ -49,11 +50,11 @@ bool ClauseParser::interpretInhOption(InhOption inhOpt)
 {
 	switch (inhOpt)
 	{
-		case INH_NO:
+		case InhOption::INH_NO:
 			return false;
-		case INH_YES:
+		case InhOption::INH_YES:
 			return true;
-		case INH_DEFAULT:
+		case InhOption::INH_DEFAULT:
 			return SQL_inheritance;
 	}
 	elog(ERROR, "bogus InhOption value: %d", inhOpt);
@@ -141,8 +142,8 @@ ClauseParser::transformRangeSubselect(PGParseState *pstate, PGRangeSubselect *r)
 	 * We can't be nested within any expression, so don't need save-restore
 	 * logic here.
 	 */
-	Assert(pstate->p_expr_kind == EXPR_KIND_NONE);
-	pstate->p_expr_kind = EXPR_KIND_FROM_SUBSELECT;
+	Assert(pstate->p_expr_kind == PGParseExprKind::EXPR_KIND_NONE);
+	pstate->p_expr_kind = PGParseExprKind::EXPR_KIND_FROM_SUBSELECT;
 
 	/*
 	 * If the subselect is LATERAL, make lateral_only names of this level
@@ -161,7 +162,7 @@ ClauseParser::transformRangeSubselect(PGParseState *pstate, PGRangeSubselect *r)
 
 	/* Restore state */
 	pstate->p_lateral_active = false;
-	pstate->p_expr_kind = EXPR_KIND_NONE;
+	pstate->p_expr_kind = PGParseExprKind::EXPR_KIND_NONE;
 
 	/*
 	 * Check that we got something reasonable.  Many of these conditions are
@@ -707,7 +708,7 @@ ClauseParser::transformJoinUsingClause(PGParseState *pstate,
 	 * transformJoinOnClause() does.  Just invoke transformExpr() to fix up
 	 * the operators, and we're done.
 	 */
-	result = expr_parser.transformExpr(pstate, result, EXPR_KIND_JOIN_USING);
+	result = expr_parser.transformExpr(pstate, result, PGParseExprKind::EXPR_KIND_JOIN_USING);
 
 	result = coerce_parser.coerce_to_boolean(pstate, result, "JOIN/USING");
 
@@ -734,7 +735,7 @@ ClauseParser::transformJoinOnClause(PGParseState *pstate, PGJoinExpr *j, PGList 
 	pstate->p_namespace = namespace_ptr;
 
 	result = transformWhereClause(pstate, j->quals,
-								  EXPR_KIND_JOIN_ON, "JOIN/ON");
+								  PGParseExprKind::EXPR_KIND_JOIN_ON, "JOIN/ON");
 
 	pstate->p_namespace = save_namespace;
 
@@ -1004,7 +1005,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 		char	   *name = strVal(linitial(((PGColumnRef *) node)->fields));
 		int			location = ((PGColumnRef *) node)->location;
 
-		if (exprKind == EXPR_KIND_GROUP_BY)
+		if (exprKind == PGParseExprKind::EXPR_KIND_GROUP_BY)
 		{
 			/*
 			 * In GROUP BY, we must prefer a match against a FROM-clause
@@ -1119,7 +1120,7 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 {
 	switch (exprKind)
 	{
-		case EXPR_KIND_GROUP_BY:
+		case PGParseExprKind::EXPR_KIND_GROUP_BY:
 			/* reject aggregates and window functions */
 			if (pstate->p_hasAggs &&
 				contain_aggs_of_level((PGNode *) tle->expr, 0))
@@ -1144,10 +1145,10 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 				throw Exception(ERROR, "window functions are not allowed in {}",
 								exprKind);
 			break;
-		case EXPR_KIND_ORDER_BY:
+		case PGParseExprKind::EXPR_KIND_ORDER_BY:
 			/* no extra checks needed */
 			break;
-		case EXPR_KIND_DISTINCT_ON:
+		case PGParseExprKind::EXPR_KIND_DISTINCT_ON:
 			/* no extra checks needed */
 			break;
 		default:
@@ -1198,14 +1199,14 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 	{
 		case PG_SORTBY_DEFAULT:
 		case PG_SORTBY_ASC:
-			get_sort_group_operators(restype,
+			oper_parser.get_sort_group_operators(restype,
 									 true, true, false,
 									 &sortop, &eqop, NULL,
 									 &hashable);
 			reverse = false;
 			break;
 		case PG_SORTBY_DESC:
-			get_sort_group_operators(restype,
+			oper_parser.get_sort_group_operators(restype,
 									 false, true, true,
 									 NULL, &eqop, &sortop,
 									 &hashable);
@@ -1464,7 +1465,7 @@ ClauseParser::transformGroupClause(PGParseState *pstate, PGList *grouplist,
 			if (targetIsInSortList(tle, InvalidOid, result))
 				continue;
 
-			get_sort_group_operators(exprType((PGNode *) tle->expr),
+			oper_parser.get_sort_group_operators(exprType((PGNode *) tle->expr),
 									 true, true, false,
 									 &sortop, &eqop, NULL, &hashable);
 			gc = make_group_clause(tle, *targetlist, eqop, sortop, false, hashable);
@@ -1724,12 +1725,12 @@ ClauseParser::transformRowExprToGroupClauses(PGParseState *pstate, PGRowExpr *ro
 			 */
 			PGTargetEntry *arg_tle =
 				findTargetlistEntrySQL92(pstate, node, &targetList,
-										 EXPR_KIND_GROUP_BY);
+										 PGParseExprKind::EXPR_KIND_GROUP_BY);
 			Oid			sortop;
 			Oid			eqop;
 			bool		hashable;
 
-			get_sort_group_operators(exprType((PGNode *) arg_tle->expr),
+			oper_parser.get_sort_group_operators(exprType((PGNode *) arg_tle->expr),
 									 true, true, false,
 									 &sortop, &eqop, NULL, &hashable);
 
@@ -1764,7 +1765,7 @@ ClauseParser::transformScatterClause(PGParseState *pstate,
 		PGTargetEntry		*tle;
 
 		tle = findTargetlistEntrySQL99(pstate, node, targetlist,
-									   EXPR_KIND_SCATTER_BY);
+									   PGParseExprKind::EXPR_KIND_SCATTER_BY);
 
 		/* coerce unknown to text */
 		if (exprType((PGNode *) tle->expr) == UNKNOWNOID)
@@ -1940,7 +1941,7 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
 		//setup_parser_errposition_callback(&pcbstate, pstate, location);
 
 		/* determine the eqop and optional sortop */
-		get_sort_group_operators(restype,
+		oper_parser.get_sort_group_operators(restype,
 								 false, true, false,
 								 &sortop, &eqop, NULL,
 								 &hashable);
@@ -1984,7 +1985,7 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctli
 		PGTargetEntry *tle;
 
 		tle = findTargetlistEntrySQL92(pstate, dexpr, targetlist,
-									   EXPR_KIND_DISTINCT_ON);
+									   PGParseExprKind::EXPR_KIND_DISTINCT_ON);
 		sortgroupref = assignSortGroupRef(tle, *targetlist);
 		sortgrouprefs = lappend_int(sortgrouprefs, sortgroupref);
 	}
@@ -2140,13 +2141,13 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		orderClause = transformSortClause(pstate,
 										  windef->orderClause,
 										  targetlist,
-										  EXPR_KIND_WINDOW_ORDER,
+										  PGParseExprKind::EXPR_KIND_WINDOW_ORDER,
 										  true /* fix unknowns */ ,
 										  true /* force SQL99 rules */ );
 		partitionClause = transformSortClause(pstate,
 											  windef->partitionClause,
 											  targetlist,
-											  EXPR_KIND_WINDOW_PARTITION,
+											  PGParseExprKind::EXPR_KIND_WINDOW_PARTITION,
 											  true /* fix unknowns */ ,
 											  true /* force SQL99 rules */ );
 
@@ -2302,7 +2303,7 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 	if (frameOptions & FRAMEOPTION_ROWS)
 	{
 		/* Transform the raw expression tree */
-		node = expr_parser.transformExpr(pstate, clause, EXPR_KIND_WINDOW_FRAME_ROWS);
+		node = expr_parser.transformExpr(pstate, clause, PGParseExprKind::EXPR_KIND_WINDOW_FRAME_ROWS);
 
 		/*
 		 * Like LIMIT clause, simply coerce to int8
@@ -2323,7 +2324,7 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 		int32		typmod;
 
 		/* Transform the raw expression tree */
-		node = expr_parser.transformExpr(pstate, clause, EXPR_KIND_WINDOW_FRAME_RANGE);
+		node = expr_parser.transformExpr(pstate, clause, PGParseExprKind::EXPR_KIND_WINDOW_FRAME_RANGE);
 
 		/*
 		 * this needs a lot of thought to decide how to support in the context
@@ -2452,7 +2453,7 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 			PGConst *con = (PGConst *) node;
 			Oid			sortop;
 
-			get_sort_group_operators(newrtype,
+			oper_parser.get_sort_group_operators(newrtype,
 									 false, false, false,
 									 &sortop, NULL, NULL, NULL);
 
@@ -2460,8 +2461,8 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 			{
 				Type typ = typeidType(newrtype);
 				Oid funcoid = get_opcode(sortop);
-				Datum zero;
-				Datum result;
+				PGDatum zero;
+				PGDatum result;
 
 				zero = stringTypeDatum(typ, "0", exprTypmod(node));
 
@@ -2496,6 +2497,38 @@ ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNod
 #endif
 
 	return node;
+};
+
+PGWindowClause *
+ClauseParser::findWindowClause(PGList *wclist, const char *name)
+{
+	PGListCell   *l;
+
+	foreach(l, wclist)
+	{
+		PGWindowClause *wc = (PGWindowClause *) lfirst(l);
+
+		if (wc->name && strcmp(wc->name, name) == 0)
+			return wc;
+	}
+
+	return NULL;
+};
+
+void
+ClauseParser::checkExprIsVarFree(PGParseState *pstate, 
+	duckdb_libpgquery::PGNode *n, const char *constructName)
+{
+	if (contain_vars_of_level(n, 0))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+		/* translator: %s is name of a SQL construct, eg LIMIT */
+				 errmsg("argument of %s must not contain variables",
+						constructName),
+				 parser_errposition(pstate,
+									locate_var_of_level(n, 0))));
+	}
 };
 
 }

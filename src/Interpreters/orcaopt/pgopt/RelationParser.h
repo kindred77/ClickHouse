@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Interpreters/orcaopt/pgopt/parser_common.h>
+#include <Interpreters/orcaopt/pgopt/CoerceParser.h>
 
 namespace DB
 {
@@ -8,7 +9,7 @@ namespace DB
 class RelationParser
 {
 private:
-    
+    CoerceParser coerce_parser;
 
 public:
 	explicit RelationParser();
@@ -96,6 +97,13 @@ public:
 
 	void buildRelationAliases(TupleDesc tupdesc,
 		duckdb_libpgquery::PGAlias *alias, duckdb_libpgquery::PGAlias *eref);
+
+	duckdb_libpgquery::PGRangeTblEntry *
+	refnameRangeTblEntry(PGParseState *pstate,
+					 const char *schemaname,
+					 const char *refname,
+					 int location,
+					 int *sublevels_up);
 };
 
 }

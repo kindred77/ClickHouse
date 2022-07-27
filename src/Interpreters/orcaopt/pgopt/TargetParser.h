@@ -42,6 +42,10 @@ public:
     char * FigureColname(duckdb_libpgquery::PGNode *node);
 
     int FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name);
+
+    duckdb_libpgquery::PGList *
+    transformExpressionList(PGParseState *pstate, duckdb_libpgquery::PGList *exprlist,
+						PGParseExprKind exprKind);
 };
 
 }

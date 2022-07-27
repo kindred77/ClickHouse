@@ -1443,7 +1443,7 @@ RelationParser::addRangeTableEntryForJoin(PGParseState *pstate,
 	rte->alias = alias;
 
 	/* transform any Vars of type UNKNOWNOID if we can */
-	fixup_unknown_vars_in_exprlist(pstate, rte->joinaliasvars);
+	coerce_parser.fixup_unknown_vars_in_exprlist(pstate, rte->joinaliasvars);
 
 	eref = alias ? (PGAlias *) copyObject(alias) : makeAlias("unnamed_join", NIL);
 	numaliases = list_length(eref->colnames);
@@ -1490,6 +1490,60 @@ RelationParser::get_tle_by_resno(PGList *tlist, PGAttrNumber resno)
 
 		if (tle->resno == resno)
 			return tle;
+	}
+	return NULL;
+};
+
+duckdb_libpgquery::PGRangeTblEntry *
+RelationParser::refnameRangeTblEntry(PGParseState *pstate,
+					 const char *schemaname,
+					 const char *refname,
+					 int location,
+					 int *sublevels_up)
+{
+	Oid			relId = InvalidOid;
+
+	if (sublevels_up)
+		*sublevels_up = 0;
+
+	if (schemaname != NULL)
+	{
+		Oid			namespaceId;
+
+		/*
+		 * We can use LookupNamespaceNoError() here because we are only
+		 * interested in finding existing RTEs.  Checking USAGE permission on
+		 * the schema is unnecessary since it would have already been checked
+		 * when the RTE was made.  Furthermore, we want to report "RTE not
+		 * found", not "no permissions for schema", if the name happens to
+		 * match a schema name the user hasn't got access to.
+		 */
+		namespaceId = LookupNamespaceNoError(schemaname);
+		if (namespaceId == InvalidOid)
+			return NULL;
+		relId = get_relname_relid(refname, namespaceId);
+		if (relId == InvalidOid)
+			return NULL;
+	}
+
+	while (pstate != NULL)
+	{
+		PGRangeTblEntry *result;
+
+		if (relId != InvalidOid)
+			result = scanNameSpaceForRelid(pstate, relId, location);
+		else
+			result = scanNameSpaceForRefname(pstate, refname, location);
+
+		if (result)
+			return result;
+
+		if (sublevels_up)
+			(*sublevels_up)++;
+		else
+			break;
+
+		pstate = pstate->parentParseState;
 	}
 	return NULL;
 };

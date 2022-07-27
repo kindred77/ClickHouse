@@ -6,6 +6,7 @@
 #include <Interpreters/orcaopt/pgopt/SelectParser.h>
 #include <Interpreters/orcaopt/pgopt/ExprParser.h>
 #include <Interpreters/orcaopt/pgopt/CollationParser.h>
+#include <Interpreters/orcaopt/pgopt/OperParser.h>
 
 namespace DB
 {
@@ -19,6 +20,7 @@ private:
     ExprParser expr_parser;
     TargetParser target_parser;
     CollationParser collation_parser;
+    OperParser oper_parser;
 public:
 	explicit ClauseParser();
     void transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGList *frmList);
@@ -159,6 +161,12 @@ public:
 
     void
     setNamespaceColumnVisibility(duckdb_libpgquery::PGList *namespace_ptr, bool cols_visible);
+
+    duckdb_libpgquery::PGWindowClause *
+    findWindowClause(duckdb_libpgquery::PGList *wclist, const char *name);
+
+    void
+    checkExprIsVarFree(PGParseState *pstate, duckdb_libpgquery::PGNode *n, const char *constructName);
 };
 
 }
