@@ -1,5 +1,11 @@
 #pragma once
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wno-old-style-cast"
+#else
+#pragma GCC diagnostic ignored "-Wno-old-style-cast"
+#endif
+
 #include <nodes/parsenodes.hpp>
 #include <nodes/makefuncs.hpp>
 #include <nodes/nodeFuncs.hpp>
@@ -190,9 +196,9 @@ get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)
 	 * XXX: we probably should catch this earlier, but we have a
 	 * few queries in the regression suite that hit this.
 	 */
-	ereport(ERROR,
-			(errcode(ERRCODE_SYNTAX_ERROR),
-			 errmsg("ORDER/GROUP BY expression not found in targetlist")));
+	duckdb_libpgquery::ereport(ERROR,
+			(duckdb_libpgquery::errcode(ERRCODE_SYNTAX_ERROR),
+			 duckdb_libpgquery::errmsg("ORDER/GROUP BY expression not found in targetlist")));
 	return NULL;				/* keep compiler quiet */
 };
 
