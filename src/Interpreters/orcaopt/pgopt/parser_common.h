@@ -197,7 +197,7 @@ get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)
 	 * few queries in the regression suite that hit this.
 	 */
 	duckdb_libpgquery::ereport(ERROR,
-			(duckdb_libpgquery::errcode(ERRCODE_SYNTAX_ERROR),
+			(duckdb_libpgquery::errcode(duckdb_libpgquery::PG_ERRCODE_SYNTAX_ERROR),
 			 duckdb_libpgquery::errmsg("ORDER/GROUP BY expression not found in targetlist")));
 	return NULL;				/* keep compiler quiet */
 };

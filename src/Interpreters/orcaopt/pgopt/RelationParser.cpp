@@ -673,7 +673,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 				 */
 				if (att_tup->attisdropped)
 					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_COLUMN),
+							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					errmsg("column \"%s\" of relation \"%s\" does not exist",
 						   NameStr(att_tup->attname),
 						   get_rel_name(rte->relid))));
@@ -938,7 +938,7 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, cha
 		 * GPDB_94_MERGE_FIXME: Could we make that work somehow? Resurrect
 		 * t_tableOid, maybe? I think we'd need it for logical decoding as well.
 		 */
-		if (pstate->p_expr_kind == EXPR_KIND_CHECK_CONSTRAINT &&
+		if (pstate->p_expr_kind == PGParseExprKind::EXPR_KIND_CHECK_CONSTRAINT &&
 			attnum < InvalidAttrNumber /* && attnum != TableOidAttributeNumber */)
 			// ereport(ERROR,
 			// 		(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),

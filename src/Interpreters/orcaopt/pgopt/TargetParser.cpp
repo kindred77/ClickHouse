@@ -165,7 +165,7 @@ PGList *
 			{
 				if (rte != NULL)
 					ereport(ERROR,
-							(errcode(ERRCODE_AMBIGUOUS_COLUMN),
+							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("column reference \"%s\" is ambiguous",
 									NameListToString(cref->fields)),
 							 parser_errposition(pstate, cref->location)));
@@ -186,14 +186,14 @@ PGList *
 					break;
 				case CRSERR_WRONG_DB:
 					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cross-database references are not implemented: %s",
 									NameListToString(cref->fields)),
 							 parser_errposition(pstate, cref->location)));
 					break;
 				case CRSERR_TOO_MANY:
 					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
+							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("improper qualified name (too many dotted names): %s",
 									NameListToString(cref->fields)),
 							 parser_errposition(pstate, cref->location)));
@@ -524,9 +524,9 @@ int FigureColnameInternal(PGNode *node, char **name)
 				case PG_ANY_SUBLINK:
 				case PG_ROWCOMPARE_SUBLINK:
 				case PG_CTE_SUBLINK:
-				case PG_INITPLAN_FUNC_SUBLINK:
-				case PG_NOT_EXISTS_SUBLINK:
-					break;
+				// case PG_INITPLAN_FUNC_SUBLINK:
+				// case PG_NOT_EXISTS_SUBLINK:
+				// 	break;
 			}
 			break;
 		case T_PGCaseExpr:
@@ -562,36 +562,36 @@ int FigureColnameInternal(PGNode *node, char **name)
 					return 2;
 			}
 			break;
-		case T_PGXmlExpr:
-			/* make SQL/XML functions act like a regular function */
-			switch (((XmlExpr *) node)->op)
-			{
-				case IS_XMLCONCAT:
-					*name = "xmlconcat";
-					return 2;
-				case IS_XMLELEMENT:
-					*name = "xmlelement";
-					return 2;
-				case IS_XMLFOREST:
-					*name = "xmlforest";
-					return 2;
-				case IS_XMLPARSE:
-					*name = "xmlparse";
-					return 2;
-				case IS_XMLPI:
-					*name = "xmlpi";
-					return 2;
-				case IS_XMLROOT:
-					*name = "xmlroot";
-					return 2;
-				case IS_XMLSERIALIZE:
-					*name = "xmlserialize";
-					return 2;
-				case IS_DOCUMENT:
-					/* nothing */
-					break;
-			}
-			break;
+		// case T_PGXmlExpr:
+		// 	/* make SQL/XML functions act like a regular function */
+		// 	switch (((XmlExpr *) node)->op)
+		// 	{
+		// 		case IS_XMLCONCAT:
+		// 			*name = "xmlconcat";
+		// 			return 2;
+		// 		case IS_XMLELEMENT:
+		// 			*name = "xmlelement";
+		// 			return 2;
+		// 		case IS_XMLFOREST:
+		// 			*name = "xmlforest";
+		// 			return 2;
+		// 		case IS_XMLPARSE:
+		// 			*name = "xmlparse";
+		// 			return 2;
+		// 		case IS_XMLPI:
+		// 			*name = "xmlpi";
+		// 			return 2;
+		// 		case IS_XMLROOT:
+		// 			*name = "xmlroot";
+		// 			return 2;
+		// 		case IS_XMLSERIALIZE:
+		// 			*name = "xmlserialize";
+		// 			return 2;
+		// 		case IS_DOCUMENT:
+		// 			/* nothing */
+		// 			break;
+		// 	}
+		// 	break;
 		case T_PGXmlSerialize:
 			*name = "xmlserialize";
 			return 2;

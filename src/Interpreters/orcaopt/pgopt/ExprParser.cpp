@@ -621,7 +621,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 			node = hookresult;
 		else if (hookresult != NULL)
 			ereport(ERROR,
-					(errcode(ERRCODE_AMBIGUOUS_COLUMN),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("column reference \"%s\" is ambiguous",
 							NameListToString(cref->fields)),
 					 parser_errposition(pstate, cref->location)));
@@ -643,14 +643,14 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 				break;
 			case CRERR_WRONG_DB:
 				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				  errmsg("cross-database references are not implemented: %s",
 						 NameListToString(cref->fields)),
 						 parser_errposition(pstate, cref->location)));
 				break;
 			case CRERR_TOO_MANY:
 				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				errmsg("improper qualified name (too many dotted names): %s",
 					   NameListToString(cref->fields)),
 						 parser_errposition(pstate, cref->location)));
@@ -756,7 +756,7 @@ ExprParser::transformParamRef(PGParseState *pstate, PGParamRef *pref)
 
 	if (result == NULL)
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_PARAMETER),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("there is no parameter $%d", pref->number),
 				 parser_errposition(pstate, pref->location)));
 
@@ -785,7 +785,7 @@ ExprParser::transformIndirection(PGParseState *pstate, PGNode *basenode, PGList 
 		else if (IsA(n, PGAStar))
 		{
 			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("row expansion via \"*\" is not supported here"),
 					 parser_errposition(pstate, location)));
 		}
@@ -900,7 +900,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 		/* Can't handle an empty array without a target type */
 		if (newelems == NIL)
 			ereport(ERROR,
-					(errcode(ERRCODE_INDETERMINATE_DATATYPE),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("cannot determine type of empty array"),
 					 errhint("Explicitly cast to the desired type, "
 							 "for example ARRAY[]::integer[]."),
@@ -915,7 +915,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 			element_type = get_element_type(array_type);
 			if (element_type == InvalidOid)
 				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					   errmsg("could not find element type for data type %s",
 							  format_type_be(array_type)),
 						 parser_errposition(pstate, a->location)));
@@ -926,7 +926,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 			array_type = get_array_type(element_type);
 			if (array_type == InvalidOid)
 				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("could not find array type for data type %s",
 								format_type_be(element_type)),
 						 parser_errposition(pstate, a->location)));
@@ -960,7 +960,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 										 -1);
 			if (newe == NULL)
 				ereport(ERROR,
-						(errcode(ERRCODE_CANNOT_COERCE),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("cannot cast type %s to %s",
 								format_type_be(exprType(e)),
 								format_type_be(coerce_type)),
@@ -1013,7 +1013,7 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 								   location);
 	if (result == NULL)
 		ereport(ERROR,
-				(errcode(ERRCODE_CANNOT_COERCE),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("cannot cast type %s to %s",
 						format_type_be(inputType),
 						format_type_be(targetType)),
@@ -1039,7 +1039,7 @@ ExprParser::transformCollateClause(PGParseState *pstate, PGCollateClause *c)
 	 */
 	if (!type_is_collatable(argtype) && argtype != UNKNOWNOID)
 		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("collations are not supported by type %s",
 						format_type_be(argtype)),
 				 parser_errposition(pstate, c->location)));
@@ -1122,7 +1122,7 @@ ExprParser::transformAExprNullIf(PGParseState *pstate, PGAExpr *a)
 	 */
 	if (result->opresulttype != BOOLOID)
 		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("NULLIF requires = operator to yield boolean"),
 				 parser_errposition(pstate, a->location)));
 
@@ -1497,7 +1497,7 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 	}
 	if (err)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg_internal("%s", err),
 				 parser_errposition(pstate, sublink->location)));
 
@@ -1540,14 +1540,14 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 		if (tlist_item == NULL ||
 			((PGTargetEntry *) lfirst(tlist_item))->resjunk)
 			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery must return a column"),
 					 parser_errposition(pstate, sublink->location)));
 		while ((tlist_item = lnext(tlist_item)) != NULL)
 		{
 			if (!((PGTargetEntry *) lfirst(tlist_item))->resjunk)
 				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("subquery must return only one column"),
 						 parser_errposition(pstate, sublink->location)));
 		}
@@ -1607,12 +1607,12 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 		 */
 		if (list_length(left_list) < list_length(right_list))
 			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery has too many columns"),
 					 parser_errposition(pstate, sublink->location)));
 		if (list_length(left_list) > list_length(right_list))
 			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery has too few columns"),
 					 parser_errposition(pstate, sublink->location)));
 
@@ -1722,7 +1722,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 		{
 			if (isWhenIsNotDistinctFromExpr(warg))
 				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("syntax error at or near \"NOT\""),
 						 errhint("Missing <operand> for \"CASE <operand> WHEN IS NOT DISTINCT FROM ...\""),
 						 parser_errposition(pstate, exprLocation((PGNode *) warg))));
@@ -1920,7 +1920,7 @@ ExprParser::transformArraySubscripts(PGParseState *pstate,
 												-1);
 				if (subexpr == NULL)
 					ereport(ERROR,
-							(errcode(ERRCODE_DATATYPE_MISMATCH),
+							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("array subscript must have type integer"),
 						parser_errposition(pstate, exprLocation(ai->lidx))));
 			}
@@ -1947,7 +1947,7 @@ ExprParser::transformArraySubscripts(PGParseState *pstate,
 										-1);
 		if (subexpr == NULL)
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("array subscript must have type integer"),
 					 parser_errposition(pstate, exprLocation(ai->uidx))));
 		upperIndexpr = lappend(upperIndexpr, subexpr);
@@ -1971,7 +1971,7 @@ ExprParser::transformArraySubscripts(PGParseState *pstate,
 										-1);
 		if (newFrom == NULL)
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("array assignment requires type %s"
 							" but expression is of type %s",
 							format_type_be(typeneeded),
@@ -2036,7 +2036,7 @@ Oid ExprParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
 	elementType = type_struct_array->typelem;
 	if (elementType == InvalidOid)
 		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("cannot subscript type %s because it is not an array",
 						format_type_be(origArrayType))));
 

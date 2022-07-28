@@ -2522,7 +2522,7 @@ ClauseParser::checkExprIsVarFree(PGParseState *pstate,
 	if (contain_vars_of_level(n, 0))
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 		/* translator: %s is name of a SQL construct, eg LIMIT */
 				 errmsg("argument of %s must not contain variables",
 						constructName),

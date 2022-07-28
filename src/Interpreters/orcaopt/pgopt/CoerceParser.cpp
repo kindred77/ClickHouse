@@ -1031,7 +1031,7 @@ CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
 										-1);
 		if (newnode == NULL)
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 			/* translator: first %s is name of a SQL construct, eg LIMIT */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName,
@@ -1043,7 +1043,7 @@ CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
 
 	if (expression_returns_set(node))
 		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 		/* translator: %s is name of a SQL construct, eg LIMIT */
 				 errmsg("argument of %s must not return a set",
 						constructName),
@@ -1178,7 +1178,7 @@ CoerceParser::find_typmod_coercion_function(Oid typeId,
 		ReleaseSysCache(tuple);
 	}
 
-	if (!OidIsValid(*funcid))
+	if (*funcid == InvalidOid)
 		result = CoercionPathType::COERCION_PATH_NONE;
 
 	return result;
@@ -1215,7 +1215,7 @@ CoerceParser::build_coercion_expression(PGNode *node,
 {
 	int			nargs = 0;
 
-	if (OidIsValid(funcId))
+	if (funcId != InvalidOid)
 	{
 		HeapTuple	tp;
 		Form_pg_proc procstruct;
@@ -1251,7 +1251,7 @@ CoerceParser::build_coercion_expression(PGNode *node,
 		PGList	   *args;
 		PGConst	   *cons;
 
-		Assert(OidIsValid(funcId));
+		Assert(funcId != InvalidOid);
 
 		args = list_make1(node);
 
@@ -1315,7 +1315,7 @@ CoerceParser::build_coercion_expression(PGNode *node,
 		/* We need to build a CoerceViaIO node */
 		PGCoerceViaIO *iocoerce = makeNode(PGCoerceViaIO);
 
-		Assert(!OidIsValid(funcId));
+		Assert(funcId == InvalidOid);
 
 		iocoerce->arg = (PGExpr *) node;
 		iocoerce->resulttype = targetTypeId;
@@ -1404,7 +1404,7 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 						   PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 	else
 		ereport(ERROR,
-				(errcode(ERRCODE_CANNOT_COERCE),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 		/* translator: first %s is name of a SQL construct, eg CASE */
 				 errmsg("%s could not convert type %s to %s",
 						context,

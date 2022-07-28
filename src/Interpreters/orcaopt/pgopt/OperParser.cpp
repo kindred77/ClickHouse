@@ -3,6 +3,8 @@
 namespace DB
 {
 
+using namespace duckdb_libpgquery;
+
 void
 OperParser::get_sort_group_operators(Oid argtype,
 						 bool needLT, bool needEQ, bool needGT,
@@ -32,19 +34,19 @@ OperParser::get_sort_group_operators(Oid argtype,
 	lt_opr = typentry->lt_opr;
 	eq_opr = typentry->eq_opr;
 	gt_opr = typentry->gt_opr;
-	hashable = OidIsValid(typentry->hash_proc);
+	hashable = (typentry->hash_proc != InvalidOid);
 
 	/* Report errors if needed */
 	if ((needLT && !OidIsValid(lt_opr)) ||
 		(needGT && !OidIsValid(gt_opr)))
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_FUNCTION),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("could not identify an ordering operator for type %s",
 						format_type_be(argtype)),
 		 errhint("Use an explicit ordering operator or modify the query.")));
 	if (needEQ && !OidIsValid(eq_opr))
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_FUNCTION),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("could not identify an equality operator for type %s",
 						format_type_be(argtype))));
 

@@ -23,7 +23,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	if (pstate->p_hasWindowFuncs &&
 		contain_windowfuncs((PGNode *) wfunc->args))
 		ereport(ERROR,
-				(errcode(ERRCODE_WINDOWING_ERROR),
+				(errcode(PG_ERRCODE_WINDOWING_ERROR),
 				 errmsg("window function calls cannot be nested"),
 				 parser_errposition(pstate,
 								  locate_windowfunc((PGNode *) wfunc->args))));
@@ -142,12 +142,12 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	}
 	if (err)
 		ereport(ERROR,
-				(errcode(ERRCODE_WINDOWING_ERROR),
+				(errcode(PG_ERRCODE_WINDOWING_ERROR),
 				 errmsg_internal("%s", err),
 				 parser_errposition(pstate, wfunc->location)));
 	if (errkind)
 		ereport(ERROR,
-				(errcode(ERRCODE_WINDOWING_ERROR),
+				(errcode(PG_ERRCODE_WINDOWING_ERROR),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("window functions are not allowed in %s",
 						ParseExprKindName(pstate->p_expr_kind)),
@@ -200,7 +200,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 		}
 		if (lc == NULL)			/* didn't find it? */
 			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("window \"%s\" does not exist", name),
 					 parser_errposition(pstate, windef->location)));
 	}
@@ -352,7 +352,7 @@ AggParser::transformAggregateCall(PGParseState *pstate, PGAggref *agg,
 					PGNode	   *expr = get_sortgroupclause_expr(sortcl, tlist);
 
 					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_FUNCTION),
+							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("could not identify an ordering operator for type %s",
 									format_type_be(exprType(expr))),
 							 errdetail("Aggregates with DISTINCT must be able to sort their inputs."),
@@ -505,12 +505,12 @@ AggParser::transformAggregateCall(PGParseState *pstate, PGAggref *agg,
 	}
 	if (err)
 		ereport(ERROR,
-				(errcode(ERRCODE_GROUPING_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg_internal("%s", err),
 				 parser_errposition(pstate, agg->location)));
 	if (errkind)
 		ereport(ERROR,
-				(errcode(ERRCODE_GROUPING_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("aggregate functions are not allowed in %s",
 						ParseExprKindName(pstate->p_expr_kind)),
@@ -566,7 +566,7 @@ AggParsercheck_agg_arguments(PGParseState *pstate,
 		if (aggloc < 0)
 			aggloc = locate_agg_of_level((PGNode *) filter, agglevel);
 		ereport(ERROR,
-				(errcode(ERRCODE_GROUPING_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("aggregate function calls cannot be nested"),
 				 parser_errposition(pstate, aggloc)));
 	}
@@ -589,14 +589,14 @@ AggParsercheck_agg_arguments(PGParseState *pstate,
 									  (void *) &context);
 		if (context.min_varlevel >= 0 && context.min_varlevel < agglevel)
 			ereport(ERROR,
-					(errcode(ERRCODE_GROUPING_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("outer-level aggregate cannot contain a lower-level variable in its direct arguments"),
 					 parser_errposition(pstate,
 									 locate_var_of_level((PGNode *) directargs,
 													context.min_varlevel))));
 		if (context.min_agglevel >= 0 && context.min_agglevel <= agglevel)
 			ereport(ERROR,
-					(errcode(ERRCODE_GROUPING_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("aggregate function calls cannot be nested"),
 					 parser_errposition(pstate,
 									 locate_agg_of_level((PGNode *) directargs,

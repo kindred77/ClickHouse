@@ -656,7 +656,7 @@ CollationParser::assign_hypothetical_collations(PGAggref *aggref,
 		 * COLLATE clause for a RelabelType, and probably on some other
 		 * fragile behaviors.
 		 */
-		if (paircontext.collation != InvalidOid) &&
+		if ((paircontext.collation != InvalidOid) &&
 			paircontext.collation != exprCollation((PGNode *) s_tle->expr))
 		{
 			s_tle->expr = (PGExpr *)

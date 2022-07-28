@@ -37,7 +37,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, He
 	 */
 	if (!((Form_pg_type) GETSTRUCT(typ))->typisdefined)
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 			errmsg("type modifier cannot be specified for shell type \"%s\"",
 				   TypeNameToString(typeName)),
 				 parser_errposition(pstate, typeName->location)));
@@ -46,7 +46,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, He
 
 	if (typmodin == InvalidOid)
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier is not allowed for type \"%s\"",
 						TypeNameToString(typeName)),
 				 parser_errposition(pstate, typeName->location)));
@@ -88,7 +88,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, He
 		}
 		if (!cstr)
 			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 			errmsg("type modifiers must be simple constants or identifiers"),
 					 parser_errposition(pstate, typeName->location)));
 		datums[n++] = CStringGetDatum(cstr);
