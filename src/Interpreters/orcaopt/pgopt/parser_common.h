@@ -3,7 +3,7 @@
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wno-old-style-cast"
 #else
-#pragma GCC diagnostic ignored "-Wno-old-style-cast"
+#pragma GCC diagnostic ignored "-Wold-style-cast"
 #endif
 
 #include <nodes/parsenodes.hpp>
