@@ -1746,41 +1746,41 @@ ClauseParser::transformRowExprToGroupClauses(PGParseState *pstate, PGRowExpr *ro
 	return groupsets;
 };
 
-PGList *
-ClauseParser::transformScatterClause(PGParseState *pstate,
-					   PGList *scatterlist,
-					   PGList **targetlist)
-{
-	PGList	   *outlist = NIL;
-	PGListCell   *olitem;
+// PGList *
+// ClauseParser::transformScatterClause(PGParseState *pstate,
+// 					   PGList *scatterlist,
+// 					   PGList **targetlist)
+// {
+// 	PGList	   *outlist = NIL;
+// 	PGListCell   *olitem;
 
-	/* Special case handling for SCATTER RANDOMLY */
-	if (list_length(scatterlist) == 1 && linitial(scatterlist) == NULL)
-		return list_make1(NULL);
+// 	/* Special case handling for SCATTER RANDOMLY */
+// 	if (list_length(scatterlist) == 1 && linitial(scatterlist) == NULL)
+// 		return list_make1(NULL);
 	
-	/* preprocess the scatter clause, lookup TLEs */
-	foreach(olitem, scatterlist)
-	{
-		PGNode			*node = reinterpret_cast<PGNode *>(lfirst(olitem));
-		PGTargetEntry		*tle;
+// 	/* preprocess the scatter clause, lookup TLEs */
+// 	foreach(olitem, scatterlist)
+// 	{
+// 		PGNode			*node = reinterpret_cast<PGNode *>(lfirst(olitem));
+// 		PGTargetEntry		*tle;
 
-		tle = findTargetlistEntrySQL99(pstate, node, targetlist,
-									   PGParseExprKind::EXPR_KIND_SCATTER_BY);
+// 		tle = findTargetlistEntrySQL99(pstate, node, targetlist,
+// 									   PGParseExprKind::EXPR_KIND_SCATTER_BY);
 
-		/* coerce unknown to text */
-		if (exprType((PGNode *) tle->expr) == UNKNOWNOID)
-		{
-			tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
-											 UNKNOWNOID, TEXTOID, -1,
-											 PG_COERCION_IMPLICIT,
-											 PG_COERCE_IMPLICIT_CAST,
-											 -1);
-		}
+// 		/* coerce unknown to text */
+// 		if (exprType((PGNode *) tle->expr) == UNKNOWNOID)
+// 		{
+// 			tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
+// 											 UNKNOWNOID, TEXTOID, -1,
+// 											 PG_COERCION_IMPLICIT,
+// 											 PG_COERCE_IMPLICIT_CAST,
+// 											 -1);
+// 		}
 
-		outlist = lappend(outlist, tle->expr);
-	}
-	return outlist;
-};
+// 		outlist = lappend(outlist, tle->expr);
+// 	}
+// 	return outlist;
+// };
 
 PGList *
 ClauseParser::transformDistinctToGroupBy(PGParseState *pstate, PGList **targetlist,
@@ -2078,426 +2078,441 @@ ClauseParser::transformLimitClause(PGParseState *pstate, PGNode *clause,
 	return qual;
 };
 
-PGList *
-ClauseParser::transformWindowDefinitions(PGParseState *pstate,
-						   PGList *windowdefs,
-						   PGList **targetlist)
+// PGList *
+// ClauseParser::transformWindowDefinitions(PGParseState *pstate,
+// 						   PGList *windowdefs,
+// 						   PGList **targetlist)
+// {
+// 	PGList	   *result = NIL;
+// 	Index		winref = 0;
+// 	PGListCell   *lc;
+
+// 	/*
+// 	 * We have two lists of window specs: one in the ParseState -- put there
+// 	 * when we find the OVER(...) clause in the targetlist and the other
+// 	 * is windowClause, a list of named window clauses. So, we concatenate
+// 	 * them together.
+// 	 *
+// 	 * Note that we're careful place those found in the target list at
+// 	 * the end because the spec might refer to a named clause and we'll
+// 	 * after to know about those first.
+// 	 */
+// 	foreach(lc, windowdefs)
+// 	{
+// 		PGWindowDef  *windef = reinterpret_cast<PGWindowDef *>(lfirst(lc));
+// 		PGWindowClause *refwc = NULL;
+// 		PGList	   *partitionClause;
+// 		PGList	   *orderClause;
+// 		PGWindowClause *wc;
+
+// 		winref++;
+
+// 		/*
+// 		 * Check for duplicate window names.
+// 		 */
+// 		if (windef->name &&
+// 			findWindowClause(result, windef->name) != NULL)
+// 			// ereport(ERROR,
+// 			// 		(errcode(ERRCODE_WINDOWING_ERROR),
+// 			// 		 errmsg("window \"%s\" is already defined", windef->name),
+// 			// 		 parser_errposition(pstate, windef->location)));
+// 			throw Exception(ERROR, "window {} is already defined", windef->name);
+
+// 		/*
+// 		 * If it references a previous window, look that up.
+// 		 */
+// 		if (windef->refname)
+// 		{
+// 			refwc = findWindowClause(result, windef->refname);
+// 			if (refwc == NULL)
+// 				// ereport(ERROR,
+// 				// 		(errcode(ERRCODE_UNDEFINED_OBJECT),
+// 				// 		 errmsg("window \"%s\" does not exist",
+// 				// 				windef->refname),
+// 				// 		 parser_errposition(pstate, windef->location)));
+// 				throw Exception(ERROR, "window {} does not exist", windef->name);
+// 		}
+
+// 		/*
+// 		 * Transform PARTITION and ORDER specs, if any.  These are treated
+// 		 * almost exactly like top-level GROUP BY and ORDER BY clauses,
+// 		 * including the special handling of nondefault operator semantics.
+// 		 */
+// 		orderClause = transformSortClause(pstate,
+// 										  windef->orderClause,
+// 										  targetlist,
+// 										  PGParseExprKind::EXPR_KIND_WINDOW_ORDER,
+// 										  true /* fix unknowns */ ,
+// 										  true /* force SQL99 rules */ );
+// 		partitionClause = transformSortClause(pstate,
+// 											  windef->partitionClause,
+// 											  targetlist,
+// 											  PGParseExprKind::EXPR_KIND_WINDOW_PARTITION,
+// 											  true /* fix unknowns */ ,
+// 											  true /* force SQL99 rules */ );
+
+// 		/*
+// 		 * And prepare the new WindowClause.
+// 		 */
+// 		wc = makeNode(PGWindowClause);
+// 		wc->name = windef->name;
+// 		wc->refname = windef->refname;
+
+// 		/*
+// 		 * Per spec, a windowdef that references a previous one copies the
+// 		 * previous partition clause (and mustn't specify its own).  It can
+// 		 * specify its own ordering clause, but only if the previous one had
+// 		 * none.  It always specifies its own frame clause, and the previous
+// 		 * one must not have a frame clause.  Yeah, it's bizarre that each of
+// 		 * these cases works differently, but SQL:2008 says so; see 7.11
+// 		 * <window clause> syntax rule 10 and general rule 1.  The frame
+// 		 * clause rule is especially bizarre because it makes "OVER foo"
+// 		 * different from "OVER (foo)", and requires the latter to throw an
+// 		 * error if foo has a nondefault frame clause.  Well, ours not to
+// 		 * reason why, but we do go out of our way to throw a useful error
+// 		 * message for such cases.
+// 		 */
+// 		if (refwc)
+// 		{
+// 			if (partitionClause)
+// 				// ereport(ERROR,
+// 				// 		(errcode(ERRCODE_WINDOWING_ERROR),
+// 				// errmsg("cannot override PARTITION BY clause of window \"%s\"",
+// 				// 	   windef->refname),
+// 				// 		 parser_errposition(pstate, windef->location)));
+// 				throw Exception(ERROR, "cannot override PARTITION BY clause of window {}", windef->refname);
+// 			wc->partitionClause = reinterpret_cast<PGList *>(copyObject(refwc->partitionClause));
+// 		}
+// 		else
+// 			wc->partitionClause = partitionClause;
+// 		if (refwc)
+// 		{
+// 			if (orderClause && refwc->orderClause)
+// 				// ereport(ERROR,
+// 				// 		(errcode(ERRCODE_WINDOWING_ERROR),
+// 				//    errmsg("cannot override ORDER BY clause of window \"%s\"",
+// 				// 		  windef->refname),
+// 				// 		 parser_errposition(pstate, windef->location)));
+// 				throw Exception(ERROR, "cannot override ORDER BY clause of window {}", windef->refname);
+// 			if (orderClause)
+// 			{
+// 				wc->orderClause = orderClause;
+// 				wc->copiedOrder = false;
+// 			}
+// 			else
+// 			{
+// 				wc->orderClause = reinterpret_cast<PGList *>(copyObject(refwc->orderClause));
+// 				wc->copiedOrder = true;
+// 			}
+// 		}
+// 		else
+// 		{
+// 			wc->orderClause = orderClause;
+// 			wc->copiedOrder = false;
+// 		}
+// 		if (refwc && refwc->frameOptions != FRAMEOPTION_DEFAULTS)
+// 		{
+// 			/*
+// 			 * Use this message if this is a WINDOW clause, or if it's an OVER
+// 			 * clause that includes ORDER BY or framing clauses.  (We already
+// 			 * rejected PARTITION BY above, so no need to check that.)
+// 			 */
+// 			if (windef->name ||
+// 				orderClause || windef->frameOptions != FRAMEOPTION_DEFAULTS)
+// 				// ereport(ERROR,
+// 				// 		(errcode(ERRCODE_WINDOWING_ERROR),
+// 				// 		 errmsg("cannot copy window \"%s\" because it has a frame clause",
+// 				// 				windef->refname),
+// 				// 		 parser_errposition(pstate, windef->location)));
+// 				throw Exception(ERROR, "cannot copy window {} because it has a frame clause", windef->refname);
+// 			/* Else this clause is just OVER (foo), so say this: */
+// 			// ereport(ERROR,
+// 			// 		(errcode(ERRCODE_WINDOWING_ERROR),
+// 			// 		 errmsg("cannot copy window \"%s\" because it has a frame clause",
+// 			// 				windef->refname),
+// 			// 		 errhint("Omit the parentheses in this OVER clause."),
+// 			// 		 parser_errposition(pstate, windef->location)));
+// 			throw Exception(ERROR, "cannot copy window {} because it has a frame clause", windef->refname);
+// 		}
+
+// 		/*
+// 		 * Finally, process the framing clause. parseProcessWindFunc() will
+// 		 * have picked up window functions that do not support framing.
+// 		 *
+// 		 * What we do need to do is the following:
+// 		 * - If BETWEEN has been specified, the trailing bound is not
+// 		 *   UNBOUNDED FOLLOWING; the leading bound is not UNBOUNDED
+// 		 *   PRECEDING; if the first bound specifies CURRENT ROW, the
+// 		 *   second bound shall not specify a PRECEDING bound; if the
+// 		 *   first bound specifies a FOLLOWING bound, the second bound
+// 		 *   shall not specify a PRECEDING or CURRENT ROW bound.
+// 		 *
+// 		 * - If the user did not specify BETWEEN, the bound is assumed to be
+// 		 *   a trailing bound and the leading bound is set to CURRENT ROW.
+// 		 *   We're careful not to set is_between here because the user did not
+// 		 *   specify it.
+// 		 *
+// 		 * - If RANGE is specified: the ORDER BY clause of the window spec
+// 		 *   may specify only one column; the type of that column must support
+// 		 *   +/- <integer> operations and must be merge-joinable.
+// 		 */
+
+// 		wc->frameOptions = windef->frameOptions;
+// 		wc->winref = winref;
+// 		/* Process frame offset expressions */
+// 		wc->startOffset = transformFrameOffset(pstate, wc->frameOptions,
+// 											   windef->startOffset, wc->orderClause,
+// 											   *targetlist,
+// 											   (windef->frameOptions & FRAMEOPTION_START_VALUE_FOLLOWING) != 0,
+// 											   windef->location);
+// 		wc->endOffset = transformFrameOffset(pstate, wc->frameOptions,
+// 											 windef->endOffset, wc->orderClause,
+// 											 *targetlist,
+// 											 (windef->frameOptions & FRAMEOPTION_END_VALUE_FOLLOWING) != 0,
+// 											 windef->location);
+
+// 		/* finally, check function restriction with this spec. */
+// 		winref_checkspec(pstate, *targetlist, winref,
+// 						 wc->orderClause != NULL,
+// 						 wc->frameOptions != FRAMEOPTION_DEFAULTS);
+
+// 		result = lappend(result, wc);
+// 	}
+
+// 	/* If there are no window functions in the targetlist,
+// 	 * forget the window clause.
+// 	 */
+// 	if (!pstate->p_hasWindowFuncs)
+// 		pstate->p_windowdefs = NIL;
+
+// 	return result;
+// };
+
+PGTargetEntry *
+ClauseParser::getTargetBySortGroupRef(Index ref, PGList *tl)
 {
-	PGList	   *result = NIL;
-	Index		winref = 0;
-	PGListCell   *lc;
+	PGListCell *tmp;
 
-	/*
-	 * We have two lists of window specs: one in the ParseState -- put there
-	 * when we find the OVER(...) clause in the targetlist and the other
-	 * is windowClause, a list of named window clauses. So, we concatenate
-	 * them together.
-	 *
-	 * Note that we're careful place those found in the target list at
-	 * the end because the spec might refer to a named clause and we'll
-	 * after to know about those first.
-	 */
-	foreach(lc, windowdefs)
+	foreach(tmp, tl)
 	{
-		PGWindowDef  *windef = reinterpret_cast<PGWindowDef *>(lfirst(lc));
-		PGWindowClause *refwc = NULL;
-		PGList	   *partitionClause;
-		PGList	   *orderClause;
-		PGWindowClause *wc;
+		PGTargetEntry *te = (PGTargetEntry *)lfirst(tmp);
 
-		winref++;
-
-		/*
-		 * Check for duplicate window names.
-		 */
-		if (windef->name &&
-			findWindowClause(result, windef->name) != NULL)
-			// ereport(ERROR,
-			// 		(errcode(ERRCODE_WINDOWING_ERROR),
-			// 		 errmsg("window \"%s\" is already defined", windef->name),
-			// 		 parser_errposition(pstate, windef->location)));
-			throw Exception(ERROR, "window {} is already defined", windef->name);
-
-		/*
-		 * If it references a previous window, look that up.
-		 */
-		if (windef->refname)
-		{
-			refwc = findWindowClause(result, windef->refname);
-			if (refwc == NULL)
-				// ereport(ERROR,
-				// 		(errcode(ERRCODE_UNDEFINED_OBJECT),
-				// 		 errmsg("window \"%s\" does not exist",
-				// 				windef->refname),
-				// 		 parser_errposition(pstate, windef->location)));
-				throw Exception(ERROR, "window {} does not exist", windef->name);
-		}
-
-		/*
-		 * Transform PARTITION and ORDER specs, if any.  These are treated
-		 * almost exactly like top-level GROUP BY and ORDER BY clauses,
-		 * including the special handling of nondefault operator semantics.
-		 */
-		orderClause = transformSortClause(pstate,
-										  windef->orderClause,
-										  targetlist,
-										  PGParseExprKind::EXPR_KIND_WINDOW_ORDER,
-										  true /* fix unknowns */ ,
-										  true /* force SQL99 rules */ );
-		partitionClause = transformSortClause(pstate,
-											  windef->partitionClause,
-											  targetlist,
-											  PGParseExprKind::EXPR_KIND_WINDOW_PARTITION,
-											  true /* fix unknowns */ ,
-											  true /* force SQL99 rules */ );
-
-		/*
-		 * And prepare the new WindowClause.
-		 */
-		wc = makeNode(PGWindowClause);
-		wc->name = windef->name;
-		wc->refname = windef->refname;
-
-		/*
-		 * Per spec, a windowdef that references a previous one copies the
-		 * previous partition clause (and mustn't specify its own).  It can
-		 * specify its own ordering clause, but only if the previous one had
-		 * none.  It always specifies its own frame clause, and the previous
-		 * one must not have a frame clause.  Yeah, it's bizarre that each of
-		 * these cases works differently, but SQL:2008 says so; see 7.11
-		 * <window clause> syntax rule 10 and general rule 1.  The frame
-		 * clause rule is especially bizarre because it makes "OVER foo"
-		 * different from "OVER (foo)", and requires the latter to throw an
-		 * error if foo has a nondefault frame clause.  Well, ours not to
-		 * reason why, but we do go out of our way to throw a useful error
-		 * message for such cases.
-		 */
-		if (refwc)
-		{
-			if (partitionClause)
-				// ereport(ERROR,
-				// 		(errcode(ERRCODE_WINDOWING_ERROR),
-				// errmsg("cannot override PARTITION BY clause of window \"%s\"",
-				// 	   windef->refname),
-				// 		 parser_errposition(pstate, windef->location)));
-				throw Exception(ERROR, "cannot override PARTITION BY clause of window {}", windef->refname);
-			wc->partitionClause = reinterpret_cast<PGList *>(copyObject(refwc->partitionClause));
-		}
-		else
-			wc->partitionClause = partitionClause;
-		if (refwc)
-		{
-			if (orderClause && refwc->orderClause)
-				// ereport(ERROR,
-				// 		(errcode(ERRCODE_WINDOWING_ERROR),
-				//    errmsg("cannot override ORDER BY clause of window \"%s\"",
-				// 		  windef->refname),
-				// 		 parser_errposition(pstate, windef->location)));
-				throw Exception(ERROR, "cannot override ORDER BY clause of window {}", windef->refname);
-			if (orderClause)
-			{
-				wc->orderClause = orderClause;
-				wc->copiedOrder = false;
-			}
-			else
-			{
-				wc->orderClause = reinterpret_cast<PGList *>(copyObject(refwc->orderClause));
-				wc->copiedOrder = true;
-			}
-		}
-		else
-		{
-			wc->orderClause = orderClause;
-			wc->copiedOrder = false;
-		}
-		if (refwc && refwc->frameOptions != FRAMEOPTION_DEFAULTS)
-		{
-			/*
-			 * Use this message if this is a WINDOW clause, or if it's an OVER
-			 * clause that includes ORDER BY or framing clauses.  (We already
-			 * rejected PARTITION BY above, so no need to check that.)
-			 */
-			if (windef->name ||
-				orderClause || windef->frameOptions != FRAMEOPTION_DEFAULTS)
-				// ereport(ERROR,
-				// 		(errcode(ERRCODE_WINDOWING_ERROR),
-				// 		 errmsg("cannot copy window \"%s\" because it has a frame clause",
-				// 				windef->refname),
-				// 		 parser_errposition(pstate, windef->location)));
-				throw Exception(ERROR, "cannot copy window {} because it has a frame clause", windef->refname);
-			/* Else this clause is just OVER (foo), so say this: */
-			// ereport(ERROR,
-			// 		(errcode(ERRCODE_WINDOWING_ERROR),
-			// 		 errmsg("cannot copy window \"%s\" because it has a frame clause",
-			// 				windef->refname),
-			// 		 errhint("Omit the parentheses in this OVER clause."),
-			// 		 parser_errposition(pstate, windef->location)));
-			throw Exception(ERROR, "cannot copy window {} because it has a frame clause", windef->refname);
-		}
-
-		/*
-		 * Finally, process the framing clause. parseProcessWindFunc() will
-		 * have picked up window functions that do not support framing.
-		 *
-		 * What we do need to do is the following:
-		 * - If BETWEEN has been specified, the trailing bound is not
-		 *   UNBOUNDED FOLLOWING; the leading bound is not UNBOUNDED
-		 *   PRECEDING; if the first bound specifies CURRENT ROW, the
-		 *   second bound shall not specify a PRECEDING bound; if the
-		 *   first bound specifies a FOLLOWING bound, the second bound
-		 *   shall not specify a PRECEDING or CURRENT ROW bound.
-		 *
-		 * - If the user did not specify BETWEEN, the bound is assumed to be
-		 *   a trailing bound and the leading bound is set to CURRENT ROW.
-		 *   We're careful not to set is_between here because the user did not
-		 *   specify it.
-		 *
-		 * - If RANGE is specified: the ORDER BY clause of the window spec
-		 *   may specify only one column; the type of that column must support
-		 *   +/- <integer> operations and must be merge-joinable.
-		 */
-
-		wc->frameOptions = windef->frameOptions;
-		wc->winref = winref;
-		/* Process frame offset expressions */
-		wc->startOffset = transformFrameOffset(pstate, wc->frameOptions,
-											   windef->startOffset, wc->orderClause,
-											   *targetlist,
-											   (windef->frameOptions & FRAMEOPTION_START_VALUE_FOLLOWING) != 0,
-											   windef->location);
-		wc->endOffset = transformFrameOffset(pstate, wc->frameOptions,
-											 windef->endOffset, wc->orderClause,
-											 *targetlist,
-											 (windef->frameOptions & FRAMEOPTION_END_VALUE_FOLLOWING) != 0,
-											 windef->location);
-
-		/* finally, check function restriction with this spec. */
-		winref_checkspec(pstate, *targetlist, winref,
-						 PointerIsValid(wc->orderClause),
-						 wc->frameOptions != FRAMEOPTION_DEFAULTS);
-
-		result = lappend(result, wc);
+		if (te->ressortgroupref == ref)
+			return te;
 	}
-
-	/* If there are no window functions in the targetlist,
-	 * forget the window clause.
-	 */
-	if (!pstate->p_hasWindowFuncs)
-		pstate->p_windowdefs = NIL;
-
-	return result;
+	return NULL;
 };
 
-PGNode *
-ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNode *clause,
-					 PGList *orderClause, PGList *targetlist, bool isFollowing,
-					 int location)
-{
-	const char *constructName = NULL;
-	PGNode	   *node;
+// PGNode *
+// ClauseParser::transformFrameOffset(PGParseState *pstate, int frameOptions, PGNode *clause,
+// 					 PGList *orderClause, PGList *targetlist, bool isFollowing,
+// 					 int location)
+// {
+// 	const char *constructName = NULL;
+// 	PGNode	   *node;
 
-	/* Quick exit if no offset expression */
-	if (clause == NULL)
-		return NULL;
+// 	/* Quick exit if no offset expression */
+// 	if (clause == NULL)
+// 		return NULL;
 
-	if (frameOptions & FRAMEOPTION_ROWS)
-	{
-		/* Transform the raw expression tree */
-		node = expr_parser.transformExpr(pstate, clause, PGParseExprKind::EXPR_KIND_WINDOW_FRAME_ROWS);
+// 	if (frameOptions & FRAMEOPTION_ROWS)
+// 	{
+// 		/* Transform the raw expression tree */
+// 		node = expr_parser.transformExpr(pstate, clause, PGParseExprKind::EXPR_KIND_WINDOW_FRAME_ROWS);
 
-		/*
-		 * Like LIMIT clause, simply coerce to int8
-		 */
-		constructName = "ROWS";
-		node = coerce_parser.coerce_to_specific_type(pstate, node, INT8OID, constructName);
-	}
-	else if (frameOptions & FRAMEOPTION_RANGE)
-	{
-		PGTargetEntry *te;
-		Oid			otype;
-		Oid			rtype;
-		Oid			newrtype;
-		PGSortGroupClause *sort;
-		Oid			oprresult;
-		PGList	   *oprname;
-		Operator	tup;
-		int32		typmod;
+// 		/*
+// 		 * Like LIMIT clause, simply coerce to int8
+// 		 */
+// 		constructName = "ROWS";
+// 		node = coerce_parser.coerce_to_specific_type(pstate, node, INT8OID, constructName);
+// 	}
+// 	else if (frameOptions & FRAMEOPTION_RANGE)
+// 	{
+// 		PGTargetEntry *te;
+// 		Oid			otype;
+// 		Oid			rtype;
+// 		Oid			newrtype;
+// 		PGSortGroupClause *sort;
+// 		Oid			oprresult;
+// 		PGList	   *oprname;
+// 		Operator	tup;
+// 		int32		typmod;
 
-		/* Transform the raw expression tree */
-		node = expr_parser.transformExpr(pstate, clause, PGParseExprKind::EXPR_KIND_WINDOW_FRAME_RANGE);
+// 		/* Transform the raw expression tree */
+// 		node = expr_parser.transformExpr(pstate, clause, PGParseExprKind::EXPR_KIND_WINDOW_FRAME_RANGE);
 
-		/*
-		 * this needs a lot of thought to decide how to support in the context
-		 * of Postgres' extensible datatype framework
-		 */
-		constructName = "RANGE";
+// 		/*
+// 		 * this needs a lot of thought to decide how to support in the context
+// 		 * of Postgres' extensible datatype framework
+// 		 */
+// 		constructName = "RANGE";
 
-		/* caller should've checked this already, but better safe than sorry */
-		if (list_length(orderClause) == 0)
-			// ereport(ERROR,
-			// 		(errcode(ERRCODE_SYNTAX_ERROR),
-			// 		 errmsg("window specifications with a framing clause must have an ORDER BY clause"),
-			// 		 parser_errposition(pstate, location)));
-			throw Exception(ERROR, "window specifications with a framing clause must have an ORDER BY clause");
-		if (list_length(orderClause) > 1)
-			// ereport(ERROR,
-			// 		(errcode(ERRCODE_SYNTAX_ERROR),
-			// 		 errmsg("only one ORDER BY column may be specified when RANGE is used in a window specification"),
-			// 		 parser_errposition(pstate, location)));
-			throw Exception(ERROR, "only one ORDER BY column may be specified when RANGE is used in a window specification");
+// 		/* caller should've checked this already, but better safe than sorry */
+// 		if (list_length(orderClause) == 0)
+// 			// ereport(ERROR,
+// 			// 		(errcode(ERRCODE_SYNTAX_ERROR),
+// 			// 		 errmsg("window specifications with a framing clause must have an ORDER BY clause"),
+// 			// 		 parser_errposition(pstate, location)));
+// 			throw Exception(ERROR, "window specifications with a framing clause must have an ORDER BY clause");
+// 		if (list_length(orderClause) > 1)
+// 			// ereport(ERROR,
+// 			// 		(errcode(ERRCODE_SYNTAX_ERROR),
+// 			// 		 errmsg("only one ORDER BY column may be specified when RANGE is used in a window specification"),
+// 			// 		 parser_errposition(pstate, location)));
+// 			throw Exception(ERROR, "only one ORDER BY column may be specified when RANGE is used in a window specification");
 
-		typmod = exprTypmod(node);
+// 		typmod = exprTypmod(node);
 
-		if (IsA(node, PGConst))
-		{
-			PGConst *con = (PGConst *) node;
+// 		if (IsA(node, PGConst))
+// 		{
+// 			PGConst *con = (PGConst *) node;
 
-			if (con->constisnull)
-				// ereport(ERROR,
-				// 		(errcode(ERRCODE_WINDOWING_ERROR),
-				// 		 errmsg("RANGE parameter cannot be NULL"),
-				// 		 parser_errposition(pstate, con->location)));
-				throw Exception(ERROR, "RANGE parameter cannot be NULL");
-		}
+// 			if (con->constisnull)
+// 				// ereport(ERROR,
+// 				// 		(errcode(ERRCODE_WINDOWING_ERROR),
+// 				// 		 errmsg("RANGE parameter cannot be NULL"),
+// 				// 		 parser_errposition(pstate, con->location)));
+// 				throw Exception(ERROR, "RANGE parameter cannot be NULL");
+// 		}
 
-		sort = (PGSortGroupClause *) linitial(orderClause);
-		te = getTargetBySortGroupRef(sort->tleSortGroupRef,
-									 targetlist);
-		otype = exprType((PGNode *)te->expr);
-		rtype = exprType(node);
+// 		sort = (PGSortGroupClause *) linitial(orderClause);
+// 		te = getTargetBySortGroupRef(sort->tleSortGroupRef,
+// 									 targetlist);
+// 		otype = exprType((PGNode *)te->expr);
+// 		rtype = exprType(node);
 
-		/* XXX: Reverse these if user specified DESC */
-		if (isFollowing)
-			oprname = lappend(NIL, makeString("+"));
-		else
-			oprname = lappend(NIL, makeString("-"));
+// 		/* XXX: Reverse these if user specified DESC */
+// 		if (isFollowing)
+// 			oprname = lappend(NIL, makeString("+"));
+// 		else
+// 			oprname = lappend(NIL, makeString("-"));
 
-		tup = oper(pstate, oprname, otype, rtype, true, 0);
+// 		tup = oper_parser.oper(pstate, oprname, otype, rtype, true, 0);
 
-		if (!HeapTupleIsValid(tup))
-			// ereport(ERROR,
-			// 		(errcode(ERRCODE_SYNTAX_ERROR),
-			// 		 errmsg("window specification RANGE parameter type must be coercible to ORDER BY column type")));
-			throw Exception(ERROR, "window specification RANGE parameter type must be coercible to ORDER BY column type");
+// 		if (!HeapTupleIsValid(tup))
+// 			// ereport(ERROR,
+// 			// 		(errcode(ERRCODE_SYNTAX_ERROR),
+// 			// 		 errmsg("window specification RANGE parameter type must be coercible to ORDER BY column type")));
+// 			throw Exception(ERROR, "window specification RANGE parameter type must be coercible to ORDER BY column type");
 
-		oprresult = ((Form_pg_operator)GETSTRUCT(tup))->oprresult;
-		newrtype = ((Form_pg_operator)GETSTRUCT(tup))->oprright;
-		ReleaseSysCache(tup);
-		list_free_deep(oprname);
+// 		oprresult = ((Form_pg_operator)GETSTRUCT(tup))->oprresult;
+// 		newrtype = ((Form_pg_operator)GETSTRUCT(tup))->oprright;
+// 		ReleaseSysCache(tup);
+// 		list_free_deep(oprname);
 
-		if (rtype != newrtype)
-		{
-			/*
-			 * We have to coerce the RHS to the new type so that we'll be
-			 * able to trivially find an operator later on.
-			 */
+// 		if (rtype != newrtype)
+// 		{
+// 			/*
+// 			 * We have to coerce the RHS to the new type so that we'll be
+// 			 * able to trivially find an operator later on.
+// 			 */
 
-			/* XXX: we assume that the typmod for the new RHS type
-			 * is the same as before... is that safe?
-			 */
-			PGExpr *expr =
-				(PGExpr *)coerce_parser.coerce_to_target_type(NULL,
-											  node,
-											  rtype,
-											  newrtype, typmod,
-											  PG_COERCION_EXPLICIT,
-											  PG_COERCE_IMPLICIT_CAST,
-											  -1);
-			if (!PointerIsValid(expr))
-			{
-				// ereport(ERROR,
-				// 		(errcode(ERRCODE_SYNTAX_ERROR),
-				// 		 errmsg("type mismatch between ORDER BY and RANGE "
-				// 				"parameter in window specification"),
-				// 		 errhint("Operations between window specification "
-				// 				 "the ORDER BY column and RANGE parameter "
-				// 				 "must result in a data type which can be "
-				// 				 "cast back to the ORDER BY column type"),
-				// 		 parser_errposition(pstate, exprLocation((PGNode *) expr))));
-				throw Exception(ERROR, "type mismatch between ORDER BY and RANGE "
-					"parameter in window specification");
-			}
+// 			/* XXX: we assume that the typmod for the new RHS type
+// 			 * is the same as before... is that safe?
+// 			 */
+// 			PGExpr *expr =
+// 				(PGExpr *)coerce_parser.coerce_to_target_type(NULL,
+// 											  node,
+// 											  rtype,
+// 											  newrtype, typmod,
+// 											  PG_COERCION_EXPLICIT,
+// 											  PG_COERCE_IMPLICIT_CAST,
+// 											  -1);
+// 			if (expr == NULL)
+// 			{
+// 				// ereport(ERROR,
+// 				// 		(errcode(ERRCODE_SYNTAX_ERROR),
+// 				// 		 errmsg("type mismatch between ORDER BY and RANGE "
+// 				// 				"parameter in window specification"),
+// 				// 		 errhint("Operations between window specification "
+// 				// 				 "the ORDER BY column and RANGE parameter "
+// 				// 				 "must result in a data type which can be "
+// 				// 				 "cast back to the ORDER BY column type"),
+// 				// 		 parser_errposition(pstate, exprLocation((PGNode *) expr))));
+// 				throw Exception(ERROR, "type mismatch between ORDER BY and RANGE "
+// 					"parameter in window specification");
+// 			}
 
-			node = (PGNode *) expr;
-		}
+// 			node = (PGNode *) expr;
+// 		}
 
-		if (oprresult != otype)
-		{
-			/*
-			 * See if it can be coerced. The point of this is to just
-			 * throw an error if the coercion is not possible. The
-			 * actual coercion will be done later, in the executor.
-			 *
-			 * XXX: Why not do it here?
-			 */
-			if (!coerce_parser.can_coerce_type(1, &oprresult, &otype, PG_COERCION_EXPLICIT))
-				// ereport(ERROR,
-				// 		(errcode(ERRCODE_SYNTAX_ERROR),
-				// 		 errmsg("invalid RANGE parameter"),
-				// 		 errhint("Operations between window specification "
-				// 				 "the ORDER BY column and RANGE parameter "
-				// 				 "must result in a data type which can be "
-				// 				 "cast back to the ORDER BY column type")));
-				throw Exception(ERROR, "invalid RANGE parameter");
-		}
+// 		if (oprresult != otype)
+// 		{
+// 			/*
+// 			 * See if it can be coerced. The point of this is to just
+// 			 * throw an error if the coercion is not possible. The
+// 			 * actual coercion will be done later, in the executor.
+// 			 *
+// 			 * XXX: Why not do it here?
+// 			 */
+// 			if (!coerce_parser.can_coerce_type(1, &oprresult, &otype, PG_COERCION_EXPLICIT))
+// 				// ereport(ERROR,
+// 				// 		(errcode(ERRCODE_SYNTAX_ERROR),
+// 				// 		 errmsg("invalid RANGE parameter"),
+// 				// 		 errhint("Operations between window specification "
+// 				// 				 "the ORDER BY column and RANGE parameter "
+// 				// 				 "must result in a data type which can be "
+// 				// 				 "cast back to the ORDER BY column type")));
+// 				throw Exception(ERROR, "invalid RANGE parameter");
+// 		}
 
-		if (IsA(node, PGConst))
-		{
-			/*
-			 * see if RANGE parameter is negative
-			 *
-			 * Note: There's a similar check in nodeWindowAgg.c, for the
-			 * case that the parameter is not a Const. Make sure it uses
-			 * the same logic!
-			 */
-			PGConst *con = (PGConst *) node;
-			Oid			sortop;
+// 		if (IsA(node, PGConst))
+// 		{
+// 			/*
+// 			 * see if RANGE parameter is negative
+// 			 *
+// 			 * Note: There's a similar check in nodeWindowAgg.c, for the
+// 			 * case that the parameter is not a Const. Make sure it uses
+// 			 * the same logic!
+// 			 */
+// 			PGConst *con = (PGConst *) node;
+// 			Oid			sortop;
 
-			oper_parser.get_sort_group_operators(newrtype,
-									 false, false, false,
-									 &sortop, NULL, NULL, NULL);
+// 			oper_parser.get_sort_group_operators(newrtype,
+// 									 false, false, false,
+// 									 &sortop, NULL, NULL, NULL);
 
-			if (sortop != InvalidOid)
-			{
-				Type typ = typeidType(newrtype);
-				Oid funcoid = get_opcode(sortop);
-				PGDatum zero;
-				PGDatum result;
+// 			if (sortop != InvalidOid)
+// 			{
+// 				Type typ = typeidType(newrtype);
+// 				Oid funcoid = get_opcode(sortop);
+// 				PGDatum zero;
+// 				PGDatum result;
 
-				zero = stringTypeDatum(typ, "0", exprTypmod(node));
+// 				zero = stringTypeDatum(typ, "0", exprTypmod(node));
 
-				/*
-				 * As we know the value is a const and since transformExpr()
-				 * will have parsed the type into its internal format, we can
-				 * just poke directly into the Const structure.
-				 */
-				result = OidFunctionCall2(funcoid, con->constvalue, zero);
+// 				/*
+// 				 * As we know the value is a const and since transformExpr()
+// 				 * will have parsed the type into its internal format, we can
+// 				 * just poke directly into the Const structure.
+// 				 */
+// 				result = OidFunctionCall2(funcoid, con->constvalue, zero);
 
-				if (result)
-					// ereport(ERROR,
-					// 		(errcode(ERRCODE_WINDOWING_ERROR),
-					// 		 errmsg("RANGE parameter cannot be negative"),
-					// 		 parser_errposition(pstate, con->location)));
-					throw Exception(ERROR, "RANGE parameter cannot be negative");
+// 				if (result)
+// 					// ereport(ERROR,
+// 					// 		(errcode(ERRCODE_WINDOWING_ERROR),
+// 					// 		 errmsg("RANGE parameter cannot be negative"),
+// 					// 		 parser_errposition(pstate, con->location)));
+// 					throw Exception(ERROR, "RANGE parameter cannot be negative");
 
-				ReleaseSysCache(typ);
-			}
-		}
-	}
-	else
-	{
-		Assert(false);
-		node = NULL;
-	}
+// 				ReleaseSysCache(typ);
+// 			}
+// 		}
+// 	}
+// 	else
+// 	{
+// 		Assert(false);
+// 		node = NULL;
+// 	}
 
-	/* In GPDB, we allow this. */
-#if 0
-	/* Disallow variables in frame offsets */
-	checkExprIsVarFree(pstate, node, constructName);
-#endif
+// 	/* In GPDB, we allow this. */
+// #if 0
+// 	/* Disallow variables in frame offsets */
+// 	checkExprIsVarFree(pstate, node, constructName);
+// #endif
 
-	return node;
-};
+// 	return node;
+// };
 
 PGWindowClause *
 ClauseParser::findWindowClause(PGList *wclist, const char *name)

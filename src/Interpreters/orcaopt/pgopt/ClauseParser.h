@@ -119,10 +119,10 @@ public:
     transformRowExprToGroupClauses(PGParseState *pstate, duckdb_libpgquery::PGRowExpr *rowexpr,
 							   duckdb_libpgquery::PGList *groupsets, duckdb_libpgquery::PGList *targetList);
     
-    duckdb_libpgquery::PGList *
-    transformScatterClause(PGParseState *pstate,
-					   duckdb_libpgquery::PGList *scatterlist,
-					   duckdb_libpgquery::PGList **targetlist);
+    // duckdb_libpgquery::PGList *
+    // transformScatterClause(PGParseState *pstate,
+	// 				   duckdb_libpgquery::PGList *scatterlist,
+	// 				   duckdb_libpgquery::PGList **targetlist);
     
     duckdb_libpgquery::PGList *
     transformDistinctToGroupBy(PGParseState *pstate, duckdb_libpgquery::PGList **targetlist,
@@ -145,15 +145,15 @@ public:
     transformLimitClause(PGParseState *pstate, duckdb_libpgquery::PGNode *clause,
 					 PGParseExprKind exprKind, const char *constructName);
 
-    duckdb_libpgquery::PGList *
-    transformWindowDefinitions(PGParseState *pstate,
-						   duckdb_libpgquery::PGList *windowdefs,
-						   duckdb_libpgquery::PGList **targetlist);
+    // duckdb_libpgquery::PGList *
+    // transformWindowDefinitions(PGParseState *pstate,
+	// 					   duckdb_libpgquery::PGList *windowdefs,
+	// 					   duckdb_libpgquery::PGList **targetlist);
     
-    duckdb_libpgquery::PGNode *
-    transformFrameOffset(PGParseState *pstate, int frameOptions, duckdb_libpgquery::PGNode *clause,
-					 duckdb_libpgquery::PGList *orderClause, duckdb_libpgquery::PGList *targetlist, bool isFollowing,
-					 int location);
+    // duckdb_libpgquery::PGNode *
+    // transformFrameOffset(PGParseState *pstate, int frameOptions, duckdb_libpgquery::PGNode *clause,
+	// 				 duckdb_libpgquery::PGList *orderClause, duckdb_libpgquery::PGList *targetlist, bool isFollowing,
+	// 				 int location);
     
     void extractRemainingColumns(duckdb_libpgquery::PGList *common_colnames,
 						duckdb_libpgquery::PGList *src_colnames, duckdb_libpgquery::PGList *src_colvars,
@@ -167,6 +167,9 @@ public:
 
     void
     checkExprIsVarFree(PGParseState *pstate, duckdb_libpgquery::PGNode *n, const char *constructName);
+
+    duckdb_libpgquery::PGTargetEntry *
+    getTargetBySortGroupRef(Index ref, duckdb_libpgquery::PGList *tl);
 };
 
 }

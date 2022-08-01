@@ -116,9 +116,9 @@ struct PGParseNamespaceItem
 	bool		p_lateral_ok;	/* If so, does join type allow use? */
 };
 
-typedef unsigned int Index;
+typedef PGIndex Index;
 
-typedef unsigned int Oid;
+typedef PGOid Oid;
 
 enum class InhOption
 {
@@ -218,3 +218,61 @@ get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause *sgClause,
 	return (duckdb_libpgquery::PGNode *) tle->expr;
 };
 
+bool
+contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up);
+
+bool
+contain_vars_of_level(duckdb_libpgquery::PGNode *node, int levelsup)
+{
+	int			sublevels_up = levelsup;
+
+	return query_or_expression_tree_walker(node,
+										   contain_vars_of_level_walker,
+										   (void *) &sublevels_up,
+										   0);
+};
+
+bool
+contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up)
+{
+	using duckdb_libpgquery::PGVar;
+	using duckdb_libpgquery::PGCurrentOfExpr;
+	//using duckdb_libpgquery::PGPlaceHolderVar;
+	using duckdb_libpgquery::PGQuery;
+	if (node == NULL)
+		return false;
+	if (IsA(node, PGVar))
+	{
+		if (((PGVar *) node)->varlevelsup == *sublevels_up)
+			return true;		/* abort tree traversal and return true */
+		return false;
+	}
+	if (IsA(node, PGCurrentOfExpr))
+	{
+		if (*sublevels_up == 0)
+			return true;
+		return false;
+	}
+	// if (IsA(node, PGPlaceHolderVar))
+	// {
+	// 	if (((PGPlaceHolderVar *) node)->phlevelsup == *sublevels_up)
+	// 		return true;		/* abort the tree traversal and return true */
+	// 	/* else fall through to check the contained expr */
+	// }
+	if (IsA(node, PGQuery))
+	{
+		/* Recurse into subselects */
+		bool		result;
+
+		(*sublevels_up)++;
+		result = query_tree_walker((PGQuery *) node,
+								   contain_vars_of_level_walker,
+								   (void *) sublevels_up,
+								   0);
+		(*sublevels_up)--;
+		return result;
+	}
+	return expression_tree_walker(node,
+								  contain_vars_of_level_walker,
+								  (void *) sublevels_up);
+};

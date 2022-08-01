@@ -61,4 +61,76 @@ OperParser::get_sort_group_operators(Oid argtype,
 		*isHashable = hashable;
 };
 
+HeapTuple
+OperParser::oper(PGParseState *pstate, PGList *opname, Oid ltypeId, Oid rtypeId,
+		bool noError, int location)
+{
+	Oid			operOid;
+	OprCacheKey key;
+	bool		key_ok;
+	FuncDetailCode fdresult = FUNCDETAIL_NOTFOUND;
+	HeapTuple	tup = NULL;
+
+	/*
+	 * Try to find the mapping in the lookaside cache.
+	 */
+	key_ok = make_oper_cache_key(&key, opname, ltypeId, rtypeId);
+	if (key_ok)
+	{
+		operOid = find_oper_cache_entry(&key);
+		if (OidIsValid(operOid))
+		{
+			tup = SearchSysCache1(OPEROID, ObjectIdGetDatum(operOid));
+			if (HeapTupleIsValid(tup))
+				return (Operator) tup;
+		}
+	}
+
+	/*
+	 * First try for an "exact" match.
+	 */
+	operOid = binary_oper_exact(opname, ltypeId, rtypeId);
+	if (!OidIsValid(operOid))
+	{
+		/*
+		 * Otherwise, search for the most suitable candidate.
+		 */
+		FuncCandidateList clist;
+
+		/* Get binary operators of given name */
+		clist = OpernameGetCandidates(opname, 'b', false);
+
+		/* No operators found? Then fail... */
+		if (clist != NULL)
+		{
+			/*
+			 * Unspecified type for one of the arguments? then use the other
+			 * (XXX this is probably dead code?)
+			 */
+			Oid			inputOids[2];
+
+			if (rtypeId == InvalidOid)
+				rtypeId = ltypeId;
+			else if (ltypeId == InvalidOid)
+				ltypeId = rtypeId;
+			inputOids[0] = ltypeId;
+			inputOids[1] = rtypeId;
+			fdresult = oper_select_candidate(2, inputOids, clist, &operOid);
+		}
+	}
+
+	if (OidIsValid(operOid))
+		tup = SearchSysCache1(OPEROID, ObjectIdGetDatum(operOid));
+
+	if (HeapTupleIsValid(tup))
+	{
+		if (key_ok)
+			make_oper_cache_entry(&key, operOid);
+	}
+	else if (!noError)
+		op_error(pstate, opname, 'b', ltypeId, rtypeId, fdresult, location);
+
+	return (Operator) tup;
+};
+
 }
