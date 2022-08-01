@@ -493,6 +493,199 @@ bool
 };
 
 bool
+range_table_walker(duckdb_libpgquery::PGList *rtable,
+				   walker_func walker,
+				   void *context,
+				   int flags)
+{
+	using duckdb_libpgquery::PGListCell;
+	using duckdb_libpgquery::PGRangeTblEntry;
+	using duckdb_libpgquery::PGRTEKind;
+
+	PGListCell   *rt;
+
+	foreach(rt, rtable)
+	{
+		PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(rt);
+
+		/* For historical reasons, visiting RTEs is not the default */
+		if (flags & QTW_EXAMINE_RTES)
+			if (walker(rte, context))
+				return true;
+
+		switch (rte->rtekind)
+		{
+			case PGRTEKind::PG_RTE_RELATION:
+			case PGRTEKind::PG_RTE_VOID:
+			case PGRTEKind::PG_RTE_CTE:
+				/* nothing to do */
+				break;
+			case PGRTEKind::PG_RTE_SUBQUERY:
+				if (!(flags & QTW_IGNORE_RT_SUBQUERIES))
+					if (walker(rte->subquery, context))
+						return true;
+				break;
+			case PGRTEKind::PG_RTE_JOIN:
+				if (!(flags & QTW_IGNORE_JOINALIASES))
+					if (walker(rte->joinaliasvars, context))
+						return true;
+				break;
+			case PGRTEKind::PG_RTE_FUNCTION:
+				if (walker(rte->functions, context))
+					return true;
+				break;
+			case PGRTEKind::PG_RTE_TABLEFUNCTION:
+				if (walker(rte->subquery, context))
+					return true;
+				if (walker(rte->functions, context))
+					return true;
+				break;
+			case PGRTEKind::PG_RTE_VALUES:
+				if (walker(rte->values_lists, context))
+					return true;
+				break;
+		}
+
+		if (walker(rte->securityQuals, context))
+			return true;
+	}
+	return false;
+};
+
+bool
+query_tree_walker(duckdb_libpgquery::PGQuery *query,
+				  walker_func walker,
+				  void *context,
+				  int flags)
+{
+	using duckdb_libpgquery::PGQuery;
+	using duckdb_libpgquery::PGNode;
+	using duckdb_libpgquery::PGWindowClause;
+	using duckdb_libpgquery::PGCopyStmt;
+	using duckdb_libpgquery::PGExplainStmt;
+	using duckdb_libpgquery::PGListCell;
+	using duckdb_libpgquery::PGPrepareStmt;
+	using duckdb_libpgquery::PGViewStmt;
+
+	Assert(query != NULL && IsA(query, PGQuery));
+
+	/*
+	 * We don't walk any utilityStmt here. However, we can't easily assert
+	 * that it is absent, since there are at least two code paths by which
+	 * action statements from CREATE RULE end up here, and NOTIFY is allowed
+	 * in a rule action.
+	 */
+
+	if (walker((PGNode *) query->targetList, context))
+		return true;
+	if (walker((PGNode *) query->withCheckOptions, context))
+		return true;
+	if (walker((PGNode *) query->returningList, context))
+		return true;
+	if (walker((PGNode *) query->jointree, context))
+		return true;
+	if (walker(query->setOperations, context))
+		return true;
+	if (walker(query->havingQual, context))
+		return true;
+	if (walker(query->limitOffset, context))
+		return true;
+	if (walker(query->limitCount, context))
+		return true;
+
+	/*
+	 * Most callers aren't interested in SortGroupClause nodes since those
+	 * don't contain actual expressions. However they do contain OIDs which
+	 * may be needed by dependency walkers etc.
+	 */
+	if ((flags & QTW_EXAMINE_SORTGROUP))
+	{
+		if (walker((PGNode *) query->groupClause, context))
+			return true;
+		if (walker((PGNode *) query->windowClause, context))
+			return true;
+		if (walker((PGNode *) query->sortClause, context))
+			return true;
+		if (walker((PGNode *) query->distinctClause, context))
+			return true;
+	}
+	else
+	{
+		/*
+		 * But we need to walk the expressions under WindowClause nodes even
+		 * if we're not interested in SortGroupClause nodes.
+		 */
+		PGListCell   *lc;
+
+		foreach(lc, query->windowClause)
+		{
+			PGWindowClause *wc = lfirst_node(PGWindowClause, lc);
+
+			if (walker(wc->startOffset, context))
+				return true;
+			if (walker(wc->endOffset, context))
+				return true;
+		}
+	}
+
+	/*
+	 * groupingSets and rowMarks are not walked:
+	 *
+	 * groupingSets contain only ressortgrouprefs (integers) which are
+	 * meaningless without the corresponding groupClause or tlist.
+	 * Accordingly, any walker that needs to care about them needs to handle
+	 * them itself in its Query processing.
+	 *
+	 * rowMarks is not walked because it contains only rangetable indexes (and
+	 * flags etc.) and therefore should be handled at Query level similarly.
+	 */
+
+	if (!(flags & QTW_IGNORE_CTE_SUBQUERIES))
+	{
+		if (walker((PGNode *) query->cteList, context))
+			return true;
+	}
+	if (!(flags & QTW_IGNORE_RANGE_TABLE))
+	{
+		if (range_table_walker(query->rtable, walker, context, flags))
+			return true;
+	}
+	if (query->utilityStmt)
+	{
+		/*
+		 * Certain utility commands contain general-purpose Querys embedded in
+		 * them --- if this is one, invoke the walker on the sub-Query.
+		 */
+		if (IsA(query->utilityStmt, PGCopyStmt))
+		{
+			if (walker(((PGCopyStmt *) query->utilityStmt)->query, context))
+				return true;
+		}
+		// if (IsA(query->utilityStmt, DeclareCursorStmt))
+		// {
+		// 	if (walker(((DeclareCursorStmt *) query->utilityStmt)->query, context))
+		// 		return true;
+		// }
+		if (IsA(query->utilityStmt, PGExplainStmt))
+		{
+			if (walker(((PGExplainStmt *) query->utilityStmt)->query, context))
+				return true;
+		}
+		if (IsA(query->utilityStmt, PGPrepareStmt))
+		{
+			if (walker(((PGPrepareStmt *) query->utilityStmt)->query, context))
+				return true;
+		}
+		if (IsA(query->utilityStmt, PGViewStmt))
+		{
+			if (walker(((PGViewStmt *) query->utilityStmt)->query, context))
+				return true;
+		}
+	}
+	return false;
+};
+
+bool
 contain_aggs_of_level_walker(duckdb_libpgquery::PGNode *node,
 							 contain_aggs_of_level_context *context)
 {
@@ -568,4 +761,20 @@ contain_windowfuncs(duckdb_libpgquery::PGNode *node)
 										   contain_windowfuncs_walker,
 										   NULL,
 										   0);
+};
+
+bool
+query_or_expression_tree_walker(duckdb_libpgquery::PGNode *node,
+								bool (*walker) (),
+								void *context,
+								int flags)
+{
+	using duckdb_libpgquery::PGQuery;
+	if (node && IsA(node, PGQuery))
+		return query_tree_walker((PGQuery *) node,
+								 walker,
+								 context,
+								 flags);
+	else
+		return walker(node, context);
 };
