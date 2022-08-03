@@ -5,6 +5,11 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+RelationParser::RelationParser()
+{
+	relation_provider = std::make_shared<RelationParser>();
+}
+
 int RelationParser::RTERangeTablePosn(PGParseState *pstate, PGRangeTblEntry *rte, int *sublevels_up)
 {
 	int			index;
@@ -973,10 +978,10 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, cha
 };
 
 void
-RelationParser::buildRelationAliases(TupleDesc tupdesc,
+RelationParser::buildRelationAliases(StoragePtr storage_ptr,
 		PGAlias *alias, PGAlias *eref)
 {
-	int			maxattrs = tupdesc->natts;
+	int			maxattrs = storage_ptr->getColumns().size();
 	PGListCell   *aliaslc;
 	int			numaliases;
 	int			varattno;
@@ -997,9 +1002,37 @@ RelationParser::buildRelationAliases(TupleDesc tupdesc,
 		numaliases = 0;
 	}
 
-	for (varattno = 0; varattno < maxattrs; varattno++)
+	// for (varattno = 0; varattno < maxattrs; varattno++)
+	// {
+	// 	Form_pg_attribute attr = tupdesc->attrs[varattno];
+	// 	PGValue	   *attrname;
+
+	// 	if (attr->attisdropped)
+	// 	{
+	// 		/* Always insert an empty string for a dropped column */
+	// 		attrname = makeString(pstrdup(""));
+	// 		if (aliaslc)
+	// 			alias->colnames = lappend(alias->colnames, attrname);
+	// 		numdropped++;
+	// 	}
+	// 	else if (aliaslc)
+	// 	{
+	// 		/* Use the next user-supplied alias */
+	// 		attrname = (PGValue *) lfirst(aliaslc);
+	// 		aliaslc = lnext(aliaslc);
+	// 		alias->colnames = lappend(alias->colnames, attrname);
+	// 	}
+	// 	else
+	// 	{
+	// 		attrname = makeString(pstrdup(attr->attname.data));
+	// 		/* we're done with the alias if any */
+	// 	}
+
+	// 	eref->colnames = lappend(eref->colnames, attrname);
+	// }
+
+	foreach (auto name_and_type : storage_ptr->getColumns().getAll())
 	{
-		Form_pg_attribute attr = tupdesc->attrs[varattno];
 		PGValue	   *attrname;
 
 		if (attr->attisdropped)
@@ -1019,7 +1052,7 @@ RelationParser::buildRelationAliases(TupleDesc tupdesc,
 		}
 		else
 		{
-			attrname = makeString(pstrdup(attr->attname.data));
+			attrname = makeString(pstrdup(name_and_type.name.c_str()));
 			/* we're done with the alias if any */
 		}
 
@@ -1045,10 +1078,10 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
 {
 	PGRangeTblEntry *rte = makeNode(PGRangeTblEntry);
 	char	   *refname = alias ? alias->aliasname : relation->relname;
-	LOCKMODE	lockmode = AccessShareLock;
+	//LOCKMODE	lockmode = AccessShareLock;
 	PGLockingClause *locking;
-	Relation	rel;
-	ParseCallbackState pcbstate;
+	//Relation	rel;
+	//ParseCallbackState pcbstate;
 
 	rte->alias = alias;
 	rte->rtekind = PG_RTE_RELATION;
@@ -1059,35 +1092,35 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
 	 * AO tables.
 	 * select for update should lock the whole table, we do it here.
 	 */
-	locking = getLockedRefname(pstate, refname);
-	if (locking)
-	{
-		if (locking->strength >= LCS_FORNOKEYUPDATE)
-		{
-			Oid relid;
+	// locking = getLockedRefname(pstate, refname);
+	// if (locking)
+	// {
+	// 	if (locking->strength >= LCS_FORNOKEYUPDATE)
+	// 	{
+	// 		Oid relid;
 
-			relid = RangeVarGetRelid(relation, lockmode, false);
+	// 		relid = RangeVarGetRelid(relation, lockmode, false);
 
-			rel = try_heap_open(relid, NoLock, true);
-			if (!rel)
-				//elog(ERROR, "open relation(%u) fail", relid);
-				throw Exception(ERROR, "open relation({}) fail", relid);
+	// 		rel = try_heap_open(relid, NoLock, true);
+	// 		if (!rel)
+	// 			//elog(ERROR, "open relation(%u) fail", relid);
+	// 			throw Exception(ERROR, "open relation({}) fail", relid);
 
-			if (rel->rd_rel->relkind == RELKIND_MATVIEW)
-				// ereport(ERROR,
-				// 		(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				// 				errmsg("cannot lock rows in materialized view \"%s\"",
-				// 					   RelationGetRelationName(rel))));
-				throw Exception(ERROR, "cannot lock rows in materialized view {}", RelationGetRelationName(rel));
+	// 		if (rel->rd_rel->relkind == RELKIND_MATVIEW)
+	// 			// ereport(ERROR,
+	// 			// 		(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+	// 			// 				errmsg("cannot lock rows in materialized view \"%s\"",
+	// 			// 					   RelationGetRelationName(rel))));
+	// 			throw Exception(ERROR, "cannot lock rows in materialized view {}", RelationGetRelationName(rel));
 
-			lockmode = IsSystemRelation(rel) ? RowExclusiveLock : ExclusiveLock;
-			heap_close(rel, NoLock);
-		}
-		else
-		{
-			lockmode = RowShareLock;
-		}
-	}
+	// 		lockmode = IsSystemRelation(rel) ? RowExclusiveLock : ExclusiveLock;
+	// 		heap_close(rel, NoLock);
+	// 	}
+	// 	else
+	// 	{
+	// 		lockmode = RowShareLock;
+	// 	}
+	// }
 
 	/*
 	 * Get the rel's OID.  This access also ensures that we have an up-to-date
@@ -1095,25 +1128,30 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
 	 * to a rel in a statement, be careful to get the right access level
 	 * depending on whether we're doing SELECT FOR UPDATE/SHARE.
 	 */
-	setup_parser_errposition_callback(&pcbstate, pstate, relation->location);
-	rel = parserOpenTable(pstate, relation, lockmode, NULL);
-	cancel_parser_errposition_callback(&pcbstate);
-	rte->relid = RelationGetRelid(rel);
-	rte->relkind = rel->rd_rel->relkind;
+	//setup_parser_errposition_callback(&pcbstate, pstate, relation->location);
+	//rel = parserOpenTable(pstate, relation, lockmode, NULL);
+	//cancel_parser_errposition_callback(&pcbstate);
 
+	auto item = relation_provider->getPairByDBAndTableName(relation->schemaname, relation->relname);
+	if (!item)
+	{
+		throw Exception(ERROR, "can not find relation {}", relation->relname);
+	}
+	rte->relid = std::get<0>(item);
+	rte->relkind = std::get<2>(item);
 	/*
 	 * Build the list of effective column names using user-supplied aliases
 	 * and/or actual column names.
 	 */
 	rte->eref = makeAlias(refname, NIL);
-	buildRelationAliases(rel->rd_att, alias, rte->eref);
+	buildRelationAliases(std::get<1>(item), alias, rte->eref);
 
 	/*
 	 * Drop the rel refcount, but keep the access lock till end of transaction
 	 * so that the table can't be deleted or have its schema modified
 	 * underneath us.
 	 */
-	heap_close(rel, NoLock);
+	//heap_close(rel, NoLock);
 
 	/*
 	 * Set flags and access permissions.

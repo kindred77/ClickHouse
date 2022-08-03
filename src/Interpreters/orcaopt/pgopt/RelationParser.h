@@ -2,6 +2,7 @@
 
 #include <Interpreters/orcaopt/pgopt/parser_common.h>
 #include <Interpreters/orcaopt/pgopt/CoerceParser.h>
+#include <Interpreters/orcaopt/pgopt/RelationProvider.h>
 
 namespace DB
 {
@@ -10,7 +11,7 @@ class RelationParser
 {
 private:
     CoerceParser coerce_parser;
-
+	std::shared_ptr<RelationProvider> relation_provider;
 public:
 	explicit RelationParser();
 

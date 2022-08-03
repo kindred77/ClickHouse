@@ -1,9 +1,3 @@
-/*
- * StorageProvider.cpp
- *
- *  Created on: 2022��3��2��
- *      Author: tangye
- */
 
 #include <Interpreters/orcaopt/StorageProvider.h>
 #include <Interpreters/DatabaseCatalog.h>

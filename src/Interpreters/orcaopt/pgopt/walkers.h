@@ -720,6 +720,22 @@ contain_aggs_of_level_walker(duckdb_libpgquery::PGNode *node,
 };
 
 bool
+query_or_expression_tree_walker(duckdb_libpgquery::PGNode *node,
+								walker_func walker,
+								void *context,
+								int flags)
+{
+	using duckdb_libpgquery::PGQuery;
+	if (node && IsA(node, PGQuery))
+		return query_tree_walker((PGQuery *) node,
+								 walker,
+								 context,
+								 flags);
+	else
+		return walker(node, context);
+};
+
+bool
 contain_aggs_of_level(duckdb_libpgquery::PGNode *node, int levelsup)
 {
 	contain_aggs_of_level_context context;
