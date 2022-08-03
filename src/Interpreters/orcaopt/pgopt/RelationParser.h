@@ -4,6 +4,10 @@
 #include <Interpreters/orcaopt/pgopt/CoerceParser.h>
 #include <Interpreters/orcaopt/pgopt/RelationProvider.h>
 
+#include <Storages/IStorage.h>
+
+#include <optional>
+
 namespace DB
 {
 
@@ -96,7 +100,7 @@ public:
 	duckdb_libpgquery::PGTargetEntry *
 	get_tle_by_resno(duckdb_libpgquery::PGList *tlist, PGAttrNumber resno);
 
-	void buildRelationAliases(TupleDesc tupdesc,
+	void buildRelationAliases(StoragePtr storage_ptr,
 		duckdb_libpgquery::PGAlias *alias, duckdb_libpgquery::PGAlias *eref);
 
 	duckdb_libpgquery::PGRangeTblEntry *
@@ -105,6 +109,16 @@ public:
 					 const char *refname,
 					 int location,
 					 int *sublevels_up);
+	
+	void
+	check_lateral_ref_ok(PGParseState *pstate, PGParseNamespaceItem *nsitem,
+					 int location);
+
+	duckdb_libpgquery::PGRangeTblEntry *
+	scanNameSpaceForRelid(PGParseState *pstate, Oid relid, int location);
+
+	duckdb_libpgquery::PGRangeTblEntry *
+	scanNameSpaceForRefname(PGParseState *pstate, const char *refname, int location);
 };
 
 }

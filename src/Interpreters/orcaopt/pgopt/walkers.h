@@ -501,6 +501,7 @@ range_table_walker(duckdb_libpgquery::PGList *rtable,
 	using duckdb_libpgquery::PGListCell;
 	using duckdb_libpgquery::PGRangeTblEntry;
 	using duckdb_libpgquery::PGRTEKind;
+	using duckdb_libpgquery::PGNode;
 
 	PGListCell   *rt;
 
@@ -510,44 +511,44 @@ range_table_walker(duckdb_libpgquery::PGList *rtable,
 
 		/* For historical reasons, visiting RTEs is not the default */
 		if (flags & QTW_EXAMINE_RTES)
-			if (walker(rte, context))
+			if (walker((PGNode*)rte, (assign_collations_context*)context))
 				return true;
 
 		switch (rte->rtekind)
 		{
 			case PGRTEKind::PG_RTE_RELATION:
-			case PGRTEKind::PG_RTE_VOID:
+			//case PGRTEKind::PG_RTE_VOID:
 			case PGRTEKind::PG_RTE_CTE:
 				/* nothing to do */
 				break;
 			case PGRTEKind::PG_RTE_SUBQUERY:
 				if (!(flags & QTW_IGNORE_RT_SUBQUERIES))
-					if (walker(rte->subquery, context))
+					if (walker((PGNode*)rte->subquery, (assign_collations_context*)context))
 						return true;
 				break;
 			case PGRTEKind::PG_RTE_JOIN:
 				if (!(flags & QTW_IGNORE_JOINALIASES))
-					if (walker(rte->joinaliasvars, context))
+					if (walker((PGNode*)rte->joinaliasvars, (assign_collations_context*)context))
 						return true;
 				break;
 			case PGRTEKind::PG_RTE_FUNCTION:
-				if (walker(rte->functions, context))
+				if (walker((PGNode*)rte->functions, (assign_collations_context*)context))
 					return true;
 				break;
-			case PGRTEKind::PG_RTE_TABLEFUNCTION:
-				if (walker(rte->subquery, context))
+			case PGRTEKind::PG_RTE_TABLEFUNC:
+				if (walker((PGNode*)rte->subquery, (assign_collations_context*)context))
 					return true;
-				if (walker(rte->functions, context))
+				if (walker((PGNode*)rte->functions, (assign_collations_context*)context))
 					return true;
 				break;
 			case PGRTEKind::PG_RTE_VALUES:
-				if (walker(rte->values_lists, context))
+				if (walker((PGNode*)rte->values_lists, (assign_collations_context*)context))
 					return true;
 				break;
 		}
 
-		if (walker(rte->securityQuals, context))
-			return true;
+		//if (walker((PGNode*)rte->securityQuals, (assign_collations_context*)context))
+			//return true;
 	}
 	return false;
 };
@@ -576,21 +577,21 @@ query_tree_walker(duckdb_libpgquery::PGQuery *query,
 	 * in a rule action.
 	 */
 
-	if (walker((PGNode *) query->targetList, context))
+	if (walker((PGNode *) query->targetList, (assign_collations_context*)context))
 		return true;
-	if (walker((PGNode *) query->withCheckOptions, context))
+	if (walker((PGNode *) query->withCheckOptions, (assign_collations_context*)context))
 		return true;
-	if (walker((PGNode *) query->returningList, context))
+	if (walker((PGNode *) query->returningList, (assign_collations_context*)context))
 		return true;
-	if (walker((PGNode *) query->jointree, context))
+	if (walker((PGNode *) query->jointree, (assign_collations_context*)context))
 		return true;
-	if (walker(query->setOperations, context))
+	if (walker(query->setOperations, (assign_collations_context*)context))
 		return true;
-	if (walker(query->havingQual, context))
+	if (walker(query->havingQual, (assign_collations_context*)context))
 		return true;
-	if (walker(query->limitOffset, context))
+	if (walker(query->limitOffset, (assign_collations_context*)context))
 		return true;
-	if (walker(query->limitCount, context))
+	if (walker(query->limitCount, (assign_collations_context*)context))
 		return true;
 
 	/*
@@ -600,13 +601,13 @@ query_tree_walker(duckdb_libpgquery::PGQuery *query,
 	 */
 	if ((flags & QTW_EXAMINE_SORTGROUP))
 	{
-		if (walker((PGNode *) query->groupClause, context))
+		if (walker((PGNode *) query->groupClause, (assign_collations_context*)context))
 			return true;
-		if (walker((PGNode *) query->windowClause, context))
+		if (walker((PGNode *) query->windowClause, (assign_collations_context*)context))
 			return true;
-		if (walker((PGNode *) query->sortClause, context))
+		if (walker((PGNode *) query->sortClause, (assign_collations_context*)context))
 			return true;
-		if (walker((PGNode *) query->distinctClause, context))
+		if (walker((PGNode *) query->distinctClause, (assign_collations_context*)context))
 			return true;
 	}
 	else
@@ -621,9 +622,9 @@ query_tree_walker(duckdb_libpgquery::PGQuery *query,
 		{
 			PGWindowClause *wc = lfirst_node(PGWindowClause, lc);
 
-			if (walker(wc->startOffset, context))
+			if (walker(wc->startOffset, (assign_collations_context*)context))
 				return true;
-			if (walker(wc->endOffset, context))
+			if (walker(wc->endOffset, (assign_collations_context*)context))
 				return true;
 		}
 	}
@@ -642,7 +643,7 @@ query_tree_walker(duckdb_libpgquery::PGQuery *query,
 
 	if (!(flags & QTW_IGNORE_CTE_SUBQUERIES))
 	{
-		if (walker((PGNode *) query->cteList, context))
+		if (walker((PGNode *) query->cteList, (assign_collations_context*)context))
 			return true;
 	}
 	if (!(flags & QTW_IGNORE_RANGE_TABLE))
@@ -658,7 +659,7 @@ query_tree_walker(duckdb_libpgquery::PGQuery *query,
 		 */
 		if (IsA(query->utilityStmt, PGCopyStmt))
 		{
-			if (walker(((PGCopyStmt *) query->utilityStmt)->query, context))
+			if (walker(((PGCopyStmt *) query->utilityStmt)->query, (assign_collations_context*)context))
 				return true;
 		}
 		// if (IsA(query->utilityStmt, DeclareCursorStmt))
@@ -668,17 +669,17 @@ query_tree_walker(duckdb_libpgquery::PGQuery *query,
 		// }
 		if (IsA(query->utilityStmt, PGExplainStmt))
 		{
-			if (walker(((PGExplainStmt *) query->utilityStmt)->query, context))
+			if (walker(((PGExplainStmt *) query->utilityStmt)->query, (assign_collations_context*)context))
 				return true;
 		}
 		if (IsA(query->utilityStmt, PGPrepareStmt))
 		{
-			if (walker(((PGPrepareStmt *) query->utilityStmt)->query, context))
+			if (walker(((PGPrepareStmt *) query->utilityStmt)->query, (assign_collations_context*)context))
 				return true;
 		}
 		if (IsA(query->utilityStmt, PGViewStmt))
 		{
-			if (walker(((PGViewStmt *) query->utilityStmt)->query, context))
+			if (walker(((PGViewStmt *) query->utilityStmt)->query, (assign_collations_context*)context))
 				return true;
 		}
 	}
@@ -711,12 +712,12 @@ contain_aggs_of_level_walker(duckdb_libpgquery::PGNode *node,
 		context->sublevels_up++;
 		result = query_tree_walker((PGQuery *) node,
 								   contain_aggs_of_level_walker,
-								   (void *) context, 0);
+								   context, 0);
 		context->sublevels_up--;
 		return result;
 	}
 	return expression_tree_walker(node, contain_aggs_of_level_walker,
-								  (void *) context);
+								  context);
 };
 
 bool
@@ -732,7 +733,7 @@ query_or_expression_tree_walker(duckdb_libpgquery::PGNode *node,
 								 context,
 								 flags);
 	else
-		return walker(node, context);
+		return walker(node, (assign_collations_context*)context);
 };
 
 bool
@@ -748,7 +749,7 @@ contain_aggs_of_level(duckdb_libpgquery::PGNode *node, int levelsup)
 	 */
 	return query_or_expression_tree_walker(node,
 										   contain_aggs_of_level_walker,
-										   (void *) &context,
+										   &context,
 										   0);
 };
 
@@ -763,7 +764,7 @@ contain_windowfuncs_walker(duckdb_libpgquery::PGNode *node, void *context)
 		return true;			/* abort the tree traversal and return true */
 	/* Mustn't recurse into subselects */
 	return expression_tree_walker(node, contain_windowfuncs_walker,
-								  (void *) context);
+								  context);
 };
 
 bool
@@ -781,7 +782,7 @@ contain_windowfuncs(duckdb_libpgquery::PGNode *node)
 
 bool
 query_or_expression_tree_walker(duckdb_libpgquery::PGNode *node,
-								bool (*walker) (),
+								walker_func walker,
 								void *context,
 								int flags)
 {
@@ -792,5 +793,5 @@ query_or_expression_tree_walker(duckdb_libpgquery::PGNode *node,
 								 context,
 								 flags);
 	else
-		return walker(node, context);
+		return walker(node, (assign_collations_context*)context);
 };

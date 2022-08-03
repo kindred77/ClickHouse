@@ -452,9 +452,9 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 				PGListCell   *lcc;
 
 				varattno = 0;
-				forthree(lct, rte->ctecoltypes,
-						 lcm, rte->ctecoltypmods,
-						 lcc, rte->ctecolcollations)
+				forthree(lct, rte->coltypes,
+						 lcm, rte->coltypmods,
+						 lcc, rte->colcollations)
 				{
 					Oid			coltype = lfirst_oid(lct);
 					int32		coltypmod = lfirst_int(lcm);
@@ -799,29 +799,29 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 					attnum, rte->eref->aliasname);
 			}
 			break;
-		case PG_RTE_VALUES:
-			{
-				/*
-				 * Values RTE --- we can get type info from first sublist, but
-				 * typmod may require scanning all sublists, and collation is
-				 * stored separately.  Using getValuesTypmods() is overkill,
-				 * but this path is taken so seldom for VALUES that it's not
-				 * worth writing extra code.
-				 */
-				PGList	   *collist = (PGList *) linitial(rte->values_lists);
-				PGNode	   *col;
-				int32	   *coltypmods = getValuesTypmods(rte);
+		// case PG_RTE_VALUES:
+		// 	{
+		// 		/*
+		// 		 * Values RTE --- we can get type info from first sublist, but
+		// 		 * typmod may require scanning all sublists, and collation is
+		// 		 * stored separately.  Using getValuesTypmods() is overkill,
+		// 		 * but this path is taken so seldom for VALUES that it's not
+		// 		 * worth writing extra code.
+		// 		 */
+		// 		PGList	   *collist = (PGList *) linitial(rte->values_lists);
+		// 		PGNode	   *col;
+		// 		int32	   *coltypmods = getValuesTypmods(rte);
 
-				if (attnum < 1 || attnum > list_length(collist))
-					elog(ERROR, "values list %s does not have attribute %d",
-						 rte->eref->aliasname, attnum);
-				col = (PGNode *) list_nth(collist, attnum - 1);
-				*vartype = exprType(col);
-				*vartypmod = coltypmods[attnum - 1];
-				*varcollid = list_nth_oid(rte->values_collations, attnum - 1);
-				pfree(coltypmods);
-			}
-			break;
+		// 		if (attnum < 1 || attnum > list_length(collist))
+		// 			elog(ERROR, "values list %s does not have attribute %d",
+		// 				 rte->eref->aliasname, attnum);
+		// 		col = (PGNode *) list_nth(collist, attnum - 1);
+		// 		*vartype = exprType(col);
+		// 		*vartypmod = coltypmods[attnum - 1];
+		// 		*varcollid = list_nth_oid(rte->values_collations, attnum - 1);
+		// 		pfree(coltypmods);
+		// 	}
+		// 	break;
 		case PG_RTE_JOIN:
 			{
 				/*
@@ -981,7 +981,7 @@ void
 RelationParser::buildRelationAliases(StoragePtr storage_ptr,
 		PGAlias *alias, PGAlias *eref)
 {
-	int			maxattrs = storage_ptr->getColumns().size();
+	int			maxattrs = storage_ptr->getInMemoryMetadata().getColumns().size();
 	PGListCell   *aliaslc;
 	int			numaliases;
 	int			varattno;
@@ -1031,19 +1031,20 @@ RelationParser::buildRelationAliases(StoragePtr storage_ptr,
 	// 	eref->colnames = lappend(eref->colnames, attrname);
 	// }
 
-	foreach (auto name_and_type : storage_ptr->getColumns().getAll())
+	for (auto name_and_type : storage_ptr->getInMemoryMetadata().getColumns().getAll())
 	{
 		PGValue	   *attrname;
 
-		if (attr->attisdropped)
-		{
-			/* Always insert an empty string for a dropped column */
-			attrname = makeString(pstrdup(""));
-			if (aliaslc)
-				alias->colnames = lappend(alias->colnames, attrname);
-			numdropped++;
-		}
-		else if (aliaslc)
+		// if (attr->attisdropped)
+		// {
+		// 	/* Always insert an empty string for a dropped column */
+		// 	attrname = makeString(pstrdup(""));
+		// 	if (aliaslc)
+		// 		alias->colnames = lappend(alias->colnames, attrname);
+		// 	numdropped++;
+		// }
+		// else
+		if (aliaslc)
 		{
 			/* Use the next user-supplied alias */
 			attrname = (PGValue *) lfirst(aliaslc);
@@ -1530,6 +1531,100 @@ RelationParser::get_tle_by_resno(PGList *tlist, PGAttrNumber resno)
 			return tle;
 	}
 	return NULL;
+};
+
+void
+RelationParser::check_lateral_ref_ok(PGParseState *pstate, PGParseNamespaceItem *nsitem,
+					 int location)
+{
+	if (nsitem->p_lateral_only && !nsitem->p_lateral_ok)
+	{
+		/* SQL:2008 demands this be an error, not an invisible item */
+		PGRangeTblEntry *rte = nsitem->p_rte;
+		char	   *refname = rte->eref->aliasname;
+
+		throw Exception(ERROR, "invalid reference to FROM-clause entry for table {}", refname);
+		// ereport(ERROR,
+		// 		(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+		// 	errmsg("invalid reference to FROM-clause entry for table \"%s\"",
+		// 		   refname),
+		// 		 (rte == pstate->p_target_rangetblentry) ?
+		// 		 errhint("There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
+		// 				 refname) :
+		// 		 errdetail("The combining JOIN type must be INNER or LEFT for a LATERAL reference."),
+		// 		 parser_errposition(pstate, location)));
+	}
+};
+
+PGRangeTblEntry *
+RelationParser::scanNameSpaceForRelid(PGParseState *pstate, Oid relid, int location)
+{
+	PGRangeTblEntry *result = NULL;
+	PGListCell   *l;
+
+	foreach(l, pstate->p_namespace)
+	{
+		PGParseNamespaceItem *nsitem = (PGParseNamespaceItem *) lfirst(l);
+		PGRangeTblEntry *rte = nsitem->p_rte;
+
+		/* Ignore columns-only items */
+		if (!nsitem->p_rel_visible)
+			continue;
+		/* If not inside LATERAL, ignore lateral-only items */
+		if (nsitem->p_lateral_only && !pstate->p_lateral_active)
+			continue;
+
+		/* yes, the test for alias == NULL should be there... */
+		if (rte->rtekind == PG_RTE_RELATION &&
+			rte->relid == relid &&
+			rte->alias == NULL)
+		{
+			if (result)
+				throw Exception(ERROR, "table reference {} is ambiguous", relid);
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_AMBIGUOUS_ALIAS),
+				// 		 errmsg("table reference %u is ambiguous",
+				// 				relid),
+				// 		 parser_errposition(pstate, location)));
+			check_lateral_ref_ok(pstate, nsitem, location);
+			result = rte;
+		}
+	}
+	return result;
+};
+
+PGRangeTblEntry *
+RelationParser::scanNameSpaceForRefname(PGParseState *pstate, const char *refname, int location)
+{
+	PGRangeTblEntry *result = NULL;
+	ListCell   *l;
+
+	foreach(l, pstate->p_namespace)
+	{
+		PGParseNamespaceItem *nsitem = (PGParseNamespaceItem *) lfirst(l);
+		PGRangeTblEntry *rte = nsitem->p_rte;
+
+		/* Ignore columns-only items */
+		if (!nsitem->p_rel_visible)
+			continue;
+		/* If not inside LATERAL, ignore lateral-only items */
+		if (nsitem->p_lateral_only && !pstate->p_lateral_active)
+			continue;
+
+		if (strcmp(rte->eref->aliasname, refname) == 0)
+		{
+			if (result)
+				throw Exception(ERROR, "table reference {} is ambiguous", refname);
+				// ereport(ERROR,
+				// 		(errcode(ERRCODE_AMBIGUOUS_ALIAS),
+				// 		 errmsg("table reference \"%s\" is ambiguous",
+				// 				refname),
+				// 		 parser_errposition(pstate, location)));
+			check_lateral_ref_ok(pstate, nsitem, location);
+			result = rte;
+		}
+	}
+	return result;
 };
 
 duckdb_libpgquery::PGRangeTblEntry *
