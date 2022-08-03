@@ -574,9 +574,9 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 			throw Exception(ERROR, "WITH query {} does not have a RETURNING clause", cte->ctename);
 	}
 
-	rte->ctecoltypes = cte->ctecoltypes;
-	rte->ctecoltypmods = cte->ctecoltypmods;
-	rte->ctecolcollations = cte->ctecolcollations;
+	rte->coltypes = list_copy(cte->ctecoltypes);
+	rte->coltypmods = list_copy(cte->ctecoltypmods);
+	rte->colcollations = list_copy(cte->ctecolcollations);
 
 	rte->alias = alias;
 	if (alias)
@@ -611,10 +611,10 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 	rte->inh = false;			/* never true for subqueries */
 	rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
-	rte->selectedCols = NULL;
-	rte->modifiedCols = NULL;
+	// rte->requiredPerms = 0;
+	// rte->checkAsUser = InvalidOid;
+	// rte->selectedCols = NULL;
+	// rte->modifiedCols = NULL;
 
 	/*
 	 * Add completed RTE to pstate's range table list, but not to join list
