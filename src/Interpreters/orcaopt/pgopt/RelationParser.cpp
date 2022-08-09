@@ -7,7 +7,7 @@ namespace DB
 
 RelationParser::RelationParser()
 {
-	relation_provider = std::make_shared<RelationParser>();
+	relation_provider = std::make_shared<RelationProvider>();
 }
 
 int RelationParser::RTERangeTablePosn(PGParseState *pstate, PGRangeTblEntry *rte, int *sublevels_up)

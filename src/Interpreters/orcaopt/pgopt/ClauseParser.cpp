@@ -6,6 +6,11 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+ClauseParser::ClauseParser() : scalar_operator_provider(std::make_shared<ScalarOperatorProvider>())
+{
+
+};
+
 PGRangeTblEntry *
 ClauseParser::transformCTEReference(PGParseState *pstate, PGRangeVar *r,
 					  PGCommonTableExpr *cte, Index levelsup)
@@ -1309,7 +1314,7 @@ ClauseParser::targetIsInSortList(PGTargetEntry *tle, Oid sortop, PGList *sortgro
 			if (scl->tleSortGroupRef == ref &&
 				(sortop == InvalidOid ||
 				 sortop == scl->sortop ||
-				 sortop == get_commutator(scl->sortop)))
+				 sortop == scalar_operator_provider->get_commutator(scl->sortop)))
 				return true;
 		}
 	}
@@ -2536,13 +2541,14 @@ ClauseParser::checkExprIsVarFree(PGParseState *pstate,
 {
 	if (contain_vars_of_level(n, 0))
 	{
-		ereport(ERROR,
-				(errcode(PG_ERRCODE_SYNTAX_ERROR),
-		/* translator: %s is name of a SQL construct, eg LIMIT */
-				 errmsg("argument of %s must not contain variables",
-						constructName),
-				 parser_errposition(pstate,
-									locate_var_of_level(n, 0))));
+		// ereport(ERROR,
+		// 		(errcode(PG_ERRCODE_SYNTAX_ERROR),
+		// /* translator: %s is name of a SQL construct, eg LIMIT */
+		// 		 errmsg("argument of %s must not contain variables",
+		// 				constructName),
+		// 		 parser_errposition(pstate,
+		// 							locate_var_of_level(n, 0))));
+		throw Exception(PG_ERRCODE_SYNTAX_ERROR, "argument of {} must not contain variables", constructName);
 	}
 };
 

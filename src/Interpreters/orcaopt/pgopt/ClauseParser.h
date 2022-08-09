@@ -1,12 +1,13 @@
 #pragma once
 
 #include <Interpreters/orcaopt/pgopt/parser_common.h>
-
 #include <Interpreters/orcaopt/pgopt/RelationParser.h>
 #include <Interpreters/orcaopt/pgopt/SelectParser.h>
 #include <Interpreters/orcaopt/pgopt/ExprParser.h>
 #include <Interpreters/orcaopt/pgopt/CollationParser.h>
 #include <Interpreters/orcaopt/pgopt/OperParser.h>
+//#include <Interpreters/orcaopt/pgopt/ScalarOperatorProvider.h>
+
 
 namespace DB
 {
@@ -21,6 +22,7 @@ private:
     TargetParser target_parser;
     CollationParser collation_parser;
     OperParser oper_parser;
+    std::shared_ptr<ScalarOperatorProvider> scalar_operator_provider = nullptr;
 public:
 	explicit ClauseParser();
     void transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGList *frmList);
