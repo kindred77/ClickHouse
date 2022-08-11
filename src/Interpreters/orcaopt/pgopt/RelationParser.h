@@ -19,7 +19,7 @@ private:
 public:
 	explicit RelationParser();
 
-	void expandTupleDesc(TupleDesc tupdesc, duckdb_libpgquery::PGAlias *eref, int count, int offset,
+	void expandTupleDesc(StoragePtr storage, duckdb_libpgquery::PGAlias *eref, int offset,
 				int rtindex, int sublevels_up,
 				int location, bool include_dropped,
 				duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars);

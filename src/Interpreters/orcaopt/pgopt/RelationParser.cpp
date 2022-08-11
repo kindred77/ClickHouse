@@ -38,13 +38,13 @@ int RelationParser::RTERangeTablePosn(PGParseState *pstate, PGRangeTblEntry *rte
 	return 0;					/* keep compiler quiet */
 };
 
-void RelationParser::expandTupleDesc(TupleDesc tupdesc, PGAlias *eref, int count, int offset,
+void RelationParser::expandTupleDesc(StoragePtr storage, PGAlias *eref, int offset,
 				int rtindex, int sublevels_up,
 				int location, bool include_dropped,
 				PGList **colnames, PGList **colvars)
 {
 	PGListCell   *aliascell = list_head(eref->colnames);
-	int			varattno;
+	int			varattno = 0;
 
 	if (colnames)
 	{
@@ -57,35 +57,35 @@ void RelationParser::expandTupleDesc(TupleDesc tupdesc, PGAlias *eref, int count
 		}
 	}
 
-	Assert(count <= tupdesc->natts);
-	for (varattno = 0; varattno < count; varattno++)
+	//Assert(count <= tupdesc->natts);
+	for (auto name_and_type : storage_ptr->getInMemoryMetadata().getColumns().getAll())
 	{
-		Form_pg_attribute attr = tupdesc->attrs[varattno];
-
-		if (attr->attisdropped)
-		{
-			if (include_dropped)
-			{
-				if (colnames)
-					*colnames = lappend(*colnames, makeString(pstrdup("")));
-				if (colvars)
-				{
-					/*
-					 * can't use atttypid here, but it doesn't really matter
-					 * what type the Const claims to be.
-					 */
-					*colvars = lappend(*colvars,
-									 makeNullConst(INT4OID, -1, InvalidOid));
-				}
-			}
-			if (aliascell)
-				aliascell = lnext(aliascell);
-			continue;
-		}
+		//Form_pg_attribute attr = tupdesc->attrs[varattno];
+		varattno++;
+		// if (attr->attisdropped)
+		// {
+		// 	if (include_dropped)
+		// 	{
+		// 		if (colnames)
+		// 			*colnames = lappend(*colnames, makeString(pstrdup("")));
+		// 		if (colvars)
+		// 		{
+		// 			/*
+		// 			 * can't use atttypid here, but it doesn't really matter
+		// 			 * what type the Const claims to be.
+		// 			 */
+		// 			*colvars = lappend(*colvars,
+		// 							 makeNullConst(INT4OID, -1, InvalidOid));
+		// 		}
+		// 	}
+		// 	if (aliascell)
+		// 		aliascell = lnext(aliascell);
+		// 	continue;
+		// }
 
 		if (colnames)
 		{
-			char	   *label;
+			const char * label;
 
 			if (aliascell)
 			{
@@ -95,7 +95,7 @@ void RelationParser::expandTupleDesc(TupleDesc tupdesc, PGAlias *eref, int count
 			else
 			{
 				/* If we run out of aliases, use the underlying name */
-				label = attr->attname.data;
+				label = name_and_type.name.c_str();
 			}
 			*colnames = lappend(*colnames, makeString(pstrdup(label)));
 		}
@@ -104,7 +104,7 @@ void RelationParser::expandTupleDesc(TupleDesc tupdesc, PGAlias *eref, int count
 		{
 			PGVar		   *varnode;
 
-			varnode = makeVar(rtindex, varattno + offset + 1,
+			varnode = makeVar(rtindex, varattno + offset,
 							  attr->atttypid, attr->atttypmod,
 							  attr->attcollation,
 							  sublevels_up);
@@ -119,15 +119,15 @@ void RelationParser::expandRelation(Oid relid, PGAlias *eref, int rtindex, int s
 			   int location, bool include_dropped,
 			   PGList **colnames, PGList **colvars)
 {
-	Relation	rel;
+	//Relation	rel;
 
 	/* Get the tupledesc and turn it over to expandTupleDesc */
-	rel = relation_open(relid, AccessShareLock);
-	expandTupleDesc(rel->rd_att, eref, rel->rd_att->natts, 0,
+	//rel = relation_open(relid, AccessShareLock);
+	expandTupleDesc(relation_provider->getStorageByOID(relid), eref, 0,
 					rtindex, sublevels_up,
 					location, include_dropped,
 					colnames, colvars);
-	relation_close(rel, AccessShareLock);
+	//relation_close(rel, AccessShareLock);
 };
 
 void

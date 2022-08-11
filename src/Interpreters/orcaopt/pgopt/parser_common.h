@@ -120,6 +120,22 @@ typedef PGIndex Index;
 
 typedef PGOid Oid;
 
+struct PGColumn
+{
+	Oid oid;
+	String name;
+	NameAndTypePair name_and_type;
+	Oid type_oid;
+	Oid type_modifier_oid;
+	Oid collation_oid;
+};
+
+struct PGRelation
+{
+	Oid oid;
+	std::vector<PGColumn> columns;
+};
+
 enum class InhOption
 {
 	INH_NO,						/* Do NOT scan child tables */
