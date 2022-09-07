@@ -31,7 +31,8 @@ public:
         const ColumnsDescription & columns_,
         ContextPtr context_,
         bool null_as_default_ = false,
-        const String & partial_col_idxes_arr_name = "");
+        const String & partial_col_idxes_arr_name = "",
+        const Block & partial_tree_header = {});
 
     Block getHeader() const override { return header; }
     void write(const Block & block) override;

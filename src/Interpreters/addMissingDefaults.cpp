@@ -93,7 +93,8 @@ ActionsDAGPtr addMissingDefaults(
 
 ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
     const String & rep_col_idxes_arr_name,
-    const Block & in_header, const Block & out_header,
+    const Block & in_header, const NamesAndTypesList & required_columns,
+    const Block & partial_tree_header,
     const ColumnsDescription & columns, ContextPtr context, bool null_as_default)
 {
     auto actions = std::make_shared<ActionsDAG>(in_header.getColumnsWithTypeAndName());
@@ -109,7 +110,7 @@ ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
     {
         const auto & elem = in_header.getByPosition(i);
 
-        col_idxes_arr.push_back(out_header.getPositionByName(elem.name) + 1);
+        col_idxes_arr.push_back(partial_tree_header.getPositionByName(elem.name) + 1);
 
         if (typeid_cast<const ColumnArray *>(&*elem.column))
         {
@@ -127,7 +128,7 @@ ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
 
     /// We take given columns from input block and missed columns without default value
     /// (default and materialized will be computed later).
-    auto const & required_columns = out_header.getNamesAndTypesList();
+    //auto const & required_columns = out_header.getNamesAndTypesList();
 
     for (const auto & column : required_columns)
     {
