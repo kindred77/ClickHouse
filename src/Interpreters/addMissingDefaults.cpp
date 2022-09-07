@@ -128,7 +128,6 @@ ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
 
     /// We take given columns from input block and missed columns without default value
     /// (default and materialized will be computed later).
-    //auto const & required_columns = out_header.getNamesAndTypesList();
 
     for (const auto & column : required_columns)
     {
