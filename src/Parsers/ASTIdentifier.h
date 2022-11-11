@@ -6,6 +6,9 @@
 
 #include <optional>
 
+#if defined(__clang__)
+#   pragma clang diagnostic ignored "-Wreturn-stack-address"
+#endif
 
 namespace DB
 {

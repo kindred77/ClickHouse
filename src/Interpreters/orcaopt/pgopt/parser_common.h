@@ -1,7 +1,8 @@
 #pragma once
 
 #ifdef __clang__
-#pragma clang diagnostic ignored "-Wno-old-style-cast"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
 #else
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #endif

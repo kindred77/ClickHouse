@@ -25,6 +25,9 @@
 #include <Interpreters/JIT/compileFunction.h>
 #include <Interpreters/JIT/CompiledExpressionCache.h>
 
+#if defined(__clang__)
+#   pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#endif
 
 namespace ProfileEvents
 {

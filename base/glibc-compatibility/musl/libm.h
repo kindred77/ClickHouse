@@ -7,6 +7,10 @@
 #include <endian.h>
 #include "musl_features.h"
 
+#if defined(__clang__)
+#   pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#endif
+
 #if LDBL_MANT_DIG == 53 && LDBL_MAX_EXP == 1024
 #elif LDBL_MANT_DIG == 64 && LDBL_MAX_EXP == 16384 && __BYTE_ORDER == __LITTLE_ENDIAN
 union ldshape {

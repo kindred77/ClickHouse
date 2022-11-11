@@ -29,6 +29,9 @@
 #include <cstddef>
 #include <stdexcept>
 
+#if defined(__clang__)
+#   pragma clang diagnostic ignored "-Wreserved-identifier"
+#endif
 
 namespace
 {

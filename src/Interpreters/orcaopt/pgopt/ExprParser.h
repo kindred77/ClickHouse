@@ -6,6 +6,9 @@
 #include <Interpreters/orcaopt/pgopt/SelectParser.h>
 #include <Interpreters/orcaopt/pgopt/TargetParser.h>
 #include <Interpreters/orcaopt/pgopt/TypeParser.h>
+#include <Interpreters/orcaopt/pgopt/FuncParser.h>
+#include <Interpreters/orcaopt/pgopt/OperParser.h>
+#include <Interpreters/orcaopt/pgopt/CollationParser.h>
 
 namespace DB
 {
@@ -18,8 +21,14 @@ private:
     SelectParser select_parser;
     TargetParser target_parser;
     TypeParser type_parser;
+    FuncParser func_parser;
+    OperParser oper_parser;
+    CollationParser collation_parser;
 public:
 	explicit ExprParser();
+
+    bool
+    exprIsNullConstant(duckdb_libpgquery::PGNode *arg);
 
     duckdb_libpgquery::PGNode *
     transformExpr(PGParseState *pstate, duckdb_libpgquery::PGNode *expr, PGParseExprKind exprKind);
@@ -98,6 +107,19 @@ public:
 
     duckdb_libpgquery::PGConst *
     make_const(PGParseState *pstate, duckdb_libpgquery::PGValue *value, int location);
+
+    duckdb_libpgquery::PGNode *
+    make_row_comparison_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
+					   duckdb_libpgquery::PGList *largs, duckdb_libpgquery::PGList *rargs, int location);
+    
+    duckdb_libpgquery::PGNode *
+    make_row_distinct_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
+					 duckdb_libpgquery::PGRowExpr *lrow, duckdb_libpgquery::PGRowExpr *rrow,
+					 int location);
+    
+    duckdb_libpgquery::PGExpr *
+    make_distinct_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname, duckdb_libpgquery::PGNode *ltree, duckdb_libpgquery::PGNode *rtree,
+				 int location);
 
     duckdb_libpgquery::PGNode *
     transformCoalesceExpr(PGParseState *pstate, duckdb_libpgquery::PGCoalesceExpr *c);

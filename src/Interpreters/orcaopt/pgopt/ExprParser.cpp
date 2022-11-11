@@ -5,6 +5,19 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+bool
+ExprParser::exprIsNullConstant(PGNode *arg)
+{
+	if (arg && IsA(arg, PGAConst))
+	{
+		PGAConst    *con = (PGAConst *) arg;
+
+		if (con->val.type == T_PGNull)
+			return true;
+	}
+	return false;
+};
+
 PGNode *
 ExprParser::transformExpr(PGParseState *pstate, PGNode *expr, PGParseExprKind exprKind)
 {
@@ -487,7 +500,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 				{
 					/* Try it as a function call on the whole row */
 					node = transformWholeRowRef(pstate, rte, cref->location);
-					node = ParseFuncOrColumn(pstate,
+					node = func_parser.ParseFuncOrColumn(pstate,
 											 list_make1(makeString(colname)),
 											 list_make1(node),
 											 NULL,
@@ -532,7 +545,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 				{
 					/* Try it as a function call on the whole row */
 					node = transformWholeRowRef(pstate, rte, cref->location);
-					node = ParseFuncOrColumn(pstate,
+					node = func_parser.ParseFuncOrColumn(pstate,
 											 list_make1(makeString(colname)),
 											 list_make1(node),
 											 NULL,
@@ -590,7 +603,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 				{
 					/* Try it as a function call on the whole row */
 					node = transformWholeRowRef(pstate, rte, cref->location);
-					node = ParseFuncOrColumn(pstate,
+					node = func_parser.ParseFuncOrColumn(pstate,
 											 list_make1(makeString(colname)),
 											 list_make1(node),
 											 NULL,
@@ -612,20 +625,20 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 	 * returns NULL, use the standard translation, or throw a suitable error
 	 * if there is none.
 	 */
-	if (pstate->p_post_columnref_hook != NULL)
-	{
-		PGNode	   *hookresult;
+	// if (pstate->p_post_columnref_hook != NULL)
+	// {
+	// 	PGNode	   *hookresult;
 
-		hookresult = (*pstate->p_post_columnref_hook) (pstate, cref, node);
-		if (node == NULL)
-			node = hookresult;
-		else if (hookresult != NULL)
-			ereport(ERROR,
-					(errcode(PG_ERRCODE_SYNTAX_ERROR),
-					 errmsg("column reference \"%s\" is ambiguous",
-							NameListToString(cref->fields)),
-					 parser_errposition(pstate, cref->location)));
-	}
+	// 	hookresult = (*pstate->p_post_columnref_hook) (pstate, cref, node);
+	// 	if (node == NULL)
+	// 		node = hookresult;
+	// 	else if (hookresult != NULL)
+	// 		ereport(ERROR,
+	// 				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+	// 				 errmsg("column reference \"%s\" is ambiguous",
+	// 						NameListToString(cref->fields)),
+	// 				 parser_errposition(pstate, cref->location)));
+	// }
 
 	/*
 	 * Throw error if no translation found.
@@ -730,7 +743,7 @@ ExprParser::transformAExprOp(PGParseState *pstate, PGAExpr *a)
 		lexpr = transformExprRecurse(pstate, lexpr);
 		rexpr = transformExprRecurse(pstate, rexpr);
 
-		result = (PGNode *) make_op(pstate,
+		result = (PGNode *) oper_parser.make_op(pstate,
 								  a->name,
 								  lexpr,
 								  rexpr,
@@ -749,10 +762,10 @@ ExprParser::transformParamRef(PGParseState *pstate, PGParamRef *pref)
 	 * The core parser knows nothing about Params.  If a hook is supplied,
 	 * call it.  If not, or if the hook returns NULL, throw a generic error.
 	 */
-	if (pstate->p_paramref_hook != NULL)
-		result = (*pstate->p_paramref_hook) (pstate, pref);
-	else
-		result = NULL;
+	// if (pstate->p_paramref_hook != NULL)
+	// 	result = (*pstate->p_paramref_hook) (pstate, pref);
+	// else
+	// 	result = NULL;
 
 	if (result == NULL)
 		ereport(ERROR,
@@ -806,7 +819,7 @@ ExprParser::transformIndirection(PGParseState *pstate, PGNode *basenode, PGList 
 														   NULL);
 			subscripts = NIL;
 
-			newresult = ParseFuncOrColumn(pstate,
+			newresult = func_parser.ParseFuncOrColumn(pstate,
 										  list_make1(n),
 										  list_make1(result),
 										  NULL,
@@ -1056,7 +1069,7 @@ ExprParser::transformAExprOpAny(PGParseState *pstate, PGAExpr *a)
 	PGNode	   *lexpr = transformExprRecurse(pstate, a->lexpr);
 	PGNode	   *rexpr = transformExprRecurse(pstate, a->rexpr);
 
-	return (PGNode *) make_scalar_array_op(pstate,
+	return (PGNode *) oper_parser.make_scalar_array_op(pstate,
 										 a->name,
 										 true,
 										 lexpr,
@@ -1070,7 +1083,7 @@ ExprParser::transformAExprOpAll(PGParseState *pstate, PGAExpr *a)
 	PGNode	   *lexpr = transformExprRecurse(pstate, a->lexpr);
 	PGNode	   *rexpr = transformExprRecurse(pstate, a->rexpr);
 
-	return (PGNode *) make_scalar_array_op(pstate,
+	return (PGNode *) oper_parser.make_scalar_array_op(pstate,
 										 a->name,
 										 false,
 										 lexpr,
@@ -1111,7 +1124,7 @@ ExprParser::transformAExprNullIf(PGParseState *pstate, PGAExpr *a)
 	PGNode	   *rexpr = transformExprRecurse(pstate, a->rexpr);
 	PGOpExpr	   *result;
 
-	result = (PGOpExpr *) make_op(pstate,
+	result = (PGOpExpr *) oper_parser.make_op(pstate,
 								a->name,
 								lexpr,
 								rexpr,
@@ -1277,7 +1290,7 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
 			newa->multidims = false;
 			newa->location = -1;
 
-			result = (PGNode *) make_scalar_array_op(pstate,
+			result = (PGNode *) oper_parser.make_scalar_array_op(pstate,
 												   a->name,
 												   useOr,
 												   lexpr,
@@ -1310,7 +1323,7 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
 		else
 		{
 			/* Ordinary scalar operator */
-			cmp = (PGNode *) make_op(pstate,
+			cmp = (PGNode *) oper_parser.make_op(pstate,
 								   a->name,
 								   copyObject(lexpr),
 								   rexpr,
@@ -1400,7 +1413,7 @@ ExprParser::transformFuncCall(PGParseState *pstate, PGFuncCall *fn)
 	}
 
 	/* ... and hand off to ParseFuncOrColumn */
-	return ParseFuncOrColumn(pstate,
+	return func_parser.ParseFuncOrColumn(pstate,
 							 fn->funcname,
 							 targs,
 							 fn,
@@ -1670,7 +1683,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 		 * leave it to parse_collate.c to do that later, but propagating the
 		 * result to the CaseTestExpr would be unnecessarily complicated.
 		 */
-		assign_expr_collations(pstate, arg);
+		collation_parser.assign_expr_collations(pstate, arg);
 
 		placeholder = makeNode(PGCaseTestExpr);
 		placeholder->typeId = exprType(arg);
@@ -2162,6 +2175,269 @@ ExprParser::make_const(PGParseState *pstate, PGValue *value, int location)
 	con->location = location;
 
 	return con;
+};
+
+PGNode *
+ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
+					   PGList *largs, PGList *rargs, int location)
+{
+	RowCompareExpr *rcexpr;
+	RowCompareType rctype;
+	PGList	   *opexprs;
+	PGList	   *opnos;
+	PGList	   *opfamilies;
+	PGListCell   *l,
+			   *r;
+	PGList	  **opinfo_lists;
+	Bitmapset  *strats;
+	int			nopers;
+	int			i;
+
+	nopers = list_length(largs);
+	if (nopers != list_length(rargs))
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("unequal number of entries in row expressions"),
+				 parser_errposition(pstate, location)));
+
+	/*
+	 * We can't compare zero-length rows because there is no principled basis
+	 * for figuring out what the operator is.
+	 */
+	if (nopers == 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot compare rows of zero length"),
+				 parser_errposition(pstate, location)));
+
+	/*
+	 * Identify all the pairwise operators, using make_op so that behavior is
+	 * the same as in the simple scalar case.
+	 */
+	opexprs = NIL;
+	forboth(l, largs, r, rargs)
+	{
+		PGNode	   *larg = (PGNode *) lfirst(l);
+		PGNode	   *rarg = (PGNode *) lfirst(r);
+		PGOpExpr	   *cmp;
+
+		cmp = (PGOpExpr *) oper_parser.make_op(pstate, opname, larg, rarg, location);
+		Assert(IsA(cmp, PGOpExpr));
+
+		/*
+		 * We don't use coerce_to_boolean here because we insist on the
+		 * operator yielding boolean directly, not via coercion.  If it
+		 * doesn't yield bool it won't be in any index opfamilies...
+		 */
+		if (cmp->opresulttype != BOOLOID)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+				   errmsg("row comparison operator must yield type boolean, "
+						  "not type %s",
+						  format_type_be(cmp->opresulttype)),
+					 parser_errposition(pstate, location)));
+		if (expression_returns_set((PGNode *) cmp))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					 errmsg("row comparison operator must not return a set"),
+					 parser_errposition(pstate, location)));
+		opexprs = lappend(opexprs, cmp);
+	}
+
+	/*
+	 * If rows are length 1, just return the single operator.  In this case we
+	 * don't insist on identifying btree semantics for the operator (but we
+	 * still require it to return boolean).
+	 */
+	if (nopers == 1)
+		return (PGNode *) linitial(opexprs);
+
+	/*
+	 * Now we must determine which row comparison semantics (= <> < <= > >=)
+	 * apply to this set of operators.  We look for btree opfamilies
+	 * containing the operators, and see which interpretations (strategy
+	 * numbers) exist for each operator.
+	 */
+	opinfo_lists = (PGList **) palloc(nopers * sizeof(PGList *));
+	strats = NULL;
+	i = 0;
+	foreach(l, opexprs)
+	{
+		Oid			opno = ((PGOpExpr *) lfirst(l))->opno;
+		Bitmapset  *this_strats;
+		PGListCell   *j;
+
+		opinfo_lists[i] = get_op_btree_interpretation(opno);
+
+		/*
+		 * convert strategy numbers into a Bitmapset to make the intersection
+		 * calculation easy.
+		 */
+		this_strats = NULL;
+		foreach(j, opinfo_lists[i])
+		{
+			OpBtreeInterpretation *opinfo = lfirst(j);
+
+			this_strats = bms_add_member(this_strats, opinfo->strategy);
+		}
+		if (i == 0)
+			strats = this_strats;
+		else
+			strats = bms_int_members(strats, this_strats);
+		i++;
+	}
+
+	/*
+	 * If there are multiple common interpretations, we may use any one of
+	 * them ... this coding arbitrarily picks the lowest btree strategy
+	 * number.
+	 */
+	i = bms_first_member(strats);
+	if (i < 0)
+	{
+		/* No common interpretation, so fail */
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("could not determine interpretation of row comparison operator %s",
+						strVal(llast(opname))),
+				 errhint("Row comparison operators must be associated with btree operator families."),
+				 parser_errposition(pstate, location)));
+	}
+	rctype = (RowCompareType) i;
+
+	/*
+	 * For = and <> cases, we just combine the pairwise operators with AND or
+	 * OR respectively.
+	 *
+	 * Note: this is presently the only place where the parser generates
+	 * BoolExpr with more than two arguments.  Should be OK since the rest of
+	 * the system thinks BoolExpr is N-argument anyway.
+	 */
+	if (rctype == ROWCOMPARE_EQ)
+		return (PGNode *) makeBoolExpr(AND_EXPR, opexprs, location);
+	if (rctype == ROWCOMPARE_NE)
+		return (PGNode *) makeBoolExpr(OR_EXPR, opexprs, location);
+
+	/*
+	 * Otherwise we need to choose exactly which opfamily to associate with
+	 * each operator.
+	 */
+	opfamilies = NIL;
+	for (i = 0; i < nopers; i++)
+	{
+		Oid			opfamily = InvalidOid;
+		ListCell   *j;
+
+		foreach(j, opinfo_lists[i])
+		{
+			OpBtreeInterpretation *opinfo = lfirst(j);
+
+			if (opinfo->strategy == rctype)
+			{
+				opfamily = opinfo->opfamily_id;
+				break;
+			}
+		}
+		if (OidIsValid(opfamily))
+			opfamilies = lappend_oid(opfamilies, opfamily);
+		else	/* should not happen */
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("could not determine interpretation of row comparison operator %s",
+							strVal(llast(opname))),
+			   errdetail("There are multiple equally-plausible candidates."),
+					 parser_errposition(pstate, location)));
+	}
+
+	/*
+	 * Now deconstruct the OpExprs and create a RowCompareExpr.
+	 *
+	 * Note: can't just reuse the passed largs/rargs lists, because of
+	 * possibility that make_op inserted coercion operations.
+	 */
+	opnos = NIL;
+	largs = NIL;
+	rargs = NIL;
+	foreach(l, opexprs)
+	{
+		PGOpExpr	   *cmp = (PGOpExpr *) lfirst(l);
+
+		opnos = lappend_oid(opnos, cmp->opno);
+		largs = lappend(largs, linitial(cmp->args));
+		rargs = lappend(rargs, lsecond(cmp->args));
+	}
+
+	rcexpr = makeNode(PGRowCompareExpr);
+	rcexpr->rctype = rctype;
+	rcexpr->opnos = opnos;
+	rcexpr->opfamilies = opfamilies;
+	rcexpr->inputcollids = NIL; /* assign_expr_collations will fix this */
+	rcexpr->largs = largs;
+	rcexpr->rargs = rargs;
+
+	return (PGNode *) rcexpr;
+};
+
+PGNode *
+ExprParser::make_row_distinct_op(PGParseState *pstate, PGList *opname,
+					 PGRowExpr *lrow, PGRowExpr *rrow,
+					 int location)
+{
+	PGNode	   *result = NULL;
+	PGList	   *largs = lrow->args;
+	PGList	   *rargs = rrow->args;
+	PGListCell   *l,
+			   *r;
+
+	if (list_length(largs) != list_length(rargs))
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("unequal number of entries in row expressions"),
+				 parser_errposition(pstate, location)));
+
+	forboth(l, largs, r, rargs)
+	{
+		PGNode	   *larg = (PGNode *) lfirst(l);
+		PGNode	   *rarg = (PGNode *) lfirst(r);
+		PGNode	   *cmp;
+
+		cmp = (PGNode *) make_distinct_op(pstate, opname, larg, rarg, location);
+		if (result == NULL)
+			result = cmp;
+		else
+			result = (PGNode *) makeBoolExpr(OR_EXPR,
+										   list_make2(result, cmp),
+										   location);
+	}
+
+	if (result == NULL)
+	{
+		/* zero-length rows?  Generate constant FALSE */
+		result = makeBoolConst(false, false);
+	}
+
+	return result;
+};
+
+PGExpr *
+ExprParser::make_distinct_op(PGParseState *pstate, PGList *opname, PGNode *ltree, PGNode *rtree,
+				 int location)
+{
+	PGExpr	   *result;
+
+	result = oper_parser.make_op(pstate, opname, ltree, rtree, location);
+	if (((PGOpExpr *) result)->opresulttype != BOOLOID)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATATYPE_MISMATCH),
+			 errmsg("IS DISTINCT FROM requires = operator to yield boolean"),
+				 parser_errposition(pstate, location)));
+
+	/*
+	 * We rely on DistinctExpr and OpExpr being same struct
+	 */
+	NodeSetTag(result, T_DistinctExpr);
+
+	return result;
 };
 
 PGNode *

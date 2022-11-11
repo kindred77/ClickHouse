@@ -7,6 +7,9 @@
 #include <filesystem>
 #include <Common/filesystemHelpers.h>
 
+#if defined(__clang__)
+#   pragma clang diagnostic ignored "-Wdeprecated"
+#endif
 
 namespace fs = std::filesystem;
 
