@@ -9,6 +9,7 @@
 #include <Interpreters/orcaopt/pgopt/FuncParser.h>
 #include <Interpreters/orcaopt/pgopt/OperParser.h>
 #include <Interpreters/orcaopt/pgopt/CollationParser.h>
+#include <Interpreters/orcaopt/pgopt/NodeParser.h>
 
 namespace DB
 {
@@ -24,6 +25,7 @@ private:
     FuncParser func_parser;
     OperParser oper_parser;
     CollationParser collation_parser;
+    NodeParser node_parser;
 public:
 	explicit ExprParser();
 
@@ -104,9 +106,6 @@ public:
 						 duckdb_libpgquery::PGNode *assignFrom);
 
     Oid transformArrayType(Oid *arrayType, int32 *arrayTypmod);
-
-    duckdb_libpgquery::PGConst *
-    make_const(PGParseState *pstate, duckdb_libpgquery::PGValue *value, int location);
 
     duckdb_libpgquery::PGNode *
     make_row_comparison_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,

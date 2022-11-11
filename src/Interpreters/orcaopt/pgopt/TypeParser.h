@@ -18,6 +18,9 @@ public:
 
     int32
     typenameTypeMod(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, HeapTuple typ);
+
+    Oid
+    LookupCollation(PGParseState *pstate, duckdb_libpgquery::PGList *collnames, int location);
 };
 
 }

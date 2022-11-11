@@ -1681,4 +1681,45 @@ RelationParser::refnameRangeTblEntry(PGParseState *pstate,
 	return NULL;
 };
 
+PGList *
+RelationParser::expandRelAttrs(PGParseState *pstate, PGRangeTblEntry *rte,
+			   int rtindex, int sublevels_up, int location)
+{
+	PGList	   *names,
+			   *vars;
+	PGListCell   *name,
+			   *var;
+	PGList	   *te_list = NIL;
+
+	expandRTE(rte, rtindex, sublevels_up, location, false,
+			  &names, &vars);
+
+	/*
+	 * Require read access to the table.  This is normally redundant with the
+	 * markVarForSelectPriv calls below, but not if the table has zero
+	 * columns.
+	 */
+	rte->requiredPerms |= ACL_SELECT;
+
+	forboth(name, names, var, vars)
+	{
+		char	   *label = strVal(lfirst(name));
+		PGVar		   *varnode = (PGVar *) lfirst(var);
+		TargetEntry *te;
+
+		te = makeTargetEntry((PGExpr *) varnode,
+							 (AttrNumber) pstate->p_next_resno++,
+							 label,
+							 false);
+		te_list = lappend(te_list, te);
+
+		/* Require read access to each column */
+		markVarForSelectPriv(pstate, varnode, rte);
+	}
+
+	Assert(name == NULL && var == NULL);		/* lists not the same length? */
+
+	return te_list;
+};
+
 }

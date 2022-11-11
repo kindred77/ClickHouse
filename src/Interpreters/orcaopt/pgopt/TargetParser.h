@@ -23,8 +23,16 @@ public:
 					bool make_target_entry);
     
     duckdb_libpgquery::PGList *
+    ExpandIndirectionStar(PGParseState *pstate, duckdb_libpgquery::PGAIndirection *ind,
+					  bool make_target_entry, PGParseExprKind exprKind);
+    
+    duckdb_libpgquery::PGList *
     ExpandSingleTable(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte,
 				  int location, bool make_target_entry);
+
+    duckdb_libpgquery::PGList *
+    ExpandRowReference(PGParseState *pstate, duckdb_libpgquery::PGNode *expr,
+				   bool make_target_entry);
 
     void markTargetListOrigins(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist);
 

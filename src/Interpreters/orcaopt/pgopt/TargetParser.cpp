@@ -6,18 +6,18 @@ namespace DB
 {
 
 PGList *
-    ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
+TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 				  int location, bool make_target_entry)
 {
 	int			sublevels_up;
 	int			rtindex;
 
-	rtindex = RTERangeTablePosn(pstate, rte, &sublevels_up);
+	rtindex = relation_parser.RTERangeTablePosn(pstate, rte, &sublevels_up);
 
 	if (make_target_entry)
 	{
 		/* expandRelAttrs handles permissions marking */
-		return expandRelAttrs(pstate, rte, rtindex, sublevels_up,
+		return relation_parser.expandRelAttrs(pstate, rte, rtindex, sublevels_up,
 							  location);
 	}
 	else
@@ -25,7 +25,7 @@ PGList *
 		PGList	   *vars;
 		PGListCell   *l;
 
-		expandRTE(rte, rtindex, sublevels_up, location, false,
+		relation_parser.expandRTE(rte, rtindex, sublevels_up, location, false,
 				  NULL, &vars);
 
 		/*
@@ -40,7 +40,7 @@ PGList *
 		{
 			PGVar		   *var = (PGVar *) lfirst(l);
 
-			markVarForSelectPriv(pstate, var, rte);
+			relation_parser.markVarForSelectPriv(pstate, var, rte);
 		}
 
 		return vars;
@@ -48,7 +48,7 @@ PGList *
 };
 
 PGList *
-    ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
+TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 					bool make_target_entry)
 {
 	PGList	   *fields = cref->fields;
@@ -100,27 +100,27 @@ PGList *
 		 * Give the PreParseColumnRefHook, if any, first shot.  If it returns
 		 * non-null then we should use that expression.
 		 */
-		if (pstate->p_pre_columnref_hook != NULL)
-		{
-			PGNode	   *node;
+		// if (pstate->p_pre_columnref_hook != NULL)
+		// {
+		// 	PGNode	   *node;
 
-			node = (*pstate->p_pre_columnref_hook) (pstate, cref);
-			if (node != NULL)
-				return ExpandRowReference(pstate, node, make_target_entry);
-		}
+		// 	node = (*pstate->p_pre_columnref_hook) (pstate, cref);
+		// 	if (node != NULL)
+		// 		return ExpandRowReference(pstate, node, make_target_entry);
+		// }
 
 		switch (numnames)
 		{
 			case 2:
 				relname = strVal(linitial(fields));
-				rte = refnameRangeTblEntry(pstate, nspname, relname,
+				rte = relation_parser.refnameRangeTblEntry(pstate, nspname, relname,
 										   cref->location,
 										   &levels_up);
 				break;
 			case 3:
 				nspname = strVal(linitial(fields));
 				relname = strVal(lsecond(fields));
-				rte = refnameRangeTblEntry(pstate, nspname, relname,
+				rte = relation_parser.refnameRangeTblEntry(pstate, nspname, relname,
 										   cref->location,
 										   &levels_up);
 				break;
@@ -138,7 +138,7 @@ PGList *
 					}
 					nspname = strVal(lsecond(fields));
 					relname = strVal(lthird(fields));
-					rte = refnameRangeTblEntry(pstate, nspname, relname,
+					rte = relation_parser.refnameRangeTblEntry(pstate, nspname, relname,
 											   cref->location,
 											   &levels_up);
 					break;
@@ -155,23 +155,23 @@ PGList *
 		 * This convention allows hooks that really care to know what is
 		 * happening.)
 		 */
-		if (pstate->p_post_columnref_hook != NULL)
-		{
-			PGNode	   *node;
+		// if (pstate->p_post_columnref_hook != NULL)
+		// {
+		// 	PGNode	   *node;
 
-			node = (*pstate->p_post_columnref_hook) (pstate, cref,
-													 (PGNode *) rte);
-			if (node != NULL)
-			{
-				if (rte != NULL)
-					ereport(ERROR,
-							(errcode(PG_ERRCODE_SYNTAX_ERROR),
-							 errmsg("column reference \"%s\" is ambiguous",
-									NameListToString(cref->fields)),
-							 parser_errposition(pstate, cref->location)));
-				return ExpandRowReference(pstate, node, make_target_entry);
-			}
-		}
+		// 	node = (*pstate->p_post_columnref_hook) (pstate, cref,
+		// 											 (PGNode *) rte);
+		// 	if (node != NULL)
+		// 	{
+		// 		if (rte != NULL)
+		// 			ereport(ERROR,
+		// 					(errcode(PG_ERRCODE_SYNTAX_ERROR),
+		// 					 errmsg("column reference \"%s\" is ambiguous",
+		// 							NameListToString(cref->fields)),
+		// 					 parser_errposition(pstate, cref->location)));
+		// 		return ExpandRowReference(pstate, node, make_target_entry);
+		// 	}
+		// }
 
 		/*
 		 * Throw error if no translation found.
@@ -206,6 +206,112 @@ PGList *
 		 */
 		return ExpandSingleTable(pstate, rte, cref->location, make_target_entry);
 	}
+};
+
+PGList *
+TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
+				   bool make_target_entry)
+{
+	PGList	   *result = NIL;
+	TupleDesc	tupleDesc;
+	int			numAttrs;
+	int			i;
+
+	/*
+	 * If the rowtype expression is a whole-row Var, we can expand the fields
+	 * as simple Vars.  Note: if the RTE is a relation, this case leaves us
+	 * with the RTE's selectedCols bitmap showing the whole row as needing
+	 * select permission, as well as the individual columns.  However, we can
+	 * only get here for weird notations like (table.*).*, so it's not worth
+	 * trying to clean up --- arguably, the permissions marking is correct
+	 * anyway for such cases.
+	 */
+	if (IsA(expr, PGVar) &&
+		((PGVar *) expr)->varattno == InvalidAttrNumber)
+	{
+		PGVar		   *var = (PGVar *) expr;
+		RangeTblEntry *rte;
+
+		rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, var->varlevelsup);
+		return ExpandSingleTable(pstate, rte, var->location, make_target_entry);
+	}
+
+	/*
+	 * Otherwise we have to do it the hard way.  Our current implementation is
+	 * to generate multiple copies of the expression and do FieldSelects.
+	 * (This can be pretty inefficient if the expression involves nontrivial
+	 * computation :-(.)
+	 *
+	 * Verify it's a composite type, and get the tupdesc.  We use
+	 * get_expr_result_type() because that can handle references to functions
+	 * returning anonymous record types.  If that fails, use
+	 * lookup_rowtype_tupdesc(), which will almost certainly fail as well, but
+	 * it will give an appropriate error message.
+	 *
+	 * If it's a Var of type RECORD, we have to work even harder: we have to
+	 * find what the Var refers to, and pass that to get_expr_result_type.
+	 * That task is handled by expandRecordVariable().
+	 */
+	if (IsA(expr, PGVar) &&
+		((PGVar *) expr)->vartype == RECORDOID)
+		tupleDesc = expandRecordVariable(pstate, (PGVar *) expr, 0);
+	else if (get_expr_result_type(expr, NULL, &tupleDesc) != TYPEFUNC_COMPOSITE)
+		tupleDesc = lookup_rowtype_tupdesc_copy(exprType(expr),
+												exprTypmod(expr));
+	Assert(tupleDesc);
+
+	/* Generate a list of references to the individual fields */
+	numAttrs = tupleDesc->natts;
+	for (i = 0; i < numAttrs; i++)
+	{
+		Form_pg_attribute att = tupleDesc->attrs[i];
+		FieldSelect *fselect;
+
+		if (att->attisdropped)
+			continue;
+
+		fselect = makeNode(FieldSelect);
+		fselect->arg = (Expr *) copyObject(expr);
+		fselect->fieldnum = i + 1;
+		fselect->resulttype = att->atttypid;
+		fselect->resulttypmod = att->atttypmod;
+		/* save attribute's collation for parse_collate.c */
+		fselect->resultcollid = att->attcollation;
+
+		if (make_target_entry)
+		{
+			/* add TargetEntry decoration */
+			TargetEntry *te;
+
+			te = makeTargetEntry((PGExpr *) fselect,
+								 (AttrNumber) pstate->p_next_resno++,
+								 pstrdup(NameStr(att->attname)),
+								 false);
+			result = lappend(result, te);
+		}
+		else
+			result = lappend(result, fselect);
+	}
+
+	return result;
+};
+
+PGList *
+TargetParser::ExpandIndirectionStar(PGParseState *pstate, PGAIndirection *ind,
+					  bool make_target_entry, PGParseExprKind exprKind)
+{
+	PGNode	   *expr;
+
+	/* Strip off the '*' to create a reference to the rowtype object */
+	ind = copyObject(ind);
+	ind->indirection = list_truncate(ind->indirection,
+									 list_length(ind->indirection) - 1);
+
+	/* And transform that */
+	expr = expr_parser.transformExpr(pstate, (PGNode *) ind, exprKind);
+
+	/* Expand the rowtype expression into individual fields */
+	return ExpandRowReference(pstate, expr, make_target_entry);
 };
 
 PGList *

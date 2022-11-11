@@ -119,6 +119,10 @@ public:
 
 	duckdb_libpgquery::PGRangeTblEntry *
 	scanNameSpaceForRefname(PGParseState *pstate, const char *refname, int location);
+
+	duckdb_libpgquery::PGList *
+	expandRelAttrs(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte,
+			   int rtindex, int sublevels_up, int location);
 };
 
 }
