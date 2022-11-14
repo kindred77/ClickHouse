@@ -33,7 +33,7 @@ TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 		 * the markVarForSelectPriv calls below, but not if the table has zero
 		 * columns.
 		 */
-		rte->requiredPerms |= ACL_SELECT;
+		//rte->requiredPerms |= ACL_SELECT;
 
 		/* Require read access to each column */
 		foreach(l, vars)
@@ -45,6 +45,49 @@ TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 
 		return vars;
 	}
+};
+
+PGList *
+TargetParser::ExpandAllTables(PGParseState *pstate, int location)
+{
+	PGList	   *target = NIL;
+	bool		found_table = false;
+	PGListCell   *l;
+
+	foreach(l, pstate->p_namespace)
+	{
+		PGParseNamespaceItem *nsitem = (PGParseNamespaceItem *) lfirst(l);
+		PGRangeTblEntry *rte = nsitem->p_rte;
+
+		/* Ignore table-only items */
+		if (!nsitem->p_cols_visible)
+			continue;
+		/* Should not have any lateral-only items when parsing targetlist */
+		Assert(!nsitem->p_lateral_only);
+		/* Remember we found a p_cols_visible item */
+		found_table = true;
+
+		target = list_concat(target,
+							 relation_parser.expandRelAttrs(pstate,
+											rte,
+											relation_parser.RTERangeTablePosn(pstate, rte,
+															  NULL),
+											0,
+											location));
+	}
+
+	/*
+	 * Check for "SELECT *;".  We do it this way, rather than checking for
+	 * target == NIL, because we want to allow SELECT * FROM a zero_column
+	 * table.
+	 */
+	if (!found_table)
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("SELECT * with no tables specified is not valid"),
+				 node_parser.parser_errposition(pstate, location)));
+
+	return target;
 };
 
 PGList *
@@ -181,7 +224,7 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 			switch (crserr)
 			{
 				case CRSERR_NO_RTE:
-					errorMissingRTE(pstate, makeRangeVar(nspname, relname,
+					relation_parser.errorMissingRTE(pstate, makeRangeVar(nspname, relname,
 														 cref->location));
 					break;
 				case CRSERR_WRONG_DB:
@@ -189,14 +232,14 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 							(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cross-database references are not implemented: %s",
 									NameListToString(cref->fields)),
-							 parser_errposition(pstate, cref->location)));
+							 node_parser.parser_errposition(pstate, cref->location)));
 					break;
 				case CRSERR_TOO_MANY:
 					ereport(ERROR,
 							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("improper qualified name (too many dotted names): %s",
 									NameListToString(cref->fields)),
-							 parser_errposition(pstate, cref->location)));
+							 node_parser.parser_errposition(pstate, cref->location)));
 					break;
 			}
 		}
@@ -206,6 +249,172 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 		 */
 		return ExpandSingleTable(pstate, rte, cref->location, make_target_entry);
 	}
+};
+
+TupleDesc
+TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsup)
+{
+	TupleDesc	tupleDesc;
+	int			netlevelsup;
+	PGRangeTblEntry *rte;
+	PGAttrNumber	attnum;
+	PGNode	   *expr;
+
+	/* Check my caller didn't mess up */
+	Assert(IsA(var, PGVar));
+	Assert(var->vartype == RECORDOID);
+
+	netlevelsup = var->varlevelsup + levelsup;
+	rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+	attnum = var->varattno;
+
+	if (attnum == InvalidAttrNumber)
+	{
+		/* Whole-row reference to an RTE, so expand the known fields */
+		PGList	   *names,
+				   *vars;
+		ListCell   *lname,
+				   *lvar;
+		int			i;
+
+		relation_parser.expandRTE(rte, var->varno, 0, var->location, false,
+				  &names, &vars);
+
+		tupleDesc = CreateTemplateTupleDesc(list_length(vars), false);
+		i = 1;
+		forboth(lname, names, lvar, vars)
+		{
+			char	   *label = strVal(lfirst(lname));
+			PGNode	   *varnode = (PGNode *) lfirst(lvar);
+
+			TupleDescInitEntry(tupleDesc, i,
+							   label,
+							   exprType(varnode),
+							   exprTypmod(varnode),
+							   0);
+			TupleDescInitEntryCollation(tupleDesc, i,
+										exprCollation(varnode));
+			i++;
+		}
+		Assert(lname == NULL && lvar == NULL);	/* lists same length? */
+
+		return tupleDesc;
+	}
+
+	expr = (PGNode *) var;		/* default if we can't drill down */
+
+	switch (rte->rtekind)
+	{
+		case PG_RTE_RELATION:
+		case PG_RTE_VALUES:
+
+			/*
+			 * This case should not occur: a column of a table or values list
+			 * shouldn't have type RECORD.  Fall through and fail (most
+			 * likely) at the bottom.
+			 */
+			break;
+		case PG_RTE_SUBQUERY:
+			{
+				/* Subselect-in-FROM: examine sub-select's output expr */
+				PGTargetEntry *ste = relation_parser.get_tle_by_resno(rte->subquery->targetList,
+													attnum);
+
+				if (ste == NULL || ste->resjunk)
+					elog(ERROR, "subquery %s does not have attribute %d",
+						 rte->eref->aliasname, attnum);
+				expr = (PGNode *) ste->expr;
+				if (IsA(expr, PGVar))
+				{
+					/*
+					 * Recurse into the sub-select to see what its Var refers
+					 * to.  We have to build an additional level of ParseState
+					 * to keep in step with varlevelsup in the subselect.
+					 */
+					PGParseState	mypstate;
+
+					MemSet(&mypstate, 0, sizeof(mypstate));
+					mypstate.parentParseState = pstate;
+					mypstate.p_rtable = rte->subquery->rtable;
+					/* don't bother filling the rest of the fake pstate */
+
+					return expandRecordVariable(&mypstate, (PGVar *) expr, 0);
+				}
+				/* else fall through to inspect the expression */
+			}
+			break;
+		case PG_RTE_JOIN:
+			/* Join RTE --- recursively inspect the alias variable */
+			Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
+			expr = (PGNode *) list_nth(rte->joinaliasvars, attnum - 1);
+			Assert(expr != NULL);
+			/* We intentionally don't strip implicit coercions here */
+			if (IsA(expr, PGVar))
+				return expandRecordVariable(pstate, (PGVar *) expr, netlevelsup);
+			/* else fall through to inspect the expression */
+			break;
+		//case PG_RTE_TABLEFUNCTION:
+		case PG_RTE_FUNCTION:
+
+			/*
+			 * We couldn't get here unless a function is declared with one of
+			 * its result columns as RECORD, which is not allowed.
+			 */
+			break;
+		case PG_RTE_CTE:
+			/* CTE reference: examine subquery's output expr */
+			if (!rte->self_reference)
+			{
+				PGCommonTableExpr *cte = relation_parser.GetCTEForRTE(pstate, rte, netlevelsup);
+				PGTargetEntry *ste;
+
+				ste = relation_parser.get_tle_by_resno(GetCTETargetList(cte), attnum);
+				if (ste == NULL || ste->resjunk)
+					elog(ERROR, "subquery %s does not have attribute %d",
+						 rte->eref->aliasname, attnum);
+				expr = (PGNode *) ste->expr;
+				if (IsA(expr, PGVar))
+				{
+					/*
+					 * Recurse into the CTE to see what its Var refers to. We
+					 * have to build an additional level of ParseState to keep
+					 * in step with varlevelsup in the CTE; furthermore it
+					 * could be an outer CTE.
+					 */
+					PGParseState	mypstate;
+					Index		levelsup;
+
+					MemSet(&mypstate, 0, sizeof(mypstate));
+					/* this loop must work, since GetCTEForRTE did */
+					for (levelsup = 0;
+						 levelsup < rte->ctelevelsup + netlevelsup;
+						 levelsup++)
+						pstate = pstate->parentParseState;
+					mypstate.parentParseState = pstate;
+					mypstate.p_rtable = ((PGQuery *) cte->ctequery)->rtable;
+					/* don't bother filling the rest of the fake pstate */
+
+					return expandRecordVariable(&mypstate, (PGVar *) expr, 0);
+				}
+				/* else fall through to inspect the expression */
+			}
+			break;
+		// case PG_RTE_VOID:
+	    //         Insist(0);
+        // 	    break;
+	}
+
+	/*
+	 * We now have an expression we can't expand any more, so see if
+	 * get_expr_result_type() can do anything with it.  If not, pass to
+	 * lookup_rowtype_tupdesc() which will probably fail, but will give an
+	 * appropriate error message while failing.
+	 */
+	if (get_expr_result_type(expr, NULL, &tupleDesc) != TYPEFUNC_COMPOSITE)
+		tupleDesc = lookup_rowtype_tupdesc_copy(exprType(expr),
+												exprTypmod(expr));
+
+	return tupleDesc;
 };
 
 PGList *
@@ -230,7 +439,7 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 		((PGVar *) expr)->varattno == InvalidAttrNumber)
 	{
 		PGVar		   *var = (PGVar *) expr;
-		RangeTblEntry *rte;
+		PGRangeTblEntry *rte;
 
 		rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, var->varlevelsup);
 		return ExpandSingleTable(pstate, rte, var->location, make_target_entry);
@@ -265,13 +474,13 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 	for (i = 0; i < numAttrs; i++)
 	{
 		Form_pg_attribute att = tupleDesc->attrs[i];
-		FieldSelect *fselect;
+		PGFieldSelect *fselect;
 
 		if (att->attisdropped)
 			continue;
 
-		fselect = makeNode(FieldSelect);
-		fselect->arg = (Expr *) copyObject(expr);
+		fselect = makeNode(PGFieldSelect);
+		fselect->arg = (PGExpr *) copyObject(expr);
 		fselect->fieldnum = i + 1;
 		fselect->resulttype = att->atttypid;
 		fselect->resulttypmod = att->atttypmod;
@@ -281,10 +490,10 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 		if (make_target_entry)
 		{
 			/* add TargetEntry decoration */
-			TargetEntry *te;
+			PGTargetEntry *te;
 
 			te = makeTargetEntry((PGExpr *) fselect,
-								 (AttrNumber) pstate->p_next_resno++,
+								 (PGAttrNumber) pstate->p_next_resno++,
 								 pstrdup(NameStr(att->attname)),
 								 false);
 			result = lappend(result, te);
@@ -421,7 +630,7 @@ TargetParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 			/* Subselect-in-FROM: copy up from the subselect */
 			if (attnum != InvalidAttrNumber)
 			{
-				PGTargetEntry *ste = get_tle_by_resno(rte->subquery->targetList,
+				PGTargetEntry *ste = relation_parser.get_tle_by_resno(rte->subquery->targetList,
 													attnum);
 
 				if (ste == NULL || ste->resjunk)
@@ -461,10 +670,10 @@ TargetParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 			 */
 			if (attnum != InvalidAttrNumber && !rte->self_reference)
 			{
-				PGCommonTableExpr *cte = GetCTEForRTE(pstate, rte, netlevelsup);
+				PGCommonTableExpr *cte = relation_parser.GetCTEForRTE(pstate, rte, netlevelsup);
 				PGTargetEntry *ste;
 
-				ste = get_tle_by_resno(GetCTETargetList(cte), attnum);
+				ste = relation_parser.get_tle_by_resno(GetCTETargetList(cte), attnum);
 				if (ste == NULL || ste->resjunk)
 					elog(ERROR, "subquery %s does not have attribute %d",
 						 rte->eref->aliasname, attnum);

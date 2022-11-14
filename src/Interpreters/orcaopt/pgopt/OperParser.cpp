@@ -61,6 +61,44 @@ OperParser::get_sort_group_operators(Oid argtype,
 		*isHashable = hashable;
 };
 
+Oid
+OperParser::binary_oper_exact(PGList *opname, Oid arg1, Oid arg2)
+{
+	Oid			result;
+	bool		was_unknown = false;
+
+	/* Unspecified type for one of the arguments? then use the other */
+	if ((arg1 == UNKNOWNOID) && (arg2 != InvalidOid))
+	{
+		arg1 = arg2;
+		was_unknown = true;
+	}
+	else if ((arg2 == UNKNOWNOID) && (arg1 != InvalidOid))
+	{
+		arg2 = arg1;
+		was_unknown = true;
+	}
+
+	result = OpernameGetOprid(opname, arg1, arg2);
+	if (OidIsValid(result))
+		return result;
+
+	if (was_unknown)
+	{
+		/* arg1 and arg2 are the same here, need only look at arg1 */
+		Oid			basetype = getBaseType(arg1);
+
+		if (basetype != arg1)
+		{
+			result = OpernameGetOprid(opname, basetype, basetype);
+			if (OidIsValid(result))
+				return result;
+		}
+	}
+
+	return InvalidOid;
+};
+
 HeapTuple
 OperParser::oper(PGParseState *pstate, PGList *opname, Oid ltypeId, Oid rtypeId,
 		bool noError, int location)
@@ -68,7 +106,7 @@ OperParser::oper(PGParseState *pstate, PGList *opname, Oid ltypeId, Oid rtypeId,
 	Oid			operOid;
 	OprCacheKey key;
 	bool		key_ok;
-	FuncDetailCode fdresult = FUNCDETAIL_NOTFOUND;
+	FuncDetailCode fdresult = FuncDetailCode::FUNCDETAIL_NOTFOUND;
 	HeapTuple	tup = NULL;
 
 	/*
@@ -139,7 +177,7 @@ OperParser::right_oper(PGParseState *pstate, PGList *op, Oid arg, bool noError, 
 	Oid			operOid;
 	OprCacheKey key;
 	bool		key_ok;
-	FuncDetailCode fdresult = FUNCDETAIL_NOTFOUND;
+	FuncDetailCode fdresult = FuncDetailCode::FUNCDETAIL_NOTFOUND;
 	HeapTuple	tup = NULL;
 
 	/*
@@ -202,7 +240,7 @@ OperParser::left_oper(PGParseState *pstate, PGList *op, Oid arg, bool noError, i
 	Oid			operOid;
 	OprCacheKey key;
 	bool		key_ok;
-	FuncDetailCode fdresult = FUNCDETAIL_NOTFOUND;
+	FuncDetailCode fdresult = FuncDetailCode::FUNCDETAIL_NOTFOUND;
 	HeapTuple	tup = NULL;
 
 	/*
@@ -287,7 +325,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 	Oid			declared_arg_types[2];
 	PGList	   *args;
 	Oid			rettype;
-	ScalarArrayOpExpr *result;
+	PGScalarArrayOpExpr *result;
 
 	ltypeId = exprType(ltree);
 	atypeId = exprType(rtree);
@@ -348,12 +386,12 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 			 errmsg("op ANY/ALL (array) requires operator to yield boolean"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 	if (get_func_retset(opform->oprcode))
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 		  errmsg("op ANY/ALL (array) requires operator not to return a set"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	/*
 	 * Now switch back to the array type on the right, arranging for any
@@ -374,7 +412,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("could not find array type for data type %s",
 							format_type_be(declared_arg_types[1])),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 	actual_arg_types[1] = atypeId;
 	declared_arg_types[1] = res_atypeId;
@@ -383,7 +421,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 	func_parser.make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
 
 	/* and build the expression node */
-	result = makeNode(ScalarArrayOpExpr);
+	result = makeNode(PGScalarArrayOpExpr);
 	result->opno = oprid(tup);
 	result->opfuncid = opform->oprcode;
 	result->useOr = useOr;
@@ -445,7 +483,7 @@ OperParser::make_op(PGParseState *pstate, PGList *opname, PGNode *ltree, PGNode 
 											opform->oprkind,
 											opform->oprleft,
 											opform->oprright)),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	/* Do typecasting and build the expression tree */
 	if (rtree == NULL)

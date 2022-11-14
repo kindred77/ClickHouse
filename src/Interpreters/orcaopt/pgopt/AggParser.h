@@ -2,6 +2,7 @@
 
 #include <Interpreters/orcaopt/pgopt/parser_common.h>
 #include <Interpreters/orcaopt/pgopt/ClauseParser.h>
+#include <Interpreters/orcaopt/pgopt/NodeParser.h>
 
 namespace DB
 {
@@ -18,6 +19,7 @@ class AggParser
 {
 private:
     ClauseParser clause_parser;
+	NodeParser node_parser;
 public:
 	explicit AggParser();
 

@@ -659,14 +659,14 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				  errmsg("cross-database references are not implemented: %s",
 						 NameListToString(cref->fields)),
-						 parser_errposition(pstate, cref->location)));
+						 node_parser.parser_errposition(pstate, cref->location)));
 				break;
 			case CRERR_TOO_MANY:
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				errmsg("improper qualified name (too many dotted names): %s",
 					   NameListToString(cref->fields)),
-						 parser_errposition(pstate, cref->location)));
+						 node_parser.parser_errposition(pstate, cref->location)));
 				break;
 		}
 	}
@@ -771,7 +771,7 @@ ExprParser::transformParamRef(PGParseState *pstate, PGParamRef *pref)
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("there is no parameter $%d", pref->number),
-				 parser_errposition(pstate, pref->location)));
+				 node_parser.parser_errposition(pstate, pref->location)));
 
 	return result;
 };
@@ -800,7 +800,7 @@ ExprParser::transformIndirection(PGParseState *pstate, PGNode *basenode, PGList 
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("row expansion via \"*\" is not supported here"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		}
 		else
 		{
@@ -917,7 +917,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 					 errmsg("cannot determine type of empty array"),
 					 errhint("Explicitly cast to the desired type, "
 							 "for example ARRAY[]::integer[]."),
-					 parser_errposition(pstate, a->location)));
+					 node_parser.parser_errposition(pstate, a->location)));
 
 		/* Select a common type for the elements */
 		coerce_type = select_common_type(pstate, newelems, "ARRAY", NULL);
@@ -931,7 +931,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					   errmsg("could not find element type for data type %s",
 							  format_type_be(array_type)),
-						 parser_errposition(pstate, a->location)));
+						 node_parser.parser_errposition(pstate, a->location)));
 		}
 		else
 		{
@@ -942,7 +942,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("could not find array type for data type %s",
 								format_type_be(element_type)),
-						 parser_errposition(pstate, a->location)));
+						 node_parser.parser_errposition(pstate, a->location)));
 		}
 		coerce_hard = false;
 	}
@@ -977,7 +977,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 						 errmsg("cannot cast type %s to %s",
 								format_type_be(exprType(e)),
 								format_type_be(coerce_type)),
-						 parser_errposition(pstate, exprLocation(e))));
+						 node_parser.parser_errposition(pstate, exprLocation(e))));
 		}
 		else
 			newe = coerce_parser.coerce_to_common_type(pstate, e,
@@ -1055,7 +1055,7 @@ ExprParser::transformCollateClause(PGParseState *pstate, PGCollateClause *c)
 				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("collations are not supported by type %s",
 						format_type_be(argtype)),
-				 parser_errposition(pstate, c->location)));
+				 node_parser.parser_errposition(pstate, c->location)));
 
 	newc->collOid = type_parser.LookupCollation(pstate, c->collname, c->location);
 	newc->location = c->location;
@@ -1137,7 +1137,7 @@ ExprParser::transformAExprNullIf(PGParseState *pstate, PGAExpr *a)
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("NULLIF requires = operator to yield boolean"),
-				 parser_errposition(pstate, a->location)));
+				 node_parser.parser_errposition(pstate, a->location)));
 
 	/*
 	 * ... but the NullIfExpr will yield the first operand's type.
@@ -1512,7 +1512,7 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg_internal("%s", err),
-				 parser_errposition(pstate, sublink->location)));
+				 node_parser.parser_errposition(pstate, sublink->location)));
 
 	pstate->p_hasSubLinks = true;
 
@@ -1555,14 +1555,14 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery must return a column"),
-					 parser_errposition(pstate, sublink->location)));
+					 node_parser.parser_errposition(pstate, sublink->location)));
 		while ((tlist_item = lnext(tlist_item)) != NULL)
 		{
 			if (!((PGTargetEntry *) lfirst(tlist_item))->resjunk)
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("subquery must return only one column"),
-						 parser_errposition(pstate, sublink->location)));
+						 node_parser.parser_errposition(pstate, sublink->location)));
 		}
 
 		/*
@@ -1622,12 +1622,12 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery has too many columns"),
-					 parser_errposition(pstate, sublink->location)));
+					 node_parser.parser_errposition(pstate, sublink->location)));
 		if (list_length(left_list) > list_length(right_list))
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery has too few columns"),
-					 parser_errposition(pstate, sublink->location)));
+					 node_parser.parser_errposition(pstate, sublink->location)));
 
 		/*
 		 * Identify the combining operator(s) and generate a suitable
@@ -1738,7 +1738,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("syntax error at or near \"NOT\""),
 						 errhint("Missing <operand> for \"CASE <operand> WHEN IS NOT DISTINCT FROM ...\""),
-						 parser_errposition(pstate, exprLocation((PGNode *) warg))));
+						 node_parser.parser_errposition(pstate, exprLocation((PGNode *) warg))));
 		}
 		neww->expr = (PGExpr *) transformExprRecurse(pstate, warg);
 
@@ -1935,7 +1935,7 @@ ExprParser::transformArraySubscripts(PGParseState *pstate,
 					ereport(ERROR,
 							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("array subscript must have type integer"),
-						parser_errposition(pstate, exprLocation(ai->lidx))));
+						node_parser.parser_errposition(pstate, exprLocation(ai->lidx))));
 			}
 			else
 			{
@@ -1962,7 +1962,7 @@ ExprParser::transformArraySubscripts(PGParseState *pstate,
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("array subscript must have type integer"),
-					 parser_errposition(pstate, exprLocation(ai->uidx))));
+					 node_parser.parser_errposition(pstate, exprLocation(ai->uidx))));
 		upperIndexpr = lappend(upperIndexpr, subexpr);
 	}
 
@@ -1990,7 +1990,7 @@ ExprParser::transformArraySubscripts(PGParseState *pstate,
 							format_type_be(typeneeded),
 							format_type_be(typesource)),
 				 errhint("You will need to rewrite or cast the expression."),
-					 parser_errposition(pstate, exprLocation(assignFrom))));
+					 node_parser.parser_errposition(pstate, exprLocation(assignFrom))));
 		assignFrom = newFrom;
 	}
 
@@ -2070,7 +2070,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 	PGListCell   *l,
 			   *r;
 	PGList	  **opinfo_lists;
-	Bitmapset  *strats;
+	PGBitmapset  *strats;
 	int			nopers;
 	int			i;
 
@@ -2079,7 +2079,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("unequal number of entries in row expressions"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	/*
 	 * We can't compare zero-length rows because there is no principled basis
@@ -2089,7 +2089,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot compare rows of zero length"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	/*
 	 * Identify all the pairwise operators, using make_op so that behavior is
@@ -2116,12 +2116,12 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 				   errmsg("row comparison operator must yield type boolean, "
 						  "not type %s",
 						  format_type_be(cmp->opresulttype)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		if (expression_returns_set((PGNode *) cmp))
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("row comparison operator must not return a set"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		opexprs = lappend(opexprs, cmp);
 	}
 
@@ -2145,7 +2145,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 	foreach(l, opexprs)
 	{
 		Oid			opno = ((PGOpExpr *) lfirst(l))->opno;
-		Bitmapset  *this_strats;
+		PGBitmapset  *this_strats;
 		PGListCell   *j;
 
 		opinfo_lists[i] = get_op_btree_interpretation(opno);
@@ -2182,9 +2182,9 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 				 errmsg("could not determine interpretation of row comparison operator %s",
 						strVal(llast(opname))),
 				 errhint("Row comparison operators must be associated with btree operator families."),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 	}
-	rctype = (RowCompareType) i;
+	rctype = (PGRowCompareType) i;
 
 	/*
 	 * For = and <> cases, we just combine the pairwise operators with AND or
@@ -2194,10 +2194,10 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 	 * BoolExpr with more than two arguments.  Should be OK since the rest of
 	 * the system thinks BoolExpr is N-argument anyway.
 	 */
-	if (rctype == ROWCOMPARE_EQ)
-		return (PGNode *) makeBoolExpr(AND_EXPR, opexprs, location);
-	if (rctype == ROWCOMPARE_NE)
-		return (PGNode *) makeBoolExpr(OR_EXPR, opexprs, location);
+	if (rctype == PG_ROWCOMPARE_EQ)
+		return (PGNode *) makeBoolExpr(PG_AND_EXPR, opexprs, location);
+	if (rctype == PG_ROWCOMPARE_NE)
+		return (PGNode *) makeBoolExpr(PG_OR_EXPR, opexprs, location);
 
 	/*
 	 * Otherwise we need to choose exactly which opfamily to associate with
@@ -2227,7 +2227,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 					 errmsg("could not determine interpretation of row comparison operator %s",
 							strVal(llast(opname))),
 			   errdetail("There are multiple equally-plausible candidates."),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 
 	/*
@@ -2274,7 +2274,7 @@ ExprParser::make_row_distinct_op(PGParseState *pstate, PGList *opname,
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("unequal number of entries in row expressions"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	forboth(l, largs, r, rargs)
 	{
@@ -2286,7 +2286,7 @@ ExprParser::make_row_distinct_op(PGParseState *pstate, PGList *opname,
 		if (result == NULL)
 			result = cmp;
 		else
-			result = (PGNode *) makeBoolExpr(OR_EXPR,
+			result = (PGNode *) makeBoolExpr(PG_OR_EXPR,
 										   list_make2(result, cmp),
 										   location);
 	}
@@ -2311,12 +2311,12 @@ ExprParser::make_distinct_op(PGParseState *pstate, PGList *opname, PGNode *ltree
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 			 errmsg("IS DISTINCT FROM requires = operator to yield boolean"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	/*
 	 * We rely on DistinctExpr and OpExpr being same struct
 	 */
-	NodeSetTag(result, T_DistinctExpr);
+	NodeSetTag(result, T_PGDistinctExpr);
 
 	return result;
 };

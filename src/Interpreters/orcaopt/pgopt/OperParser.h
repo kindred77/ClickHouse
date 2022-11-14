@@ -2,6 +2,7 @@
 
 #include <Interpreters/orcaopt/pgopt/parser_common.h>
 #include <Interpreters/orcaopt/pgopt/FuncParser.h>
+#include <Interpreters/orcaopt/pgopt/NodeParser.h>
 
 namespace DB
 {
@@ -10,7 +11,7 @@ class OperParser
 {
 private:
     FuncParser func_parser;
-
+	NodeParser node_parser;
 public:
 	explicit OperParser();
 
@@ -39,6 +40,9 @@ public:
 					 bool useOr,
 					 duckdb_libpgquery::PGNode *ltree, duckdb_libpgquery::PGNode *rtree,
 					 int location);
+	
+	Oid
+	binary_oper_exact(duckdb_libpgquery::PGList *opname, Oid arg1, Oid arg2);
 };
 
 }

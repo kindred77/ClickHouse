@@ -7,19 +7,6 @@ typedef struct
 	int			sublevels_up;
 } contain_aggs_of_level_context;
 
-/*
- * Collation strength (the SQL standard calls this "derivation").  Order is
- * chosen to allow comparisons to work usefully.  Note: the standard doesn't
- * seem to distinguish between NONE and CONFLICT.
- */
-typedef enum
-{
-	COLLATE_NONE,				/* expression is of a noncollatable datatype */
-	COLLATE_IMPLICIT,			/* collation was derived implicitly */
-	COLLATE_CONFLICT,			/* we had a conflict of implicit collations */
-	COLLATE_EXPLICIT			/* collation was derived explicitly */
-} CollateStrength;
-
 typedef struct
 {
 	PGParseState *pstate;			/* parse state (for error reporting) */

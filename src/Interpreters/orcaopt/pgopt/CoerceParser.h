@@ -120,6 +120,9 @@ public:
 	coerce_to_common_type(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
 					  Oid targetTypeId, const char *context);
 
+	void
+	get_type_category_preferred(Oid typid, char *typcategory, bool *typispreferred);
+
 };
 
 }

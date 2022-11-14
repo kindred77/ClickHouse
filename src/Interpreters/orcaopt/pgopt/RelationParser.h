@@ -2,6 +2,7 @@
 
 #include <Interpreters/orcaopt/pgopt/parser_common.h>
 #include <Interpreters/orcaopt/pgopt/CoerceParser.h>
+#include <Interpreters/orcaopt/pgopt/NodeParser.h>
 #include <Interpreters/orcaopt/pgopt/RelationProvider.h>
 
 #include <Storages/IStorage.h>
@@ -16,6 +17,7 @@ class RelationParser
 private:
     CoerceParser coerce_parser;
 	std::shared_ptr<RelationProvider> relation_provider;
+	NodeParser node_parser;
 public:
 	explicit RelationParser();
 
@@ -31,6 +33,12 @@ public:
     void expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 		  int location, bool include_dropped,
 		  duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars);
+
+	duckdb_libpgquery::PGRangeTblEntry *
+	searchRangeTableForRel(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *relation);
+
+	void
+	errorMissingRTE(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *relation);
     
     void checkNameSpaceConflicts(PGParseState *pstate, duckdb_libpgquery::PGList *namespace1,
 						duckdb_libpgquery::PGList *namespace2);

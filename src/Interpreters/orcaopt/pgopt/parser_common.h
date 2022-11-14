@@ -15,7 +15,8 @@
 #include <nodes/bitmapset.hpp>
 #include <pg_functions.hpp>
 #include <access/attnum.hpp>
-
+//#include <c.h>
+//#include <funcapi.h>
 #include <Common/Exception.h>
 
 #include<string.h>
@@ -144,9 +145,55 @@ enum class InhOption
 	INH_DEFAULT					/* Use current SQL_inheritance option */
 };
 
+enum class TypeFuncClass
+{
+	TYPEFUNC_SCALAR,			/* scalar result type */
+	TYPEFUNC_COMPOSITE,			/* determinable rowtype result */
+	TYPEFUNC_RECORD,			/* indeterminate rowtype result */
+	TYPEFUNC_OTHER				/* bogus type, eg pseudotype */
+};
+
+/* Result codes for func_get_detail */
+enum class FuncDetailCode
+{
+	FUNCDETAIL_NOTFOUND,		/* no matching function */
+	FUNCDETAIL_MULTIPLE,		/* too many matching functions */
+	FUNCDETAIL_NORMAL,			/* found a matching regular function */
+	FUNCDETAIL_AGGREGATE,		/* found a matching aggregate function */
+	FUNCDETAIL_WINDOWFUNC,		/* found a matching window function */
+	FUNCDETAIL_COERCION			/* it's a type coercion request */
+};
+
+typedef struct _FuncCandidateList
+{
+	struct _FuncCandidateList *next;
+	int			pathpos;		/* for internal use of namespace lookup */
+	Oid			oid;			/* the function or operator's OID */
+	int			nargs;			/* number of arg types returned */
+	int			nvargs;			/* number of args to become variadic array */
+	int			ndargs;			/* number of defaulted args */
+	int		   *argnumbers;		/* args' positional indexes, if named call */
+	Oid			args[1];		/* arg types --- VARIABLE LENGTH ARRAY */
+}	*FuncCandidateList;	/* VARIABLE LENGTH STRUCT */
+
+/*
+ * Collation strength (the SQL standard calls this "derivation").  Order is
+ * chosen to allow comparisons to work usefully.  Note: the standard doesn't
+ * seem to distinguish between NONE and CONFLICT.
+ */
+typedef enum
+{
+	COLLATE_NONE,				/* expression is of a noncollatable datatype */
+	COLLATE_IMPLICIT,			/* collation was derived implicitly */
+	COLLATE_CONFLICT,			/* we had a conflict of implicit collations */
+	COLLATE_EXPLICIT			/* collation was derived explicitly */
+} CollateStrength;
+
 bool		SQL_inheritance = true;
 
 typedef signed int int32;
+
+typedef char TYPCATEGORY;
 
 #define ERROR		20
 
@@ -160,10 +207,40 @@ typedef signed int int32;
 #define INT8OID			20
 #define INT4OID			23
 #define BOOLOID         16
+#define VOIDOID			2278
+#define RECORDOID		2249
+
+#define OidIsValid(objectId)  ((bool) ((objectId) != InvalidOid))
 
 #define rt_fetch(rangetable_index, rangetable) \
 	((duckdb_libpgquery::PGRangeTblEntry *) list_nth(rangetable, (rangetable_index)-1))
 
+/*
+ * macros
+ */
+#define  TYPTYPE_BASE		'b' /* base type (ordinary scalar type) */
+#define  TYPTYPE_COMPOSITE	'c' /* composite (e.g., table's rowtype) */
+#define  TYPTYPE_DOMAIN		'd' /* domain over another type */
+#define  TYPTYPE_ENUM		'e' /* enumerated type */
+#define  TYPTYPE_PSEUDO		'p' /* pseudo-type */
+#define  TYPTYPE_RANGE		'r' /* range type */
+
+#define  TYPCATEGORY_INVALID	'\0'	/* not an allowed category */
+#define  TYPCATEGORY_ARRAY		'A'
+#define  TYPCATEGORY_BOOLEAN	'B'
+#define  TYPCATEGORY_COMPOSITE	'C'
+#define  TYPCATEGORY_DATETIME	'D'
+#define  TYPCATEGORY_ENUM		'E'
+#define  TYPCATEGORY_GEOMETRIC	'G'
+#define  TYPCATEGORY_NETWORK	'I'		/* think INET */
+#define  TYPCATEGORY_NUMERIC	'N'
+#define  TYPCATEGORY_PSEUDOTYPE 'P'
+#define  TYPCATEGORY_RANGE		'R'
+#define  TYPCATEGORY_STRING		'S'
+#define  TYPCATEGORY_TIMESPAN	'T'
+#define  TYPCATEGORY_USER		'U'
+#define  TYPCATEGORY_BITSTRING	'V'		/* er ... "varbit"? */
+#define  TYPCATEGORY_UNKNOWN	'X'
 
 PGParseState *
 make_parsestate(PGParseState *parentParseState)

@@ -3,6 +3,7 @@
 #include <Interpreters/orcaopt/pgopt/parser_common.h>
 #include <Interpreters/orcaopt/pgopt/RelationParser.h>
 #include <Interpreters/orcaopt/pgopt/ExprParser.h>
+#include <Interpreters/orcaopt/pgopt/NodeParser.h>
 
 namespace DB
 {
@@ -12,6 +13,7 @@ class TargetParser
 private:
     RelationParser relation_parser;
     ExprParser expr_parser;
+    NodeParser node_parser;
 public:
 	explicit TargetParser();
 
@@ -33,6 +35,12 @@ public:
     duckdb_libpgquery::PGList *
     ExpandRowReference(PGParseState *pstate, duckdb_libpgquery::PGNode *expr,
 				   bool make_target_entry);
+
+    duckdb_libpgquery::PGList *
+    ExpandAllTables(PGParseState *pstate, int location);
+
+    TupleDesc
+    expandRecordVariable(PGParseState *pstate, duckdb_libpgquery::PGVar *var, int levelsup);
 
     void markTargetListOrigins(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist);
 

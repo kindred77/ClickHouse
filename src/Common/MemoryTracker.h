@@ -5,6 +5,10 @@
 #include <Common/CurrentMetrics.h>
 #include <Common/VariableContext.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wreserved-identifier"
+#endif
+
 #if !defined(NDEBUG)
 #define MEMORY_TRACKER_DEBUG_CHECKS
 #endif

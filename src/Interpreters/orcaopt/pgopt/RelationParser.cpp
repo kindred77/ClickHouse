@@ -219,7 +219,7 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 					functypclass = get_expr_result_type(rtfunc->funcexpr,
 														&funcrettype,
 														&tupdesc);
-					if (functypclass == TYPEFUNC_COMPOSITE)
+					if (functypclass == TypeFuncClass::TYPEFUNC_COMPOSITE)
 					{
 						/* Composite data type, e.g. a table's row type */
 						Assert(tupdesc);
@@ -228,7 +228,7 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 										rtindex, sublevels_up, location,
 										include_dropped, colnames, colvars);
 					}
-					else if (functypclass == TYPEFUNC_SCALAR)
+					else if (functypclass == TypeFuncClass::TYPEFUNC_SCALAR)
 					{
 						/* Base data type, i.e. scalar */
 						if (colnames)
@@ -249,7 +249,7 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 							*colvars = lappend(*colvars, varnode);
 						}
 					}
-					else if (functypclass == TYPEFUNC_RECORD)
+					else if (functypclass == TypeFuncClass::TYPEFUNC_RECORD)
 					{
 						if (colnames)
 						{
@@ -491,6 +491,112 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 	}
 };
 
+duckdb_libpgquery::PGRangeTblEntry *
+RelationParser::searchRangeTableForRel(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *relation)
+{
+	const char *refname = relation->relname;
+	Oid			relId = InvalidOid;
+	PGCommonTableExpr *cte = NULL;
+	Index		ctelevelsup = 0;
+	Index		levelsup;
+
+	/*
+	 * If it's an unqualified name, check for possible CTE matches. A CTE
+	 * hides any real relation matches.  If no CTE, look for a matching
+	 * relation.
+	 *
+	 * NB: It's not critical that RangeVarGetRelid return the correct answer
+	 * here in the face of concurrent DDL.  If it doesn't, the worst case
+	 * scenario is a less-clear error message.  Also, the tables involved in
+	 * the query are already locked, which reduces the number of cases in
+	 * which surprising behavior can occur.  So we do the name lookup
+	 * unlocked.
+	 */
+	if (!relation->schemaname)
+		cte = scanNameSpaceForCTE(pstate, refname, &ctelevelsup);
+	if (!cte)
+		relId = RangeVarGetRelid(relation, NoLock, true);
+
+	/* Now look for RTEs matching either the relation/CTE or the alias */
+	for (levelsup = 0;
+		 pstate != NULL;
+		 pstate = pstate->parentParseState, levelsup++)
+	{
+		ListCell   *l;
+
+		foreach(l, pstate->p_rtable)
+		{
+			PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(l);
+
+			if (rte->rtekind == PG_RTE_RELATION &&
+				OidIsValid(relId) &&
+				rte->relid == relId)
+				return rte;
+			if (rte->rtekind == PG_RTE_CTE &&
+				cte != NULL &&
+				rte->ctelevelsup + levelsup == ctelevelsup &&
+				strcmp(rte->ctename, refname) == 0)
+				return rte;
+
+			if (rte->eref != NULL &&
+                rte->eref->aliasname != NULL &&
+                strcmp(rte->eref->aliasname, refname) == 0)
+				return rte;
+		}
+	}
+	return NULL;
+};
+
+void
+RelationParser::errorMissingRTE(PGParseState *pstate, PGRangeVar *relation)
+{
+	PGRangeTblEntry *rte;
+	int			sublevels_up;
+	const char *badAlias = NULL;
+
+	/*
+	 * Check to see if there are any potential matches in the query's
+	 * rangetable.  (Note: cases involving a bad schema name in the RangeVar
+	 * will throw error immediately here.  That seems OK.)
+	 */
+	rte = searchRangeTableForRel(pstate, relation);
+
+	/*
+	 * If we found a match that has an alias and the alias is visible in the
+	 * namespace, then the problem is probably use of the relation's real name
+	 * instead of its alias, ie "SELECT foo.* FROM foo f". This mistake is
+	 * common enough to justify a specific hint.
+	 *
+	 * If we found a match that doesn't meet those criteria, assume the
+	 * problem is illegal use of a relation outside its scope, as in the
+	 * MySQL-ism "SELECT ... FROM a, b LEFT JOIN c ON (a.x = c.y)".
+	 */
+	if (rte && rte->alias &&
+		strcmp(rte->eref->aliasname, relation->relname) != 0 &&
+		refnameRangeTblEntry(pstate, NULL, rte->eref->aliasname,
+							 relation->location,
+							 &sublevels_up) == rte)
+		badAlias = rte->eref->aliasname;
+
+	if (rte)
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_TABLE),
+			errmsg("invalid reference to FROM-clause entry for table \"%s\"",
+				   relation->relname),
+				 (badAlias ?
+			errhint("Perhaps you meant to reference the table alias \"%s\".",
+					badAlias) :
+				  errhint("There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
+						  rte->eref->aliasname)),
+				 node_parser.parser_errposition(pstate, relation->location)));
+	else
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_TABLE),
+				 errmsg("missing FROM-clause entry for table \"%s\"",
+						relation->relname),
+				 node_parser.parser_errposition(pstate, relation->location)));
+};
+
 void
 RelationParser::checkNameSpaceConflicts(PGParseState *pstate, PGList *namespace1,
 						PGList *namespace2)
@@ -726,7 +832,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 															&funcrettype,
 															&tupdesc);
 
-						if (functypclass == TYPEFUNC_COMPOSITE)
+						if (functypclass == TypeFuncClass::TYPEFUNC_COMPOSITE)
 						{
 							/* Composite data type, e.g. a table's row type */
 							Form_pg_attribute att_tup;
@@ -750,14 +856,14 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 							*vartypmod = att_tup->atttypmod;
 							*varcollid = att_tup->attcollation;
 						}
-						else if (functypclass == TYPEFUNC_SCALAR)
+						else if (functypclass == TypeFuncClass::TYPEFUNC_SCALAR)
 						{
 							/* Base data type, i.e. scalar */
 							*vartype = funcrettype;
 							*vartypmod = -1;
 							*varcollid = exprCollation(rtfunc->funcexpr);
 						}
-						else if (functypclass == TYPEFUNC_RECORD)
+						else if (functypclass == TypeFuncClass::TYPEFUNC_RECORD)
 						{
 							*vartype = list_nth_oid(rtfunc->funccoltypes,
 													attnum - 1);
@@ -1699,16 +1805,16 @@ RelationParser::expandRelAttrs(PGParseState *pstate, PGRangeTblEntry *rte,
 	 * markVarForSelectPriv calls below, but not if the table has zero
 	 * columns.
 	 */
-	rte->requiredPerms |= ACL_SELECT;
+	//rte->requiredPerms |= ACL_SELECT;
 
 	forboth(name, names, var, vars)
 	{
 		char	   *label = strVal(lfirst(name));
 		PGVar		   *varnode = (PGVar *) lfirst(var);
-		TargetEntry *te;
+		PGTargetEntry *te;
 
 		te = makeTargetEntry((PGExpr *) varnode,
-							 (AttrNumber) pstate->p_next_resno++,
+							 (PGAttrNumber) pstate->p_next_resno++,
 							 label,
 							 false);
 		te_list = lappend(te_list, te);
