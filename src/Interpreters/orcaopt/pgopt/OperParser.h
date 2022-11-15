@@ -43,6 +43,12 @@ public:
 	
 	Oid
 	binary_oper_exact(duckdb_libpgquery::PGList *opname, Oid arg1, Oid arg2);
+
+	FuncDetailCode
+	oper_select_candidate(int nargs,
+					  Oid *input_typeids,
+					  FuncCandidateList candidates,
+					  Oid *operOid)		/* output argument */;
 };
 
 }

@@ -71,14 +71,14 @@ CoerceParser::can_coerce_type(int nargs, Oid *input_typeids, Oid *target_typeids
 		 * coerce (may need tighter checking here)
 		 */
 		if (inputTypeId == RECORDOID &&
-			ISCOMPLEX(targetTypeId))
+			type_parser.typeidTypeRelid(targetTypeId) != InvalidOid)
 			continue;
 
 		/*
 		 * If input is a composite type and target is RECORD, accept
 		 */
 		if (targetTypeId == RECORDOID &&
-			ISCOMPLEX(inputTypeId))
+			type_parser.typeidTypeRelid(inputTypeId) != InvalidOid)
 			continue;
 
 #ifdef NOT_USED					/* not implemented yet */
@@ -434,6 +434,39 @@ CoerceParser::coerce_unknown_var(PGParseState *pstate, PGVar *var,
     return var;
 };
 
+bool
+CoerceParser::is_complex_array(Oid typid)
+{
+	Oid			elemtype = get_element_type(typid);
+
+	return (OidIsValid(elemtype) && type_parser.typeidTypeRelid(elemtype) != InvalidOid);
+};
+
+bool
+CoerceParser::typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId)
+{
+	Oid			relid = type_parser.typeidTypeRelid(reltypeId);
+	bool		result = false;
+
+	if (relid)
+	{
+		HeapTuple	tp;
+		Form_pg_class reltup;
+
+		tp = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
+		if (!HeapTupleIsValid(tp))
+			elog(ERROR, "cache lookup failed for relation %u", relid);
+
+		reltup = (Form_pg_class) GETSTRUCT(tp);
+		if (reltup->reloftype == reloftypeId)
+			result = true;
+
+		ReleaseSysCache(tp);
+	}
+
+	return result;
+};
+
 PGNode *
 CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 			Oid inputTypeId, Oid targetTypeId, int32 targetTypeMod,
@@ -584,13 +617,13 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		else
 			inputTypeMod = -1;
 
-		targetType = typeidType(baseTypeId);
+		targetType = type_parser.typeidType(baseTypeId);
 
 		newcon->consttype = baseTypeId;
 		newcon->consttypmod = inputTypeMod;
-		newcon->constcollid = typeTypeCollation(targetType);
-		newcon->constlen = typeLen(targetType);
-		newcon->constbyval = typeByVal(targetType);
+		newcon->constcollid = type_parser.typeTypeCollation(targetType);
+		newcon->constlen = type_parser.typeLen(targetType);
+		newcon->constbyval = type_parser.typeByVal(targetType);
 		newcon->constisnull = con->constisnull;
 
 		/*
@@ -815,14 +848,14 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		return result;
 	}
 	if (inputTypeId == RECORDOID &&
-		ISCOMPLEX(targetTypeId))
+		type_parser.typeidTypeRelid(targetTypeId) != InvalidOid)
 	{
 		/* Coerce a RECORD to a specific complex type */
 		return coerce_record_to_complex(pstate, node, targetTypeId,
 										ccontext, cformat, location);
 	}
 	if (targetTypeId == RECORDOID &&
-		ISCOMPLEX(inputTypeId))
+		type_parser.typeidTypeRelid(inputTypeId) != InvalidOid)
 	{
 		/* Coerce a specific complex type to RECORD */
 		/* NB: we do NOT want a RelabelType here */
@@ -865,6 +898,135 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 	throw Exception(ERROR, "failed to find conversion function from {} to {}",
 			format_type_be(inputTypeId), format_type_be(targetTypeId));
 	return NULL;				/* keep compiler quiet */
+};
+
+int
+CoerceParser::parser_coercion_errposition(PGParseState *pstate,
+							int coerce_location,
+							PGNode *input_expr)
+{
+	if (coerce_location >= 0)
+		return node_parser.parser_errposition(pstate, coerce_location);
+	else
+		return node_parser.parser_errposition(pstate, exprLocation(input_expr));
+};
+
+PGNode *
+CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
+						 Oid targetTypeId,
+						 PGCoercionContext ccontext,
+						 PGCoercionForm cformat,
+						 int location)
+{
+	PGRowExpr    *rowexpr;
+	TupleDesc	tupdesc;
+	PGList	   *args = NIL;
+	PGList	   *newargs;
+	int			i;
+	int			ucolno;
+	PGListCell   *arg;
+
+	if (node && IsA(node, PGRowExpr))
+	{
+		/*
+		 * Since the RowExpr must be of type RECORD, we needn't worry about it
+		 * containing any dropped columns.
+		 */
+		args = ((PGRowExpr *) node)->args;
+	}
+	else if (node && IsA(node, PGVar) &&
+			 ((PGVar *) node)->varattno == InvalidAttrNumber)
+	{
+		int			rtindex = ((PGVar *) node)->varno;
+		int			sublevels_up = ((PGVar *) node)->varlevelsup;
+		int			vlocation = ((PGVar *) node)->location;
+		PGRangeTblEntry *rte;
+
+		rte = relation_parser.GetRTEByRangeTablePosn(pstate, rtindex, sublevels_up);
+		relation_parser.expandRTE(rte, rtindex, sublevels_up, vlocation, false,
+				  NULL, &args);
+	}
+	else
+		ereport(ERROR,
+				(errcode(ERRCODE_CANNOT_COERCE),
+				 errmsg("cannot cast type %s to %s",
+						format_type_be(RECORDOID),
+						format_type_be(targetTypeId)),
+				 parser_coercion_errposition(pstate, location, node)));
+
+	tupdesc = lookup_rowtype_tupdesc(targetTypeId, -1);
+	newargs = NIL;
+	ucolno = 1;
+	arg = list_head(args);
+	for (i = 0; i < tupdesc->natts; i++)
+	{
+		PGNode	   *expr;
+		PGNode	   *cexpr;
+		Oid			exprtype;
+
+		/* Fill in NULLs for dropped columns in rowtype */
+		if (tupdesc->attrs[i]->attisdropped)
+		{
+			/*
+			 * can't use atttypid here, but it doesn't really matter what type
+			 * the Const claims to be.
+			 */
+			newargs = lappend(newargs,
+							  makeNullConst(INT4OID, -1, InvalidOid));
+			continue;
+		}
+
+		if (arg == NULL)
+			ereport(ERROR,
+					(errcode(ERRCODE_CANNOT_COERCE),
+					 errmsg("cannot cast type %s to %s",
+							format_type_be(RECORDOID),
+							format_type_be(targetTypeId)),
+					 errdetail("Input has too few columns."),
+					 parser_coercion_errposition(pstate, location, node)));
+		expr = (PGNode *) lfirst(arg);
+		exprtype = exprType(expr);
+
+		cexpr = coerce_to_target_type(pstate,
+									  expr, exprtype,
+									  tupdesc->attrs[i]->atttypid,
+									  tupdesc->attrs[i]->atttypmod,
+									  ccontext,
+									  PG_COERCE_IMPLICIT_CAST,
+									  -1);
+		if (cexpr == NULL)
+			ereport(ERROR,
+					(errcode(ERRCODE_CANNOT_COERCE),
+					 errmsg("cannot cast type %s to %s",
+							format_type_be(RECORDOID),
+							format_type_be(targetTypeId)),
+					 errdetail("Cannot cast type %s to %s in column %d.",
+							   format_type_be(exprtype),
+							   format_type_be(tupdesc->attrs[i]->atttypid),
+							   ucolno),
+					 parser_coercion_errposition(pstate, location, expr)));
+		newargs = lappend(newargs, cexpr);
+		ucolno++;
+		arg = lnext(arg);
+	}
+	if (arg != NULL)
+		ereport(ERROR,
+				(errcode(ERRCODE_CANNOT_COERCE),
+				 errmsg("cannot cast type %s to %s",
+						format_type_be(RECORDOID),
+						format_type_be(targetTypeId)),
+				 errdetail("Input has too many columns."),
+				 parser_coercion_errposition(pstate, location, node)));
+
+	ReleaseTupleDesc(tupdesc);
+
+	rowexpr = makeNode(PGRowExpr);
+	rowexpr->args = newargs;
+	rowexpr->row_typeid = targetTypeId;
+	rowexpr->row_format = cformat;
+	rowexpr->colnames = NIL;	/* not needed for named target type */
+	rowexpr->location = location;
+	return (PGNode *) rowexpr;
 };
 
 PGNode *
@@ -1052,7 +1214,7 @@ CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
 							constructName,
 							format_type_be(targetTypeId),
 							format_type_be(inputTypeId)),
-					 parser_errposition(pstate, exprLocation(node))));
+					 node_parser.parser_errposition(pstate, exprLocation(node))));
 		node = newnode;
 	}
 
@@ -1062,7 +1224,7 @@ CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
 		/* translator: %s is name of a SQL construct, eg LIMIT */
 				 errmsg("argument of %s must not return a set",
 						constructName),
-				 parser_errposition(pstate, exprLocation(node))));
+				 node_parser.parser_errposition(pstate, exprLocation(node))));
 
 	return node;
 };
@@ -1425,8 +1587,32 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 						context,
 						format_type_be(inputTypeId),
 						format_type_be(targetTypeId)),
-				 parser_errposition(pstate, exprLocation(node))));
+				 node_parser.parser_errposition(pstate, exprLocation(node))));
 	return node;
+};
+
+TYPCATEGORY
+CoerceParser::TypeCategory(Oid type)
+{
+	char		typcategory;
+	bool		typispreferred;
+
+	get_type_category_preferred(type, &typcategory, &typispreferred);
+	Assert(typcategory != TYPCATEGORY_INVALID);
+	return (TYPCATEGORY) typcategory;
+};
+
+bool
+CoerceParser::IsPreferredType(TYPCATEGORY category, Oid type)
+{
+	char		typcategory;
+	bool		typispreferred;
+
+	get_type_category_preferred(type, &typcategory, &typispreferred);
+	if (category == typcategory || category == TYPCATEGORY_INVALID)
+		return typispreferred;
+	else
+		return false;
 };
 
 }

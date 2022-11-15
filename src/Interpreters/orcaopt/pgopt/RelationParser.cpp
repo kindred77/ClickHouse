@@ -786,7 +786,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 					ereport(ERROR,
 							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					errmsg("column \"%s\" of relation \"%s\" does not exist",
-						   NameStr(att_tup->attname),
+						   att_tup->attname.data,
 						   get_rel_name(rte->relid))));
 				*vartype = att_tup->atttypid;
 				*vartypmod = att_tup->atttypmod;

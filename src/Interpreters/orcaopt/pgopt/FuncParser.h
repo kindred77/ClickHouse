@@ -7,6 +7,7 @@
 #include <Interpreters/orcaopt/pgopt/NodeParser.h>
 #include <Interpreters/orcaopt/pgopt/TypeParser.h>
 #include <Interpreters/orcaopt/pgopt/RelationParser.h>
+#include <Interpreters/orcaopt/pgopt/TargetParser.h>
 
 namespace DB
 {
@@ -20,6 +21,7 @@ private:
     NodeParser node_parser;
     TypeParser type_parser;
     RelationParser relation_parser;
+	TargetParser target_parser;
 public:
 	explicit FuncParser();
 

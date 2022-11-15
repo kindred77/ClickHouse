@@ -24,6 +24,18 @@ public:
     int32
     typenameTypeMod(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, Type typ);
 
+    Type
+    typeidType(Oid id);
+
+    Oid
+    typeTypeCollation(Type typ);
+
+    int16
+    typeLen(Type t);
+
+    bool
+    typeByVal(Type t);
+
     Oid
     LookupCollation(PGParseState *pstate, duckdb_libpgquery::PGList *collnames, int location);
 

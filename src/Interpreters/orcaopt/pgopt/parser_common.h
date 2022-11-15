@@ -145,13 +145,13 @@ enum class InhOption
 	INH_DEFAULT					/* Use current SQL_inheritance option */
 };
 
-enum class TypeFuncClass
+typedef enum
 {
 	TYPEFUNC_SCALAR,			/* scalar result type */
 	TYPEFUNC_COMPOSITE,			/* determinable rowtype result */
 	TYPEFUNC_RECORD,			/* indeterminate rowtype result */
 	TYPEFUNC_OTHER				/* bogus type, eg pseudotype */
-};
+} TypeFuncClass;
 
 /* Result codes for func_get_detail */
 enum class FuncDetailCode
@@ -191,7 +191,9 @@ typedef enum
 
 bool		SQL_inheritance = true;
 
+typedef signed short int16;
 typedef signed int int32;
+typedef long int int64;
 
 typedef char TYPCATEGORY;
 
@@ -204,11 +206,25 @@ typedef char TYPCATEGORY;
 //#define InvalidOid		((Oid) 0)
 #define UNKNOWNOID		705
 #define TEXTOID			25
+#define OIDOID			26
 #define INT8OID			20
+#define INT2VECTOROID	22
 #define INT4OID			23
 #define BOOLOID         16
+#define OIDVECTOROID	30
 #define VOIDOID			2278
 #define RECORDOID		2249
+#define NUMERICOID		1700
+#define INTERVALOID		1186
+#define CSTRINGOID		2275
+#define RECORDARRAYOID	2287
+#define BITOID	 1560
+#define ANYOID			2276
+#define ANYARRAYOID		2277
+#define ANYELEMENTOID	2283
+#define ANYNONARRAYOID	2776
+#define ANYENUMOID		3500
+#define ANYRANGEOID		3831
 
 #define OidIsValid(objectId)  ((bool) ((objectId) != InvalidOid))
 
@@ -241,6 +257,49 @@ typedef char TYPCATEGORY;
 #define  TYPCATEGORY_USER		'U'
 #define  TYPCATEGORY_BITSTRING	'V'		/* er ... "varbit"? */
 #define  TYPCATEGORY_UNKNOWN	'X'
+
+/* Get a bit mask of the bits set in non-long aligned addresses */
+#define LONG_ALIGN_MASK (sizeof(long) - 1)
+#define MEMSET_LOOP_LIMIT 1024
+/*
+ * MemSet
+ *	Exactly the same as standard library function memset(), but considerably
+ *	faster for zeroing small word-aligned structures (such as parsetree nodes).
+ *	This has to be a macro because the main point is to avoid function-call
+ *	overhead.   However, we have also found that the loop is faster than
+ *	native libc memset() on some platforms, even those with assembler
+ *	memset() functions.  More research needs to be done, perhaps with
+ *	MEMSET_LOOP_LIMIT tests in configure.
+ */
+#define MemSet(start, val, len) \
+	do \
+	{ \
+		/* must be void* because we don't know if it is integer aligned yet */ \
+		void   *_vstart = (void *) (start); \
+		int		_val = (val); \
+		size_t	_len = (len); \
+\
+		if ((((uintptr_t) _vstart) & LONG_ALIGN_MASK) == 0 && \
+			(_len & LONG_ALIGN_MASK) == 0 && \
+			_val == 0 && \
+			_len <= MEMSET_LOOP_LIMIT && \
+			/* \
+			 *	If MEMSET_LOOP_LIMIT == 0, optimizer should find \
+			 *	the whole "if" false at compile time. \
+			 */ \
+			MEMSET_LOOP_LIMIT != 0) \
+		{ \
+			long *_start = (long *) _vstart; \
+			long *_stop = (long *) ((char *) _start + _len); \
+			while (_start < _stop) \
+				*_start++ = 0; \
+		} \
+		else \
+			memset(_vstart, _val, _len); \
+	} while (0)
+
+#define TypeSupportsDescribe(typid)  \
+	((typid) == RECORDOID)
 
 PGParseState *
 make_parsestate(PGParseState *parentParseState)

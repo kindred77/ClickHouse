@@ -5,6 +5,8 @@
 #include <Interpreters/orcaopt/pgopt/RelationParser.h>
 #include <Interpreters/orcaopt/pgopt/SelectParser.h>
 #include <Interpreters/orcaopt/pgopt/ExprParser.h>
+#include <Interpreters/orcaopt/pgopt/NodeParser.h>
+#include <Interpreters/orcaopt/pgopt/TypeParser.h>
 
 namespace DB
 {
@@ -42,6 +44,8 @@ class CoerceParser
 {
 private:
 	RelationParser relation_parser;
+	NodeParser node_parser;
+	TypeParser type_parser;
 public:
 	explicit CoerceParser();
 
@@ -122,6 +126,30 @@ public:
 
 	void
 	get_type_category_preferred(Oid typid, char *typcategory, bool *typispreferred);
+
+	TYPCATEGORY
+	TypeCategory(Oid type);
+
+	bool
+	IsPreferredType(TYPCATEGORY category, Oid type);
+
+	duckdb_libpgquery::PGNode *
+	coerce_record_to_complex(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+						 Oid targetTypeId,
+						 duckdb_libpgquery::PGCoercionContext ccontext,
+						 duckdb_libpgquery::PGCoercionForm cformat,
+						 int location);
+	
+	int
+	parser_coercion_errposition(PGParseState *pstate,
+							int coerce_location,
+							duckdb_libpgquery::PGNode *input_expr);
+	
+	bool
+	is_complex_array(Oid typid);
+
+	bool
+	typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId);
 
 };
 

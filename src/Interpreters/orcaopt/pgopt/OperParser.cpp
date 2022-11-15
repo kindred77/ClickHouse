@@ -99,6 +99,49 @@ OperParser::binary_oper_exact(PGList *opname, Oid arg1, Oid arg2)
 	return InvalidOid;
 };
 
+FuncDetailCode
+OperParser::oper_select_candidate(int nargs,
+					  Oid *input_typeids,
+					  FuncCandidateList candidates,
+					  Oid *operOid)
+{
+	int			ncandidates;
+
+	/*
+	 * Delete any candidates that cannot actually accept the given input
+	 * types, whether directly or by coercion.
+	 */
+	ncandidates = func_parser.func_match_argtypes(nargs, input_typeids,
+									  candidates, &candidates);
+
+	/* Done if no candidate or only one candidate survives */
+	if (ncandidates == 0)
+	{
+		*operOid = InvalidOid;
+		return FuncDetailCode::FUNCDETAIL_NOTFOUND;
+	}
+	if (ncandidates == 1)
+	{
+		*operOid = candidates->oid;
+		return FuncDetailCode::FUNCDETAIL_NORMAL;
+	}
+
+	/*
+	 * Use the same heuristics as for ambiguous functions to resolve the
+	 * conflict.
+	 */
+	candidates = func_parser.func_select_candidate(nargs, input_typeids, candidates);
+
+	if (candidates)
+	{
+		*operOid = candidates->oid;
+		return FuncDetailCode::FUNCDETAIL_NORMAL;
+	}
+
+	*operOid = InvalidOid;
+	return FuncDetailCode::FUNCDETAIL_MULTIPLE; /* failed to select a best candidate */
+};
+
 HeapTuple
 OperParser::oper(PGParseState *pstate, PGList *opname, Oid ltypeId, Oid rtypeId,
 		bool noError, int location)
@@ -344,7 +387,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				   errmsg("op ANY/ALL (array) requires array on right side"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 
 	/* Now resolve the operator */
@@ -360,7 +403,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 											opform->oprkind,
 											opform->oprleft,
 											opform->oprright)),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	args = list_make2(ltree, rtree);
 	actual_arg_types[0] = ltypeId;

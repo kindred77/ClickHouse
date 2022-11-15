@@ -410,7 +410,7 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
 	 * lookup_rowtype_tupdesc() which will probably fail, but will give an
 	 * appropriate error message while failing.
 	 */
-	if (get_expr_result_type(expr, NULL, &tupleDesc) != TYPEFUNC_COMPOSITE)
+	if (get_expr_result_type(expr, NULL, &tupleDesc) != TypeFuncClass::TYPEFUNC_COMPOSITE)
 		tupleDesc = lookup_rowtype_tupdesc_copy(exprType(expr),
 												exprTypmod(expr));
 
@@ -464,7 +464,7 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 	if (IsA(expr, PGVar) &&
 		((PGVar *) expr)->vartype == RECORDOID)
 		tupleDesc = expandRecordVariable(pstate, (PGVar *) expr, 0);
-	else if (get_expr_result_type(expr, NULL, &tupleDesc) != TYPEFUNC_COMPOSITE)
+	else if (get_expr_result_type(expr, NULL, &tupleDesc) != TypeFuncClass::TYPEFUNC_COMPOSITE)
 		tupleDesc = lookup_rowtype_tupdesc_copy(exprType(expr),
 												exprTypmod(expr));
 	Assert(tupleDesc);
@@ -494,7 +494,7 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 
 			te = makeTargetEntry((PGExpr *) fselect,
 								 (PGAttrNumber) pstate->p_next_resno++,
-								 pstrdup(NameStr(att->attname)),
+								 pstrdup(att->attname.data),
 								 false);
 			result = lappend(result, te);
 		}

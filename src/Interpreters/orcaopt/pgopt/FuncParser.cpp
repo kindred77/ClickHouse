@@ -42,8 +42,8 @@ FuncParser::ParseComplexProjection(PGParseState *pstate, char *funcname, PGNode 
 	 */
 	if (IsA(first_arg, PGVar) &&
 		((PGVar *) first_arg)->vartype == RECORDOID)
-		tupdesc = expandRecordVariable(pstate, (PGVar *) first_arg, 0);
-	else if (get_expr_result_type(first_arg, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
+		tupdesc = target_parser.expandRecordVariable(pstate, (PGVar *) first_arg, 0);
+	else if (get_expr_result_type(first_arg, NULL, &tupdesc) != TypeFuncClass::TYPEFUNC_COMPOSITE)
 		return NULL;			/* unresolvable RECORD type */
 	Assert(tupdesc);
 
@@ -218,7 +218,7 @@ FuncParser::func_get_detail(PGList *funcname,
 			if (OidIsValid(targetType))
 			{
 				Oid			sourceType = argtypes[0];
-				PGNode	   *arg1 = linitial(fargs);
+				PGNode	   *arg1 = (PGNode *)linitial(fargs);
 				bool		iscoercion;
 
 				if (sourceType == UNKNOWNOID && IsA(arg1, PGConst))
@@ -241,8 +241,8 @@ FuncParser::func_get_detail(PGList *funcname,
 							break;
 						case CoercionPathType::COERCION_PATH_COERCEVIAIO:
 							if ((sourceType == RECORDOID ||
-								 ISCOMPLEX(sourceType)) &&
-							  TypeCategory(targetType) == TYPCATEGORY_STRING)
+								 type_parser.typeidTypeRelid(sourceType) != InvalidOid) &&
+							  coerce_parser.TypeCategory(targetType) == TYPCATEGORY_STRING)
 								iscoercion = false;
 							else
 								iscoercion = true;
@@ -342,9 +342,9 @@ FuncParser::func_get_detail(PGList *funcname,
 
 			foreach(lc, fargs)
 			{
-				NamedArgExpr *na = (NamedArgExpr *) lfirst(lc);
+				PGNamedArgExpr *na = (PGNamedArgExpr *) lfirst(lc);
 
-				if (IsA(na, NamedArgExpr))
+				if (IsA(na, PGNamedArgExpr))
 					na->argnumber = best_candidate->argnumbers[i];
 				i++;
 			}
@@ -391,9 +391,9 @@ FuncParser::func_get_detail(PGList *funcname,
 				 * the needed items.  (This assumes that defaulted arguments
 				 * should be supplied in their positional order.)
 				 */
-				Bitmapset  *defargnumbers;
+				PGBitmapset  *defargnumbers;
 				int		   *firstdefarg;
-				List	   *newdefaults;
+				PGList	   *newdefaults;
 				ListCell   *lc;
 				int			i;
 
@@ -1300,7 +1300,7 @@ FuncParser::func_select_candidate(int nargs,
 	 * conversions to preferred types.)  Keep all candidates if none match.
 	 */
 	for (i = 0; i < nargs; i++) /* avoid multiple lookups */
-		slot_category[i] = TypeCategory(input_base_typeids[i]);
+		slot_category[i] = coerce_parser.TypeCategory(input_base_typeids[i]);
 	ncandidates = 0;
 	nbestMatch = 0;
 	last_candidate = NULL;
@@ -1315,7 +1315,7 @@ FuncParser::func_select_candidate(int nargs,
 			if (input_base_typeids[i] != UNKNOWNOID)
 			{
 				if (current_typeids[i] == input_base_typeids[i] ||
-					IsPreferredType(slot_category[i], current_typeids[i]))
+					coerce_parser.IsPreferredType(slot_category[i], current_typeids[i]))
 					nmatch++;
 			}
 		}

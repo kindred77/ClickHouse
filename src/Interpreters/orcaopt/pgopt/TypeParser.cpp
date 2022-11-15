@@ -130,6 +130,44 @@ TypeParser::typeidTypeRelid(Oid type_id)
 };
 
 Oid
+TypeParser::typeTypeCollation(Type typ)
+{
+	Form_pg_type typtup;
+
+	typtup = (Form_pg_type) GETSTRUCT(typ);
+	return typtup->typcollation;
+};
+
+int16
+TypeParser::typeLen(Type t)
+{
+	Form_pg_type typ;
+
+	typ = (Form_pg_type) GETSTRUCT(t);
+	return typ->typlen;
+};
+
+bool
+TypeParser::typeByVal(Type t)
+{
+	Form_pg_type typ;
+
+	typ = (Form_pg_type) GETSTRUCT(t);
+	return typ->typbyval;
+};
+
+Type
+TypeParser::typeidType(Oid id)
+{
+	HeapTuple	tup;
+
+	tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(id));
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "cache lookup failed for type %u", id);
+	return (Type) tup;
+};
+
+Oid
 TypeParser::LookupCollation(PGParseState *pstate, PGList *collnames, int location)
 {
 	Oid			colloid;

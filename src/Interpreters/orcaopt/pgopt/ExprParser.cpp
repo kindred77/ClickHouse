@@ -2062,8 +2062,8 @@ PGNode *
 ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 					   PGList *largs, PGList *rargs, int location)
 {
-	RowCompareExpr *rcexpr;
-	RowCompareType rctype;
+	PGRowCompareExpr *rcexpr;
+	PGRowCompareType rctype;
 	PGList	   *opexprs;
 	PGList	   *opnos;
 	PGList	   *opfamilies;
@@ -2077,7 +2077,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 	nopers = list_length(largs);
 	if (nopers != list_length(rargs))
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("unequal number of entries in row expressions"),
 				 node_parser.parser_errposition(pstate, location)));
 
@@ -2087,7 +2087,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 	 */
 	if (nopers == 0)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot compare rows of zero length"),
 				 node_parser.parser_errposition(pstate, location)));
 
@@ -2178,7 +2178,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 	{
 		/* No common interpretation, so fail */
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("could not determine interpretation of row comparison operator %s",
 						strVal(llast(opname))),
 				 errhint("Row comparison operators must be associated with btree operator families."),
@@ -2223,7 +2223,7 @@ ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
 			opfamilies = lappend_oid(opfamilies, opfamily);
 		else	/* should not happen */
 			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("could not determine interpretation of row comparison operator %s",
 							strVal(llast(opname))),
 			   errdetail("There are multiple equally-plausible candidates."),
@@ -2272,7 +2272,7 @@ ExprParser::make_row_distinct_op(PGParseState *pstate, PGList *opname,
 
 	if (list_length(largs) != list_length(rargs))
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("unequal number of entries in row expressions"),
 				 node_parser.parser_errposition(pstate, location)));
 
