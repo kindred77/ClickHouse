@@ -17,6 +17,8 @@ public:
 
     int
     parser_errposition(PGParseState *pstate, int location);
+
+    Oid transformArrayType(Oid *arrayType, int32 *arrayTypmod);
 };
 
 }

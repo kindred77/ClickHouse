@@ -1828,4 +1828,81 @@ RelationParser::expandRelAttrs(PGParseState *pstate, PGRangeTblEntry *rte,
 	return te_list;
 };
 
+bool
+RelationParser::isSimplyUpdatableRelation(Oid relid, bool noerror)
+{
+	PGRelation rel;
+	bool return_value = true;
+
+	if (!OidIsValid(relid))
+	{
+		if (!noerror)
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					 errmsg("Invalid oid: %d is not simply updatable", relid)));
+		return false;
+	}
+
+	rel = relation_open(relid, AccessShareLock);
+
+	do
+	{
+		/*
+		 * This should match the error message in rewriteManip.c,
+		 * so that you get the same error as in PostgreSQL.
+		 */
+		if (rel->rd_rel->relkind == RELKIND_VIEW)
+		{
+			if (!noerror)
+				ereport(ERROR,
+						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("WHERE CURRENT OF on a view is not implemented")));
+			return_value = false;
+			break;
+		}
+
+		if (rel->rd_rel->relkind != RELKIND_RELATION)
+		{
+			if (!noerror)
+				ereport(ERROR,
+						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("\"%s\" is not simply updatable",
+								RelationGetRelationName(rel))));
+			return_value = false;
+			break;
+		}
+
+		if (rel->rd_rel->relstorage != RELSTORAGE_HEAP)
+		{
+			if (!noerror)
+				ereport(ERROR,
+						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("\"%s\" is not simply updatable",
+								RelationGetRelationName(rel))));
+			return_value = false;
+			break;
+		}
+
+		/*
+		 * A row in replicated table cannot be identified by (ctid + gp_segment_id)
+		 * in all replicas, for each row replica, the gp_segment_id is different,
+		 * the ctid is also not guaranteed to be the same, so it's not simply
+		 * updateable for CURRENT OF.
+		 */
+		if (GpPolicyIsReplicated(rel->rd_cdbpolicy))
+		{
+			if (!noerror)
+				ereport(ERROR,
+						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("\"%s\" is not simply updatable",
+								RelationGetRelationName(rel))));
+			return_value = false;
+			break;
+		}
+	} while (0);
+
+	relation_close(rel, NoLock);
+	return return_value;
+};
+
 }

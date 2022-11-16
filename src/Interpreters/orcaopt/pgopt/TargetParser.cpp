@@ -83,7 +83,7 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 	 */
 	if (!found_table)
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT * with no tables specified is not valid"),
 				 node_parser.parser_errposition(pstate, location)));
 

@@ -1030,7 +1030,7 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 				 errmsg("cannot cast type %s to %s",
 						format_type_be(inputType),
 						format_type_be(targetType)),
-				 parser_coercion_errposition(pstate, location, expr)));
+				 coerce_parser.parser_coercion_errposition(pstate, location, expr)));
 
 	return result;
 };
@@ -1643,6 +1643,26 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 	return result;
 };
 
+bool
+ExprParser::isWhenIsNotDistinctFromExpr(PGNode *warg)
+{
+	if (IsA(warg, PGAExpr))
+	{
+		PGAExpr *top = (PGAExpr *) warg;
+		// if (top->kind == AEXPR_NOT && IsA(top->rexpr, PGAExpr))
+		// {
+		// 	PGAExpr *expr = (PGAExpr *) top->rexpr;
+		// 	if (expr->kind == PG_AEXPR_DISTINCT && expr->lexpr == NULL)
+		// 		return true;
+		// }
+		if (top->kind == PG_AEXPR_NOT_DISTINCT)
+		{
+			return true;
+		}
+	}
+	return false;
+};
+
 duckdb_libpgquery::PGNode *
 ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 {
@@ -1889,7 +1909,7 @@ ExprParser::transformArraySubscripts(PGParseState *pstate,
 	 * by transformArrayType, ie, smash domain to base type.
 	 */
 	if (elementType == InvalidOid)
-		elementType = transformArrayType(&arrayType, &arrayTypMod);
+		elementType = node_parser.transformArrayType(&arrayType, &arrayTypMod);
 
 	/*
 	 * A list containing only single subscripts refers to a single array
@@ -2008,54 +2028,6 @@ ExprParser::transformArraySubscripts(PGParseState *pstate,
 	aref->refassgnexpr = (PGExpr *) assignFrom;
 
 	return aref;
-};
-
-Oid ExprParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
-{
-	Oid			origArrayType = *arrayType;
-	Oid			elementType;
-	HeapTuple	type_tuple_array;
-	Form_pg_type type_struct_array;
-
-	/*
-	 * If the input is a domain, smash to base type, and extract the actual
-	 * typmod to be applied to the base type.  Subscripting a domain is an
-	 * operation that necessarily works on the base array type, not the domain
-	 * itself.  (Note that we provide no method whereby the creator of a
-	 * domain over an array type could hide its ability to be subscripted.)
-	 */
-	*arrayType = getBaseTypeAndTypmod(*arrayType, arrayTypmod);
-
-	/*
-	 * We treat int2vector and oidvector as though they were domains over
-	 * int2[] and oid[].  This is needed because array slicing could create an
-	 * array that doesn't satisfy the dimensionality constraints of the
-	 * xxxvector type; so we want the result of a slice operation to be
-	 * considered to be of the more general type.
-	 */
-	if (*arrayType == INT2VECTOROID)
-		*arrayType = INT2ARRAYOID;
-	else if (*arrayType == OIDVECTOROID)
-		*arrayType = OIDARRAYOID;
-
-	/* Get the type tuple for the array */
-	type_tuple_array = SearchSysCache1(TYPEOID, ObjectIdGetDatum(*arrayType));
-	if (!HeapTupleIsValid(type_tuple_array))
-		elog(ERROR, "cache lookup failed for type %u", *arrayType);
-	type_struct_array = (Form_pg_type) GETSTRUCT(type_tuple_array);
-
-	/* needn't check typisdefined since this will fail anyway */
-
-	elementType = type_struct_array->typelem;
-	if (elementType == InvalidOid)
-		ereport(ERROR,
-				(errcode(PG_ERRCODE_SYNTAX_ERROR),
-				 errmsg("cannot subscript type %s because it is not an array",
-						format_type_be(origArrayType))));
-
-	ReleaseSysCache(type_tuple_array);
-
-	return elementType;
 };
 
 PGNode *
@@ -2448,7 +2420,7 @@ ExprParser::transformCurrentOfExpr(PGParseState *pstate, PGCurrentOfExpr *cexpr)
 	 * rewriting/planning against views, for example.
 	 */
 	Assert(pstate->p_target_rangetblentry != NULL);
-	(void) isSimplyUpdatableRelation(pstate->p_target_rangetblentry->relid, false);
+	(void) relation_parser.isSimplyUpdatableRelation(pstate->p_target_rangetblentry->relid, false);
 
 	/* CURRENT OF can only appear at top level of UPDATE/DELETE */
 	Assert(pstate->p_target_rangetblentry != NULL);

@@ -6,6 +6,7 @@
 #include <Interpreters/orcaopt/pgopt/ExprParser.h>
 #include <Interpreters/orcaopt/pgopt/CollationParser.h>
 #include <Interpreters/orcaopt/pgopt/OperParser.h>
+#include <Interpreters/orcaopt/pgopt/NodeParser.h>
 //#include <Interpreters/orcaopt/pgopt/ScalarOperatorProvider.h>
 
 
@@ -22,6 +23,7 @@ private:
     TargetParser target_parser;
     CollationParser collation_parser;
     OperParser oper_parser;
+    NodeParser node_parser;
     std::shared_ptr<ScalarOperatorProvider> scalar_operator_provider = nullptr;
 public:
 	explicit ClauseParser();
@@ -94,8 +96,26 @@ public:
 
     Index assignSortGroupRef(duckdb_libpgquery::PGTargetEntry *tle, duckdb_libpgquery::PGList *tlist);
 
+    Index
+    transformGroupClauseExpr(duckdb_libpgquery::PGList **flatresult, duckdb_libpgquery::PGBitmapset *seen_local,
+						 PGParseState *pstate, duckdb_libpgquery::PGNode *gexpr,
+						 duckdb_libpgquery::PGList **targetlist, duckdb_libpgquery::PGList *sortClause,
+						 PGParseExprKind exprKind, bool useSQL99, bool toplevel);
+
     duckdb_libpgquery::PGList *
-    transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGList *grouplist,
+    transformGroupClauseList(duckdb_libpgquery::PGList **flatresult,
+						 PGParseState *pstate, duckdb_libpgquery::PGList *list,
+						 duckdb_libpgquery::PGList **targetlist, duckdb_libpgquery::PGList *sortClause,
+						 PGParseExprKind exprKind, bool useSQL99, bool toplevel);
+
+    duckdb_libpgquery::PGNode *
+    transformGroupingSet(duckdb_libpgquery::PGList **flatresult,
+					 PGParseState *pstate, duckdb_libpgquery::PGGroupingSet *gset,
+					 duckdb_libpgquery::PGList **targetlist, duckdb_libpgquery::PGList *sortClause,
+					 PGParseExprKind exprKind, bool useSQL99, bool toplevel);
+
+    duckdb_libpgquery::PGList *
+    transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGList *grouplist, duckdb_libpgquery::PGList **groupingSets,
 					 duckdb_libpgquery::PGList **targetlist, duckdb_libpgquery::PGList *sortClause,
 					 PGParseExprKind exprKind, bool useSQL99);
     
@@ -136,8 +156,7 @@ public:
 
     duckdb_libpgquery::PGList *
     addTargetToGroupList(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
-					 duckdb_libpgquery::PGList *grouplist, duckdb_libpgquery::PGList *targetlist, int location,
-					 bool resolveUnknown);
+					 duckdb_libpgquery::PGList *grouplist, duckdb_libpgquery::PGList *targetlist, int location);
     
     duckdb_libpgquery::PGList *
     transformDistinctOnClause(PGParseState *pstate, duckdb_libpgquery::PGList *distinctlist,
@@ -172,6 +191,9 @@ public:
 
     duckdb_libpgquery::PGTargetEntry *
     getTargetBySortGroupRef(Index ref, duckdb_libpgquery::PGList *tl);
+
+    duckdb_libpgquery::PGNode *
+    flatten_grouping_sets(duckdb_libpgquery::PGNode *expr, bool toplevel, bool *hasGroupingSets);
 };
 
 }

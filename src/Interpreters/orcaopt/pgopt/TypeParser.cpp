@@ -211,7 +211,7 @@ TypeParser::LookupTypeNameExtended(PGParseState *pstate,
 		{
 			case 1:
 				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				errmsg("improper %%TYPE reference (too few dotted names): %s",
 					   NameListToString(typeName->names)),
 						 node_parser.parser_errposition(pstate, typeName->location)));
@@ -233,7 +233,7 @@ TypeParser::LookupTypeNameExtended(PGParseState *pstate,
 				break;
 			default:
 				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too many dotted names): %s",
 								NameListToString(typeName->names)),
 						 node_parser.parser_errposition(pstate, typeName->location)));

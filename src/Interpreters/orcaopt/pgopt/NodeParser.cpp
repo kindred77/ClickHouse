@@ -140,4 +140,52 @@ NodeParser::parser_errposition(PGParseState *pstate, int location)
 	return errposition(pos);
 };
 
+Oid NodeParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
+{
+	Oid			origArrayType = *arrayType;
+	Oid			elementType;
+	HeapTuple	type_tuple_array;
+	Form_pg_type type_struct_array;
+
+	/*
+	 * If the input is a domain, smash to base type, and extract the actual
+	 * typmod to be applied to the base type.  Subscripting a domain is an
+	 * operation that necessarily works on the base array type, not the domain
+	 * itself.  (Note that we provide no method whereby the creator of a
+	 * domain over an array type could hide its ability to be subscripted.)
+	 */
+	*arrayType = getBaseTypeAndTypmod(*arrayType, arrayTypmod);
+
+	/*
+	 * We treat int2vector and oidvector as though they were domains over
+	 * int2[] and oid[].  This is needed because array slicing could create an
+	 * array that doesn't satisfy the dimensionality constraints of the
+	 * xxxvector type; so we want the result of a slice operation to be
+	 * considered to be of the more general type.
+	 */
+	if (*arrayType == INT2VECTOROID)
+		*arrayType = INT2ARRAYOID;
+	else if (*arrayType == OIDVECTOROID)
+		*arrayType = OIDARRAYOID;
+
+	/* Get the type tuple for the array */
+	type_tuple_array = SearchSysCache1(TYPEOID, ObjectIdGetDatum(*arrayType));
+	if (!HeapTupleIsValid(type_tuple_array))
+		elog(ERROR, "cache lookup failed for type %u", *arrayType);
+	type_struct_array = (Form_pg_type) GETSTRUCT(type_tuple_array);
+
+	/* needn't check typisdefined since this will fail anyway */
+
+	elementType = type_struct_array->typelem;
+	if (elementType == InvalidOid)
+		ereport(ERROR,
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+				 errmsg("cannot subscript type %s because it is not an array",
+						format_type_be(origArrayType))));
+
+	ReleaseSysCache(type_tuple_array);
+
+	return elementType;
+};
+
 }

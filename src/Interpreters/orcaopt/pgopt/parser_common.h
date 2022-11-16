@@ -189,13 +189,40 @@ typedef enum
 	COLLATE_EXPLICIT			/* collation was derived explicitly */
 } CollateStrength;
 
+typedef signed int int32;
+
+/*
+ * Arrays are varlena objects, so must meet the varlena convention that
+ * the first int32 of the object contains the total object size in bytes.
+ * Be sure to use VARSIZE() and SET_VARSIZE() to access it, though!
+ *
+ * CAUTION: if you change the header for ordinary arrays you will also
+ * need to change the headers for oidvector and int2vector!
+ */
+typedef struct ArrayType
+{
+	int32		vl_len_;		/* varlena header (do not touch directly!) */
+	int			ndim;			/* # of dimensions */
+	int32		dataoffset;		/* offset to data, or 0 if no bitmap */
+	Oid			elemtype;		/* element type OID */
+} ArrayType;
+
 bool		SQL_inheritance = true;
 
 typedef signed short int16;
-typedef signed int int32;
 typedef long int int64;
-
+typedef int64 Datum;
 typedef char TYPCATEGORY;
+
+static inline int32 DatumGetInt32(Datum d) { return (int32) d; } 
+static inline Datum Int32GetDatum(int32 i32) { return (Datum) i32; } 
+static inline Datum Int64GetDatum(int64 i64) { return (Datum) i64; } 
+
+#define PointerGetDatum(X) ((Datum) (X))
+static inline Datum CStringGetDatum(const char *p) { return PointerGetDatum(p); }
+static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; } 
+
+#define FLOAT8PASSBYVAL true
 
 #define ERROR		20
 
@@ -212,6 +239,8 @@ typedef char TYPCATEGORY;
 #define INT4OID			23
 #define BOOLOID         16
 #define OIDVECTOROID	30
+#define INT2ARRAYOID		1005
+#define OIDARRAYOID			1028
 #define VOIDOID			2278
 #define RECORDOID		2249
 #define NUMERICOID		1700
@@ -225,6 +254,15 @@ typedef char TYPCATEGORY;
 #define ANYNONARRAYOID	2776
 #define ANYENUMOID		3500
 #define ANYRANGEOID		3831
+#define ANYTABLEOID     7053
+
+/* Is a type OID a polymorphic pseudotype?	(Beware of multiple evaluation) */
+#define IsPolymorphicType(typid)  \
+	((typid) == ANYELEMENTOID || \
+	 (typid) == ANYARRAYOID || \
+	 (typid) == ANYNONARRAYOID || \
+	 (typid) == ANYENUMOID || \
+	 (typid) == ANYRANGEOID)
 
 #define OidIsValid(objectId)  ((bool) ((objectId) != InvalidOid))
 

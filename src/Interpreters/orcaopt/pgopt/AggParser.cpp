@@ -26,7 +26,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 				(errcode(PG_ERRCODE_WINDOWING_ERROR),
 				 errmsg("window function calls cannot be nested"),
 				 node_parser.parser_errposition(pstate,
-								  locate_windowfunc((PGNode *) wfunc->args))));
+									locate_windowfunc((PGNode *) wfunc->args))));
 
 	/*
 	 * Check to see if the window function is in an invalid place within the
@@ -62,6 +62,9 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 		case PGParseExprKind::EXPR_KIND_WHERE:
 			errkind = true;
 			break;
+		// case PGParseExprKind::EXPR_KIND_POLICY:
+		// 	err = _("window functions are not allowed in policy expressions");
+		// 	break;
 		case PGParseExprKind::EXPR_KIND_HAVING:
 			errkind = true;
 			break;
@@ -72,6 +75,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 		case PGParseExprKind::EXPR_KIND_WINDOW_ORDER:
 		case PGParseExprKind::EXPR_KIND_WINDOW_FRAME_RANGE:
 		case PGParseExprKind::EXPR_KIND_WINDOW_FRAME_ROWS:
+		// case PGParseExprKind::EXPR_KIND_WINDOW_FRAME_GROUPS:
 			err = _("window functions are not allowed in window definitions");
 			break;
 		case PGParseExprKind::EXPR_KIND_SELECT_TARGET:
@@ -99,6 +103,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 			errkind = true;
 			break;
 		case PGParseExprKind::EXPR_KIND_VALUES:
+		// case PGParseExprKind::EXPR_KIND_VALUES_SINGLE:
 			errkind = true;
 			break;
 		case PGParseExprKind::EXPR_KIND_CHECK_CONSTRAINT:
@@ -124,13 +129,24 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 		case PGParseExprKind::EXPR_KIND_TRIGGER_WHEN:
 			err = _("window functions are not allowed in trigger WHEN conditions");
 			break;
-		case PGParseExprKind::EXPR_KIND_PARTITION_EXPRESSION:
-			err = _("window functions are not allowed in partition key expression");
-			break;
-
 		case PGParseExprKind::EXPR_KIND_SCATTER_BY:
 			/* okay */
 			break;
+		// case PGParseExprKind::EXPR_KIND_PARTITION_BOUND:
+		// 	err = _("window functions are not allowed in partition bound");
+		// 	break;
+		case PGParseExprKind::EXPR_KIND_PARTITION_EXPRESSION:
+			err = _("window functions are not allowed in partition key expressions");
+			break;
+		// case PGParseExprKind::EXPR_KIND_CALL_ARGUMENT:
+		// 	err = _("window functions are not allowed in CALL arguments");
+		// 	break;
+		// case PGParseExprKind::PGParseExprKind::EXPR_KIND_COPY_WHERE:
+		// 	err = _("window functions are not allowed in COPY FROM WHERE conditions");
+		// 	break;
+		// case PGParseExprKind::EXPR_KIND_GENERATED_COLUMN:
+		// 	err = _("window functions are not allowed in column generation expressions");
+		// 	break;
 
 			/*
 			 * There is intentionally no default: case here, so that the
@@ -200,7 +216,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 		}
 		if (lc == NULL)			/* didn't find it? */
 			ereport(ERROR,
-					(errcode(PG_ERRCODE_SYNTAX_ERROR),
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("window \"%s\" does not exist", name),
 					 node_parser.parser_errposition(pstate, windef->location)));
 	}
@@ -518,7 +534,7 @@ AggParser::transformAggregateCall(PGParseState *pstate, PGAggref *agg,
 };
 
 int
-AggParsercheck_agg_arguments(PGParseState *pstate,
+AggParser::check_agg_arguments(PGParseState *pstate,
 					PGList *directargs,
 					PGList *args,
 					PGExpr *filter)

@@ -1343,165 +1343,283 @@ ClauseParser::assignSortGroupRef(PGTargetEntry *tle, PGList *tlist)
 	return tle->ressortgroupref;
 };
 
+Index
+ClauseParser::transformGroupClauseExpr(PGList **flatresult, PGBitmapset *seen_local,
+						 PGParseState *pstate, PGNode *gexpr,
+						 PGList **targetlist, PGList *sortClause,
+						 PGParseExprKind exprKind, bool useSQL99, bool toplevel)
+{
+	PGTargetEntry *tle;
+	bool		found = false;
+
+	if (useSQL99)
+		tle = findTargetlistEntrySQL99(pstate, gexpr,
+									   targetlist, exprKind);
+	else
+		tle = findTargetlistEntrySQL92(pstate, gexpr,
+									   targetlist, exprKind);
+
+	if (tle->ressortgroupref > 0)
+	{
+		ListCell   *sl;
+
+		/*
+		 * Eliminate duplicates (GROUP BY x, x) but only at local level.
+		 * (Duplicates in grouping sets can affect the number of returned
+		 * rows, so can't be dropped indiscriminately.)
+		 *
+		 * Since we don't care about anything except the sortgroupref, we can
+		 * use a bitmapset rather than scanning lists.
+		 */
+		if (bms_is_member(tle->ressortgroupref, seen_local))
+			return 0;
+
+		/*
+		 * If we're already in the flat clause list, we don't need to consider
+		 * adding ourselves again.
+		 */
+		found = targetIsInSortList(tle, InvalidOid, *flatresult);
+		if (found)
+			return tle->ressortgroupref;
+
+		/*
+		 * If the GROUP BY tlist entry also appears in ORDER BY, copy operator
+		 * info from the (first) matching ORDER BY item.  This means that if
+		 * you write something like "GROUP BY foo ORDER BY foo USING <<<", the
+		 * GROUP BY operation silently takes on the equality semantics implied
+		 * by the ORDER BY.  There are two reasons to do this: it improves the
+		 * odds that we can implement both GROUP BY and ORDER BY with a single
+		 * sort step, and it allows the user to choose the equality semantics
+		 * used by GROUP BY, should she be working with a datatype that has
+		 * more than one equality operator.
+		 *
+		 * If we're in a grouping set, though, we force our requested ordering
+		 * to be NULLS LAST, because if we have any hope of using a sorted agg
+		 * for the job, we're going to be tacking on generated NULL values
+		 * after the corresponding groups. If the user demands nulls first,
+		 * another sort step is going to be inevitable, but that's the
+		 * planner's problem.
+		 */
+
+		foreach(sl, sortClause)
+		{
+			PGSortGroupClause *sc = (PGSortGroupClause *) lfirst(sl);
+
+			if (sc->tleSortGroupRef == tle->ressortgroupref)
+			{
+				PGSortGroupClause *grpc = copyObject(sc);
+
+				if (!toplevel)
+					grpc->nulls_first = false;
+				*flatresult = lappend(*flatresult, grpc);
+				found = true;
+				break;
+			}
+		}
+	}
+
+	/*
+	 * If no match in ORDER BY, just add it to the result using default
+	 * sort/group semantics.
+	 */
+	if (!found)
+		*flatresult = addTargetToGroupList(pstate, tle,
+										   *flatresult, *targetlist,
+										   exprLocation(gexpr));
+
+	/*
+	 * _something_ must have assigned us a sortgroupref by now...
+	 */
+
+	return tle->ressortgroupref;
+};
+
 PGList *
-ClauseParser::transformGroupClause(PGParseState *pstate, PGList *grouplist,
+ClauseParser::transformGroupClauseList(PGList **flatresult,
+						 PGParseState *pstate, PGList *list,
+						 PGList **targetlist, PGList *sortClause,
+						 PGParseExprKind exprKind, bool useSQL99, bool toplevel)
+{
+	PGBitmapset  *seen_local = NULL;
+	PGList	   *result = NIL;
+	PGListCell   *gl;
+
+	foreach(gl, list)
+	{
+		PGNode	   *gexpr = (PGNode *) lfirst(gl);
+
+		Index		ref = transformGroupClauseExpr(flatresult,
+												   seen_local,
+												   pstate,
+												   gexpr,
+												   targetlist,
+												   sortClause,
+												   exprKind,
+												   useSQL99,
+												   toplevel);
+
+		if (ref > 0)
+		{
+			seen_local = bms_add_member(seen_local, ref);
+			result = lappend_int(result, ref);
+		}
+	}
+
+	return result;
+};
+
+PGNode *
+ClauseParser::transformGroupingSet(PGList **flatresult,
+					 PGParseState *pstate, PGGroupingSet *gset,
+					 PGList **targetlist, PGList *sortClause,
+					 PGParseExprKind exprKind, bool useSQL99, bool toplevel)
+{
+	PGListCell   *gl;
+	PGList	   *content = NIL;
+
+	Assert(toplevel || gset->kind != GROUPING_SET_SETS);
+
+	foreach(gl, gset->content)
+	{
+		PGNode	   *n = (PGNode *)lfirst(gl);
+
+		if (IsA(n, PGList))
+		{
+			PGList	   *l = transformGroupClauseList(flatresult,
+													 pstate, (PGList *) n,
+													 targetlist, sortClause,
+													 exprKind, useSQL99, false);
+
+			content = lappend(content, makeGroupingSet(GROUPING_SET_SIMPLE,
+													   l,
+													   exprLocation(n)));
+		}
+		else if (IsA(n, PGGroupingSet))
+		{
+			PGGroupingSet *gset2 = (PGGroupingSet *) lfirst(gl);
+
+			content = lappend(content, transformGroupingSet(flatresult,
+															pstate, gset2,
+															targetlist, sortClause,
+															exprKind, useSQL99, false));
+		}
+		else
+		{
+			Index		ref = transformGroupClauseExpr(flatresult,
+													   NULL,
+													   pstate,
+													   n,
+													   targetlist,
+													   sortClause,
+													   exprKind,
+													   useSQL99,
+													   false);
+
+			content = lappend(content, makeGroupingSet(GROUPING_SET_SIMPLE,
+													   list_make1_int(ref),
+													   exprLocation(n)));
+		}
+	}
+
+	/* Arbitrarily cap the size of CUBE, which has exponential growth */
+	if (gset->kind == GROUPING_SET_CUBE)
+	{
+		if (list_length(content) > 12)
+			ereport(ERROR,
+					(errcode(ERRCODE_TOO_MANY_COLUMNS),
+					 errmsg("CUBE is limited to 12 elements"),
+					 node_parser.parser_errposition(pstate, gset->location)));
+	}
+
+	return (PGNode *) makeGroupingSet(gset->kind, content, gset->location);
+};
+
+PGList *
+ClauseParser::transformGroupClause(PGParseState *pstate, PGList *grouplist, PGList **groupingSets,
 					 PGList **targetlist, PGList *sortClause,
 					 PGParseExprKind exprKind, bool useSQL99)
 {
 	PGList	   *result = NIL;
-	PGList	   *tle_list = NIL;
-	PGListCell   *l;
-	PGList       *reorder_grouplist = NIL;
-
-	/* Preprocess the grouping clause, lookup TLEs */
-	foreach(l, grouplist)
-	{
-		PGList        *tl;
-		PGListCell    *tl_cell;
-		PGTargetEntry *tle;
-		Oid			restype;
-		PGNode        *node;
-
-		node = (PGNode*)lfirst(l);
-		tl = findListTargetlistEntries(pstate, node, targetlist, false, false, 
-                                       exprKind, useSQL99);
-
-		foreach(tl_cell, tl)
-		{
-			tle = (PGTargetEntry*)lfirst(tl_cell);
-
-			/* if tlist item is an UNKNOWN literal, change it to TEXT */
-			restype = exprType((PGNode *) tle->expr);
-
-			if (restype == UNKNOWNOID)
-				tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
-												 restype, TEXTOID, -1,
-												 PG_COERCION_IMPLICIT,
-												 PG_COERCE_IMPLICIT_CAST,
-												 -1);
-
-			/*
-			 * The tle_list will be used to match with the ORDER by element below.
-			 * We only append the tle to tle_list when node is not a
-			 * GroupingClause or tle->expr is not a RowExpr.
-			 */
-			 if (node != NULL &&
-				 !IsA(node, PGGroupingClause) &&
-				 !IsA(tle->expr, PGRowExpr))
-				 tle_list = lappend(tle_list, tle);
-		}
-	}
-
-	/* create first group clauses based on sort clauses */
-	PGList *tle_list_remainder = NIL;
-	result = create_group_clause(tle_list,
-								*targetlist,
-								sortClause,
-								&tle_list_remainder);
+	PGList	   *flat_grouplist;
+	PGList	   *gsets = NIL;
+	PGListCell   *gl;
+	bool		hasGroupingSets = false;
+	PGBitmapset  *seen_local = NULL;
 
 	/*
-	 * Now add all remaining elements of the GROUP BY list to the result list.
-	 * The result list is a list of GroupClauses and/or GroupingClauses.
-	 * In each grouping set, all GroupClauses will appear in front of
-	 * GroupingClauses. See the following GROUP BY clause:
-	 *
-	 *   GROUP BY ROLLUP(b,c),a, ROLLUP(e,d)
-	 *
-	 * the result list can be roughly represented as follows.
-	 *
-	 *    GroupClause(a),
-	 *    GroupingClause(ROLLUP,groupsets(GroupClause(b),GroupClause(c))),
-	 *    GroupingClause(CUBE,groupsets(GroupClause(e),GroupClause(d)))
-	 *
-	 *   XXX: the above transformation doesn't make sense -gs
+	 * Recursively flatten implicit RowExprs. (Technically this is only needed
+	 * for GROUP BY, per the syntax rules for grouping sets, but we do it
+	 * anyway.)
 	 */
-	reorder_grouplist = reorderGroupList(grouplist);
+	flat_grouplist = (PGList *) flatten_grouping_sets((PGNode *) grouplist,
+													true,
+													&hasGroupingSets);
 
-	foreach(l, reorder_grouplist)
+	/*
+	 * If the list is now empty, but hasGroupingSets is true, it's because we
+	 * elided redundant empty grouping sets. Restore a single empty grouping
+	 * set to leave a canonical form: GROUP BY ()
+	 */
+
+	if (flat_grouplist == NIL && hasGroupingSets)
 	{
-		PGNode *node = (PGNode*) lfirst(l);
+		flat_grouplist = list_make1(makeGroupingSet(GROUPING_SET_EMPTY,
+													NIL,
+													exprLocation((PGNode *) grouplist)));
+	}
 
-		if (node == NULL) /* the empty grouping set */
-			result = list_concat(result, list_make1(NIL));
+	foreach(gl, flat_grouplist)
+	{
+		PGNode	   *gexpr = (PGNode *) lfirst(gl);
 
-		// else if (IsA(node, PGGroupingClause))
-		// {
-		// 	GroupingClause *tmp = make_grouping_clause(pstate,
-		// 											   (GroupingClause*)node,
-		// 											   *targetlist);
-		// 	result = lappend(result, tmp);
-		// }
-
-		else if (IsA(node, PGRowExpr))
+		if (IsA(gexpr, PGGroupingSet))
 		{
-			/* The top level RowExprs are handled differently with other expressions.
-			 * We convert each argument into GroupClause and append them
-			 * one by one into 'result' list.
-			 *
-			 * Note that RowExprs are not added into the final targetlist.
-			 */
-			result =
-				transformRowExprToGroupClauses(pstate, (PGRowExpr *)node,
-											   result, *targetlist);
-		}
+			PGGroupingSet *gset = (PGGroupingSet *) gexpr;
 
+			switch (gset->kind)
+			{
+				case GROUPING_SET_EMPTY:
+					gsets = lappend(gsets, gset);
+					break;
+				case GROUPING_SET_SIMPLE:
+					/* can't happen */
+					Assert(false);
+					break;
+				case GROUPING_SET_SETS:
+				case GROUPING_SET_CUBE:
+				case GROUPING_SET_ROLLUP:
+					gsets = lappend(gsets,
+									transformGroupingSet(&result,
+														 pstate, gset,
+														 targetlist, sortClause,
+														 exprKind, useSQL99, true));
+					break;
+			}
+		}
 		else
 		{
-			PGTargetEntry *tle;
-			PGSortGroupClause *gc;
-			Oid			sortop;
-			Oid			eqop;
-			bool		hashable;
+			Index		ref = transformGroupClauseExpr(&result, seen_local,
+													   pstate, gexpr,
+													   targetlist, sortClause,
+													   exprKind, useSQL99, true);
 
-			if (useSQL99)
-				tle = findTargetlistEntrySQL99(pstate, node,
-											   targetlist, exprKind);
-			else
-				tle = findTargetlistEntrySQL92(pstate, node,
-											   targetlist, exprKind);
-
-			/*
-			 * Avoid making duplicate grouplist entries.  Note that we don't
-			 * enforce a particular sortop here.  Along with the copying of sort
-			 * information above, this means that if you write something like
-			 * "GROUP BY foo ORDER BY foo USING <<<", the GROUP BY operation
-			 * silently takes on the equality semantics implied by the ORDER BY.
-			 */
-			if (targetIsInSortList(tle, InvalidOid, result))
-				continue;
-
-			oper_parser.get_sort_group_operators(exprType((PGNode *) tle->expr),
-									 true, true, false,
-									 &sortop, &eqop, NULL, &hashable);
-			gc = make_group_clause(tle, *targetlist, eqop, sortop, false, hashable);
-			result = lappend(result, gc);
+			if (ref > 0)
+			{
+				seen_local = bms_add_member(seen_local, ref);
+				if (hasGroupingSets)
+					gsets = lappend(gsets,
+									makeGroupingSet(GROUPING_SET_SIMPLE,
+													list_make1_int(ref),
+													exprLocation(gexpr)));
+			}
 		}
 	}
 
-	/* We're doing extended grouping for both ordinary grouping and grouping
-	 * extensions.
-	 */
-	{
-		PGListCell *lc;
+	/* parser should prevent this */
+	Assert(gsets == NIL || groupingSets != NULL);
 
-		/*
-		 * Find all unique target entries appeared in reorder_grouplist.
-		 * We stash them in the ParseState, to be processed later by
-		 * processExtendedGrouping().
-		 */
-		foreach (lc, reorder_grouplist)
-		{
-			pstate->p_grp_tles = list_concat_unique(
-				pstate->p_grp_tles,
-				findListTargetlistEntries(pstate, reinterpret_cast<PGNode *>(lfirst(lc)),
-										  targetlist, false, true,
-										  exprKind, useSQL99));
-		}
-	}
-
-	list_free(tle_list);
-	list_free(tle_list_remainder);
-	freeGroupList(reorder_grouplist);
+	if (groupingSets)
+		*groupingSets = gsets;
 
 	return result;
 };
@@ -1893,8 +2011,7 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 			continue;			/* ignore junk */
 		result = addTargetToGroupList(pstate, tle,
 									  result, *targetlist,
-									  exprLocation((PGNode *) tle->expr),
-									  true);
+									  exprLocation((PGNode *) tle->expr));
 	}
 
 	/*
@@ -1918,13 +2035,12 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 
 PGList *
 ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
-					 PGList *grouplist, PGList *targetlist, int location,
-					 bool resolveUnknown)
+					 PGList *grouplist, PGList *targetlist, int location)
 {
 	Oid			restype = exprType((PGNode *) tle->expr);
 
 	/* if tlist item is an UNKNOWN literal, change it to TEXT */
-	if (restype == UNKNOWNOID && resolveUnknown)
+	if (restype == UNKNOWNOID)
 	{
 		tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
 										 restype, TEXTOID, -1,
@@ -1941,9 +2057,9 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
 		Oid			sortop;
 		Oid			eqop;
 		bool		hashable;
-		//ParseCallbackState pcbstate;
+		ParseCallbackState pcbstate;
 
-		//setup_parser_errposition_callback(&pcbstate, pstate, location);
+		setup_parser_errposition_callback(&pcbstate, pstate, location);
 
 		/* determine the eqop and optional sortop */
 		oper_parser.get_sort_group_operators(restype,
@@ -1951,12 +2067,12 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
 								 &sortop, &eqop, NULL,
 								 &hashable);
 
-		//cancel_parser_errposition_callback(&pcbstate);
+		cancel_parser_errposition_callback(&pcbstate);
 
 		grpcl->tleSortGroupRef = assignSortGroupRef(tle, targetlist);
 		grpcl->eqop = eqop;
 		grpcl->sortop = sortop;
-		grpcl->nulls_first = false;		/* OK with or without sortop */
+		grpcl->nulls_first = false; /* OK with or without sortop */
 		grpcl->hashable = hashable;
 
 		grouplist = lappend(grouplist, grpcl);
@@ -2051,8 +2167,7 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctli
 			throw Exception(ERROR, "SELECT DISTINCT ON expressions must match initial ORDER BY expressions");
 		result = addTargetToGroupList(pstate, tle,
 									  result, *targetlist,
-									  exprLocation(dexpr),
-									  true);
+									  exprLocation(dexpr));
 	}
 
 	/*
@@ -2550,6 +2665,98 @@ ClauseParser::checkExprIsVarFree(PGParseState *pstate,
 		// 							locate_var_of_level(n, 0))));
 		throw Exception(PG_ERRCODE_SYNTAX_ERROR, "argument of {} must not contain variables", constructName);
 	}
+};
+
+PGNode *
+ClauseParser::flatten_grouping_sets(PGNode *expr, bool toplevel, bool *hasGroupingSets)
+{
+	/* just in case of pathological input */
+	check_stack_depth();
+
+	if (expr == (PGNode *) NIL)
+		return (PGNode *) NIL;
+
+	switch (expr->type)
+	{
+		case T_PGRowExpr:
+			{
+				PGRowExpr    *r = (PGRowExpr *) expr;
+
+				if (r->row_format == PG_COERCE_IMPLICIT_CAST)
+					return flatten_grouping_sets((PGNode *) r->args,
+												 false, NULL);
+			}
+			break;
+		case T_PGGroupingSet:
+			{
+				PGGroupingSet *gset = (PGGroupingSet *) expr;
+				PGListCell   *l2;
+				PGList	   *result_set = NIL;
+
+				if (hasGroupingSets)
+					*hasGroupingSets = true;
+
+				/*
+				 * at the top level, we skip over all empty grouping sets; the
+				 * caller can supply the canonical GROUP BY () if nothing is
+				 * left.
+				 */
+
+				if (toplevel && gset->kind == GROUPING_SET_EMPTY)
+					return (PGNode *) NIL;
+
+				foreach(l2, gset->content)
+				{
+					PGNode	   *n1 = (PGNode *)lfirst(l2);
+					PGNode	   *n2 = flatten_grouping_sets(n1, false, NULL);
+
+					if (IsA(n1, PGGroupingSet) &&
+						((PGGroupingSet *) n1)->kind == GROUPING_SET_SETS)
+					{
+						result_set = list_concat(result_set, (PGList *) n2);
+					}
+					else
+						result_set = lappend(result_set, n2);
+				}
+
+				/*
+				 * At top level, keep the grouping set node; but if we're in a
+				 * nested grouping set, then we need to concat the flattened
+				 * result into the outer list if it's simply nested.
+				 */
+
+				if (toplevel || (gset->kind != GROUPING_SET_SETS))
+				{
+					return (PGNode *) makeGroupingSet(gset->kind, result_set, gset->location);
+				}
+				else
+					return (PGNode *) result_set;
+			}
+		case T_PGList:
+			{
+				PGList	   *result = NIL;
+				ListCell   *l;
+
+				foreach(l, (PGList *) expr)
+				{
+					PGNode	   *n = flatten_grouping_sets((PGNode *)lfirst(l), toplevel, hasGroupingSets);
+
+					if (n != (PGNode *) NIL)
+					{
+						if (IsA(n, PGList))
+							result = list_concat(result, (PGList *) n);
+						else
+							result = lappend(result, n);
+					}
+				}
+
+				return (PGNode *) result;
+			}
+		default:
+			break;
+	}
+
+	return expr;
 };
 
 }

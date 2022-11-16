@@ -131,6 +131,9 @@ public:
 	duckdb_libpgquery::PGList *
 	expandRelAttrs(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte,
 			   int rtindex, int sublevels_up, int location);
+
+	bool
+	isSimplyUpdatableRelation(Oid relid, bool noerror);
 };
 
 }

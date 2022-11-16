@@ -105,8 +105,6 @@ public:
 						 duckdb_libpgquery::PGList *indirection,
 						 duckdb_libpgquery::PGNode *assignFrom);
 
-    Oid transformArrayType(Oid *arrayType, int32 *arrayTypmod);
-
     duckdb_libpgquery::PGNode *
     make_row_comparison_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
 					   duckdb_libpgquery::PGList *largs, duckdb_libpgquery::PGList *rargs, int location);
@@ -134,6 +132,9 @@ public:
 
     duckdb_libpgquery::PGNode *
     transformGroupingFunc(PGParseState *pstate, duckdb_libpgquery::PGGroupingFunc *gf);
+
+    bool
+    isWhenIsNotDistinctFromExpr(duckdb_libpgquery::PGNode *warg);
 };
 
 }

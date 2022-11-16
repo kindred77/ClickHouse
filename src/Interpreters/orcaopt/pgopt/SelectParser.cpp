@@ -10,22 +10,41 @@ SelectParser::transformStmt(PGParseState *pstate, PGNode *parseTree)
 {
 	PGQuery	   *result;
 
+	/*
+	 * We apply RAW_EXPRESSION_COVERAGE_TEST testing to basic DML statements;
+	 * we can't just run it on everything because raw_expression_tree_walker()
+	 * doesn't claim to handle utility statements.
+	 */
+#ifdef RAW_EXPRESSION_COVERAGE_TEST
+	switch (nodeTag(parseTree))
+	{
+		case T_SelectStmt:
+		case T_InsertStmt:
+		case T_UpdateStmt:
+		case T_DeleteStmt:
+			(void) test_raw_expression_coverage(parseTree, NULL);
+			break;
+		default:
+			break;
+	}
+#endif							/* RAW_EXPRESSION_COVERAGE_TEST */
+
 	switch (nodeTag(parseTree))
 	{
 			/*
 			 * Optimizable statements
 			 */
-		/*case T_InsertStmt:
-			result = transformInsertStmt(pstate, (InsertStmt *) parseTree);
-			break;
+		// case T_PGInsertStmt:
+		// 	result = transformInsertStmt(pstate, (PGInsertStmt *) parseTree);
+		// 	break;
 
-		case T_DeleteStmt:
-			result = transformDeleteStmt(pstate, (DeleteStmt *) parseTree);
-			break;
+		// case T_PGDeleteStmt:
+		// 	result = transformDeleteStmt(pstate, (PGDeleteStmt *) parseTree);
+		// 	break;
 
-		case T_UpdateStmt:
-			result = transformUpdateStmt(pstate, (UpdateStmt *) parseTree);
-			break;*/
+		// case T_PGUpdateStmt:
+		// 	result = transformUpdateStmt(pstate, (PGUpdateStmt *) parseTree);
+		// 	break;
 
 		case T_PGSelectStmt:
 			{
@@ -33,32 +52,38 @@ SelectParser::transformStmt(PGParseState *pstate, PGNode *parseTree)
 
 				if (n->op == PG_SETOP_NONE)
 					result = transformSelectStmt(pstate, n);
-				/*if (n->valuesLists)
-					result = transformValuesClause(pstate, n);
-				else if (n->op == PG_SETOP_NONE)
-					result = transformSelectStmt(pstate, n);
-				else
-					result = transformSetOperationStmt(pstate, n);*/
+
+				//if (n->valuesLists)
+					//result = transformValuesClause(pstate, n);
+				//else if (n->op == PG_SETOP_NONE)
+					//result = transformSelectStmt(pstate, n);
+				//else
+					//result = transformSetOperationStmt(pstate, n);
 			}
 			break;
 
 			/*
 			 * Special cases
 			 */
-		/*case T_DeclareCursorStmt:
-			result = transformDeclareCursorStmt(pstate,
-											(DeclareCursorStmt *) parseTree);
-			break;
+		// case T_PGDeclareCursorStmt:
+		// 	result = transformDeclareCursorStmt(pstate,
+		// 										(DeclareCursorStmt *) parseTree);
+		// 	break;
 
-		case T_ExplainStmt:
-			result = transformExplainStmt(pstate,
-										  (ExplainStmt *) parseTree);
-			break;
+		// case T_PGExplainStmt:
+		// 	result = transformExplainStmt(pstate,
+		// 								  (PGExplainStmt *) parseTree);
+		// 	break;
 
-		case T_CreateTableAsStmt:
-			result = transformCreateTableAsStmt(pstate,
-											(CreateTableAsStmt *) parseTree);
-			break;*/
+		// case T_PGCreateTableAsStmt:
+		// 	result = transformCreateTableAsStmt(pstate,
+		// 										(PGCreateTableAsStmt *) parseTree);
+		// 	break;
+
+		// case T_PGCallStmt:
+		// 	result = transformCallStmt(pstate,
+		// 							   (PGCallStmt *) parseTree);
+		// 	break;
 
 		default:
 

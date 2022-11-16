@@ -1330,7 +1330,7 @@ CoerceParser::find_typmod_coercion_function(Oid typeId,
 	*funcid = InvalidOid;
 	result = CoercionPathType::COERCION_PATH_FUNC;
 
-	targetType = typeidType(typeId);
+	targetType = type_parser.typeidType(typeId);
 	typeForm = (Form_pg_type) GETSTRUCT(targetType);
 
 	/* Check for a varlena array type */
