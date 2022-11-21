@@ -189,7 +189,8 @@ add_object_library(clickhouse_interpreters_clusterproxy Interpreters/ClusterProx
 add_object_library(clickhouse_interpreters_jit Interpreters/JIT)
 
 #add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt)
-add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/pgopt)
+#add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/pgopt)
+add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/pgoptnew)
 
 add_object_library(clickhouse_columns Columns)
 add_object_library(clickhouse_storages Storages)

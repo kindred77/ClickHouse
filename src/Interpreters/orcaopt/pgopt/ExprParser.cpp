@@ -648,10 +648,10 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 		switch (crerr)
 		{
 			case CRERR_NO_COLUMN:
-				errorMissingColumn(pstate, relname, colname, cref->location);
+				relation_parser.errorMissingColumn(pstate, relname, colname, cref->location);
 				break;
 			case CRERR_NO_RTE:
-				errorMissingRTE(pstate, makeRangeVar(nspname, relname,
+				relation_parser.errorMissingRTE(pstate, makeRangeVar(nspname, relname,
 													 cref->location));
 				break;
 			case CRERR_WRONG_DB:
@@ -681,6 +681,26 @@ ExprParser::transformAExprOp(PGParseState *pstate, PGAExpr *a)
 	PGNode	   *rexpr = a->rexpr;
 	PGNode	   *result;
 
+	if (operator_precedence_warning)
+	{
+		int			opgroup;
+		const char *opname;
+
+		opgroup = operator_precedence_group((PGNode *) a, &opname);
+		if (opgroup > 0)
+			emit_precedence_warnings(pstate, opgroup, opname,
+									 lexpr, rexpr,
+									 a->location);
+
+		/* Look through AEXPR_PAREN nodes so they don't affect tests below */
+		while (lexpr && IsA(lexpr, PGAExpr) &&
+			   ((PGAExpr *) lexpr)->kind == AEXPR_PAREN)
+			lexpr = ((PGAExpr *) lexpr)->lexpr;
+		while (rexpr && IsA(rexpr, PGAExpr) &&
+			   ((PGAExpr *) rexpr)->kind == AEXPR_PAREN)
+			rexpr = ((PGAExpr *) rexpr)->lexpr;
+	}
+
 	/*
 	 * Special-case "foo = NULL" and "NULL = foo" for compatibility with
 	 * standards-broken products (like Microsoft's).  Turn these into IS NULL
@@ -697,6 +717,7 @@ ExprParser::transformAExprOp(PGParseState *pstate, PGAExpr *a)
 		PGNullTest   *n = makeNode(PGNullTest);
 
 		n->nulltesttype = PG_IS_NULL;
+		n->location = a->location;
 
 		if (exprIsNullConstant(lexpr))
 			n->arg = (PGExpr *) rexpr;
@@ -728,18 +749,18 @@ ExprParser::transformAExprOp(PGParseState *pstate, PGAExpr *a)
 		/* ROW() op ROW() is handled specially */
 		lexpr = transformExprRecurse(pstate, lexpr);
 		rexpr = transformExprRecurse(pstate, rexpr);
-		Assert(IsA(lexpr, PGRowExpr));
-		Assert(IsA(rexpr, PGRowExpr));
 
 		result = make_row_comparison_op(pstate,
 										a->name,
-										((PGRowExpr *) lexpr)->args,
-										((PGRowExpr *) rexpr)->args,
+										castNode(PGRowExpr, lexpr)->args,
+										castNode(PGRowExpr, rexpr)->args,
 										a->location);
 	}
 	else
 	{
 		/* Ordinary scalar operator */
+		PGNode	   *last_srf = pstate->p_last_srf;
+
 		lexpr = transformExprRecurse(pstate, lexpr);
 		rexpr = transformExprRecurse(pstate, rexpr);
 
@@ -747,6 +768,7 @@ ExprParser::transformAExprOp(PGParseState *pstate, PGAExpr *a)
 								  a->name,
 								  lexpr,
 								  rexpr,
+								  last_srf,
 								  a->location);
 	}
 

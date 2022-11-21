@@ -479,7 +479,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 
 PGExpr *
 OperParser::make_op(PGParseState *pstate, PGList *opname, PGNode *ltree, PGNode *rtree,
-		int location)
+		PGNode *last_srf, int location)
 {
 	Oid			ltypeId,
 				rtypeId;
@@ -579,6 +579,14 @@ OperParser::make_op(PGParseState *pstate, PGList *opname, PGNode *ltree, PGNode 
 	/* opcollid and inputcollid will be set by parse_collate.c */
 	result->args = args;
 	result->location = location;
+
+	/* if it returns a set, check that's OK */
+	if (result->opretset)
+	{
+		check_srf_call_placement(pstate, last_srf, location);
+		/* ... and remember it for error checks at higher levels */
+		pstate->p_last_srf = (PGNode *) result;
+	}
 
 	ReleaseSysCache(tup);
 

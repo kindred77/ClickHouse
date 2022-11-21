@@ -26,8 +26,8 @@ public:
 		bool noError, int location);
 
 	duckdb_libpgquery::PGExpr *
-	make_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname, duckdb_libpgquery::PGNode *ltree, duckdb_libpgquery::PGNode *rtree,
-		int location);
+	make_op(PGParseState *pstate, PGList *opname, PGNode *ltree, PGNode *rtree,
+		PGNode *last_srf, int location);
 	
 	Operator
 	right_oper(PGParseState *pstate, duckdb_libpgquery::PGList *op, Oid arg, bool noError, int location);

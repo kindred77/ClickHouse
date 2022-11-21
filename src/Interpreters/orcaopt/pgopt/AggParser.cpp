@@ -201,7 +201,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	if (name)
 	{
 		Index		winref = 0;
-		ListCell   *lc;
+		PGListCell   *lc;
 
 		foreach(lc, pstate->p_windowdefs)
 		{
@@ -223,7 +223,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	else
 	{
 		Index		winref = 0;
-		ListCell   *lc;
+		PGListCell   *lc;
 
 		foreach(lc, pstate->p_windowdefs)
 		{
@@ -529,7 +529,7 @@ AggParser::transformAggregateCall(PGParseState *pstate, PGAggref *agg,
 				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("aggregate functions are not allowed in %s",
-						ParseExprKindName(pstate->p_expr_kind)),
+						expr_parser.ParseExprKindName(pstate->p_expr_kind)),
 				 node_parser.parser_errposition(pstate, agg->location)));
 };
 

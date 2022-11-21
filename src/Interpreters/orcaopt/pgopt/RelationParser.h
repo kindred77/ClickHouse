@@ -39,6 +39,14 @@ public:
 
 	void
 	errorMissingRTE(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *relation);
+
+	FuzzyAttrMatchState *
+	searchRangeTableForCol(PGParseState *pstate, const char *alias, const char *colname,
+					   int location);
+
+	void
+    errorMissingColumn(PGParseState *pstate,
+				   const char *relname, const char *colname, int location);
     
     void checkNameSpaceConflicts(PGParseState *pstate, duckdb_libpgquery::PGList *namespace1,
 						duckdb_libpgquery::PGList *namespace2);

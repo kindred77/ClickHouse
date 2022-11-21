@@ -597,6 +597,141 @@ RelationParser::errorMissingRTE(PGParseState *pstate, PGRangeVar *relation)
 				 node_parser.parser_errposition(pstate, relation->location)));
 };
 
+FuzzyAttrMatchState *
+RelationParser::searchRangeTableForCol(PGParseState *pstate, const char *alias, const char *colname,
+					   int location)
+{
+	PGParseState *orig_pstate = pstate;
+	FuzzyAttrMatchState *fuzzystate = palloc(sizeof(FuzzyAttrMatchState));
+
+	fuzzystate->distance = MAX_FUZZY_DISTANCE + 1;
+	fuzzystate->rfirst = NULL;
+	fuzzystate->rsecond = NULL;
+	fuzzystate->first = InvalidAttrNumber;
+	fuzzystate->second = InvalidAttrNumber;
+
+	while (pstate != NULL)
+	{
+		PGListCell   *l;
+
+		foreach(l, pstate->p_rtable)
+		{
+			PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(l);
+			int			fuzzy_rte_penalty = 0;
+
+			/*
+			 * Typically, it is not useful to look for matches within join
+			 * RTEs; they effectively duplicate other RTEs for our purposes,
+			 * and if a match is chosen from a join RTE, an unhelpful alias is
+			 * displayed in the final diagnostic message.
+			 */
+			if (rte->rtekind == PG_RTE_JOIN)
+				continue;
+
+			/*
+			 * If the user didn't specify an alias, then matches against one
+			 * RTE are as good as another.  But if the user did specify an
+			 * alias, then we want at least a fuzzy - and preferably an exact
+			 * - match for the range table entry.
+			 */
+			if (alias != NULL)
+				fuzzy_rte_penalty =
+					varstr_levenshtein_less_equal(alias, strlen(alias),
+												  rte->eref->aliasname,
+												  strlen(rte->eref->aliasname),
+												  1, 1, 1,
+												  MAX_FUZZY_DISTANCE + 1,
+												  true);
+
+			/*
+			 * Scan for a matching column; if we find an exact match, we're
+			 * done.  Otherwise, update fuzzystate.
+			 */
+			if (scanRTEForColumn(orig_pstate, rte, colname, location,
+								 fuzzy_rte_penalty, fuzzystate)
+				&& fuzzy_rte_penalty == 0)
+			{
+				fuzzystate->rfirst = rte;
+				fuzzystate->first = InvalidAttrNumber;
+				fuzzystate->rsecond = NULL;
+				fuzzystate->second = InvalidAttrNumber;
+				return fuzzystate;
+			}
+		}
+
+		pstate = pstate->parentParseState;
+	}
+
+	return fuzzystate;
+};
+
+void
+RelationParser::errorMissingColumn(PGParseState *pstate,
+				   const char *relname, const char *colname, int location)
+{
+	FuzzyAttrMatchState *state;
+	char	   *closestfirst = NULL;
+
+	/*
+	 * Search the entire rtable looking for possible matches.  If we find one,
+	 * emit a hint about it.
+	 *
+	 * TODO: improve this code (and also errorMissingRTE) to mention using
+	 * LATERAL if appropriate.
+	 */
+	state = searchRangeTableForCol(pstate, relname, colname, location);
+
+	/*
+	 * Extract closest col string for best match, if any.
+	 *
+	 * Infer an exact match referenced despite not being visible from the fact
+	 * that an attribute number was not present in state passed back -- this
+	 * is what is reported when !closestfirst.  There might also be an exact
+	 * match that was qualified with an incorrect alias, in which case
+	 * closestfirst will be set (so hint is the same as generic fuzzy case).
+	 */
+	if (state->rfirst && AttributeNumberIsValid(state->first))
+		closestfirst = strVal(list_nth(state->rfirst->eref->colnames,
+									   state->first - 1));
+
+	if (!state->rsecond)
+	{
+		/*
+		 * Handle case where there is zero or one column suggestions to hint,
+		 * including exact matches referenced but not visible.
+		 */
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_COLUMN),
+				 relname ?
+				 errmsg("column %s.%s does not exist", relname, colname) :
+				 errmsg("column \"%s\" does not exist", colname),
+				 state->rfirst ? closestfirst ?
+				 errhint("Perhaps you meant to reference the column \"%s.%s\".",
+						 state->rfirst->eref->aliasname, closestfirst) :
+				 errhint("There is a column named \"%s\" in table \"%s\", but it cannot be referenced from this part of the query.",
+						 colname, state->rfirst->eref->aliasname) : 0,
+				 node_parser.parser_errposition(pstate, location)));
+	}
+	else
+	{
+		/* Handle case where there are two equally useful column hints */
+		char	   *closestsecond;
+
+		closestsecond = strVal(list_nth(state->rsecond->eref->colnames,
+										state->second - 1));
+
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_COLUMN),
+				 relname ?
+				 errmsg("column %s.%s does not exist", relname, colname) :
+				 errmsg("column \"%s\" does not exist", colname),
+				 errhint("Perhaps you meant to reference the column \"%s.%s\" or the column \"%s.%s\".",
+						 state->rfirst->eref->aliasname, closestfirst,
+						 state->rsecond->eref->aliasname, closestsecond),
+				 node_parser.parser_errposition(pstate, location)));
+	}
+};
+
 void
 RelationParser::checkNameSpaceConflicts(PGParseState *pstate, PGList *namespace1,
 						PGList *namespace2)

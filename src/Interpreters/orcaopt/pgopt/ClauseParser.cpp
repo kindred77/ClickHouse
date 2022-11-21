@@ -1407,7 +1407,7 @@ ClauseParser::transformGroupClauseExpr(PGList **flatresult, PGBitmapset *seen_lo
 
 			if (sc->tleSortGroupRef == tle->ressortgroupref)
 			{
-				PGSortGroupClause *grpc = copyObject(sc);
+				PGSortGroupClause *grpc = (PGSortGroupClause *)copyObject(sc);
 
 				if (!toplevel)
 					grpc->nulls_first = false;

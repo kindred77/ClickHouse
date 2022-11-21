@@ -21,7 +21,7 @@
 
 #include<string.h>
 
-enum class PGParseExprKind
+typedef enum 
 {
 	EXPR_KIND_NONE = 0,			/* "not in an expression" */
 	EXPR_KIND_OTHER,			/* reserved for extensions */
@@ -60,11 +60,11 @@ enum class PGParseExprKind
 
 	/* GPDB additions */
 	EXPR_KIND_SCATTER_BY		/* SCATTER BY expression */
-};
+} PGParseExprKind;
 
 struct PGParseState
 {
-	struct PGParseState *parentParseState;		/* stack link */
+	struct ParseState *parentParseState;	/* stack link */
 	const char *p_sourcetext;	/* source text, or NULL if not available */
 	duckdb_libpgquery::PGList	   *p_rtable;		/* range table so far */
 	duckdb_libpgquery::PGList	   *p_joinexprs;	/* JoinExprs for RTE_JOIN p_rtable entries */
@@ -72,24 +72,35 @@ struct PGParseState
 								 * node's fromlist) */
 	duckdb_libpgquery::PGList	   *p_namespace;	/* currently-referenceable RTEs (List of
 								 * ParseNamespaceItem) */
-	bool		p_lateral_active;		/* p_lateral_only items visible? */
+	bool		p_lateral_active;	/* p_lateral_only items visible? */
 	duckdb_libpgquery::PGList	   *p_ctenamespace; /* current namespace for common table exprs */
 	duckdb_libpgquery::PGList	   *p_future_ctes;	/* common table exprs not yet in namespace */
-	duckdb_libpgquery::PGCommonTableExpr *p_parent_cte;		/* this query's containing CTE */
+	duckdb_libpgquery::PGCommonTableExpr *p_parent_cte;	/* this query's containing CTE */
+	Relation	p_target_relation;	/* INSERT/UPDATE/DELETE target rel */
+	duckdb_libpgquery::PGRangeTblEntry *p_target_rangetblentry;	/* target rel's RTE */
+	bool		p_is_insert;	/* process assignment like INSERT not UPDATE */
 	duckdb_libpgquery::PGList	   *p_windowdefs;	/* raw representations of window clauses */
 	PGParseExprKind p_expr_kind;	/* what kind of expression we're parsing */
 	int			p_next_resno;	/* next targetlist resno to assign */
-	duckdb_libpgquery::PGList	   *p_locking_clause;		/* raw FOR UPDATE/FOR SHARE info */
-	duckdb_libpgquery::PGNode	   *p_value_substitute;		/* what to replace VALUE with, if any */
+	duckdb_libpgquery::PGList	   *p_multiassign_exprs;	/* junk tlist entries for multiassign */
+	duckdb_libpgquery::PGList	   *p_locking_clause;	/* raw FOR UPDATE/FOR SHARE info */
+	bool		p_locked_from_parent;	/* parent has marked this subquery
+										 * with FOR UPDATE/FOR SHARE */
+	bool		p_resolve_unknowns; /* resolve unknown-type SELECT outputs as
+									 * type text */
+
+	//QueryEnvironment *p_queryEnv;	/* curr env, incl refs to enclosing env */
+
+	/* Flags telling about things found in the query: */
 	bool		p_hasAggs;
 	bool		p_hasWindowFuncs;
+	bool		p_hasTargetSRFs;
 	bool		p_hasSubLinks;
 	bool		p_hasModifyingCTE;
-	bool		p_is_insert;
-	bool		p_is_update;
+	duckdb_libpgquery::PGNode	   *p_last_srf;		/* most recent set-returning func/op found */
+	bool        p_is_on_conflict_update;
+	bool        p_canOptSelectLockingClause; /* Whether can do some optimization on select with locking clause */
 	duckdb_libpgquery::PGLockingClause *p_lockclause_from_parent;
-	Relation	p_target_relation;
-	duckdb_libpgquery::PGRangeTblEntry *p_target_rangetblentry;
 
 	struct HTAB *p_namecache;  /* parse state object name cache */
 	bool        p_hasTblValueExpr;
@@ -102,11 +113,11 @@ struct PGParseState
 	 * Optional hook functions for parser callbacks.  These are null unless
 	 * set up by the caller of make_parsestate.
 	 */
-	//PreParseColumnRefHook p_pre_columnref_hook;
-	//PostParseColumnRefHook p_post_columnref_hook;
-	//ParseParamRefHook p_paramref_hook;
-	//CoerceParamHook p_coerce_param_hook;
-	void	   *p_ref_hook_state;		/* common passthrough link for above */
+	// PreParseColumnRefHook p_pre_columnref_hook;
+	// PostParseColumnRefHook p_post_columnref_hook;
+	// ParseParamRefHook p_paramref_hook;
+	// CoerceParamHook p_coerce_param_hook;
+	void	   *p_ref_hook_state;	/* common passthrough link for above */
 };
 
 struct PGParseNamespaceItem
@@ -138,12 +149,12 @@ struct PGRelation
 	std::vector<PGColumn> columns;
 };
 
-enum class InhOption
+typedef enum
 {
 	INH_NO,						/* Do NOT scan child tables */
 	INH_YES,					/* DO scan child tables */
 	INH_DEFAULT					/* Use current SQL_inheritance option */
-};
+} InhOption;
 
 typedef enum
 {
@@ -154,15 +165,16 @@ typedef enum
 } TypeFuncClass;
 
 /* Result codes for func_get_detail */
-enum class FuncDetailCode
+typedef enum 
 {
 	FUNCDETAIL_NOTFOUND,		/* no matching function */
 	FUNCDETAIL_MULTIPLE,		/* too many matching functions */
 	FUNCDETAIL_NORMAL,			/* found a matching regular function */
+	FUNCDETAIL_PROCEDURE,		/* found a matching procedure */
 	FUNCDETAIL_AGGREGATE,		/* found a matching aggregate function */
 	FUNCDETAIL_WINDOWFUNC,		/* found a matching window function */
 	FUNCDETAIL_COERCION			/* it's a type coercion request */
-};
+} FuncDetailCode;
 
 typedef struct _FuncCandidateList
 {
@@ -207,6 +219,15 @@ typedef struct ArrayType
 	Oid			elemtype;		/* element type OID */
 } ArrayType;
 
+typedef struct
+{
+	int			distance;		/* Weighted distance (lowest so far) */
+	duckdb_libpgquery::PGRangeTblEntry *rfirst;		/* RTE of first */
+	duckdb_libpgquery::PGAttrNumber	first;			/* Closest attribute so far */
+	duckdb_libpgquery::PGRangeTblEntry *rsecond;		/* RTE of second */
+	duckdb_libpgquery::PGAttrNumber	second;			/* Second closest attribute so far */
+} FuzzyAttrMatchState;
+
 bool		SQL_inheritance = true;
 
 typedef signed short int16;
@@ -223,6 +244,9 @@ static inline Datum CStringGetDatum(const char *p) { return PointerGetDatum(p); 
 static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; } 
 
 #define FLOAT8PASSBYVAL true
+
+#define MAX_FUZZY_DISTANCE				3
+#define MaxTupleAttributeNumber 1664	/* 8 * 208 */
 
 #define ERROR		20
 

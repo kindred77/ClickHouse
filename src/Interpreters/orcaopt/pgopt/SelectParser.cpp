@@ -197,6 +197,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 
 	qry->groupClause = clause_parser.transformGroupClause(pstate,
 											stmt->groupClause,
+											&qry->groupingSets,
 											&qry->targetList,
 											qry->sortClause,
 											PGParseExprKind::EXPR_KIND_GROUP_BY,
