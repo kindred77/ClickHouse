@@ -36,6 +36,7 @@ typedef enum
 	EXPR_KIND_WINDOW_ORDER,		/* window definition ORDER BY */
 	EXPR_KIND_WINDOW_FRAME_RANGE,	/* window frame clause with RANGE */
 	EXPR_KIND_WINDOW_FRAME_ROWS,	/* window frame clause with ROWS */
+	EXPR_KIND_WINDOW_FRAME_GROUPS,	/* window frame clause with GROUPS */
 	EXPR_KIND_SELECT_TARGET,	/* SELECT target list item */
 	EXPR_KIND_INSERT_TARGET,	/* INSERT target list item */
 	EXPR_KIND_UPDATE_SOURCE,	/* UPDATE assignment source item */
@@ -47,6 +48,7 @@ typedef enum
 	EXPR_KIND_OFFSET,			/* OFFSET */
 	EXPR_KIND_RETURNING,		/* RETURNING */
 	EXPR_KIND_VALUES,			/* VALUES */
+	EXPR_KIND_VALUES_SINGLE,	/* single-row VALUES (in INSERT only) */
 	EXPR_KIND_CHECK_CONSTRAINT, /* CHECK constraint for a table */
 	EXPR_KIND_DOMAIN_CHECK,		/* CHECK constraint for a domain */
 	EXPR_KIND_COLUMN_DEFAULT,	/* default value for a table column */
@@ -56,7 +58,12 @@ typedef enum
 	EXPR_KIND_ALTER_COL_TRANSFORM,	/* transform expr in ALTER COLUMN TYPE */
 	EXPR_KIND_EXECUTE_PARAMETER,	/* parameter value in EXECUTE */
 	EXPR_KIND_TRIGGER_WHEN,		/* WHEN condition in CREATE TRIGGER */
+	EXPR_KIND_POLICY,			/* USING or WITH CHECK expr in policy */
+	EXPR_KIND_PARTITION_BOUND,	/* partition bound expression */
 	EXPR_KIND_PARTITION_EXPRESSION, /* PARTITION BY expression */
+	EXPR_KIND_CALL_ARGUMENT,	/* procedure argument in CALL */
+	EXPR_KIND_COPY_WHERE,		/* WHERE condition in COPY FROM */
+	EXPR_KIND_GENERATED_COLUMN, /* generation expression for a column */
 
 	/* GPDB additions */
 	EXPR_KIND_SCATTER_BY		/* SCATTER BY expression */
@@ -64,7 +71,7 @@ typedef enum
 
 struct PGParseState
 {
-	struct ParseState *parentParseState;	/* stack link */
+	struct PGParseState *parentParseState;	/* stack link */
 	const char *p_sourcetext;	/* source text, or NULL if not available */
 	duckdb_libpgquery::PGList	   *p_rtable;		/* range table so far */
 	duckdb_libpgquery::PGList	   *p_joinexprs;	/* JoinExprs for RTE_JOIN p_rtable entries */
@@ -128,6 +135,21 @@ struct PGParseNamespaceItem
 	bool		p_lateral_only; /* Is only visible to LATERAL expressions? */
 	bool		p_lateral_ok;	/* If so, does join type allow use? */
 };
+
+typedef struct ErrorContextCallback
+{
+	struct ErrorContextCallback *previous;
+	void		(*callback) (void *arg);
+	void	   *arg;
+} ErrorContextCallback;
+
+/* Support for parser_errposition_callback function */
+typedef struct PGParseCallbackState
+{
+	PGParseState *pstate;
+	int			location;
+	ErrorContextCallback errcallback;
+} PGParseCallbackState;
 
 typedef PGIndex Index;
 
@@ -228,20 +250,36 @@ typedef struct
 	duckdb_libpgquery::PGAttrNumber	second;			/* Second closest attribute so far */
 } FuzzyAttrMatchState;
 
+#define NAMEDATALEN 64
+#define MAX_CACHED_PATH_LEN		16
+
+typedef struct OprCacheKey
+{
+	char		oprname[NAMEDATALEN];
+	Oid			left_arg;		/* Left input OID, or 0 if prefix op */
+	Oid			right_arg;		/* Right input OID, or 0 if postfix op */
+	Oid			search_path[MAX_CACHED_PATH_LEN];
+} OprCacheKey;
+
 bool		SQL_inheritance = true;
 
 typedef signed short int16;
 typedef long int int64;
 typedef int64 Datum;
 typedef char TYPCATEGORY;
+typedef char *Pointer;
 
-static inline int32 DatumGetInt32(Datum d) { return (int32) d; } 
-static inline Datum Int32GetDatum(int32 i32) { return (Datum) i32; } 
-static inline Datum Int64GetDatum(int64 i64) { return (Datum) i64; } 
+static inline Datum BoolGetDatum(bool b) { return (b ? 1 : 0); } 
 
+static inline int32 DatumGetInt32(Datum d) { return (int32) d; };
+static inline Datum Int32GetDatum(int32 i32) { return (Datum) i32; };
+static inline Datum Int64GetDatum(int64 i64) { return (Datum) i64; };
+
+#define DatumGetPointer(X) ((Pointer) (X))
 #define PointerGetDatum(X) ((Datum) (X))
-static inline Datum CStringGetDatum(const char *p) { return PointerGetDatum(p); }
-static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; } 
+static inline Datum CStringGetDatum(const char *p) { return PointerGetDatum(p); };
+static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; } ;
+static inline char *DatumGetCString(Datum d) { return (char* ) DatumGetPointer(d); };
 
 #define FLOAT8PASSBYVAL true
 
@@ -320,6 +358,21 @@ static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; }
 #define  TYPCATEGORY_BITSTRING	'V'		/* er ... "varbit"? */
 #define  TYPCATEGORY_UNKNOWN	'X'
 
+#define PREC_GROUP_POSTFIX_IS	1	/* postfix IS tests (NullTest, etc) */
+#define PREC_GROUP_INFIX_IS		2	/* infix IS (IS DISTINCT FROM, etc) */
+#define PREC_GROUP_LESS			3	/* < > */
+#define PREC_GROUP_EQUAL		4	/* = */
+#define PREC_GROUP_LESS_EQUAL	5	/* <= >= <> */
+#define PREC_GROUP_LIKE			6	/* LIKE ILIKE SIMILAR */
+#define PREC_GROUP_BETWEEN		7	/* BETWEEN */
+#define PREC_GROUP_IN			8	/* IN */
+#define PREC_GROUP_NOT_LIKE		9	/* NOT LIKE/ILIKE/SIMILAR */
+#define PREC_GROUP_NOT_BETWEEN	10	/* NOT BETWEEN */
+#define PREC_GROUP_NOT_IN		11	/* NOT IN */
+#define PREC_GROUP_POSTFIX_OP	12	/* generic postfix operators */
+#define PREC_GROUP_INFIX_OP		13	/* generic infix operators */
+#define PREC_GROUP_PREFIX_OP	14	/* generic prefix operators */
+
 /* Get a bit mask of the bits set in non-long aligned addresses */
 #define LONG_ALIGN_MASK (sizeof(long) - 1)
 #define MEMSET_LOOP_LIMIT 1024
@@ -364,6 +417,26 @@ static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; }
 	((typid) == RECORDOID)
 
 #define Min(x, y)		((x) < (y) ? (x) : (y))
+
+/*
+ * count_nonjunk_tlist_entries
+ *		What it says ...
+ */
+int
+count_nonjunk_tlist_entries(duckdb_libpgquery::PGList *tlist)
+{
+	int			len = 0;
+	duckdb_libpgquery::PGListCell   *l;
+
+	foreach(l, tlist)
+	{
+		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(l);
+
+		if (!tle->resjunk)
+			len++;
+	}
+	return len;
+}
 
 PGParseState *
 make_parsestate(PGParseState *parentParseState)

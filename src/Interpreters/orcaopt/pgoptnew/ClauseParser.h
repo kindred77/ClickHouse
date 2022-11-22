@@ -104,6 +104,16 @@ public:
 
     Index
     assignSortGroupRef(duckdb_libpgquery::PGTargetEntry *tle, duckdb_libpgquery::PGList *tlist);
+
+    duckdb_libpgquery::PGList *
+    addTargetToGroupList(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
+					 duckdb_libpgquery::PGList *grouplist,
+                     duckdb_libpgquery::PGList *targetlist, int location);
+
+    duckdb_libpgquery::PGList *
+    transformDistinctClause(PGParseState *pstate,
+						duckdb_libpgquery::PGList **targetlist,
+                        duckdb_libpgquery::PGList *sortClause, bool is_agg);
 };
 
 }

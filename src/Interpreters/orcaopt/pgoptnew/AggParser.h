@@ -25,6 +25,26 @@ private:
 public:
 	explicit AggParser();
 
+	duckdb_libpgquery::PGNode *
+	transformGroupingFunc(PGParseState *pstate, duckdb_libpgquery::PGGroupingFunc *p);
+
+	int
+	check_agg_arguments(PGParseState *pstate,
+					duckdb_libpgquery::PGList *directargs,
+					duckdb_libpgquery::PGList *args,
+					duckdb_libpgquery::PGExpr *filter);
+
+	void
+	check_agglevels_and_constraints(PGParseState *pstate, duckdb_libpgquery::PGNode *expr);
+
+	void
+	transformAggregateCall(PGParseState *pstate, duckdb_libpgquery::PGAggref *agg,
+					   duckdb_libpgquery::PGList *args,
+					   duckdb_libpgquery::PGList *aggorder, bool agg_distinct);
+
+	void
+	transformWindowFuncCall(PGParseState *pstate, duckdb_libpgquery::PGWindowFunc *wfunc,
+						duckdb_libpgquery::PGWindowDef *windef);
 };
 
 }

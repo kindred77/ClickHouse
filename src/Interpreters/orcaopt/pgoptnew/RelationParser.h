@@ -156,6 +156,13 @@ public:
 
 	duckdb_libpgquery::PGRangeTblEntry *
 	searchRangeTableForRel(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *relation);
+
+	bool
+	isSimplyUpdatableRelation(Oid relid, bool noerror);
+
+	void
+	get_rte_attribute_type(duckdb_libpgquery::PGRangeTblEntry *rte, PGAttrNumber attnum,
+					   Oid *vartype, int32 *vartypmod, Oid *varcollid);
 };
 
 }

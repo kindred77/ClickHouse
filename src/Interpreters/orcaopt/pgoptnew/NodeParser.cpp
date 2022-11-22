@@ -4,6 +4,55 @@ namespace DB
 {
 using namespace duckdb_libpgquery;
 
+Oid
+NodeParser::transformContainerType(Oid *containerType, int32 *containerTypmod)
+{
+	Oid			origContainerType = *containerType;
+	Oid			elementType;
+	HeapTuple	type_tuple_container;
+	Form_pg_type type_struct_container;
+
+	/*
+	 * If the input is a domain, smash to base type, and extract the actual
+	 * typmod to be applied to the base type. Subscripting a domain is an
+	 * operation that necessarily works on the base container type, not the
+	 * domain itself. (Note that we provide no method whereby the creator of a
+	 * domain over a container type could hide its ability to be subscripted.)
+	 */
+	*containerType = getBaseTypeAndTypmod(*containerType, containerTypmod);
+
+	/*
+	 * Here is an array specific code. We treat int2vector and oidvector as
+	 * though they were domains over int2[] and oid[].  This is needed because
+	 * array slicing could create an array that doesn't satisfy the
+	 * dimensionality constraints of the xxxvector type; so we want the result
+	 * of a slice operation to be considered to be of the more general type.
+	 */
+	if (*containerType == INT2VECTOROID)
+		*containerType = INT2ARRAYOID;
+	else if (*containerType == OIDVECTOROID)
+		*containerType = OIDARRAYOID;
+
+	/* Get the type tuple for the container */
+	type_tuple_container = SearchSysCache1(TYPEOID, ObjectIdGetDatum(*containerType));
+	if (!HeapTupleIsValid(type_tuple_container))
+		elog(ERROR, "cache lookup failed for type %u", *containerType);
+	type_struct_container = (Form_pg_type) GETSTRUCT(type_tuple_container);
+
+	/* needn't check typisdefined since this will fail anyway */
+
+	elementType = type_struct_container->typelem;
+	if (elementType == InvalidOid)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATATYPE_MISMATCH),
+				 errmsg("cannot subscript type %s because it is not an array",
+						format_type_be(origContainerType))));
+
+	ReleaseSysCache(type_tuple_container);
+
+	return elementType;
+};
+
 SubscriptingRef *
 NodeParser::transformContainerSubscripts(PGParseState *pstate,
 							 PGNode *containerBase,
@@ -163,6 +212,43 @@ NodeParser::transformContainerSubscripts(PGParseState *pstate,
 	sbsref->refassgnexpr = (PGExpr *) assignFrom;
 
 	return sbsref;
+};
+
+void
+NodeParser::setup_parser_errposition_callback(PGParseCallbackState *pcbstate,
+								  PGParseState *pstate, int location)
+{
+	/* Setup error traceback support for ereport() */
+	pcbstate->pstate = pstate;
+	pcbstate->location = location;
+	pcbstate->errcallback.callback = pcb_error_callback;
+	pcbstate->errcallback.arg = (void *) pcbstate;
+	pcbstate->errcallback.previous = error_context_stack;
+	error_context_stack = &pcbstate->errcallback;
+};
+
+void
+NodeParser::cancel_parser_errposition_callback(PGParseCallbackState *pcbstate)
+{
+	/* Pop the error context stack */
+	error_context_stack = pcbstate->errcallback.previous;
+};
+
+PGVar *
+NodeParser::make_var(PGParseState *pstate, PGRangeTblEntry *rte, int attrno, int location)
+{
+	PGVar		   *result;
+	int			vnum,
+				sublevels_up;
+	Oid			vartypeid;
+	int32		type_mod;
+	Oid			varcollid;
+
+	vnum = relation_parser.RTERangeTablePosn(pstate, rte, &sublevels_up);
+	relation_parser.get_rte_attribute_type(rte, attrno, &vartypeid, &type_mod, &varcollid);
+	result = makeVar(vnum, attrno, vartypeid, type_mod, varcollid, sublevels_up);
+	result->location = location;
+	return result;
 };
 
 }

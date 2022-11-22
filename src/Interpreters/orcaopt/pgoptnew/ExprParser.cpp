@@ -393,20 +393,20 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 	 * returns NULL, use the standard translation, or throw a suitable error
 	 * if there is none.
 	 */
-	if (pstate->p_post_columnref_hook != NULL)
-	{
-		PGNode	   *hookresult;
+	// if (pstate->p_post_columnref_hook != NULL)
+	// {
+	// 	PGNode	   *hookresult;
 
-		hookresult = pstate->p_post_columnref_hook(pstate, cref, node);
-		if (node == NULL)
-			node = hookresult;
-		else if (hookresult != NULL)
-			ereport(ERROR,
-					(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-					 errmsg("column reference \"%s\" is ambiguous",
-							NameListToString(cref->fields)),
-					 parser_errposition(pstate, cref->location)));
-	}
+	// 	hookresult = pstate->p_post_columnref_hook(pstate, cref, node);
+	// 	if (node == NULL)
+	// 		node = hookresult;
+	// 	else if (hookresult != NULL)
+	// 		ereport(ERROR,
+	// 				(errcode(ERRCODE_AMBIGUOUS_COLUMN),
+	// 				 errmsg("column reference \"%s\" is ambiguous",
+	// 						NameListToString(cref->fields)),
+	// 				 parser_errposition(pstate, cref->location)));
+	// }
 
 	/*
 	 * Throw error if no translation found.
@@ -463,6 +463,52 @@ ExprParser::transformParamRef(PGParseState *pstate, PGParamRef *pref)
 				 parser_errposition(pstate, pref->location)));
 
 	return result;
+};
+
+void
+ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *attname,
+				  int location)
+{
+	PGRangeTblEntry *rte;
+
+	if (IsA(relref, PGVar) &&
+		((PGVar *) relref)->varattno == InvalidAttrNumber)
+	{
+		/* Reference the RTE by alias not by actual table name */
+		rte = relation_parser.GetRTEByRangeTablePosn(pstate,
+									 ((PGVar *) relref)->varno,
+									 ((PGVar *) relref)->varlevelsup);
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_COLUMN),
+				 errmsg("column %s.%s does not exist",
+						rte->eref->aliasname, attname),
+				 parser_errposition(pstate, location)));
+	}
+	else
+	{
+		/* Have to do it by reference to the type of the expression */
+		Oid			relTypeId = exprType(relref);
+
+		if (type_parser.typeOrDomainTypeRelid(relTypeId) != InvalidOid)
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_COLUMN),
+					 errmsg("column \"%s\" not found in data type %s",
+							attname, format_type_be(relTypeId)),
+					 parser_errposition(pstate, location)));
+		else if (relTypeId == RECORDOID)
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_COLUMN),
+					 errmsg("could not identify column \"%s\" in record data type",
+							attname),
+					 parser_errposition(pstate, location)));
+		else
+			ereport(ERROR,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("column notation .%s applied to type %s, "
+							"which is not a composite type",
+							attname, format_type_be(relTypeId)),
+					 parser_errposition(pstate, location)));
+	}
 };
 
 PGNode *
@@ -617,7 +663,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 					 parser_errposition(pstate, a->location)));
 
 		/* Select a common type for the elements */
-		coerce_type = select_common_type(pstate, newelems, "ARRAY", NULL);
+		coerce_type = coerce_parser.select_common_type(pstate, newelems, "ARRAY", NULL);
 
 		if (newa->multidims)
 		{
@@ -704,7 +750,7 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 	int			location;
 
 	/* Look up the type name first */
-	typenameTypeIdAndMod(pstate, tc->typeName, &targetType, &targetTypmod);
+	type_parser.typenameTypeIdAndMod(pstate, tc->typeName, &targetType, &targetTypmod);
 
 	/*
 	 * Look through any AEXPR_PAREN nodes that may have been inserted thanks
@@ -775,7 +821,7 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 				 errmsg("cannot cast type %s to %s",
 						format_type_be(inputType),
 						format_type_be(targetType)),
-				 parser_coercion_errposition(pstate, location, expr)));
+				 coerce_parser.parser_coercion_errposition(pstate, location, expr)));
 
 	return result;
 };
@@ -802,10 +848,438 @@ ExprParser::transformCollateClause(PGParseState *pstate, PGCollateClause *c)
 						format_type_be(argtype)),
 				 parser_errposition(pstate, c->location)));
 
-	newc->collOid = LookupCollation(pstate, c->collname, c->location);
+	newc->collOid = type_parser.LookupCollation(pstate, c->collname, c->location);
 	newc->location = c->location;
 
 	return (PGNode *) newc;
+};
+
+int
+ExprParser::operator_precedence_group(PGNode *node, const char **nodename)
+{
+	int			group = 0;
+
+	*nodename = NULL;
+	if (node == NULL)
+		return 0;
+
+	if (IsA(node, PGAExpr))
+	{
+		PGAExpr	   *aexpr = (PGAExpr *) node;
+
+		if (aexpr->kind == PG_AEXPR_OP &&
+			aexpr->lexpr != NULL &&
+			aexpr->rexpr != NULL)
+		{
+			/* binary operator */
+			if (list_length(aexpr->name) == 1)
+			{
+				*nodename = strVal(linitial(aexpr->name));
+				/* Ignore if op was always higher priority than IS-tests */
+				if (strcmp(*nodename, "+") == 0 ||
+					strcmp(*nodename, "-") == 0 ||
+					strcmp(*nodename, "*") == 0 ||
+					strcmp(*nodename, "/") == 0 ||
+					strcmp(*nodename, "%") == 0 ||
+					strcmp(*nodename, "^") == 0)
+					group = 0;
+				else if (strcmp(*nodename, "<") == 0 ||
+						 strcmp(*nodename, ">") == 0)
+					group = PREC_GROUP_LESS;
+				else if (strcmp(*nodename, "=") == 0)
+					group = PREC_GROUP_EQUAL;
+				else if (strcmp(*nodename, "<=") == 0 ||
+						 strcmp(*nodename, ">=") == 0 ||
+						 strcmp(*nodename, "<>") == 0)
+					group = PREC_GROUP_LESS_EQUAL;
+				else
+					group = PREC_GROUP_INFIX_OP;
+			}
+			else
+			{
+				/* schema-qualified operator syntax */
+				*nodename = "OPERATOR()";
+				group = PREC_GROUP_INFIX_OP;
+			}
+		}
+		else if (aexpr->kind == PG_AEXPR_OP &&
+				 aexpr->lexpr == NULL &&
+				 aexpr->rexpr != NULL)
+		{
+			/* prefix operator */
+			if (list_length(aexpr->name) == 1)
+			{
+				*nodename = strVal(linitial(aexpr->name));
+				/* Ignore if op was always higher priority than IS-tests */
+				if (strcmp(*nodename, "+") == 0 ||
+					strcmp(*nodename, "-") == 0)
+					group = 0;
+				else
+					group = PREC_GROUP_PREFIX_OP;
+			}
+			else
+			{
+				/* schema-qualified operator syntax */
+				*nodename = "OPERATOR()";
+				group = PREC_GROUP_PREFIX_OP;
+			}
+		}
+		else if (aexpr->kind == PG_AEXPR_OP &&
+				 aexpr->lexpr != NULL &&
+				 aexpr->rexpr == NULL)
+		{
+			/* postfix operator */
+			if (list_length(aexpr->name) == 1)
+			{
+				*nodename = strVal(linitial(aexpr->name));
+				group = PREC_GROUP_POSTFIX_OP;
+			}
+			else
+			{
+				/* schema-qualified operator syntax */
+				*nodename = "OPERATOR()";
+				group = PREC_GROUP_POSTFIX_OP;
+			}
+		}
+		else if (aexpr->kind == PG_AEXPR_OP_ANY ||
+				 aexpr->kind == PG_AEXPR_OP_ALL)
+		{
+			*nodename = strVal(llast(aexpr->name));
+			group = PREC_GROUP_POSTFIX_OP;
+		}
+		else if (aexpr->kind == PG_AEXPR_DISTINCT ||
+				 aexpr->kind == PG_AEXPR_NOT_DISTINCT)
+		{
+			*nodename = "IS";
+			group = PREC_GROUP_INFIX_IS;
+		}
+		else if (aexpr->kind == PG_AEXPR_OF)
+		{
+			*nodename = "IS";
+			group = PREC_GROUP_POSTFIX_IS;
+		}
+		else if (aexpr->kind == PG_AEXPR_IN)
+		{
+			*nodename = "IN";
+			if (strcmp(strVal(linitial(aexpr->name)), "=") == 0)
+				group = PREC_GROUP_IN;
+			else
+				group = PREC_GROUP_NOT_IN;
+		}
+		else if (aexpr->kind == PG_AEXPR_LIKE)
+		{
+			*nodename = "LIKE";
+			if (strcmp(strVal(linitial(aexpr->name)), "~~") == 0)
+				group = PREC_GROUP_LIKE;
+			else
+				group = PREC_GROUP_NOT_LIKE;
+		}
+		else if (aexpr->kind == PG_AEXPR_ILIKE)
+		{
+			*nodename = "ILIKE";
+			if (strcmp(strVal(linitial(aexpr->name)), "~~*") == 0)
+				group = PREC_GROUP_LIKE;
+			else
+				group = PREC_GROUP_NOT_LIKE;
+		}
+		else if (aexpr->kind == PG_AEXPR_SIMILAR)
+		{
+			*nodename = "SIMILAR";
+			if (strcmp(strVal(linitial(aexpr->name)), "~") == 0)
+				group = PREC_GROUP_LIKE;
+			else
+				group = PREC_GROUP_NOT_LIKE;
+		}
+		else if (aexpr->kind == PG_AEXPR_BETWEEN ||
+				 aexpr->kind == PG_AEXPR_BETWEEN_SYM)
+		{
+			Assert(list_length(aexpr->name) == 1);
+			*nodename = strVal(linitial(aexpr->name));
+			group = PREC_GROUP_BETWEEN;
+		}
+		else if (aexpr->kind == PG_AEXPR_NOT_BETWEEN ||
+				 aexpr->kind == PG_AEXPR_NOT_BETWEEN_SYM)
+		{
+			Assert(list_length(aexpr->name) == 1);
+			*nodename = strVal(linitial(aexpr->name));
+			group = PREC_GROUP_NOT_BETWEEN;
+		}
+	}
+	else if (IsA(node, PGNullTest) ||
+			 IsA(node, PGBooleanTest))
+	{
+		*nodename = "IS";
+		group = PREC_GROUP_POSTFIX_IS;
+	}
+	// else if (IsA(node, PGXmlExpr))
+	// {
+	// 	PGXmlExpr    *x = (PGXmlExpr *) node;
+
+	// 	if (x->op == PG_IS_DOCUMENT)
+	// 	{
+	// 		*nodename = "IS";
+	// 		group = PREC_GROUP_POSTFIX_IS;
+	// 	}
+	// }
+	else if (IsA(node, PGSubLink))
+	{
+		PGSubLink    *s = (PGSubLink *) node;
+
+		if (s->subLinkType == PG_ANY_SUBLINK ||
+			s->subLinkType == PG_ALL_SUBLINK)
+		{
+			if (s->operName == NIL)
+			{
+				*nodename = "IN";
+				group = PREC_GROUP_IN;
+			}
+			else
+			{
+				*nodename = strVal(llast(s->operName));
+				group = PREC_GROUP_POSTFIX_OP;
+			}
+		}
+	}
+	else if (IsA(node, PGBoolExpr))
+	{
+		/*
+		 * Must dig into NOTs to see if it's IS NOT DOCUMENT or NOT IN.  This
+		 * opens us to possibly misrecognizing, eg, NOT (x IS DOCUMENT) as a
+		 * problematic construct.  We can tell the difference by checking
+		 * whether the parse locations of the two nodes are identical.
+		 *
+		 * Note that when we are comparing the child node to its own children,
+		 * we will not know that it was a NOT.  Fortunately, that doesn't
+		 * matter for these cases.
+		 */
+		PGBoolExpr   *b = (PGBoolExpr *) node;
+
+		if (b->boolop == PG_NOT_EXPR)
+		{
+			PGNode	   *child = (PGNode *) linitial(b->args);
+
+			if (IsA(child, PGXmlExpr))
+			{
+				// PGXmlExpr    *x = (PGXmlExpr *) child;
+
+				// if (x->op == IS_DOCUMENT &&
+				// 	x->location == b->location)
+				// {
+				// 	*nodename = "IS";
+				// 	group = PREC_GROUP_POSTFIX_IS;
+				// }
+			}
+			else if (IsA(child, PGSubLink))
+			{
+				PGSubLink    *s = (PGSubLink *) child;
+
+				if (s->subLinkType == PG_ANY_SUBLINK && s->operName == NIL &&
+					s->location == b->location)
+				{
+					*nodename = "IN";
+					group = PREC_GROUP_NOT_IN;
+				}
+			}
+		}
+	}
+	return group;
+};
+
+PGNode *
+ExprParser::make_row_comparison_op(PGParseState *pstate, PGList *opname,
+					   PGList *largs, PGList *rargs, int location)
+{
+	PGRowCompareExpr *rcexpr;
+	PGRowCompareType rctype;
+	PGList	   *opexprs;
+	PGList	   *opnos;
+	PGList	   *opfamilies;
+	PGListCell   *l,
+			   *r;
+	PGList	  **opinfo_lists;
+	PGBitmapset  *strats;
+	int			nopers;
+	int			i;
+
+	nopers = list_length(largs);
+	if (nopers != list_length(rargs))
+		ereport(ERROR,
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+				 errmsg("unequal number of entries in row expressions"),
+				 parser_errposition(pstate, location)));
+
+	/*
+	 * We can't compare zero-length rows because there is no principled basis
+	 * for figuring out what the operator is.
+	 */
+	if (nopers == 0)
+		ereport(ERROR,
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot compare rows of zero length"),
+				 parser_errposition(pstate, location)));
+
+	/*
+	 * Identify all the pairwise operators, using make_op so that behavior is
+	 * the same as in the simple scalar case.
+	 */
+	opexprs = NIL;
+	forboth(l, largs, r, rargs)
+	{
+		PGNode	   *larg = (PGNode *) lfirst(l);
+		PGNode	   *rarg = (PGNode *) lfirst(r);
+		PGOpExpr	   *cmp;
+
+		cmp = castNode(PGOpExpr, oper_parser.make_op(pstate, opname, larg, rarg,
+									   pstate->p_last_srf, location));
+
+		/*
+		 * We don't use coerce_to_boolean here because we insist on the
+		 * operator yielding boolean directly, not via coercion.  If it
+		 * doesn't yield bool it won't be in any index opfamilies...
+		 */
+		if (cmp->opresulttype != BOOLOID)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					 errmsg("row comparison operator must yield type boolean, "
+							"not type %s",
+							format_type_be(cmp->opresulttype)),
+					 parser_errposition(pstate, location)));
+		if (expression_returns_set((PGNode *) cmp))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					 errmsg("row comparison operator must not return a set"),
+					 parser_errposition(pstate, location)));
+		opexprs = lappend(opexprs, cmp);
+	}
+
+	/*
+	 * If rows are length 1, just return the single operator.  In this case we
+	 * don't insist on identifying btree semantics for the operator (but we
+	 * still require it to return boolean).
+	 */
+	if (nopers == 1)
+		return (PGNode *) linitial(opexprs);
+
+	/*
+	 * Now we must determine which row comparison semantics (= <> < <= > >=)
+	 * apply to this set of operators.  We look for btree opfamilies
+	 * containing the operators, and see which interpretations (strategy
+	 * numbers) exist for each operator.
+	 */
+	opinfo_lists = (PGList **) palloc(nopers * sizeof(PGList *));
+	strats = NULL;
+	i = 0;
+	foreach(l, opexprs)
+	{
+		Oid			opno = ((PGOpExpr *) lfirst(l))->opno;
+		PGBitmapset  *this_strats;
+		PGListCell   *j;
+
+		opinfo_lists[i] = get_op_btree_interpretation(opno);
+
+		/*
+		 * convert strategy numbers into a Bitmapset to make the intersection
+		 * calculation easy.
+		 */
+		this_strats = NULL;
+		foreach(j, opinfo_lists[i])
+		{
+			OpBtreeInterpretation *opinfo = lfirst(j);
+
+			this_strats = bms_add_member(this_strats, opinfo->strategy);
+		}
+		if (i == 0)
+			strats = this_strats;
+		else
+			strats = bms_int_members(strats, this_strats);
+		i++;
+	}
+
+	/*
+	 * If there are multiple common interpretations, we may use any one of
+	 * them ... this coding arbitrarily picks the lowest btree strategy
+	 * number.
+	 */
+	i = bms_first_member(strats);
+	if (i < 0)
+	{
+		/* No common interpretation, so fail */
+		ereport(ERROR,
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("could not determine interpretation of row comparison operator %s",
+						strVal(llast(opname))),
+				 errhint("Row comparison operators must be associated with btree operator families."),
+				 parser_errposition(pstate, location)));
+	}
+	rctype = (PGRowCompareType) i;
+
+	/*
+	 * For = and <> cases, we just combine the pairwise operators with AND or
+	 * OR respectively.
+	 */
+	if (rctype == PG_ROWCOMPARE_EQ)
+		return (PGNode *) makeBoolExpr(PG_AND_EXPR, opexprs, location);
+	if (rctype == PG_ROWCOMPARE_NE)
+		return (PGNode *) makeBoolExpr(PG_OR_EXPR, opexprs, location);
+
+	/*
+	 * Otherwise we need to choose exactly which opfamily to associate with
+	 * each operator.
+	 */
+	opfamilies = NIL;
+	for (i = 0; i < nopers; i++)
+	{
+		Oid			opfamily = InvalidOid;
+		ListCell   *j;
+
+		foreach(j, opinfo_lists[i])
+		{
+			OpBtreeInterpretation *opinfo = lfirst(j);
+
+			if (opinfo->strategy == rctype)
+			{
+				opfamily = opinfo->opfamily_id;
+				break;
+			}
+		}
+		if (OidIsValid(opfamily))
+			opfamilies = lappend_oid(opfamilies, opfamily);
+		else					/* should not happen */
+			ereport(ERROR,
+					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("could not determine interpretation of row comparison operator %s",
+							strVal(llast(opname))),
+					 errdetail("There are multiple equally-plausible candidates."),
+					 parser_errposition(pstate, location)));
+	}
+
+	/*
+	 * Now deconstruct the OpExprs and create a RowCompareExpr.
+	 *
+	 * Note: can't just reuse the passed largs/rargs lists, because of
+	 * possibility that make_op inserted coercion operations.
+	 */
+	opnos = NIL;
+	largs = NIL;
+	rargs = NIL;
+	foreach(l, opexprs)
+	{
+		PGOpExpr	   *cmp = (PGOpExpr *) lfirst(l);
+
+		opnos = lappend_oid(opnos, cmp->opno);
+		largs = lappend(largs, linitial(cmp->args));
+		rargs = lappend(rargs, lsecond(cmp->args));
+	}
+
+	rcexpr = makeNode(PGRowCompareExpr);
+	rcexpr->rctype = rctype;
+	rcexpr->opnos = opnos;
+	rcexpr->opfamilies = opfamilies;
+	rcexpr->inputcollids = NIL; /* assign_expr_collations will fix this */
+	rcexpr->largs = largs;
+	rcexpr->rargs = rargs;
+
+	return (PGNode *) rcexpr;
 };
 
 PGNode *
@@ -898,7 +1372,7 @@ ExprParser::transformAExprOp(PGParseState *pstate, PGAExpr *a)
 		lexpr = transformExprRecurse(pstate, lexpr);
 		rexpr = transformExprRecurse(pstate, rexpr);
 
-		result = (PGNode *) make_op(pstate,
+		result = (PGNode *) oper_parser.make_op(pstate,
 								  a->name,
 								  lexpr,
 								  rexpr,
@@ -924,12 +1398,64 @@ ExprParser::transformAExprOpAny(PGParseState *pstate, PGAExpr *a)
 	lexpr = transformExprRecurse(pstate, lexpr);
 	rexpr = transformExprRecurse(pstate, rexpr);
 
-	return (PGNode *) make_scalar_array_op(pstate,
+	return (PGNode *) oper_parser.make_scalar_array_op(pstate,
 										 a->name,
 										 true,
 										 lexpr,
 										 rexpr,
 										 a->location);
+};
+
+void
+ExprParser::emit_precedence_warnings(PGParseState *pstate,
+						 int opgroup, const char *opname,
+						 PGNode *lchild, PGNode *rchild,
+						 int location)
+{
+	int			cgroup;
+	const char *copname;
+
+	Assert(opgroup > 0);
+
+	/*
+	 * Complain if left child, which should be same or higher precedence
+	 * according to current rules, used to be lower precedence.
+	 *
+	 * Exception to precedence rules: if left child is IN or NOT IN or a
+	 * postfix operator, the grouping is syntactically forced regardless of
+	 * precedence.
+	 */
+	cgroup = operator_precedence_group(lchild, &copname);
+	if (cgroup > 0)
+	{
+		if (oldprecedence_l[cgroup] < oldprecedence_r[opgroup] &&
+			cgroup != PREC_GROUP_IN &&
+			cgroup != PREC_GROUP_NOT_IN &&
+			cgroup != PREC_GROUP_POSTFIX_OP &&
+			cgroup != PREC_GROUP_POSTFIX_IS)
+			ereport(WARNING,
+					(errmsg("operator precedence change: %s is now lower precedence than %s",
+							opname, copname),
+					 parser_errposition(pstate, location)));
+	}
+
+	/*
+	 * Complain if right child, which should be higher precedence according to
+	 * current rules, used to be same or lower precedence.
+	 *
+	 * Exception to precedence rules: if right child is a prefix operator, the
+	 * grouping is syntactically forced regardless of precedence.
+	 */
+	cgroup = operator_precedence_group(rchild, &copname);
+	if (cgroup > 0)
+	{
+		if (oldprecedence_r[cgroup] <= oldprecedence_l[opgroup] &&
+			cgroup != PREC_GROUP_PREFIX_OP)
+			ereport(WARNING,
+					(errmsg("operator precedence change: %s is now lower precedence than %s",
+							opname, copname),
+					 parser_errposition(pstate, location)));
+	}
 };
 
 PGNode *
@@ -953,6 +1479,23 @@ ExprParser::transformAExprOpAll(PGParseState *pstate, PGAExpr *a)
 										 lexpr,
 										 rexpr,
 										 a->location);
+};
+
+duckdb_libpgquery::PGNode *
+ExprParser::make_nulltest_from_distinct(PGParseState *pstate, PGAExpr *distincta, PGNode *arg)
+{
+	PGNullTest   *nt = makeNode(PGNullTest);
+
+	nt->arg = (PGExpr *) transformExprRecurse(pstate, arg);
+	/* the argument can be any type, so don't coerce it */
+	if (distincta->kind == PG_AEXPR_NOT_DISTINCT)
+		nt->nulltesttype = PG_IS_NULL;
+	else
+		nt->nulltesttype = IS_NOT_NULL;
+	/* argisrow = false is correct whether or not arg is composite */
+	nt->argisrow = false;
+	nt->location = distincta->location;
+	return (PGNode *) nt;
 };
 
 PGNode *
@@ -1633,39 +2176,6 @@ ExprParser::transformMultiAssignRef(PGParseState *pstate, PGMultiAssignRef *mare
 };
 
 PGNode *
-ExprParser::transformGroupingFunc(PGParseState *pstate, PGGroupingFunc *p)
-{
-	PGListCell   *lc;
-	PGList	   *args = p->args;
-	PGList	   *result_list = NIL;
-	PGGroupingFunc *result = makeNode(PGGroupingFunc);
-
-	if (list_length(args) > 31)
-		ereport(ERROR,
-				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
-				 errmsg("GROUPING must have fewer than 32 arguments"),
-				 parser_errposition(pstate, p->location)));
-
-	foreach(lc, args)
-	{
-		PGNode	   *current_result;
-
-		current_result = transformExpr(pstate, (PGNode *) lfirst(lc), pstate->p_expr_kind);
-
-		/* acceptability of expressions is checked later */
-
-		result_list = lappend(result_list, current_result);
-	}
-
-	result->args = result_list;
-	result->location = p->location;
-
-	check_agglevels_and_constraints(pstate, (PGNode *) result);
-
-	return (PGNode *) result;
-};
-
-PGNode *
 ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 {
 	PGNode	   *result = (PGNode *) sublink;
@@ -1911,6 +2421,23 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 	return result;
 };
 
+bool
+ExprParser::isWhenIsNotDistinctFromExpr(PGNode *warg)
+{
+	if (IsA(warg, PGBoolExpr))
+	{
+		PGBoolExpr *bexpr = (PGBoolExpr *) warg;
+		PGNode *arg = (PGNode *)linitial(bexpr->args);
+		if (bexpr->boolop == PG_NOT_EXPR && IsA(arg, PGAExpr))
+		{
+			PGAExpr *expr = (PGAExpr *) arg;
+			if (expr->kind == PG_AEXPR_DISTINCT && expr->lexpr == NULL)
+				return true;
+		}
+	}
+	return false;
+};
+
 PGNode *
 ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 {
@@ -1946,7 +2473,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 		 * leave it to parse_collate.c to do that later, but propagating the
 		 * result to the CaseTestExpr would be unnecessarily complicated.
 		 */
-		assign_expr_collations(pstate, arg);
+		collation_parser.assign_expr_collations(pstate, arg);
 
 		placeholder = makeNode(PGCaseTestExpr);
 		placeholder->typeId = exprType(arg);
@@ -2272,7 +2799,7 @@ ExprParser::transformCurrentOfExpr(PGParseState *pstate, PGCurrentOfExpr *cexpr)
 	 * rewriting/planning against views, for example.
 	 */
 	Assert(pstate->p_target_rangetblentry != NULL);
-	(void) isSimplyUpdatableRelation(pstate->p_target_rangetblentry->relid, false);
+	(void) relation_parser.isSimplyUpdatableRelation(pstate->p_target_rangetblentry->relid, false);
 
 	/* CURRENT OF can only appear at top level of UPDATE/DELETE */
 	Assert(pstate->p_target_rangetblentry != NULL);
@@ -2436,7 +2963,7 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 			break;
 
 		case T_PGGroupingFunc:
-			result = transformGroupingFunc(pstate, (PGGroupingFunc *) expr);
+			result = agg_parser.transformGroupingFunc(pstate, (PGGroupingFunc *) expr);
 			break;
 
 		// case T_PGGroupId:
@@ -2561,6 +3088,102 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 	}
 
 	return result;
+};
+
+char *
+ExprParser::ParseExprKindName(PGParseExprKind exprKind)
+{
+	switch (exprKind)
+	{
+		case EXPR_KIND_NONE:
+			return "invalid expression context";
+		case EXPR_KIND_OTHER:
+			return "extension expression";
+		case EXPR_KIND_JOIN_ON:
+			return "JOIN/ON";
+		case EXPR_KIND_JOIN_USING:
+			return "JOIN/USING";
+		case EXPR_KIND_FROM_SUBSELECT:
+			return "sub-SELECT in FROM";
+		case EXPR_KIND_FROM_FUNCTION:
+			return "function in FROM";
+		case EXPR_KIND_WHERE:
+			return "WHERE";
+		case EXPR_KIND_POLICY:
+			return "POLICY";
+		case EXPR_KIND_HAVING:
+			return "HAVING";
+		case EXPR_KIND_FILTER:
+			return "FILTER";
+		case EXPR_KIND_WINDOW_PARTITION:
+			return "window PARTITION BY";
+		case EXPR_KIND_WINDOW_ORDER:
+			return "window ORDER BY";
+		case EXPR_KIND_WINDOW_FRAME_RANGE:
+			return "window RANGE";
+		case EXPR_KIND_WINDOW_FRAME_ROWS:
+			return "window ROWS";
+		case EXPR_KIND_WINDOW_FRAME_GROUPS:
+			return "window GROUPS";
+		case EXPR_KIND_SELECT_TARGET:
+			return "SELECT";
+		case EXPR_KIND_INSERT_TARGET:
+			return "INSERT";
+		case EXPR_KIND_UPDATE_SOURCE:
+		case EXPR_KIND_UPDATE_TARGET:
+			return "UPDATE";
+		case EXPR_KIND_GROUP_BY:
+			return "GROUP BY";
+		case EXPR_KIND_ORDER_BY:
+			return "ORDER BY";
+		case EXPR_KIND_DISTINCT_ON:
+			return "DISTINCT ON";
+		case EXPR_KIND_LIMIT:
+			return "LIMIT";
+		case EXPR_KIND_OFFSET:
+			return "OFFSET";
+		case EXPR_KIND_RETURNING:
+			return "RETURNING";
+		case EXPR_KIND_VALUES:
+		case EXPR_KIND_VALUES_SINGLE:
+			return "VALUES";
+		case EXPR_KIND_CHECK_CONSTRAINT:
+		case EXPR_KIND_DOMAIN_CHECK:
+			return "CHECK";
+		case EXPR_KIND_COLUMN_DEFAULT:
+		case EXPR_KIND_FUNCTION_DEFAULT:
+			return "DEFAULT";
+		case EXPR_KIND_INDEX_EXPRESSION:
+			return "index expression";
+		case EXPR_KIND_INDEX_PREDICATE:
+			return "index predicate";
+		case EXPR_KIND_ALTER_COL_TRANSFORM:
+			return "USING";
+		case EXPR_KIND_EXECUTE_PARAMETER:
+			return "EXECUTE";
+		case EXPR_KIND_TRIGGER_WHEN:
+			return "WHEN";
+		case EXPR_KIND_PARTITION_BOUND:
+			return "partition bound";
+		case EXPR_KIND_PARTITION_EXPRESSION:
+			return "PARTITION BY";
+		case EXPR_KIND_CALL_ARGUMENT:
+			return "CALL";
+		case EXPR_KIND_COPY_WHERE:
+			return "WHERE";
+		case EXPR_KIND_GENERATED_COLUMN:
+			return "GENERATED AS";
+		case EXPR_KIND_SCATTER_BY:
+			return "SCATTER BY";
+
+			/*
+			 * There is intentionally no default: case here, so that the
+			 * compiler will warn if we add a new ParseExprKind without
+			 * extending this switch.  If we do see an unrecognized value at
+			 * runtime, we'll fall through to the "unrecognized" return.
+			 */
+	}
+	return "unrecognized expression kind";
 };
 
 }

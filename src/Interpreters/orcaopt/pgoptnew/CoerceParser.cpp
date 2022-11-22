@@ -274,6 +274,19 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 	return (PGNode *) rowexpr;
 };
 
+bool
+CoerceParser::IsPreferredType(TYPCATEGORY category, Oid type)
+{
+	char		typcategory;
+	bool		typispreferred;
+
+	get_type_category_preferred(type, &typcategory, &typispreferred);
+	if (category == typcategory || category == TYPCATEGORY_INVALID)
+		return typispreferred;
+	else
+		return false;
+};
+
 PGNode *
 CoerceParser::coerce_to_domain(PGNode *arg, Oid baseTypeId, int32 baseTypeMod, Oid typeId,
 				 PGCoercionContext ccontext, PGCoercionForm cformat, int location,
@@ -324,6 +337,14 @@ CoerceParser::coerce_to_domain(PGNode *arg, Oid baseTypeId, int32 baseTypeMod, O
 	result->location = location;
 
 	return (PGNode *) result;
+};
+
+bool
+CoerceParser::is_complex_array(Oid typid)
+{
+	Oid			elemtype = get_element_type(typid);
+
+	return (OidIsValid(elemtype) && type_parser.typeOrDomainTypeRelid(elemtype) != InvalidOid);
 };
 
 PGNode *
@@ -474,13 +495,13 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		else
 			inputTypeMod = -1;
 
-		baseType = typeidType(baseTypeId);
+		baseType = type_parser.typeidType(baseTypeId);
 
 		newcon->consttype = baseTypeId;
 		newcon->consttypmod = inputTypeMod;
-		newcon->constcollid = typeTypeCollation(baseType);
-		newcon->constlen = typeLen(baseType);
-		newcon->constbyval = typeByVal(baseType);
+		newcon->constcollid = type_parser.typeTypeCollation(baseType);
+		newcon->constlen = type_parser.typeLen(baseType);
+		newcon->constbyval = type_parser.typeByVal(baseType);
 		newcon->constisnull = con->constisnull;
 
 		/*
@@ -501,11 +522,11 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		 * as CSTRING.
 		 */
 		if (!con->constisnull)
-			newcon->constvalue = stringTypeDatum(baseType,
+			newcon->constvalue = type_parser.stringTypeDatum(baseType,
 												 DatumGetCString(con->constvalue),
 												 inputTypeMod);
 		else
-			newcon->constvalue = stringTypeDatum(baseType,
+			newcon->constvalue = type_parser.stringTypeDatum(baseType,
 												 NULL,
 												 inputTypeMod);
 
@@ -535,7 +556,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		{
 			Datum		val2;
 
-			val2 = stringTypeDatum(baseType,
+			val2 = type_parser.stringTypeDatum(baseType,
 								   DatumGetCString(con->constvalue),
 								   inputTypeMod);
 			if (newcon->constlen == -1)
@@ -664,14 +685,14 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		return result;
 	}
 	if (inputTypeId == RECORDOID &&
-		ISCOMPLEX(targetTypeId))
+		type_parser.typeOrDomainTypeRelid(targetTypeId) != InvalidOid)
 	{
 		/* Coerce a RECORD to a specific complex type */
 		return coerce_record_to_complex(pstate, node, targetTypeId,
 										ccontext, cformat, location);
 	}
 	if (targetTypeId == RECORDOID &&
-		ISCOMPLEX(inputTypeId))
+		type_parser.typeOrDomainTypeRelid(inputTypeId) != InvalidOid)
 	{
 		/* Coerce a specific complex type to RECORD */
 		/* NB: we do NOT want a RelabelType here */
@@ -729,6 +750,17 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 	elog(ERROR, "failed to find conversion function from %s to %s",
 		 format_type_be(inputTypeId), format_type_be(targetTypeId));
 	return NULL;				/* keep compiler quiet */
+};
+
+TYPCATEGORY
+CoerceParser::TypeCategory(Oid type)
+{
+	char		typcategory;
+	bool		typispreferred;
+
+	get_type_category_preferred(type, &typcategory, &typispreferred);
+	Assert(typcategory != TYPCATEGORY_INVALID);
+	return (TYPCATEGORY) typcategory;
 };
 
 CoercionPathType
@@ -930,14 +962,14 @@ CoerceParser::can_coerce_type(int nargs, const Oid *input_typeids, const Oid *ta
 		 * coerce (may need tighter checking here)
 		 */
 		if (inputTypeId == RECORDOID &&
-			ISCOMPLEX(targetTypeId))
+			type_parser.typeOrDomainTypeRelid(targetTypeId) != InvalidOid)
 			continue;
 
 		/*
 		 * If input is a composite type and target is RECORD, accept
 		 */
 		if (targetTypeId == RECORDOID &&
-			ISCOMPLEX(inputTypeId))
+			type_parser.typeOrDomainTypeRelid(inputTypeId) != InvalidOid)
 			continue;
 
 #ifdef NOT_USED					/* not implemented yet */
@@ -994,7 +1026,7 @@ CoerceParser::find_typmod_coercion_function(Oid typeId,
 	*funcid = InvalidOid;
 	result = COERCION_PATH_FUNC;
 
-	targetType = typeidType(typeId);
+	targetType = type_parser.typeidType(typeId);
 	typeForm = (Form_pg_type) GETSTRUCT(targetType);
 
 	/* Check for a varlena array type */
@@ -1356,6 +1388,318 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 						format_type_be(targetTypeId)),
 				 parser_errposition(pstate, exprLocation(node))));
 	return node;
+};
+
+void
+CoerceParser::parser_coercion_errposition(PGParseState *pstate,
+							int coerce_location,
+							PGNode *input_expr)
+{
+	if (coerce_location >= 0)
+		parser_errposition(pstate, coerce_location);
+	else
+		parser_errposition(pstate, exprLocation(input_expr));
+};
+
+Oid
+CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
+								 Oid *declared_arg_types,
+								 int nargs,
+								 Oid rettype,
+								 bool allow_poly)
+{
+	int			j;
+	bool		have_generics = false;
+	bool		have_unknowns = false;
+	Oid			elem_typeid = InvalidOid;
+	Oid			array_typeid = InvalidOid;
+	Oid			range_typeid = InvalidOid;
+	Oid			array_typelem;
+	Oid			range_typelem;
+	bool		have_anyelement = (rettype == ANYELEMENTOID ||
+								   rettype == ANYNONARRAYOID ||
+								   rettype == ANYENUMOID);
+	bool		have_anynonarray = (rettype == ANYNONARRAYOID);
+	bool		have_anyenum = (rettype == ANYENUMOID);
+
+	/*
+	 * Loop through the arguments to see if we have any that are polymorphic.
+	 * If so, require the actual types to be consistent.
+	 */
+	for (j = 0; j < nargs; j++)
+	{
+		Oid			decl_type = declared_arg_types[j];
+		Oid			actual_type = actual_arg_types[j];
+
+		if (decl_type == ANYELEMENTOID ||
+			decl_type == ANYNONARRAYOID ||
+			decl_type == ANYENUMOID)
+		{
+			have_generics = have_anyelement = true;
+			if (decl_type == ANYNONARRAYOID)
+				have_anynonarray = true;
+			else if (decl_type == ANYENUMOID)
+				have_anyenum = true;
+			if (actual_type == UNKNOWNOID)
+			{
+				have_unknowns = true;
+				continue;
+			}
+			if (allow_poly && decl_type == actual_type)
+				continue;		/* no new information here */
+			if (OidIsValid(elem_typeid) && actual_type != elem_typeid)
+				ereport(ERROR,
+						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						 errmsg("arguments declared \"anyelement\" are not all alike"),
+						 errdetail("%s versus %s",
+								   format_type_be(elem_typeid),
+								   format_type_be(actual_type))));
+			elem_typeid = actual_type;
+		}
+		else if (decl_type == ANYARRAYOID)
+		{
+			have_generics = true;
+			if (actual_type == UNKNOWNOID)
+			{
+				have_unknowns = true;
+				continue;
+			}
+			if (allow_poly && decl_type == actual_type)
+				continue;		/* no new information here */
+			actual_type = getBaseType(actual_type); /* flatten domains */
+			if (OidIsValid(array_typeid) && actual_type != array_typeid)
+				ereport(ERROR,
+						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						 errmsg("arguments declared \"anyarray\" are not all alike"),
+						 errdetail("%s versus %s",
+								   format_type_be(array_typeid),
+								   format_type_be(actual_type))));
+			array_typeid = actual_type;
+		}
+		else if (decl_type == ANYRANGEOID)
+		{
+			have_generics = true;
+			if (actual_type == UNKNOWNOID)
+			{
+				have_unknowns = true;
+				continue;
+			}
+			if (allow_poly && decl_type == actual_type)
+				continue;		/* no new information here */
+			actual_type = getBaseType(actual_type); /* flatten domains */
+			if (OidIsValid(range_typeid) && actual_type != range_typeid)
+				ereport(ERROR,
+						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						 errmsg("arguments declared \"anyrange\" are not all alike"),
+						 errdetail("%s versus %s",
+								   format_type_be(range_typeid),
+								   format_type_be(actual_type))));
+			range_typeid = actual_type;
+		}
+	}
+
+	/*
+	 * Fast Track: if none of the arguments are polymorphic, return the
+	 * unmodified rettype.  We assume it can't be polymorphic either.
+	 */
+	if (!have_generics)
+		return rettype;
+
+	/* Get the element type based on the array type, if we have one */
+	if (OidIsValid(array_typeid))
+	{
+		if (array_typeid == ANYARRAYOID && !have_anyelement)
+		{
+			/* Special case for ANYARRAY input: okay iff no ANYELEMENT */
+			array_typelem = ANYELEMENTOID;
+		}
+		else
+		{
+			array_typelem = get_element_type(array_typeid);
+			if (!OidIsValid(array_typelem))
+				ereport(ERROR,
+						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						 errmsg("argument declared %s is not an array but type %s",
+								"anyarray", format_type_be(array_typeid))));
+		}
+
+		if (!OidIsValid(elem_typeid))
+		{
+			/*
+			 * if we don't have an element type yet, use the one we just got
+			 */
+			elem_typeid = array_typelem;
+		}
+		else if (array_typelem != elem_typeid)
+		{
+			/* otherwise, they better match */
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					 errmsg("argument declared %s is not consistent with argument declared %s",
+							"anyarray", "anyelement"),
+					 errdetail("%s versus %s",
+							   format_type_be(array_typeid),
+							   format_type_be(elem_typeid))));
+		}
+	}
+
+	/* Get the element type based on the range type, if we have one */
+	if (OidIsValid(range_typeid))
+	{
+		if (range_typeid == ANYRANGEOID && !have_anyelement)
+		{
+			/* Special case for ANYRANGE input: okay iff no ANYELEMENT */
+			range_typelem = ANYELEMENTOID;
+		}
+		else
+		{
+			range_typelem = get_range_subtype(range_typeid);
+			if (!OidIsValid(range_typelem))
+				ereport(ERROR,
+						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						 errmsg("argument declared %s is not a range type but type %s",
+								"anyrange",
+								format_type_be(range_typeid))));
+		}
+
+		if (!OidIsValid(elem_typeid))
+		{
+			/*
+			 * if we don't have an element type yet, use the one we just got
+			 */
+			elem_typeid = range_typelem;
+		}
+		else if (range_typelem != elem_typeid)
+		{
+			/* otherwise, they better match */
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					 errmsg("argument declared %s is not consistent with argument declared %s",
+							"anyrange", "anyelement"),
+					 errdetail("%s versus %s",
+							   format_type_be(range_typeid),
+							   format_type_be(elem_typeid))));
+		}
+	}
+
+	if (!OidIsValid(elem_typeid))
+	{
+		if (allow_poly)
+		{
+			elem_typeid = ANYELEMENTOID;
+			array_typeid = ANYARRAYOID;
+			range_typeid = ANYRANGEOID;
+		}
+		else
+		{
+			/* Only way to get here is if all the generic args are UNKNOWN */
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					 errmsg("could not determine polymorphic type because input has type %s",
+							"unknown")));
+		}
+	}
+
+	if (have_anynonarray && elem_typeid != ANYELEMENTOID)
+	{
+		/* require the element type to not be an array or domain over array */
+		if (type_is_array_domain(elem_typeid))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					 errmsg("type matched to anynonarray is an array type: %s",
+							format_type_be(elem_typeid))));
+	}
+
+	if (have_anyenum && elem_typeid != ANYELEMENTOID)
+	{
+		/* require the element type to be an enum */
+		if (!type_is_enum(elem_typeid))
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					 errmsg("type matched to anyenum is not an enum type: %s",
+							format_type_be(elem_typeid))));
+	}
+
+	/*
+	 * If we had any unknown inputs, re-scan to assign correct types
+	 */
+	if (have_unknowns)
+	{
+		for (j = 0; j < nargs; j++)
+		{
+			Oid			decl_type = declared_arg_types[j];
+			Oid			actual_type = actual_arg_types[j];
+
+			if (actual_type != UNKNOWNOID)
+				continue;
+
+			if (decl_type == ANYELEMENTOID ||
+				decl_type == ANYNONARRAYOID ||
+				decl_type == ANYENUMOID)
+				declared_arg_types[j] = elem_typeid;
+			else if (decl_type == ANYARRAYOID)
+			{
+				if (!OidIsValid(array_typeid))
+				{
+					array_typeid = get_array_type(elem_typeid);
+					if (!OidIsValid(array_typeid))
+						ereport(ERROR,
+								(errcode(ERRCODE_UNDEFINED_OBJECT),
+								 errmsg("could not find array type for data type %s",
+										format_type_be(elem_typeid))));
+				}
+				declared_arg_types[j] = array_typeid;
+			}
+			else if (decl_type == ANYRANGEOID)
+			{
+				if (!OidIsValid(range_typeid))
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_UNDEFINED_OBJECT),
+							 errmsg("could not find range type for data type %s",
+									format_type_be(elem_typeid))));
+				}
+				declared_arg_types[j] = range_typeid;
+			}
+		}
+	}
+
+	/* if we return ANYARRAY use the appropriate argument type */
+	if (rettype == ANYARRAYOID)
+	{
+		if (!OidIsValid(array_typeid))
+		{
+			array_typeid = get_array_type(elem_typeid);
+			if (!OidIsValid(array_typeid))
+				ereport(ERROR,
+						(errcode(ERRCODE_UNDEFINED_OBJECT),
+						 errmsg("could not find array type for data type %s",
+								format_type_be(elem_typeid))));
+		}
+		return array_typeid;
+	}
+
+	/* if we return ANYRANGE use the appropriate argument type */
+	if (rettype == ANYRANGEOID)
+	{
+		if (!OidIsValid(range_typeid))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					 errmsg("could not find range type for data type %s",
+							format_type_be(elem_typeid))));
+		}
+		return range_typeid;
+	}
+
+	/* if we return ANYELEMENT use the appropriate argument type */
+	if (rettype == ANYELEMENTOID ||
+		rettype == ANYNONARRAYOID ||
+		rettype == ANYENUMOID)
+		return elem_typeid;
+
+	/* we don't return a generic type; send back the original return type */
+	return rettype;
 };
 
 }

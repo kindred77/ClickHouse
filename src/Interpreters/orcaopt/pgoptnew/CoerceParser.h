@@ -119,6 +119,27 @@ public:
 	coerce_to_domain(duckdb_libpgquery::PGNode *arg, Oid baseTypeId, int32 baseTypeMod, Oid typeId,
 				 duckdb_libpgquery::PGCoercionContext ccontext, duckdb_libpgquery::PGCoercionForm cformat, int location,
 				 bool hideInputCoercion);
+
+	void
+	parser_coercion_errposition(PGParseState *pstate,
+							int coerce_location,
+							duckdb_libpgquery::PGNode *input_expr);
+
+	TYPCATEGORY
+	TypeCategory(Oid type);
+
+	bool
+	is_complex_array(Oid typid);
+
+	bool
+	IsPreferredType(TYPCATEGORY category, Oid type);
+
+	Oid
+	enforce_generic_type_consistency(const Oid *actual_arg_types,
+								 Oid *declared_arg_types,
+								 int nargs,
+								 Oid rettype,
+								 bool allow_poly);
 };
 
 }

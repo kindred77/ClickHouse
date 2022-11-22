@@ -951,7 +951,7 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 						(errcode(ERRCODE_GROUPING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("aggregate functions are not allowed in %s",
-								ParseExprKindName(exprKind)),
+								expr_parser.ParseExprKindName(exprKind)),
 						 parser_errposition(pstate,
 											locate_agg_of_level((PGNode *) tle->expr, 0))));
 			if (pstate->p_hasWindowFuncs &&
@@ -960,7 +960,7 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 						(errcode(PG_ERRCODE_WINDOWING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("window functions are not allowed in %s",
-								ParseExprKindName(exprKind)),
+								expr_parser.ParseExprKindName(exprKind)),
 						 parser_errposition(pstate,
 											locate_windowfunc((PGNode *) tle->expr))));
 			break;
@@ -1069,7 +1069,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 							/*------
 							  translator: first %s is name of a SQL construct, eg ORDER BY */
 									 errmsg("%s \"%s\" is ambiguous",
-											ParseExprKindName(exprKind),
+											expr_parser.ParseExprKindName(exprKind),
 											name),
 									 parser_errposition(pstate, location)));
 					}
@@ -1098,7 +1098,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 			/* translator: %s is name of a SQL construct, eg ORDER BY */
 					 errmsg("non-integer constant in %s",
-							ParseExprKindName(exprKind)),
+							expr_parser.ParseExprKindName(exprKind)),
 					 parser_errposition(pstate, location)));
 
 		target_pos = intVal(val);
@@ -1120,7 +1120,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 		/* translator: %s is name of a SQL construct, eg ORDER BY */
 				 errmsg("%s position %d is not in select list",
-						ParseExprKindName(exprKind), target_pos),
+						expr_parser.ParseExprKindName(exprKind), target_pos),
 				 parser_errposition(pstate, location)));
 	}
 
@@ -1216,14 +1216,14 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 	{
 		case PG_SORTBY_DEFAULT:
 		case PG_SORTBY_ASC:
-			get_sort_group_operators(restype,
+			oper_parser.get_sort_group_operators(restype,
 									 true, true, false,
 									 &sortop, &eqop, NULL,
 									 &hashable);
 			reverse = false;
 			break;
 		case PG_SORTBY_DESC:
-			get_sort_group_operators(restype,
+			oper_parser.get_sort_group_operators(restype,
 									 false, true, true,
 									 NULL, &eqop, &sortop,
 									 &hashable);
@@ -1231,7 +1231,7 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 			break;
 		case SORTBY_USING:
 			Assert(sortby->useOp != NIL);
-			sortop = compatible_oper_opid(sortby->useOp,
+			sortop = oper_parser.compatible_oper_opid(sortby->useOp,
 										  restype,
 										  restype,
 										  false);
@@ -1327,6 +1327,127 @@ ClauseParser::transformSortClause(PGParseState *pstate,
 	}
 
 	return sortlist;
+};
+
+PGList *
+ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
+					 PGList *grouplist,
+                     PGList *targetlist, int location)
+{
+	Oid			restype = exprType((PGNode *) tle->expr);
+
+	/* if tlist item is an UNKNOWN literal, change it to TEXT */
+	if (restype == UNKNOWNOID)
+	{
+		tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
+										 restype, TEXTOID, -1,
+										 PG_COERCION_IMPLICIT,
+										 PG_COERCE_IMPLICIT_CAST,
+										 -1);
+		restype = TEXTOID;
+	}
+
+	/* avoid making duplicate grouplist entries */
+	if (!targetIsInSortList(tle, InvalidOid, grouplist))
+	{
+		PGSortGroupClause *grpcl = makeNode(PGSortGroupClause);
+		Oid			sortop;
+		Oid			eqop;
+		bool		hashable;
+		ParseCallbackState pcbstate;
+
+		setup_parser_errposition_callback(&pcbstate, pstate, location);
+
+		/* determine the eqop and optional sortop */
+		get_sort_group_operators(restype,
+								 false, true, false,
+								 &sortop, &eqop, NULL,
+								 &hashable);
+
+		cancel_parser_errposition_callback(&pcbstate);
+
+		grpcl->tleSortGroupRef = assignSortGroupRef(tle, targetlist);
+		grpcl->eqop = eqop;
+		grpcl->sortop = sortop;
+		grpcl->nulls_first = false; /* OK with or without sortop */
+		grpcl->hashable = hashable;
+
+		grouplist = lappend(grouplist, grpcl);
+	}
+
+	return grouplist;
+};
+
+PGList *
+ClauseParser::transformDistinctClause(PGParseState *pstate,
+						PGList **targetlist,
+                        PGList *sortClause, bool is_agg)
+{
+	PGList	   *result = NIL;
+	PGListCell   *slitem;
+	PGListCell   *tlitem;
+
+	/*
+	 * The distinctClause should consist of all ORDER BY items followed by all
+	 * other non-resjunk targetlist items.  There must not be any resjunk
+	 * ORDER BY items --- that would imply that we are sorting by a value that
+	 * isn't necessarily unique within a DISTINCT group, so the results
+	 * wouldn't be well-defined.  This construction ensures we follow the rule
+	 * that sortClause and distinctClause match; in fact the sortClause will
+	 * always be a prefix of distinctClause.
+	 *
+	 * Note a corner case: the same TLE could be in the ORDER BY list multiple
+	 * times with different sortops.  We have to include it in the
+	 * distinctClause the same way to preserve the prefix property. The net
+	 * effect will be that the TLE value will be made unique according to both
+	 * sortops.
+	 */
+	foreach(slitem, sortClause)
+	{
+		PGSortGroupClause *scl = (PGSortGroupClause *) lfirst(slitem);
+		PGTargetEntry *tle = get_sortgroupclause_tle(scl, *targetlist);
+
+		if (tle->resjunk)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+					 is_agg ?
+					 errmsg("in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list") :
+					 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
+					 parser_errposition(pstate,
+										exprLocation((PGNode *) tle->expr))));
+		result = lappend(result, copyObject(scl));
+	}
+
+	/*
+	 * Now add any remaining non-resjunk tlist items, using default sort/group
+	 * semantics for their data types.
+	 */
+	foreach(tlitem, *targetlist)
+	{
+		PGTargetEntry *tle = (PGTargetEntry *) lfirst(tlitem);
+
+		if (tle->resjunk)
+			continue;			/* ignore junk */
+		result = addTargetToGroupList(pstate, tle,
+									  result, *targetlist,
+									  exprLocation((PGNode *) tle->expr));
+	}
+
+	/*
+	 * Complain if we found nothing to make DISTINCT.  Returning an empty list
+	 * would cause the parsed Query to look like it didn't have DISTINCT, with
+	 * results that would probably surprise the user.  Note: this case is
+	 * presently impossible for aggregates because of grammar restrictions,
+	 * but we check anyway.
+	 */
+	if (result == NIL)
+		ereport(ERROR,
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+				 is_agg ?
+				 errmsg("an aggregate with DISTINCT must have at least one argument") :
+				 errmsg("SELECT DISTINCT must have at least one column")));
+
+	return result;
 };
 
 }

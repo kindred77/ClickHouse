@@ -1927,4 +1927,278 @@ RelationParser::colNameToVar(PGParseState *pstate, const char *colname, bool loc
 	return result;
 };
 
+bool
+RelationParser::isSimplyUpdatableRelation(Oid relid, bool noerror)
+{
+	Relation rel;
+	bool return_value = true;
+
+	if (!OidIsValid(relid))
+	{
+		if (!noerror)
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					 errmsg("invalid oid: %d is not simply updatable", relid)));
+		return false;
+	}
+
+	rel = relation_open(relid, AccessShareLock);
+
+	do
+	{
+		/*
+		 * This should match the error message in rewriteManip.c,
+		 * so that you get the same error as in PostgreSQL.
+		 */
+		if (rel->rd_rel->relkind == RELKIND_VIEW)
+		{
+			if (!noerror)
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("WHERE CURRENT OF on a view is not implemented")));
+			return_value = false;
+			break;
+		}
+
+		if (rel->rd_rel->relkind != RELKIND_RELATION &&
+			rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+		{
+			if (!noerror)
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("\"%s\" is not simply updatable",
+								RelationGetRelationName(rel))));
+			return_value = false;
+			break;
+		}
+
+		if (!RelationIsHeap(rel) &&
+			rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+		{
+			if (!noerror)
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("\"%s\" is not simply updatable",
+								RelationGetRelationName(rel))));
+			return_value = false;
+			break;
+		}
+
+		/*
+		 * A row in replicated table cannot be identified by (ctid + gp_segment_id)
+		 * in all replicas, for each row replica, the gp_segment_id is different,
+		 * the ctid is also not guaranteed to be the same, so it's not simply
+		 * updateable for CURRENT OF.
+		 */
+		if (GpPolicyIsReplicated(rel->rd_cdbpolicy))
+		{
+			if (!noerror)
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("\"%s\" is not simply updatable",
+								RelationGetRelationName(rel))));
+			return_value = false;
+			break;
+		}
+	} while (0);
+
+	relation_close(rel, NoLock);
+	return return_value;
+};
+
+void
+RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum,
+					   Oid *vartype, int32 *vartypmod, Oid *varcollid)
+{
+	switch (rte->rtekind)
+	{
+		case PG_RTE_RELATION:
+			{
+				/* Plain relation RTE --- get the attribute's type info */
+				HeapTuple	tp;
+				Form_pg_attribute att_tup;
+
+				tp = SearchSysCache2(ATTNUM,
+									 ObjectIdGetDatum(rte->relid),
+									 Int16GetDatum(attnum));
+				if (!HeapTupleIsValid(tp))	/* shouldn't happen */
+					elog(ERROR, "cache lookup failed for attribute %d of relation %u",
+						 attnum, rte->relid);
+				att_tup = (Form_pg_attribute) GETSTRUCT(tp);
+
+				/*
+				 * If dropped column, pretend it ain't there.  See notes in
+				 * scanRTEForColumn.
+				 */
+				if (att_tup->attisdropped)
+					ereport(ERROR,
+							(errcode(ERRCODE_UNDEFINED_COLUMN),
+							 errmsg("column \"%s\" of relation \"%s\" does not exist",
+									NameStr(att_tup->attname),
+									get_rel_name(rte->relid))));
+				*vartype = att_tup->atttypid;
+				*vartypmod = att_tup->atttypmod;
+				*varcollid = att_tup->attcollation;
+				ReleaseSysCache(tp);
+			}
+			break;
+		case PG_RTE_SUBQUERY:
+			{
+				/* Subselect RTE --- get type info from subselect's tlist */
+				PGTargetEntry *te = get_tle_by_resno(rte->subquery->targetList,
+												   attnum);
+
+				if (te == NULL || te->resjunk)
+					elog(ERROR, "subquery %s does not have attribute %d",
+						 rte->eref->aliasname, attnum);
+				*vartype = exprType((PGNode *) te->expr);
+				*vartypmod = exprTypmod((PGNode *) te->expr);
+				*varcollid = exprCollation((PGNode *) te->expr);
+			}
+			break;
+		case PG_RTE_TABLEFUNCTION:
+		case PG_RTE_FUNCTION:
+			{
+				/* Function RTE */
+				PGListCell   *lc;
+				int			atts_done = 0;
+
+				/* Identify which function covers the requested column */
+				foreach(lc, rte->functions)
+				{
+					PGRangeTblFunction *rtfunc = (PGRangeTblFunction *) lfirst(lc);
+
+					if (attnum > atts_done &&
+						attnum <= atts_done + rtfunc->funccolcount)
+					{
+						TypeFuncClass functypclass;
+						Oid			funcrettype;
+						TupleDesc	tupdesc;
+
+						attnum -= atts_done;	/* now relative to this func */
+						functypclass = get_expr_result_type(rtfunc->funcexpr,
+															&funcrettype,
+															&tupdesc);
+
+						if (functypclass == TYPEFUNC_COMPOSITE ||
+							functypclass == TYPEFUNC_COMPOSITE_DOMAIN)
+						{
+							/* Composite data type, e.g. a table's row type */
+							Form_pg_attribute att_tup;
+
+							Assert(tupdesc);
+							Assert(attnum <= tupdesc->natts);
+							att_tup = TupleDescAttr(tupdesc, attnum - 1);
+
+							/*
+							 * If dropped column, pretend it ain't there.  See
+							 * notes in scanRTEForColumn.
+							 */
+							if (att_tup->attisdropped)
+								ereport(ERROR,
+										(errcode(ERRCODE_UNDEFINED_COLUMN),
+										 errmsg("column \"%s\" of relation \"%s\" does not exist",
+												att_tup->attname.data,
+												rte->eref->aliasname)));
+							*vartype = att_tup->atttypid;
+							*vartypmod = att_tup->atttypmod;
+							*varcollid = att_tup->attcollation;
+						}
+						else if (functypclass == TYPEFUNC_SCALAR)
+						{
+							/* Base data type, i.e. scalar */
+							*vartype = funcrettype;
+							*vartypmod = -1;
+							*varcollid = exprCollation(rtfunc->funcexpr);
+						}
+						else if (functypclass == TYPEFUNC_RECORD)
+						{
+							*vartype = list_nth_oid(rtfunc->funccoltypes,
+													attnum - 1);
+							*vartypmod = list_nth_int(rtfunc->funccoltypmods,
+													  attnum - 1);
+							*varcollid = list_nth_oid(rtfunc->funccolcollations,
+													  attnum - 1);
+						}
+						else
+						{
+							/*
+							 * addRangeTableEntryForFunction should've caught
+							 * this
+							 */
+							elog(ERROR, "function in FROM has unsupported return type");
+						}
+						return;
+					}
+					atts_done += rtfunc->funccolcount;
+				}
+
+				/* If we get here, must be looking for the ordinality column */
+				if (rte->funcordinality && attnum == atts_done + 1)
+				{
+					*vartype = INT8OID;
+					*vartypmod = -1;
+					*varcollid = InvalidOid;
+					return;
+				}
+
+				/* this probably can't happen ... */
+				ereport(ERROR,
+						(errcode(ERRCODE_UNDEFINED_COLUMN),
+						 errmsg("column %d of relation \"%s\" does not exist",
+								attnum,
+								rte->eref->aliasname)));
+			}
+			break;
+		case PG_RTE_JOIN:
+			{
+				/*
+				 * Join RTE --- get type info from join RTE's alias variable
+				 */
+				PGNode	   *aliasvar;
+
+				Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
+				aliasvar = (PGNode *) list_nth(rte->joinaliasvars, attnum - 1);
+				Assert(aliasvar != NULL);
+				*vartype = exprType(aliasvar);
+				*vartypmod = exprTypmod(aliasvar);
+				*varcollid = exprCollation(aliasvar);
+			}
+			break;
+		case PG_RTE_TABLEFUNC:
+		case PG_RTE_VALUES:
+		case PG_RTE_CTE:
+		case RTE_NAMEDTUPLESTORE:
+			{
+				/*
+				 * tablefunc, VALUES, CTE, or ENR RTE --- get type info from
+				 * lists in the RTE
+				 */
+				Assert(attnum > 0 && attnum <= list_length(rte->coltypes));
+				*vartype = list_nth_oid(rte->coltypes, attnum - 1);
+				*vartypmod = list_nth_int(rte->coltypmods, attnum - 1);
+				*varcollid = list_nth_oid(rte->colcollations, attnum - 1);
+
+				/* For ENR, better check for dropped column */
+				if (!OidIsValid(*vartype))
+					ereport(ERROR,
+							(errcode(ERRCODE_UNDEFINED_COLUMN),
+							 errmsg("column %d of relation \"%s\" does not exist",
+									attnum,
+									rte->eref->aliasname)));
+			}
+			break;
+		case PG_RTE_RESULT:
+			/* this probably can't happen ... */
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_COLUMN),
+					 errmsg("column %d of relation \"%s\" does not exist",
+							attnum,
+							rte->eref->aliasname)));
+			break;
+		default:
+			elog(ERROR, "unrecognized RTE kind: %d", (int) rte->rtekind);
+	}
+};
+
 }
