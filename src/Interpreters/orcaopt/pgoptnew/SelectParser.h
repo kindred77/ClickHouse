@@ -5,6 +5,11 @@
 #include <Interpreters/orcaopt/pgoptnew/CoerceParser.h>
 #include <Interpreters/orcaopt/pgoptnew/TargetParser.h>
 #include <Interpreters/orcaopt/pgoptnew/NodeParser.h>
+#include <Interpreters/orcaopt/pgoptnew/RelationParser.h>
+#include <Interpreters/orcaopt/pgoptnew/CTEParser.h>
+#include <Interpreters/orcaopt/pgoptnew/CollationParser.h>
+#include <Interpreters/orcaopt/pgoptnew/AggParser.h>
+#include <Interpreters/orcaopt/pgoptnew/FuncParser.h>
 
 namespace DB
 {
@@ -16,6 +21,11 @@ private:
     TargetParser target_parser;
     CoerceParser coerce_parser;
     NodeParser node_parser;
+    RelationParser relation_parser;
+    CTEParser cte_parser;
+    CollationParser collation_parser;
+    AggParser agg_parser;
+    FuncParser func_parser;
 public:
 	explicit SelectParser();
 
@@ -37,6 +47,11 @@ public:
 				  duckdb_libpgquery::PGCommonTableExpr *parentCTE,
 				  duckdb_libpgquery::PGLockingClause *lockclause_from_parent,
 				  bool resolve_unknowns);
+
+    void
+    transformLockingClause(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry,
+                        duckdb_libpgquery::PGLockingClause *lc,
+					    bool pushedDown);
 };
 
 }

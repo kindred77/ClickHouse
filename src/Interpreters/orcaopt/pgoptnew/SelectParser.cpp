@@ -11,12 +11,12 @@ SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 {
     int			netlevelsup;
 	PGRangeTblEntry *rte;
-	AttrNumber	attnum;
+	PGAttrNumber	attnum;
 
 	if (var == NULL || !IsA(var, PGVar))
 		return;
 	netlevelsup = var->varlevelsup + levelsup;
-	rte = GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+	rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
 	attnum = var->varattno;
 
 	switch (rte->rtekind)
@@ -30,7 +30,7 @@ SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 			/* Subselect-in-FROM: copy up from the subselect */
 			if (attnum != InvalidAttrNumber)
 			{
-				PGTargetEntry *ste = get_tle_by_resno(rte->subquery->targetList,
+				PGTargetEntry *ste = relation_parser.get_tle_by_resno(rte->subquery->targetList,
 													attnum);
 
 				if (ste == NULL || ste->resjunk)
@@ -44,21 +44,21 @@ SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 			/* Join RTE --- recursively inspect the alias variable */
 			if (attnum != InvalidAttrNumber)
 			{
-				Var		   *aliasvar;
+				PGVar		   *aliasvar;
 
 				Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
-				aliasvar = (Var *) list_nth(rte->joinaliasvars, attnum - 1);
+				aliasvar = (PGVar *) list_nth(rte->joinaliasvars, attnum - 1);
 				/* We intentionally don't strip implicit coercions here */
 				markTargetListOrigin(pstate, tle, aliasvar, netlevelsup);
 			}
 			break;
-		case PG_RTE_TABLEFUNCTION:
+		// case PG_RTE_TABLEFUNCTION:
 		case PG_RTE_FUNCTION:
 		case PG_RTE_VALUES:
 		case PG_RTE_TABLEFUNC:
-		case PG_RTE_NAMEDTUPLESTORE:
-		case PG_RTE_RESULT:
-		case PG_RTE_VOID:
+		// case PG_RTE_NAMEDTUPLESTORE:
+		// case PG_RTE_RESULT:
+		// case PG_RTE_VOID:
 			/* not a simple relation, leave it unmarked */
 			break;
 		case PG_RTE_CTE:
@@ -73,10 +73,10 @@ SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 			 */
 			if (attnum != InvalidAttrNumber && !rte->self_reference)
 			{
-				PGCommonTableExpr *cte = GetCTEForRTE(pstate, rte, netlevelsup);
+				PGCommonTableExpr *cte = relation_parser.GetCTEForRTE(pstate, rte, netlevelsup);
 				PGTargetEntry *ste;
 
-				ste = get_tle_by_resno(GetCTETargetList(cte), attnum);
+				ste = relation_parser.get_tle_by_resno(GetCTETargetList(cte), attnum);
 				if (ste == NULL || ste->resjunk)
 					elog(ERROR, "subquery %s does not have attribute %d",
 						 rte->eref->aliasname, attnum);
@@ -100,6 +100,192 @@ SelectParser::markTargetListOrigins(PGParseState *pstate, PGList *targetlist)
 	}
 };
 
+void
+SelectParser::transformLockingClause(PGParseState *pstate, PGQuery *qry,
+                        PGLockingClause *lc,
+					    bool pushedDown)
+{
+	PGList	   *lockedRels = lc->lockedRels;
+	PGListCell   *l;
+	PGListCell   *rt;
+	Index		i;
+	PGLockingClause *allrels;
+
+	CheckSelectLocking(qry, lc->strength);
+
+	/* make a clause we can pass down to subqueries to select all rels */
+	allrels = makeNode(PGLockingClause);
+	allrels->lockedRels = NIL;	/* indicates all rels */
+	allrels->strength = lc->strength;
+	allrels->waitPolicy = lc->waitPolicy;
+
+	if (lockedRels == NIL)
+	{
+		/* all regular tables used in query */
+		i = 0;
+		foreach(rt, qry->rtable)
+		{
+			PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(rt);
+
+			++i;
+			switch (rte->rtekind)
+			{
+				case PG_RTE_RELATION:
+					if (rel_is_external_table(rte->relid))
+						ereport(ERROR,
+								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								 errmsg("SELECT FOR UPDATE/SHARE cannot be applied to external tables")));
+
+					applyLockingClause(qry, i, lc->strength, lc->waitPolicy,
+									   pushedDown);
+					rte->requiredPerms |= ACL_SELECT_FOR_UPDATE;
+					break;
+				case PG_RTE_SUBQUERY:
+					applyLockingClause(qry, i, lc->strength, lc->waitPolicy,
+									   pushedDown);
+
+					/*
+					 * FOR UPDATE/SHARE of subquery is propagated to all of
+					 * subquery's rels, too.  We could do this later (based on
+					 * the marking of the subquery RTE) but it is convenient
+					 * to have local knowledge in each query level about which
+					 * rels need to be opened with RowShareLock.
+					 */
+					transformLockingClause(pstate, rte->subquery,
+										   allrels, true);
+					break;
+				default:
+					/* ignore JOIN, SPECIAL, FUNCTION, VALUES, CTE RTEs */
+					break;
+			}
+		}
+	}
+	else
+	{
+		/* just the named tables */
+		foreach(l, lockedRels)
+		{
+			PGRangeVar   *thisrel = (PGRangeVar *) lfirst(l);
+
+			/* For simplicity we insist on unqualified alias names here */
+			if (thisrel->catalogname || thisrel->schemaname)
+				ereport(ERROR,
+						(errcode(ERRCODE_SYNTAX_ERROR),
+				/*------
+				  translator: %s is a SQL row locking clause such as FOR UPDATE */
+						 errmsg("%s must specify unqualified relation names",
+								LCS_asString(lc->strength)),
+						 node_parser.parser_errposition(pstate, thisrel->location)));
+
+			i = 0;
+			foreach(rt, qry->rtable)
+			{
+				PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(rt);
+
+				++i;
+				if (strcmp(rte->eref->aliasname, thisrel->relname) == 0)
+				{
+					switch (rte->rtekind)
+					{
+						case PG_RTE_RELATION:
+							if (rel_is_external_table(rte->relid))
+								ereport(ERROR,
+										(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+										 errmsg("SELECT FOR UPDATE/SHARE cannot be applied to external tables")));
+							applyLockingClause(qry, i, lc->strength,
+											   lc->waitPolicy, pushedDown);
+							rte->requiredPerms |= ACL_SELECT_FOR_UPDATE;
+							break;
+						case PG_RTE_SUBQUERY:
+							applyLockingClause(qry, i, lc->strength,
+											   lc->waitPolicy, pushedDown);
+							/* see comment above */
+							transformLockingClause(pstate, rte->subquery,
+												   allrels, true);
+							break;
+						case PG_RTE_JOIN:
+							ereport(ERROR,
+									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							/*------
+							  translator: %s is a SQL row locking clause such as FOR UPDATE */
+									 errmsg("%s cannot be applied to a join",
+											LCS_asString(lc->strength)),
+									 node_parser.parser_errposition(pstate, thisrel->location)));
+							break;
+						case PG_RTE_FUNCTION:
+							ereport(ERROR,
+									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							/*------
+							  translator: %s is a SQL row locking clause such as FOR UPDATE */
+									 errmsg("%s cannot be applied to a function",
+											LCS_asString(lc->strength)),
+									 node_parser.parser_errposition(pstate, thisrel->location)));
+							break;
+						case PG_RTE_TABLEFUNC:
+							ereport(ERROR,
+									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							/*------
+							  translator: %s is a SQL row locking clause such as FOR UPDATE */
+									 errmsg("%s cannot be applied to a table function",
+											LCS_asString(lc->strength)),
+									 node_parser.parser_errposition(pstate, thisrel->location)));
+							break;
+						// case PG_RTE_TABLEFUNCTION:
+						// 	ereport(ERROR,
+						// 			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						// 			 errmsg("SELECT FOR UPDATE/SHARE cannot be applied to a table function")));
+						// 	break;
+						case PG_RTE_VALUES:
+							ereport(ERROR,
+									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							/*------
+							  translator: %s is a SQL row locking clause such as FOR UPDATE */
+									 errmsg("%s cannot be applied to VALUES",
+											LCS_asString(lc->strength)),
+									 node_parser.parser_errposition(pstate, thisrel->location)));
+							break;
+						case PG_RTE_CTE:
+							ereport(ERROR,
+									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							/*------
+							  translator: %s is a SQL row locking clause such as FOR UPDATE */
+									 errmsg("%s cannot be applied to a WITH query",
+											LCS_asString(lc->strength)),
+									 node_parser.parser_errposition(pstate, thisrel->location)));
+							break;
+						case RTE_NAMEDTUPLESTORE:
+							ereport(ERROR,
+									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							/*------
+							  translator: %s is a SQL row locking clause such as FOR UPDATE */
+									 errmsg("%s cannot be applied to a named tuplestore",
+											LCS_asString(lc->strength)),
+									 node_parser.parser_errposition(pstate, thisrel->location)));
+							break;
+
+							/* Shouldn't be possible to see RTE_RESULT here */
+
+						default:
+							elog(ERROR, "unrecognized RTE type: %d",
+								 (int) rte->rtekind);
+							break;
+					}
+					break;		/* out of foreach loop */
+				}
+			}
+			if (rt == NULL)
+				ereport(ERROR,
+						(errcode(ERRCODE_UNDEFINED_TABLE),
+				/*------
+				  translator: %s is a SQL row locking clause such as FOR UPDATE */
+						 errmsg("relation \"%s\" in %s clause not found in FROM clause",
+								thisrel->relname,
+								LCS_asString(lc->strength)),
+						 node_parser.parser_errposition(pstate, thisrel->location)));
+		}
+	}
+};
+
 PGQuery *
 SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 {
@@ -113,14 +299,14 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	if (stmt->withClause)
 	{
 		qry->hasRecursive = stmt->withClause->recursive;
-		qry->cteList = transformWithClause(pstate, stmt->withClause);
+		qry->cteList = cte_parser.transformWithClause(pstate, stmt->withClause);
 		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
 	}
 
 	/* Complain if we get called from someplace where INTO is not allowed */
 	if (stmt->intoClause)
 		ereport(ERROR,
-				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT ... INTO is not allowed here"),
 				 node_parser.parser_errposition(pstate,
 									exprLocation((PGNode *) stmt->intoClause))));
@@ -155,13 +341,13 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	 * that these functions can also change the targetList, so it's passed to
 	 * them by reference.
 	 */
-	qry->sortClause = transformSortClause(pstate,
+	qry->sortClause = clause_parser.transformSortClause(pstate,
 										  stmt->sortClause,
 										  &qry->targetList,
 										  PGParseExprKind::EXPR_KIND_ORDER_BY,
 										  false /* allow SQL92 rules */ );
 
-	qry->groupClause = transformGroupClause(pstate,
+	qry->groupClause = clause_parser.transformGroupClause(pstate,
 											stmt->groupClause,
 											&qry->groupingSets,
 											&qry->targetList,
@@ -178,9 +364,9 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	 * allowed.
 	 */
 	Assert(!(stmt->scatterClause && stmt->intoClause));
-	qry->scatterClause = transformScatterClause(pstate,
-												stmt->scatterClause,
-												&qry->targetList);
+	// qry->scatterClause = transformScatterClause(pstate,
+	// 											stmt->scatterClause,
+	// 											&qry->targetList);
 
 	if (stmt->distinctClause == NIL)
 	{
@@ -190,7 +376,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	else if (linitial(stmt->distinctClause) == NULL)
 	{
 		/* We had SELECT DISTINCT */
-		qry->distinctClause = transformDistinctClause(pstate,
+		qry->distinctClause = clause_parser.transformDistinctClause(pstate,
 													  &qry->targetList,
 													  qry->sortClause,
 													  false);
@@ -199,7 +385,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	else
 	{
 		/* We had SELECT DISTINCT ON */
-		qry->distinctClause = transformDistinctOnClause(pstate,
+		qry->distinctClause = clause_parser.transformDistinctOnClause(pstate,
 														stmt->distinctClause,
 														&qry->targetList,
 														qry->sortClause);
@@ -207,19 +393,19 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	}
 
 	/* transform LIMIT */
-	qry->limitOffset = transformLimitClause(pstate, stmt->limitOffset,
+	qry->limitOffset = clause_parser.transformLimitClause(pstate, stmt->limitOffset,
 											PGParseExprKind::EXPR_KIND_OFFSET, "OFFSET");
-	qry->limitCount = transformLimitClause(pstate, stmt->limitCount,
+	qry->limitCount = clause_parser.transformLimitClause(pstate, stmt->limitCount,
 										   PGParseExprKind::EXPR_KIND_LIMIT, "LIMIT");
 
 	/* transform window clauses after we have seen all window functions */
-	qry->windowClause = transformWindowDefinitions(pstate,
+	qry->windowClause = clause_parser.transformWindowDefinitions(pstate,
 												   pstate->p_windowdefs,
 												   &qry->targetList);
 
 	/* resolve any still-unresolved output columns as being type text */
 	if (pstate->p_resolve_unknowns)
-		resolveTargetListUnknowns(pstate, qry->targetList);
+		target_parser.resolveTargetListUnknowns(pstate, qry->targetList);
 
 	qry->rtable = pstate->p_rtable;
 	qry->jointree = makeFromExpr(pstate->p_joinlist, qual);
@@ -228,10 +414,10 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	qry->hasWindowFuncs = pstate->p_hasWindowFuncs;
 	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
 	qry->hasAggs = pstate->p_hasAggs;
-	qry->hasFuncsWithExecRestrictions = pstate->p_hasFuncsWithExecRestrictions;
+	// qry->hasFuncsWithExecRestrictions = pstate->p_hasFuncsWithExecRestrictions;
 
 	if (pstate->p_hasTblValueExpr)
-		parseCheckTableFunctions(pstate, qry);
+		func_parser.parseCheckTableFunctions(pstate, qry);
 
 	foreach(l, stmt->lockingClause)
 	{
@@ -239,11 +425,11 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 							   (PGLockingClause *) lfirst(l), false);
 	}
 
-	assign_query_collations(pstate, qry);
+	collation_parser.assign_query_collations(pstate, qry);
 
 	/* this must be done after collations, for reliable comparison of exprs */
 	if (pstate->p_hasAggs || qry->groupClause || qry->groupingSets || qry->havingQual)
-		parseCheckAggregates(pstate, qry);
+		agg_parser.parseCheckAggregates(pstate, qry);
 
 	return qry;
 };

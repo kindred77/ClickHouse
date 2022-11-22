@@ -45,6 +45,9 @@ public:
 	void
 	transformWindowFuncCall(PGParseState *pstate, duckdb_libpgquery::PGWindowFunc *wfunc,
 						duckdb_libpgquery::PGWindowDef *windef);
+
+	void
+	parseCheckAggregates(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry);
 };
 
 }

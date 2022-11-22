@@ -764,7 +764,7 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 			{
 				if (list_length(j->alias->colnames) > list_length(res_colnames))
 					ereport(ERROR,
-							(errcode(PG_ERRCODE_SYNTAX_ERROR),
+							(errcode(ERRCODE_SYNTAX_ERROR),
 							 errmsg("column alias list for \"%s\" has too many entries",
 									j->alias->aliasname)));
 			}
@@ -957,7 +957,7 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 			if (pstate->p_hasWindowFuncs &&
 				contain_windowfuncs((PGNode *) tle->expr))
 				ereport(ERROR,
-						(errcode(PG_ERRCODE_WINDOWING_ERROR),
+						(errcode(ERRCODE_WINDOWING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("window functions are not allowed in %s",
 								expr_parser.ParseExprKindName(exprKind)),
@@ -1095,7 +1095,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 
 		if (!IsA(val, PGInteger))
 			ereport(ERROR,
-					(errcode(PG_ERRCODE_SYNTAX_ERROR),
+					(errcode(ERRCODE_SYNTAX_ERROR),
 			/* translator: %s is name of a SQL construct, eg ORDER BY */
 					 errmsg("non-integer constant in %s",
 							expr_parser.ParseExprKindName(exprKind)),
@@ -1185,7 +1185,7 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 	bool		hashable;
 	bool		reverse;
 	int			location;
-	ParseCallbackState pcbstate;
+	PGParseCallbackState pcbstate;
 
 	/* if tlist item is an UNKNOWN literal, change it to TEXT */
 	if (restype == UNKNOWNOID)
@@ -1359,7 +1359,7 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
 		node_parser.setup_parser_errposition_callback(&pcbstate, pstate, location);
 
 		/* determine the eqop and optional sortop */
-		get_sort_group_operators(restype,
+		oper_parser.get_sort_group_operators(restype,
 								 false, true, false,
 								 &sortop, &eqop, NULL,
 								 &hashable);
@@ -1442,10 +1442,767 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 	 */
 	if (result == NIL)
 		ereport(ERROR,
-				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+				(errcode(ERRCODE_SYNTAX_ERROR),
 				 is_agg ?
 				 errmsg("an aggregate with DISTINCT must have at least one argument") :
 				 errmsg("SELECT DISTINCT must have at least one column")));
+
+	return result;
+};
+
+PGNode *
+ClauseParser::flatten_grouping_sets(PGNode *expr, bool toplevel, bool *hasGroupingSets)
+{
+	/* just in case of pathological input */
+	check_stack_depth();
+
+	if (expr == (PGNode *) NIL)
+		return (PGNode *) NIL;
+
+	switch (expr->type)
+	{
+		case T_PGRowExpr:
+			{
+				PGRowExpr    *r = (PGRowExpr *) expr;
+
+				if (r->row_format == PG_COERCE_IMPLICIT_CAST)
+					return flatten_grouping_sets((PGNode *) r->args,
+												 false, NULL);
+			}
+			break;
+		case T_PGGroupingSet:
+			{
+				PGGroupingSet *gset = (PGGroupingSet *) expr;
+				PGListCell   *l2;
+				PGList	   *result_set = NIL;
+
+				if (hasGroupingSets)
+					*hasGroupingSets = true;
+
+				/*
+				 * at the top level, we skip over all empty grouping sets; the
+				 * caller can supply the canonical GROUP BY () if nothing is
+				 * left.
+				 */
+
+				if (toplevel && gset->kind == GROUPING_SET_EMPTY)
+					return (PGNode *) NIL;
+
+				foreach(l2, gset->content)
+				{
+					PGNode	   *n1 = (PGNode *)lfirst(l2);
+					PGNode	   *n2 = flatten_grouping_sets(n1, false, NULL);
+
+					if (IsA(n1, PGGroupingSet) &&
+						((PGGroupingSet *) n1)->kind == GROUPING_SET_SETS)
+					{
+						result_set = list_concat(result_set, (PGList *) n2);
+					}
+					else
+						result_set = lappend(result_set, n2);
+				}
+
+				/*
+				 * At top level, keep the grouping set node; but if we're in a
+				 * nested grouping set, then we need to concat the flattened
+				 * result into the outer list if it's simply nested.
+				 */
+
+				if (toplevel || (gset->kind != GROUPING_SET_SETS))
+				{
+					return (PGNode *) makeGroupingSet(gset->kind, result_set, gset->location);
+				}
+				else
+					return (PGNode *) result_set;
+			}
+		case T_PGList:
+			{
+				PGList	   *result = NIL;
+				PGListCell   *l;
+
+				foreach(l, (PGList *) expr)
+				{
+					PGNode	   *n = flatten_grouping_sets((PGNode *)lfirst(l), toplevel, hasGroupingSets);
+
+					if (n != (PGNode *) NIL)
+					{
+						if (IsA(n, PGList))
+							result = list_concat(result, (PGList *) n);
+						else
+							result = lappend(result, n);
+					}
+				}
+
+				return (PGNode *) result;
+			}
+		default:
+			break;
+	}
+
+	return expr;
+};
+
+Index
+ClauseParser::transformGroupClauseExpr(PGList **flatresult,
+                        PGBitmapset *seen_local,
+						PGParseState *pstate, PGNode *gexpr,
+						PGList **targetlist,
+                        PGList *sortClause,
+						PGParseExprKind exprKind, bool useSQL99, bool toplevel)
+{
+	PGTargetEntry *tle;
+	bool		found = false;
+
+	if (useSQL99)
+		tle = findTargetlistEntrySQL99(pstate, gexpr,
+									   targetlist, exprKind);
+	else
+		tle = findTargetlistEntrySQL92(pstate, gexpr,
+									   targetlist, exprKind);
+
+	if (tle->ressortgroupref > 0)
+	{
+		ListCell   *sl;
+
+		/*
+		 * Eliminate duplicates (GROUP BY x, x) but only at local level.
+		 * (Duplicates in grouping sets can affect the number of returned
+		 * rows, so can't be dropped indiscriminately.)
+		 *
+		 * Since we don't care about anything except the sortgroupref, we can
+		 * use a bitmapset rather than scanning lists.
+		 */
+		if (bms_is_member(tle->ressortgroupref, seen_local))
+			return 0;
+
+		/*
+		 * If we're already in the flat clause list, we don't need to consider
+		 * adding ourselves again.
+		 */
+		found = targetIsInSortList(tle, InvalidOid, *flatresult);
+		if (found)
+			return tle->ressortgroupref;
+
+		/*
+		 * If the GROUP BY tlist entry also appears in ORDER BY, copy operator
+		 * info from the (first) matching ORDER BY item.  This means that if
+		 * you write something like "GROUP BY foo ORDER BY foo USING <<<", the
+		 * GROUP BY operation silently takes on the equality semantics implied
+		 * by the ORDER BY.  There are two reasons to do this: it improves the
+		 * odds that we can implement both GROUP BY and ORDER BY with a single
+		 * sort step, and it allows the user to choose the equality semantics
+		 * used by GROUP BY, should she be working with a datatype that has
+		 * more than one equality operator.
+		 *
+		 * If we're in a grouping set, though, we force our requested ordering
+		 * to be NULLS LAST, because if we have any hope of using a sorted agg
+		 * for the job, we're going to be tacking on generated NULL values
+		 * after the corresponding groups. If the user demands nulls first,
+		 * another sort step is going to be inevitable, but that's the
+		 * planner's problem.
+		 */
+
+		foreach(sl, sortClause)
+		{
+			PGSortGroupClause *sc = (PGSortGroupClause *) lfirst(sl);
+
+			if (sc->tleSortGroupRef == tle->ressortgroupref)
+			{
+				PGSortGroupClause *grpc = (PGSortGroupClause *)copyObject(sc);
+
+				if (!toplevel)
+					grpc->nulls_first = false;
+				*flatresult = lappend(*flatresult, grpc);
+				found = true;
+				break;
+			}
+		}
+	}
+
+	/*
+	 * If no match in ORDER BY, just add it to the result using default
+	 * sort/group semantics.
+	 */
+	if (!found)
+		*flatresult = addTargetToGroupList(pstate, tle,
+										   *flatresult, *targetlist,
+										   exprLocation(gexpr));
+
+	/*
+	 * _something_ must have assigned us a sortgroupref by now...
+	 */
+
+	return tle->ressortgroupref;
+};
+
+PGList *
+ClauseParser::transformGroupClauseList(PGList **flatresult,
+						 PGParseState *pstate, PGList *list,
+						 PGList **targetlist,
+                         PGList *sortClause,
+						 PGParseExprKind exprKind, bool useSQL99, bool toplevel)
+{
+	PGBitmapset  *seen_local = NULL;
+	PGList	   *result = NIL;
+	PGListCell   *gl;
+
+	foreach(gl, list)
+	{
+		PGNode	   *gexpr = (PGNode *) lfirst(gl);
+
+		Index		ref = transformGroupClauseExpr(flatresult,
+												   seen_local,
+												   pstate,
+												   gexpr,
+												   targetlist,
+												   sortClause,
+												   exprKind,
+												   useSQL99,
+												   toplevel);
+
+		if (ref > 0)
+		{
+			seen_local = bms_add_member(seen_local, ref);
+			result = lappend_int(result, ref);
+		}
+	}
+
+	return result;
+};
+
+PGNode *
+ClauseParser::transformGroupingSet(PGList **flatresult,
+					 PGParseState *pstate, PGGroupingSet *gset,
+					 PGList **targetlist, PGList *sortClause,
+					 PGParseExprKind exprKind, bool useSQL99, bool toplevel)
+{
+	PGListCell   *gl;
+	PGList	   *content = NIL;
+
+	Assert(toplevel || gset->kind != GROUPING_SET_SETS);
+
+	foreach(gl, gset->content)
+	{
+		PGNode	   *n = (PGNode *)lfirst(gl);
+
+		if (IsA(n, PGList))
+		{
+			PGList	   *l = transformGroupClauseList(flatresult,
+													 pstate, (PGList *) n,
+													 targetlist, sortClause,
+													 exprKind, useSQL99, false);
+
+			content = lappend(content, makeGroupingSet(GROUPING_SET_SIMPLE,
+													   l,
+													   exprLocation(n)));
+		}
+		else if (IsA(n, PGGroupingSet))
+		{
+			PGGroupingSet *gset2 = (PGGroupingSet *) lfirst(gl);
+
+			content = lappend(content, transformGroupingSet(flatresult,
+															pstate, gset2,
+															targetlist, sortClause,
+															exprKind, useSQL99, false));
+		}
+		else
+		{
+			Index		ref = transformGroupClauseExpr(flatresult,
+													   NULL,
+													   pstate,
+													   n,
+													   targetlist,
+													   sortClause,
+													   exprKind,
+													   useSQL99,
+													   false);
+
+			content = lappend(content, makeGroupingSet(GROUPING_SET_SIMPLE,
+													   list_make1_int(ref),
+													   exprLocation(n)));
+		}
+	}
+
+	/* Arbitrarily cap the size of CUBE, which has exponential growth */
+	if (gset->kind == GROUPING_SET_CUBE)
+	{
+		if (list_length(content) > 12)
+			ereport(ERROR,
+					(errcode(ERRCODE_TOO_MANY_COLUMNS),
+					 errmsg("CUBE is limited to 12 elements"),
+					 node_parser.parser_errposition(pstate, gset->location)));
+	}
+
+	return (PGNode *) makeGroupingSet(gset->kind, content, gset->location);
+};
+
+PGList *
+ClauseParser::transformGroupClause(PGParseState *pstate, PGList *grouplist,
+                    PGList **groupingSets,
+					PGList **targetlist,
+                    PGList *sortClause,
+					PGParseExprKind exprKind, bool useSQL99)
+{
+	PGList	   *result = NIL;
+	PGList	   *flat_grouplist;
+	PGList	   *gsets = NIL;
+	PGListCell   *gl;
+	bool		hasGroupingSets = false;
+	PGBitmapset  *seen_local = NULL;
+
+	/*
+	 * Recursively flatten implicit RowExprs. (Technically this is only needed
+	 * for GROUP BY, per the syntax rules for grouping sets, but we do it
+	 * anyway.)
+	 */
+	flat_grouplist = (PGList *) flatten_grouping_sets((PGNode *) grouplist,
+													true,
+													&hasGroupingSets);
+
+	/*
+	 * If the list is now empty, but hasGroupingSets is true, it's because we
+	 * elided redundant empty grouping sets. Restore a single empty grouping
+	 * set to leave a canonical form: GROUP BY ()
+	 */
+
+	if (flat_grouplist == NIL && hasGroupingSets)
+	{
+		flat_grouplist = list_make1(makeGroupingSet(GROUPING_SET_EMPTY,
+													NIL,
+													exprLocation((PGNode *) grouplist)));
+	}
+
+	foreach(gl, flat_grouplist)
+	{
+		PGNode	   *gexpr = (PGNode *) lfirst(gl);
+
+		if (IsA(gexpr, PGGroupingSet))
+		{
+			PGGroupingSet *gset = (PGGroupingSet *) gexpr;
+
+			switch (gset->kind)
+			{
+				case GROUPING_SET_EMPTY:
+					gsets = lappend(gsets, gset);
+					break;
+				case GROUPING_SET_SIMPLE:
+					/* can't happen */
+					Assert(false);
+					break;
+				case GROUPING_SET_SETS:
+				case GROUPING_SET_CUBE:
+				case GROUPING_SET_ROLLUP:
+					gsets = lappend(gsets,
+									transformGroupingSet(&result,
+														 pstate, gset,
+														 targetlist, sortClause,
+														 exprKind, useSQL99, true));
+					break;
+			}
+		}
+		else
+		{
+			Index		ref = transformGroupClauseExpr(&result, seen_local,
+													   pstate, gexpr,
+													   targetlist, sortClause,
+													   exprKind, useSQL99, true);
+
+			if (ref > 0)
+			{
+				seen_local = bms_add_member(seen_local, ref);
+				if (hasGroupingSets)
+					gsets = lappend(gsets,
+									makeGroupingSet(GROUPING_SET_SIMPLE,
+													list_make1_int(ref),
+													exprLocation(gexpr)));
+			}
+		}
+	}
+
+	/* parser should prevent this */
+	Assert(gsets == NIL || groupingSets != NULL);
+
+	if (groupingSets)
+		*groupingSets = gsets;
+
+	return result;
+};
+
+PGList *
+ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctlist,
+						  PGList **targetlist,
+                          PGList *sortClause)
+{
+	PGList	   *result = NIL;
+	PGList	   *sortgrouprefs = NIL;
+	bool		skipped_sortitem;
+	PGListCell   *lc;
+	PGListCell   *lc2;
+
+	/*
+	 * Add all the DISTINCT ON expressions to the tlist (if not already
+	 * present, they are added as resjunk items).  Assign sortgroupref numbers
+	 * to them, and make a list of these numbers.  (NB: we rely below on the
+	 * sortgrouprefs list being one-for-one with the original distinctlist.
+	 * Also notice that we could have duplicate DISTINCT ON expressions and
+	 * hence duplicate entries in sortgrouprefs.)
+	 */
+	foreach(lc, distinctlist)
+	{
+		PGNode	   *dexpr = (PGNode *) lfirst(lc);
+		int			sortgroupref;
+		PGTargetEntry *tle;
+
+		tle = findTargetlistEntrySQL92(pstate, dexpr, targetlist,
+									   EXPR_KIND_DISTINCT_ON);
+		sortgroupref = assignSortGroupRef(tle, *targetlist);
+		sortgrouprefs = lappend_int(sortgrouprefs, sortgroupref);
+	}
+
+	/*
+	 * If the user writes both DISTINCT ON and ORDER BY, adopt the sorting
+	 * semantics from ORDER BY items that match DISTINCT ON items, and also
+	 * adopt their column sort order.  We insist that the distinctClause and
+	 * sortClause match, so throw error if we find the need to add any more
+	 * distinctClause items after we've skipped an ORDER BY item that wasn't
+	 * in DISTINCT ON.
+	 */
+	skipped_sortitem = false;
+	foreach(lc, sortClause)
+	{
+		PGSortGroupClause *scl = (PGSortGroupClause *) lfirst(lc);
+
+		if (list_member_int(sortgrouprefs, scl->tleSortGroupRef))
+		{
+			if (skipped_sortitem)
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+						 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
+						 node_parser.parser_errposition(pstate,
+											get_matching_location(scl->tleSortGroupRef,
+																  sortgrouprefs,
+																  distinctlist))));
+			else
+				result = lappend(result, copyObject(scl));
+		}
+		else
+			skipped_sortitem = true;
+	}
+
+	/*
+	 * Now add any remaining DISTINCT ON items, using default sort/group
+	 * semantics for their data types.  (Note: this is pretty questionable; if
+	 * the ORDER BY list doesn't include all the DISTINCT ON items and more
+	 * besides, you certainly aren't using DISTINCT ON in the intended way,
+	 * and you probably aren't going to get consistent results.  It might be
+	 * better to throw an error or warning here.  But historically we've
+	 * allowed it, so keep doing so.)
+	 */
+	forboth(lc, distinctlist, lc2, sortgrouprefs)
+	{
+		PGNode	   *dexpr = (PGNode *) lfirst(lc);
+		int			sortgroupref = lfirst_int(lc2);
+		PGTargetEntry *tle = get_sortgroupref_tle(sortgroupref, *targetlist);
+
+		if (targetIsInSortList(tle, InvalidOid, result))
+			continue;			/* already in list (with some semantics) */
+		if (skipped_sortitem)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+					 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
+					 node_parser.parser_errposition(pstate, exprLocation(dexpr))));
+		result = addTargetToGroupList(pstate, tle,
+									  result, *targetlist,
+									  exprLocation(dexpr));
+	}
+
+	/*
+	 * An empty result list is impossible here because of grammar
+	 * restrictions.
+	 */
+	Assert(result != NIL);
+
+	return result;
+};
+
+PGNode *
+ClauseParser::transformLimitClause(PGParseState *pstate, PGNode *clause,
+					 PGParseExprKind exprKind, const char *constructName)
+{
+	PGNode	   *qual;
+
+	if (clause == NULL)
+		return NULL;
+
+	qual = expr_parser.transformExpr(pstate, clause, exprKind);
+
+	qual = coerce_parser.coerce_to_specific_type(pstate, qual, INT8OID, constructName);
+
+	/* LIMIT can't refer to any variables of the current query */
+	checkExprIsVarFree(pstate, qual, constructName);
+
+	return qual;
+};
+
+PGWindowClause *
+ClauseParser::findWindowClause(PGList *wclist, const char *name)
+{
+	PGListCell   *l;
+
+	foreach(l, wclist)
+	{
+		PGWindowClause *wc = (PGWindowClause *) lfirst(l);
+
+		if (wc->name && strcmp(wc->name, name) == 0)
+			return wc;
+	}
+
+	return NULL;
+};
+
+PGList *
+ClauseParser::transformWindowDefinitions(PGParseState *pstate,
+						   PGList *windowdefs,
+						   PGList **targetlist)
+{
+	PGList	   *result = NIL;
+	Index		winref = 0;
+	PGListCell   *lc;
+
+	/*
+	 * We have two lists of window specs: one in the ParseState -- put there
+	 * when we find the OVER(...) clause in the targetlist and the other
+	 * is windowClause, a list of named window clauses. So, we concatenate
+	 * them together.
+	 *
+	 * Note that we're careful place those found in the target list at
+	 * the end because the spec might refer to a named clause and we'll
+	 * after to know about those first.
+	 */
+	foreach(lc, windowdefs)
+	{
+		PGWindowDef  *windef = (PGWindowDef *) lfirst(lc);
+		PGWindowClause *refwc = NULL;
+		PGList	   *partitionClause;
+		PGList	   *orderClause;
+		Oid			rangeopfamily = InvalidOid;
+		Oid			rangeopcintype = InvalidOid;
+		PGWindowClause *wc;
+
+		winref++;
+
+		/*
+		 * Check for duplicate window names.
+		 */
+		if (windef->name &&
+			findWindowClause(result, windef->name) != NULL)
+			ereport(ERROR,
+					(errcode(ERRCODE_WINDOWING_ERROR),
+					 errmsg("window \"%s\" is already defined", windef->name),
+					 node_parser.parser_errposition(pstate, windef->location)));
+
+		/*
+		 * If it references a previous window, look that up.
+		 */
+		if (windef->refname)
+		{
+			refwc = findWindowClause(result, windef->refname);
+			if (refwc == NULL)
+				ereport(ERROR,
+						(errcode(ERRCODE_UNDEFINED_OBJECT),
+						 errmsg("window \"%s\" does not exist",
+								windef->refname),
+						 node_parser.parser_errposition(pstate, windef->location)));
+		}
+
+		/*
+		 * Transform PARTITION and ORDER specs, if any.  These are treated
+		 * almost exactly like top-level GROUP BY and ORDER BY clauses,
+		 * including the special handling of nondefault operator semantics.
+		 */
+		orderClause = transformSortClause(pstate,
+										  windef->orderClause,
+										  targetlist,
+										  EXPR_KIND_WINDOW_ORDER,
+										  true /* force SQL99 rules */ );
+		partitionClause = transformGroupClause(pstate,
+											   windef->partitionClause,
+											   NULL,
+											   targetlist,
+											   orderClause,
+											   EXPR_KIND_WINDOW_PARTITION,
+											   true /* force SQL99 rules */ );
+
+		/*
+		 * And prepare the new WindowClause.
+		 */
+		wc = makeNode(PGWindowClause);
+		wc->name = windef->name;
+		wc->refname = windef->refname;
+
+		/*
+		 * Per spec, a windowdef that references a previous one copies the
+		 * previous partition clause (and mustn't specify its own).  It can
+		 * specify its own ordering clause, but only if the previous one had
+		 * none.  It always specifies its own frame clause, and the previous
+		 * one must not have a frame clause.  Yeah, it's bizarre that each of
+		 * these cases works differently, but SQL:2008 says so; see 7.11
+		 * <window clause> syntax rule 10 and general rule 1.  The frame
+		 * clause rule is especially bizarre because it makes "OVER foo"
+		 * different from "OVER (foo)", and requires the latter to throw an
+		 * error if foo has a nondefault frame clause.  Well, ours not to
+		 * reason why, but we do go out of our way to throw a useful error
+		 * message for such cases.
+		 */
+		if (refwc)
+		{
+			if (partitionClause)
+				ereport(ERROR,
+						(errcode(ERRCODE_WINDOWING_ERROR),
+						 errmsg("cannot override PARTITION BY clause of window \"%s\"",
+								windef->refname),
+						 node_parser.parser_errposition(pstate, windef->location)));
+			wc->partitionClause = (PGList *)copyObject(refwc->partitionClause);
+		}
+		else
+			wc->partitionClause = partitionClause;
+		if (refwc)
+		{
+			if (orderClause && refwc->orderClause)
+				ereport(ERROR,
+						(errcode(ERRCODE_WINDOWING_ERROR),
+						 errmsg("cannot override ORDER BY clause of window \"%s\"",
+								windef->refname),
+						 node_parser.parser_errposition(pstate, windef->location)));
+			if (orderClause)
+			{
+				wc->orderClause = orderClause;
+				wc->copiedOrder = false;
+			}
+			else
+			{
+				wc->orderClause = (PGList *)copyObject(refwc->orderClause);
+				wc->copiedOrder = true;
+			}
+		}
+		else
+		{
+			wc->orderClause = orderClause;
+			wc->copiedOrder = false;
+		}
+		if (refwc && refwc->frameOptions != FRAMEOPTION_DEFAULTS)
+		{
+			/*
+			 * Use this message if this is a WINDOW clause, or if it's an OVER
+			 * clause that includes ORDER BY or framing clauses.  (We already
+			 * rejected PARTITION BY above, so no need to check that.)
+			 */
+			if (windef->name ||
+				orderClause || windef->frameOptions != FRAMEOPTION_DEFAULTS)
+				ereport(ERROR,
+						(errcode(ERRCODE_WINDOWING_ERROR),
+						 errmsg("cannot copy window \"%s\" because it has a frame clause",
+								windef->refname),
+						 node_parser.parser_errposition(pstate, windef->location)));
+			/* Else this clause is just OVER (foo), so say this: */
+			ereport(ERROR,
+					(errcode(ERRCODE_WINDOWING_ERROR),
+			errmsg("cannot copy window \"%s\" because it has a frame clause",
+				   windef->refname),
+					 errhint("Omit the parentheses in this OVER clause."),
+					 node_parser.parser_errposition(pstate, windef->location)));
+		}
+
+		/*
+		 * Finally, process the framing clause. parseProcessWindFunc() will
+		 * have picked up window functions that do not support framing.
+		 *
+		 * What we do need to do is the following:
+		 * - If BETWEEN has been specified, the trailing bound is not
+		 *   UNBOUNDED FOLLOWING; the leading bound is not UNBOUNDED
+		 *   PRECEDING; if the first bound specifies CURRENT ROW, the
+		 *   second bound shall not specify a PRECEDING bound; if the
+		 *   first bound specifies a FOLLOWING bound, the second bound
+		 *   shall not specify a PRECEDING or CURRENT ROW bound.
+		 *
+		 * - If the user did not specify BETWEEN, the bound is assumed to be
+		 *   a trailing bound and the leading bound is set to CURRENT ROW.
+		 *   We're careful not to set is_between here because the user did not
+		 *   specify it.
+		 *
+		 * - If RANGE is specified: the ORDER BY clause of the window spec
+		 *   may specify only one column; the type of that column must support
+		 *   +/- <integer> operations and must be merge-joinable.
+		 */
+
+		wc->frameOptions = windef->frameOptions;
+
+		/*
+		 * RANGE offset PRECEDING/FOLLOWING requires exactly one ORDER BY
+		 * column; check that and get its sort opfamily info.
+		 */
+		if ((wc->frameOptions & FRAMEOPTION_RANGE) &&
+			(wc->frameOptions & (FRAMEOPTION_START_OFFSET |
+								 FRAMEOPTION_END_OFFSET)))
+		{
+			PGSortGroupClause *sortcl;
+			PGNode	   *sortkey;
+			int16		rangestrategy;
+
+			if (list_length(wc->orderClause) != 1)
+				ereport(ERROR,
+						(errcode(ERRCODE_WINDOWING_ERROR),
+						 errmsg("RANGE with offset PRECEDING/FOLLOWING requires exactly one ORDER BY column"),
+						 node_parser.parser_errposition(pstate, windef->location)));
+			sortcl = castNode(PGSortGroupClause, linitial(wc->orderClause));
+			sortkey = get_sortgroupclause_expr(sortcl, *targetlist);
+			/* Find the sort operator in pg_amop */
+			if (!get_ordering_op_properties(sortcl->sortop,
+											&rangeopfamily,
+											&rangeopcintype,
+											&rangestrategy))
+				elog(ERROR, "operator %u is not a valid ordering operator",
+					 sortcl->sortop);
+			/* Record properties of sort ordering */
+			// wc->inRangeColl = exprCollation(sortkey);
+			// wc->inRangeAsc = (rangestrategy == BTLessStrategyNumber);
+			// wc->inRangeNullsFirst = sortcl->nulls_first;
+		}
+
+		/* Per spec, GROUPS mode requires an ORDER BY clause */
+		if (wc->frameOptions & FRAMEOPTION_GROUPS)
+		{
+			if (wc->orderClause == NIL)
+				ereport(ERROR,
+						(errcode(ERRCODE_WINDOWING_ERROR),
+						 errmsg("GROUPS mode requires an ORDER BY clause"),
+						 node_parser.parser_errposition(pstate, windef->location)));
+		}
+
+		/* Process frame offset expressions */
+		wc->startOffset = transformFrameOffset(pstate, wc->frameOptions,
+											   rangeopfamily, rangeopcintype,
+											   &wc->startInRangeFunc,
+											   windef->startOffset);
+		wc->endOffset = transformFrameOffset(pstate, wc->frameOptions,
+											 rangeopfamily, rangeopcintype,
+											 &wc->endInRangeFunc,
+											 windef->endOffset);
+		wc->winref = winref;
+
+		/* finally, check function restriction with this spec. */
+		winref_checkspec(pstate, *targetlist, winref,
+						 PointerIsValid(wc->orderClause),
+						 wc->frameOptions != FRAMEOPTION_DEFAULTS);
+
+		result = lappend(result, wc);
+	}
+
+	/* If there are no window functions in the targetlist,
+	 * forget the window clause.
+	 */
+	if (!pstate->p_hasWindowFuncs)
+		pstate->p_windowdefs = NIL;
 
 	return result;
 };

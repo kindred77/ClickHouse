@@ -4,6 +4,7 @@
 #include <Interpreters/orcaopt/pgoptnew/RelationParser.h>
 #include <Interpreters/orcaopt/pgoptnew/ExprParser.h>
 #include <Interpreters/orcaopt/pgoptnew/NodeParser.h>
+#include <Interpreters/orcaopt/pgoptnew/CoerceParser.h>
 
 namespace DB
 {
@@ -14,6 +15,7 @@ private:
     RelationParser relation_parser;
     ExprParser expr_parser;
     NodeParser node_parser;
+    CoerceParser coerce_parser;
 public:
 	explicit TargetParser();
 
@@ -60,6 +62,9 @@ public:
     duckdb_libpgquery::PGList *
     transformExpressionList(PGParseState *pstate, duckdb_libpgquery::PGList *exprlist,
 						PGParseExprKind exprKind, bool allowDefault);
+
+    void
+    resolveTargetListUnknowns(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist);
 };
 
 }

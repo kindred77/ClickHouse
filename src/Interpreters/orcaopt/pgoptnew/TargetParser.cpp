@@ -342,7 +342,7 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 	 */
 	if (!found_table)
 		ereport(ERROR,
-				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT * with no tables specified is not valid"),
 				 node_parser.parser_errposition(pstate, location)));
 
@@ -782,14 +782,14 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 					break;
 				case CRSERR_WRONG_DB:
 					ereport(ERROR,
-							(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cross-database references are not implemented: %s",
 									NameListToString(cref->fields)),
 							 node_parser.parser_errposition(pstate, cref->location)));
 					break;
 				case CRSERR_TOO_MANY:
 					ereport(ERROR,
-							(errcode(PG_ERRCODE_SYNTAX_ERROR),
+							(errcode(ERRCODE_SYNTAX_ERROR),
 							 errmsg("improper qualified name (too many dotted names): %s",
 									NameListToString(cref->fields)),
 							 node_parser.parser_errposition(pstate, cref->location)));
@@ -968,6 +968,27 @@ TargetParser::transformExpressionList(PGParseState *pstate, PGList *exprlist,
 	Assert(pstate->p_multiassign_exprs == NIL);
 
 	return result;
+};
+
+void
+TargetParser::resolveTargetListUnknowns(PGParseState *pstate, PGList *targetlist)
+{
+	PGListCell   *l;
+
+	foreach(l, targetlist)
+	{
+		PGTargetEntry *tle = (PGTargetEntry *) lfirst(l);
+		Oid			restype = exprType((PGNode *) tle->expr);
+
+		if (restype == UNKNOWNOID)
+		{
+			tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
+											 restype, TEXTOID, -1,
+											 PG_COERCION_IMPLICIT,
+											 PG_COERCE_IMPLICIT_CAST,
+											 -1);
+		}
+	}
 };
 
 }

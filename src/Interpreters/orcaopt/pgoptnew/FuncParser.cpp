@@ -1038,7 +1038,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 			{
 				if (strcmp(na->name, (char *) lfirst(lc)) == 0)
 					ereport(ERROR,
-							(errcode(PG_ERRCODE_SYNTAX_ERROR),
+							(errcode(ERRCODE_SYNTAX_ERROR),
 							 errmsg("argument name \"%s\" used more than once",
 									na->name),
 							 node_parser.parser_errposition(pstate, na->location)));
@@ -1049,7 +1049,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 		{
 			if (argnames != NIL)
 				ereport(ERROR,
-						(errcode(PG_ERRCODE_SYNTAX_ERROR),
+						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("positional argument cannot follow named argument"),
 						 node_parser.parser_errposition(pstate, exprLocation(arg))));
 		}
@@ -1234,7 +1234,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 						 node_parser.parser_errposition(pstate, location)));
 			if (over)
 				ereport(ERROR,
-						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("OVER is not supported for ordered-set aggregate %s",
 								NameListToString(funcname)),
 						 node_parser.parser_errposition(pstate, location)));
@@ -1652,7 +1652,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 		 */
 		if (argnames != NIL)
 			ereport(ERROR,
-					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("aggregates cannot use named arguments"),
 					 node_parser.parser_errposition(pstate, location)));
 
@@ -1690,13 +1690,13 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 		{
 			if (fdresult == FUNCDETAIL_WINDOWFUNC)
 				ereport(ERROR,
-						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("DISTINCT is not implemented for window functions"),
 						 node_parser.parser_errposition(pstate, location)));
 
 			if (list_length(fargs) != 1)
 				ereport(ERROR,
-						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("DISTINCT is supported only for single-argument window aggregates")));
 		}
 
@@ -1720,7 +1720,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 		 */
 		if (agg_order != NIL)
 			ereport(ERROR,
-					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("aggregate ORDER BY is not implemented for window functions"),
 					 node_parser.parser_errposition(pstate, location)));
 
@@ -1729,7 +1729,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 		 */
 		if (!wfunc->winagg && agg_filter)
 			ereport(ERROR,
-					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("FILTER is not implemented for non-aggregate window functions"),
 					 node_parser.parser_errposition(pstate, location)));
 
@@ -1738,7 +1738,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 		 */
 		if (pstate->p_last_srf != last_srf)
 			ereport(ERROR,
-					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("window function calls cannot contain set-returning function calls"),
 					 errhint("You might be able to move the set-returning function into a LATERAL FROM item."),
 					 node_parser.parser_errposition(pstate,
@@ -1831,7 +1831,7 @@ FuncParser::check_srf_call_placement(PGParseState *pstate, PGNode *last_srf, int
 			/* errposition should point to the inner SRF */
 			if (pstate->p_last_srf != last_srf)
 				ereport(ERROR,
-						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("set-returning functions must appear at top level of FROM"),
 						 node_parser.parser_errposition(pstate,
 											exprLocation(pstate->p_last_srf))));
@@ -1945,12 +1945,12 @@ FuncParser::check_srf_call_placement(PGParseState *pstate, PGNode *last_srf, int
 	}
 	if (err)
 		ereport(ERROR,
-				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg_internal("%s", err),
 				 node_parser.parser_errposition(pstate, location)));
 	if (errkind)
 		ereport(ERROR,
-				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("set-returning functions are not allowed in %s",
 						expr_parser.ParseExprKindName(pstate->p_expr_kind)),
@@ -2004,6 +2004,16 @@ FuncParser::make_fn_arguments(PGParseState *pstate,
 		}
 		i++;
 	}
+};
+
+void 
+FuncParser::parseCheckTableFunctions(PGParseState *pstate, PGQuery *qry)
+{
+	check_table_func_context context;
+	context.parent = NULL;
+	query_tree_walker(qry, 
+					  checkTableFunctions_walker,
+					  (void *) &context, 0);
 };
 
 }

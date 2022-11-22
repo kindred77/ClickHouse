@@ -15,6 +15,9 @@ public:
 
     void
 	assign_expr_collations(PGParseState *pstate, duckdb_libpgquery::PGNode *expr);
+
+	void
+	assign_query_collations(PGParseState *pstate, duckdb_libpgquery::PGQuery *query);
 };
 
 }

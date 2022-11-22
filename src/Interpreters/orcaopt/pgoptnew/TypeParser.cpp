@@ -51,7 +51,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 		{
 			case 1:
 				ereport(ERROR,
-						(errcode(PG_ERRCODE_SYNTAX_ERROR),
+						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too few dotted names): %s",
 								NameListToString(typeName->names)),
 						 node_parser.parser_errposition(pstate, typeName->location)));
@@ -73,7 +73,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 				break;
 			default:
 				ereport(ERROR,
-						(errcode(PG_ERRCODE_SYNTAX_ERROR),
+						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too many dotted names): %s",
 								NameListToString(typeName->names)),
 						 node_parser.parser_errposition(pstate, typeName->location)));
@@ -193,7 +193,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 	 */
 	if (!((Form_pg_type) GETSTRUCT(typ))->typisdefined)
 		ereport(ERROR,
-				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier cannot be specified for shell type \"%s\"",
 						TypeNameToString(typeName)),
 				 node_parser.parser_errposition(pstate, typeName->location)));
@@ -202,7 +202,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 
 	if (typmodin == InvalidOid)
 		ereport(ERROR,
-				(errcode(PG_ERRCODE_SYNTAX_ERROR),
+				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier is not allowed for type \"%s\"",
 						TypeNameToString(typeName)),
 				 node_parser.parser_errposition(pstate, typeName->location)));
@@ -244,7 +244,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 		}
 		if (!cstr)
 			ereport(ERROR,
-					(errcode(PG_ERRCODE_SYNTAX_ERROR),
+					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("type modifiers must be simple constants or identifiers"),
 					 node_parser.parser_errposition(pstate, typeName->location)));
 		datums[n++] = CStringGetDatum(cstr);

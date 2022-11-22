@@ -88,6 +88,9 @@ public:
 
     void
     check_srf_call_placement(PGParseState *pstate, duckdb_libpgquery::PGNode *last_srf, int location);
+
+	void 
+	parseCheckTableFunctions(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry);
 };
 
 }

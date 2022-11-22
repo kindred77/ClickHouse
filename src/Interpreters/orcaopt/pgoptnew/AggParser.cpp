@@ -823,4 +823,180 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	pstate->p_hasWindowFuncs = true;
 };
 
+void
+AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
+{
+	PGList	   *gset_common = NIL;
+	PGList	   *groupClauses = NIL;
+	PGList	   *groupClauseCommonVars = NIL;
+	bool		have_non_var_grouping;
+	PGList	   *func_grouped_rels = NIL;
+	PGListCell   *l;
+	bool		hasJoinRTEs;
+	bool		hasSelfRefRTEs;
+	PGNode	   *clause;
+
+	/* This should only be called if we found aggregates or grouping */
+	Assert(pstate->p_hasAggs || qry->groupClause || qry->havingQual || qry->groupingSets);
+
+	/*
+	 * If we have grouping sets, expand them and find the intersection of all
+	 * sets.
+	 */
+	if (qry->groupingSets)
+	{
+		/*
+		 * The limit of 4096 is arbitrary and exists simply to avoid resource
+		 * issues from pathological constructs.
+		 */
+		PGList	   *gsets = expand_grouping_sets(qry->groupingSets, 4096);
+
+		if (!gsets)
+			ereport(ERROR,
+					(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+					 errmsg("too many grouping sets present (maximum 4096)"),
+					 parser_errposition(pstate,
+										qry->groupClause
+										? exprLocation((PGNode *) qry->groupClause)
+										: exprLocation((PGNode *) qry->groupingSets))));
+
+		/*
+		 * The intersection will often be empty, so help things along by
+		 * seeding the intersect with the smallest set.
+		 */
+		gset_common = linitial(gsets);
+
+		if (gset_common)
+		{
+			for_each_cell(l, lnext(list_head(gsets)))
+			{
+				gset_common = list_intersection_int(gset_common, lfirst(l));
+				if (!gset_common)
+					break;
+			}
+		}
+
+		/*
+		 * If there was only one grouping set in the expansion, AND if the
+		 * groupClause is non-empty (meaning that the grouping set is not
+		 * empty either), then we can ditch the grouping set and pretend we
+		 * just had a normal GROUP BY.
+		 */
+		if (list_length(gsets) == 1 && qry->groupClause)
+			qry->groupingSets = NIL;
+	}
+
+	/*
+	 * Scan the range table to see if there are JOIN or self-reference CTE
+	 * entries.  We'll need this info below.
+	 */
+	hasJoinRTEs = hasSelfRefRTEs = false;
+	foreach(l, pstate->p_rtable)
+	{
+		PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(l);
+
+		if (rte->rtekind == PG_RTE_JOIN)
+			hasJoinRTEs = true;
+		else if (rte->rtekind == PG_RTE_CTE && rte->self_reference)
+			hasSelfRefRTEs = true;
+	}
+
+	/*
+	 * Build a list of the acceptable GROUP BY expressions for use by
+	 * check_ungrouped_columns().
+	 *
+	 * We get the TLE, not just the expr, because GROUPING wants to know the
+	 * sortgroupref.
+	 */
+	foreach(l, qry->groupClause)
+	{
+		PGSortGroupClause *grpcl = (PGSortGroupClause *) lfirst(l);
+		PGTargetEntry *expr;
+
+		expr = get_sortgroupclause_tle(grpcl, qry->targetList);
+		if (expr == NULL)
+			continue;			/* probably cannot happen */
+
+		groupClauses = lcons(expr, groupClauses);
+	}
+
+	/*
+	 * If there are join alias vars involved, we have to flatten them to the
+	 * underlying vars, so that aliased and unaliased vars will be correctly
+	 * taken as equal.  We can skip the expense of doing this if no rangetable
+	 * entries are RTE_JOIN kind.
+	 */
+	if (hasJoinRTEs)
+		groupClauses = (PGList *) flatten_join_alias_vars(qry,
+														(PGNode *) groupClauses);
+
+	/*
+	 * Detect whether any of the grouping expressions aren't simple Vars; if
+	 * they're all Vars then we don't have to work so hard in the recursive
+	 * scans.  (Note we have to flatten aliases before this.)
+	 *
+	 * Track Vars that are included in all grouping sets separately in
+	 * groupClauseCommonVars, since these are the only ones we can use to
+	 * check for functional dependencies.
+	 */
+	have_non_var_grouping = false;
+	foreach(l, groupClauses)
+	{
+		PGTargetEntry *tle = lfirst(l);
+
+		if (!IsA(tle->expr, PGVar))
+		{
+			have_non_var_grouping = true;
+		}
+		else if (!qry->groupingSets ||
+				 list_member_int(gset_common, tle->ressortgroupref))
+		{
+			groupClauseCommonVars = lappend(groupClauseCommonVars, tle->expr);
+		}
+	}
+
+	/*
+	 * Check the targetlist and HAVING clause for ungrouped variables.
+	 *
+	 * Note: because we check resjunk tlist elements as well as regular ones,
+	 * this will also find ungrouped variables that came from ORDER BY and
+	 * WINDOW clauses.  For that matter, it's also going to examine the
+	 * grouping expressions themselves --- but they'll all pass the test ...
+	 *
+	 * We also finalize GROUPING expressions, but for that we need to traverse
+	 * the original (unflattened) clause in order to modify nodes.
+	 */
+	clause = (PGNode *) qry->targetList;
+	finalize_grouping_exprs(clause, pstate, qry,
+							groupClauses, hasJoinRTEs,
+							have_non_var_grouping);
+	if (hasJoinRTEs)
+		clause = flatten_join_alias_vars(qry, clause);
+	check_ungrouped_columns(clause, pstate, qry,
+							groupClauses, groupClauseCommonVars,
+							have_non_var_grouping,
+							&func_grouped_rels);
+
+	clause = (PGNode *) qry->havingQual;
+	finalize_grouping_exprs(clause, pstate, qry,
+							groupClauses, hasJoinRTEs,
+							have_non_var_grouping);
+	if (hasJoinRTEs)
+		clause = flatten_join_alias_vars(qry, clause);
+	check_ungrouped_columns(clause, pstate, qry,
+							groupClauses, groupClauseCommonVars,
+							have_non_var_grouping,
+							&func_grouped_rels);
+
+	/*
+	 * Per spec, aggregates can't appear in a recursive term.
+	 */
+	if (pstate->p_hasAggs && hasSelfRefRTEs)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_RECURSION),
+				 errmsg("aggregate functions are not allowed in a recursive query's recursive term"),
+				 parser_errposition(pstate,
+									locate_agg_of_level((Node *) qry, 0))));
+};
+
 }

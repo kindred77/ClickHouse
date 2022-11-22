@@ -76,7 +76,7 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 		if (ctequery->commandType != PG_CMD_SELECT &&
 			ctequery->returningList == NIL)
 			ereport(ERROR,
-					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("WITH query \"%s\" does not have a RETURNING clause",
 							cte->ctename),
 					 node_parser.parser_errposition(pstate, rv->location)));

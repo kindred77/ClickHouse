@@ -1702,4 +1702,53 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 	return rettype;
 };
 
+PGNode *
+CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
+							   Oid targetTypeId, int32 targetTypmod,
+							   const char *constructName)
+{
+	Oid			inputTypeId = exprType(node);
+
+	if (inputTypeId != targetTypeId)
+	{
+		PGNode	   *newnode;
+
+		newnode = coerce_to_target_type(pstate, node, inputTypeId,
+										targetTypeId, targetTypmod,
+										PG_COERCION_ASSIGNMENT,
+										PG_COERCE_IMPLICIT_CAST,
+										-1);
+		if (newnode == NULL)
+			ereport(ERROR,
+					(errcode(ERRCODE_DATATYPE_MISMATCH),
+			/* translator: first %s is name of a SQL construct, eg LIMIT */
+					 errmsg("argument of %s must be type %s, not type %s",
+							constructName,
+							format_type_be(targetTypeId),
+							format_type_be(inputTypeId)),
+					 node_parser.parser_errposition(pstate, exprLocation(node))));
+		node = newnode;
+	}
+
+	if (expression_returns_set(node))
+		ereport(ERROR,
+				(errcode(ERRCODE_DATATYPE_MISMATCH),
+		/* translator: %s is name of a SQL construct, eg LIMIT */
+				 errmsg("argument of %s must not return a set",
+						constructName),
+				 node_parser.parser_errposition(pstate, exprLocation(node))));
+
+	return node;
+};
+
+PGNode *
+CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
+						Oid targetTypeId,
+						const char *constructName)
+{
+	return coerce_to_specific_type_typmod(pstate, node,
+										  targetTypeId, -1,
+										  constructName);
+};
+
 }
