@@ -344,7 +344,7 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT * with no tables specified is not valid"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	return target;
 };
@@ -785,14 +785,14 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 							(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cross-database references are not implemented: %s",
 									NameListToString(cref->fields)),
-							 parser_errposition(pstate, cref->location)));
+							 node_parser.parser_errposition(pstate, cref->location)));
 					break;
 				case CRSERR_TOO_MANY:
 					ereport(ERROR,
 							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("improper qualified name (too many dotted names): %s",
 									NameListToString(cref->fields)),
-							 parser_errposition(pstate, cref->location)));
+							 node_parser.parser_errposition(pstate, cref->location)));
 					break;
 			}
 		}

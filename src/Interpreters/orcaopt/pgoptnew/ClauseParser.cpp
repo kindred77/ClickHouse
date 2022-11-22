@@ -952,7 +952,7 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("aggregate functions are not allowed in %s",
 								expr_parser.ParseExprKindName(exprKind)),
-						 parser_errposition(pstate,
+						 node_parser.parser_errposition(pstate,
 											locate_agg_of_level((PGNode *) tle->expr, 0))));
 			if (pstate->p_hasWindowFuncs &&
 				contain_windowfuncs((PGNode *) tle->expr))
@@ -961,7 +961,7 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("window functions are not allowed in %s",
 								expr_parser.ParseExprKindName(exprKind)),
-						 parser_errposition(pstate,
+						 node_parser.parser_errposition(pstate,
 											locate_windowfunc((PGNode *) tle->expr))));
 			break;
 		case EXPR_KIND_ORDER_BY:
@@ -1071,7 +1071,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 									 errmsg("%s \"%s\" is ambiguous",
 											expr_parser.ParseExprKindName(exprKind),
 											name),
-									 parser_errposition(pstate, location)));
+									 node_parser.parser_errposition(pstate, location)));
 					}
 					else
 						target_result = tle;
@@ -1099,7 +1099,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 			/* translator: %s is name of a SQL construct, eg ORDER BY */
 					 errmsg("non-integer constant in %s",
 							expr_parser.ParseExprKindName(exprKind)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 
 		target_pos = intVal(val);
 		foreach(tl, *tlist)
@@ -1121,7 +1121,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 		/* translator: %s is name of a SQL construct, eg ORDER BY */
 				 errmsg("%s position %d is not in select list",
 						expr_parser.ParseExprKindName(exprKind), target_pos),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 	}
 
 	/*
@@ -1209,7 +1209,7 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 	location = sortby->location;
 	if (location < 0)
 		location = exprLocation(sortby->node);
-	setup_parser_errposition_callback(&pcbstate, pstate, location);
+	node_parser.setup_parser_errposition_callback(&pcbstate, pstate, location);
 
 	/* determine the sortop, eqop, and directionality */
 	switch (sortby->sortby_dir)
@@ -1263,7 +1263,7 @@ ClauseParser::addTargetToSortList(PGParseState *pstate, PGTargetEntry *tle,
 			break;
 	}
 
-	cancel_parser_errposition_callback(&pcbstate);
+	node_parser.cancel_parser_errposition_callback(&pcbstate);
 
 	/* avoid making duplicate sortlist entries */
 	if (!targetIsInSortList(tle, sortop, sortlist))
@@ -1354,9 +1354,9 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
 		Oid			sortop;
 		Oid			eqop;
 		bool		hashable;
-		ParseCallbackState pcbstate;
+		PGParseCallbackState pcbstate;
 
-		setup_parser_errposition_callback(&pcbstate, pstate, location);
+		node_parser.setup_parser_errposition_callback(&pcbstate, pstate, location);
 
 		/* determine the eqop and optional sortop */
 		get_sort_group_operators(restype,
@@ -1364,7 +1364,7 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
 								 &sortop, &eqop, NULL,
 								 &hashable);
 
-		cancel_parser_errposition_callback(&pcbstate);
+		node_parser.cancel_parser_errposition_callback(&pcbstate);
 
 		grpcl->tleSortGroupRef = assignSortGroupRef(tle, targetlist);
 		grpcl->eqop = eqop;
@@ -1413,7 +1413,7 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 					 is_agg ?
 					 errmsg("in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list") :
 					 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
-					 parser_errposition(pstate,
+					 node_parser.parser_errposition(pstate,
 										exprLocation((PGNode *) tle->expr))));
 		result = lappend(result, copyObject(scl));
 	}

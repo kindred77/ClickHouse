@@ -251,4 +251,140 @@ NodeParser::make_var(PGParseState *pstate, PGRangeTblEntry *rte, int attrno, int
 	return result;
 };
 
+PGConst *
+NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
+{
+	Const	   *con;
+	Datum		val;
+	int64		val64;
+	Oid			typeid;
+	int			typelen;
+	bool		typebyval;
+	ParseCallbackState pcbstate;
+
+	switch (nodeTag(value))
+	{
+		case T_Integer:
+			val = Int32GetDatum(intVal(value));
+
+			typeid = INT4OID;
+			typelen = sizeof(int32);
+			typebyval = true;
+			break;
+
+		case T_Float:
+			/* could be an oversize integer as well as a float ... */
+			if (scanint8(strVal(value), true, &val64))
+			{
+				/*
+				 * It might actually fit in int32. Probably only INT_MIN can
+				 * occur, but we'll code the test generally just to be sure.
+				 */
+				int32		val32 = (int32) val64;
+
+				if (val64 == (int64) val32)
+				{
+					val = Int32GetDatum(val32);
+
+					typeid = INT4OID;
+					typelen = sizeof(int32);
+					typebyval = true;
+				}
+				else
+				{
+					val = Int64GetDatum(val64);
+
+					typeid = INT8OID;
+					typelen = sizeof(int64);
+					typebyval = FLOAT8PASSBYVAL;	/* int8 and float8 alike */
+				}
+			}
+			else
+			{
+				/* arrange to report location if numeric_in() fails */
+				setup_parser_errposition_callback(&pcbstate, pstate, location);
+				val = DirectFunctionCall3(numeric_in,
+										  CStringGetDatum(strVal(value)),
+										  ObjectIdGetDatum(InvalidOid),
+										  Int32GetDatum(-1));
+				cancel_parser_errposition_callback(&pcbstate);
+
+				typeid = NUMERICOID;
+				typelen = -1;	/* variable len */
+				typebyval = false;
+			}
+			break;
+
+		case T_String:
+
+			/*
+			 * We assume here that UNKNOWN's internal representation is the
+			 * same as CSTRING
+			 */
+			val = CStringGetDatum(strVal(value));
+
+			typeid = UNKNOWNOID;	/* will be coerced later */
+			typelen = -2;		/* cstring-style varwidth type */
+			typebyval = false;
+			break;
+
+		case T_BitString:
+			/* arrange to report location if bit_in() fails */
+			setup_parser_errposition_callback(&pcbstate, pstate, location);
+			val = DirectFunctionCall3(bit_in,
+									  CStringGetDatum(strVal(value)),
+									  ObjectIdGetDatum(InvalidOid),
+									  Int32GetDatum(-1));
+			cancel_parser_errposition_callback(&pcbstate);
+			typeid = BITOID;
+			typelen = -1;
+			typebyval = false;
+			break;
+
+		case T_Null:
+			/* return a null const */
+			con = makeConst(UNKNOWNOID,
+							-1,
+							InvalidOid,
+							-2,
+							(Datum) 0,
+							true,
+							false);
+			con->location = location;
+			return con;
+
+		default:
+			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(value));
+			return NULL;		/* keep compiler quiet */
+	}
+
+	con = makeConst(typeid,
+					-1,			/* typmod -1 is OK for all cases */
+					InvalidOid, /* all cases are uncollatable types */
+					typelen,
+					val,
+					false,
+					typebyval);
+	con->location = location;
+
+	return con;
+};
+
+void
+NodeParser::parser_errposition(PGParseState *pstate, int location)
+{
+	int			pos;
+
+	/* No-op if location was not provided */
+	if (location < 0)
+		return;
+	/* Can't do anything if source text is not available */
+	if (pstate == NULL || pstate->p_sourcetext == NULL)
+		return;
+	/* Convert offset to character number */
+	pos = pg_mbstrlen_with_len(pstate->p_sourcetext, location) + 1;
+	/* And pass it to the ereport mechanism */
+	errposition(pos);
+};
+
 }

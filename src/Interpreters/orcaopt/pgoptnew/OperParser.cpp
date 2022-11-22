@@ -47,7 +47,7 @@ OperParser::compatible_oper(PGParseState *pstate, PGList *op, Oid arg1, Oid arg2
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
 				 errmsg("operator requires run-time type coercion: %s",
 						op_signature_string(op, 'b', arg1, arg2)),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	return (Operator) NULL;
 };
@@ -270,12 +270,12 @@ OperParser::make_oper_cache_key(PGParseState *pstate, OprCacheKey *key, PGList *
 
 	if (schemaname)
 	{
-		ParseCallbackState pcbstate;
+		PGParseCallbackState pcbstate;
 
 		/* search only in exact schema given */
-		setup_parser_errposition_callback(&pcbstate, pstate, location);
+		node_parser.setup_parser_errposition_callback(&pcbstate, pstate, location);
 		key->search_path[0] = LookupExplicitNamespace(schemaname, false);
-		cancel_parser_errposition_callback(&pcbstate);
+		node_parser.cancel_parser_errposition_callback(&pcbstate);
 	}
 	else
 	{
@@ -361,7 +361,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("op ANY/ALL (array) requires array on right side"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 
 	/* Now resolve the operator */
@@ -377,7 +377,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 											opform->oprkind,
 											opform->oprleft,
 											opform->oprright)),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	args = list_make2(ltree, rtree);
 	actual_arg_types[0] = ltypeId;
@@ -403,12 +403,12 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("op ANY/ALL (array) requires operator to yield boolean"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 	if (get_func_retset(opform->oprcode))
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("op ANY/ALL (array) requires operator not to return a set"),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	/*
 	 * Now switch back to the array type on the right, arranging for any
@@ -429,7 +429,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("could not find array type for data type %s",
 							format_type_be(declared_arg_types[1])),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 	actual_arg_types[1] = atypeId;
 	declared_arg_types[1] = res_atypeId;
@@ -627,7 +627,7 @@ OperParser::op_error(PGParseState *pstate, PGList *op, char oprkind,
 						op_signature_string(op, oprkind, arg1, arg2)),
 				 errhint("Could not choose a best candidate operator. "
 						 "You might need to add explicit type casts."),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 	else
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
@@ -638,7 +638,7 @@ OperParser::op_error(PGParseState *pstate, PGList *op, char oprkind,
 						 "You might need to add an explicit type cast.") :
 				 errhint("No operator matches the given name and argument types. "
 						 "You might need to add explicit type casts."),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 };
 
 const char *
@@ -715,7 +715,7 @@ OperParser::make_op(PGParseState *pstate, PGList *opname,
 											opform->oprkind,
 											opform->oprleft,
 											opform->oprright)),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	/* Do typecasting and build the expression tree */
 	if (rtree == NULL)

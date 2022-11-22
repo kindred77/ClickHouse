@@ -984,7 +984,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 							   "cannot pass more than %d arguments to a function",
 							   FUNC_MAX_ARGS,
 							   FUNC_MAX_ARGS),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	/*
 	 * Extract arg type info in preparation for function lookup.
@@ -1041,7 +1041,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("argument name \"%s\" used more than once",
 									na->name),
-							 parser_errposition(pstate, na->location)));
+							 node_parser.parser_errposition(pstate, na->location)));
 			}
 			argnames = lappend(argnames, na->name);
 		}
@@ -1051,7 +1051,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("positional argument cannot follow named argument"),
-						 parser_errposition(pstate, exprLocation(arg))));
+						 node_parser.parser_errposition(pstate, exprLocation(arg))));
 		}
 	}
 
@@ -1109,7 +1109,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 	 * with default arguments.
 	 */
 
-	setup_parser_errposition_callback(&pcbstate, pstate, location);
+	node_parser.setup_parser_errposition_callback(&pcbstate, pstate, location);
 
 	fdresult = func_get_detail(funcname, fargs, argnames, nargs,
 							   actual_arg_types,
@@ -1118,7 +1118,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 							   &nvargs, &vatype,
 							   &declared_arg_types, &argdefaults);
 
-	cancel_parser_errposition_callback(&pcbstate);
+	node_parser.cancel_parser_errposition_callback(&pcbstate);
 
 	/*
 	 * Check for various wrong-kind-of-routine cases.
@@ -1137,7 +1137,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 											  argnames,
 											  actual_arg_types)),
 				 errhint("To call a function, use SELECT."),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 	/* Conversely, if not a CALL, reject procedures */
 	if (fdresult == FUNCDETAIL_PROCEDURE && !proc_call)
 		ereport(ERROR,
@@ -1147,7 +1147,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 											  argnames,
 											  actual_arg_types)),
 				 errhint("To call a procedure, use CALL."),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 
 	if (fdresult == FUNCDETAIL_NORMAL ||
 		fdresult == FUNCDETAIL_PROCEDURE ||
@@ -1163,7 +1163,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 					 errmsg("%s(*) specified, but %s is not an aggregate function",
 							NameListToString(funcname),
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.node_parser.parser_errposition(pstate, location)));
 		if (agg_distinct)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -1175,25 +1175,25 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("WITHIN GROUP specified, but %s is not an aggregate function",
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		if (agg_order != NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("ORDER BY specified, but %s is not an aggregate function",
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		if (agg_filter)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("FILTER specified, but %s is not an aggregate function",
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		if (over)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("OVER specified, but %s is not a window function nor an aggregate function",
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 
 	/*
@@ -1231,13 +1231,13 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("WITHIN GROUP is required for ordered-set aggregate %s",
 								NameListToString(funcname)),
-						 parser_errposition(pstate, location)));
+						 node_parser.parser_errposition(pstate, location)));
 			if (over)
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("OVER is not supported for ordered-set aggregate %s",
 								NameListToString(funcname)),
-						 parser_errposition(pstate, location)));
+						 node_parser.parser_errposition(pstate, location)));
 			/* gram.y rejects DISTINCT + WITHIN GROUP */
 			Assert(!agg_distinct);
 			/* gram.y rejects VARIADIC + WITHIN GROUP */
@@ -1269,7 +1269,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 							 errhint("There is an ordered-set aggregate %s, but it requires %d direct arguments, not %d.",
 									 NameListToString(funcname),
 									 catDirectArgs, numDirectArgs),
-							 parser_errposition(pstate, location)));
+							 node_parser.parser_errposition(pstate, location)));
 			}
 			else
 			{
@@ -1298,7 +1298,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 								 errhint("There is an ordered-set aggregate %s, but it requires %d direct arguments, not %d.",
 										 NameListToString(funcname),
 										 catDirectArgs, numDirectArgs),
-								 parser_errposition(pstate, location)));
+								 node_parser.parser_errposition(pstate, location)));
 				}
 				else
 				{
@@ -1323,7 +1323,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 									 errhint("To use the hypothetical-set aggregate %s, the number of hypothetical direct arguments (here %d) must match the number of ordering columns (here %d).",
 											 NameListToString(funcname),
 											 nvargs - numAggregatedArgs, numAggregatedArgs),
-									 parser_errposition(pstate, location)));
+									 node_parser.parser_errposition(pstate, location)));
 					}
 					else
 					{
@@ -1337,7 +1337,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 									 errhint("There is an ordered-set aggregate %s, but it requires at least %d direct arguments.",
 											 NameListToString(funcname),
 											 catDirectArgs),
-									 parser_errposition(pstate, location)));
+									 node_parser.parser_errposition(pstate, location)));
 					}
 				}
 			}
@@ -1355,7 +1355,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("%s is not an ordered-set aggregate, so it cannot have WITHIN GROUP",
 								NameListToString(funcname)),
-						 parser_errposition(pstate, location)));
+						 node_parser.parser_errposition(pstate, location)));
 		}
 	}
 	else if (fdresult == FUNCDETAIL_WINDOWFUNC)
@@ -1368,14 +1368,14 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("window function %s requires an OVER clause",
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		/* And, per spec, WITHIN GROUP isn't allowed */
 		if (agg_within_group)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("window function %s cannot have WITHIN GROUP",
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 	else if (fdresult == FUNCDETAIL_COERCION)
 	{
@@ -1407,7 +1407,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 												  actual_arg_types)),
 					 errhint("Could not choose a best candidate procedure. "
 							 "You might need to add explicit type casts."),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_AMBIGUOUS_FUNCTION),
@@ -1416,7 +1416,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 												  actual_arg_types)),
 					 errhint("Could not choose a best candidate function. "
 							 "You might need to add explicit type casts."),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 	else
 	{
@@ -1456,7 +1456,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 					 errhint("No aggregate function matches the given name and argument types. "
 							 "Perhaps you misplaced ORDER BY; ORDER BY must appear "
 							 "after all regular arguments of the aggregate."),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		}
 		else if (proc_call)
 			ereport(ERROR,
@@ -1466,7 +1466,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 												  actual_arg_types)),
 					 errhint("No procedure matches the given name and argument types. "
 							 "You might need to add explicit type casts."),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_FUNCTION),
@@ -1475,7 +1475,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 												  actual_arg_types)),
 					 errhint("No function matches the given name and argument types. "
 							 "You might need to add explicit type casts."),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 	}
 
 	/*
@@ -1498,7 +1498,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 								   "cannot pass more than %d arguments to a function",
 								   FUNC_MAX_ARGS,
 								   FUNC_MAX_ARGS),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 
 		actual_arg_types[nargsplusdefs++] = exprType(expr);
 	}
@@ -1551,7 +1551,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("could not find array type for data type %s",
 							format_type_be(newa->element_typeid)),
-					 parser_errposition(pstate, exprLocation((PGNode *) vargs))));
+					 node_parser.parser_errposition(pstate, exprLocation((PGNode *) vargs))));
 		/* array_collid will be set by parse_collate.c */
 		newa->multidims = false;
 		newa->location = exprLocation((PGNode *) vargs);
@@ -1576,7 +1576,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("VARIADIC argument must be an array"),
-					 parser_errposition(pstate,
+					 node_parser.parser_errposition(pstate,
 										exprLocation((PGNode *) llast(fargs)))));
 	}
 
@@ -1632,14 +1632,14 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("%s(*) must be used to call a parameterless aggregate function",
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 #endif
 
 		if (retset)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 					 errmsg("aggregates cannot return sets"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 
 		/*
 		 * We might want to support named arguments later, but disallow it for
@@ -1654,7 +1654,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("aggregates cannot use named arguments"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 
 		/* parse_agg.c does additional aggregate-specific processing */
 		agg_parser.transformAggregateCall(pstate, aggref, fargs, agg_order, agg_distinct);
@@ -1692,7 +1692,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("DISTINCT is not implemented for window functions"),
-						 parser_errposition(pstate, location)));
+						 node_parser.parser_errposition(pstate, location)));
 
 			if (list_length(fargs) != 1)
 				ereport(ERROR,
@@ -1712,7 +1712,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("%s(*) must be used to call a parameterless aggregate function",
 							NameListToString(funcname)),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 #endif
 
 		/*
@@ -1722,7 +1722,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("aggregate ORDER BY is not implemented for window functions"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 
 		/*
 		 * FILTER is not yet supported with true window functions
@@ -1731,7 +1731,7 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("FILTER is not implemented for non-aggregate window functions"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 
 		/*
 		 * Window functions can't either take or return sets
@@ -1741,14 +1741,14 @@ FuncParser::ParseFuncOrColumn(PGParseState *pstate, PGList *funcname, PGList *fa
 					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("window function calls cannot contain set-returning function calls"),
 					 errhint("You might be able to move the set-returning function into a LATERAL FROM item."),
-					 parser_errposition(pstate,
+					 node_parser.parser_errposition(pstate,
 										exprLocation(pstate->p_last_srf))));
 
 		if (retset)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 					 errmsg("window functions cannot return sets"),
-					 parser_errposition(pstate, location)));
+					 node_parser.parser_errposition(pstate, location)));
 
 		/* parse_agg.c does additional window-func-specific processing */
 		agg_parser.transformWindowFuncCall(pstate, wfunc, over);
@@ -1833,7 +1833,7 @@ FuncParser::check_srf_call_placement(PGParseState *pstate, PGNode *last_srf, int
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("set-returning functions must appear at top level of FROM"),
-						 parser_errposition(pstate,
+						 node_parser.parser_errposition(pstate,
 											exprLocation(pstate->p_last_srf))));
 			break;
 		case EXPR_KIND_WHERE:
@@ -1947,14 +1947,14 @@ FuncParser::check_srf_call_placement(PGParseState *pstate, PGNode *last_srf, int
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg_internal("%s", err),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 	if (errkind)
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("set-returning functions are not allowed in %s",
 						expr_parser.ParseExprKindName(pstate->p_expr_kind)),
-				 parser_errposition(pstate, location)));
+				 node_parser.parser_errposition(pstate, location)));
 };
 
 void

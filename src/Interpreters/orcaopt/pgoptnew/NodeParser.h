@@ -38,6 +38,12 @@ public:
 	
 	duckdb_libpgquery::PGVar *
 	make_var(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int attrno, int location);
+
+	duckdb_libpgquery::PGConst *
+	make_const(PGParseState *pstate, duckdb_libpgquery::PGValue *value, int location);
+
+	void
+	parser_errposition(PGParseState *pstate, int location);
 };
 
 }

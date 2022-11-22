@@ -54,7 +54,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too few dotted names): %s",
 								NameListToString(typeName->names)),
-						 parser_errposition(pstate, typeName->location)));
+						 node_parser.parser_errposition(pstate, typeName->location)));
 				break;
 			case 2:
 				rel->relname = strVal(linitial(typeName->names));
@@ -76,7 +76,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too many dotted names): %s",
 								NameListToString(typeName->names)),
-						 parser_errposition(pstate, typeName->location)));
+						 node_parser.parser_errposition(pstate, typeName->location)));
 				break;
 		}
 
@@ -98,7 +98,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 						(errcode(ERRCODE_UNDEFINED_COLUMN),
 						 errmsg("column \"%s\" of relation \"%s\" does not exist",
 								field, rel->relname),
-						 parser_errposition(pstate, typeName->location)));
+						 node_parser.parser_errposition(pstate, typeName->location)));
 		}
 		else
 		{
@@ -127,9 +127,9 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 		{
 			/* Look in specific schema only */
 			Oid			namespaceId;
-			ParseCallbackState pcbstate;
+			PGParseCallbackState pcbstate;
 
-			setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
+			node_parser.setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
 
 			namespaceId = LookupExplicitNamespace(schemaname, missing_ok);
 			if (OidIsValid(namespaceId))
@@ -139,7 +139,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 			else
 				typoid = InvalidOid;
 
-			cancel_parser_errposition_callback(&pcbstate);
+			node_parser.cancel_parser_errposition_callback(&pcbstate);
 		}
 		else
 		{
@@ -196,7 +196,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier cannot be specified for shell type \"%s\"",
 						TypeNameToString(typeName)),
-				 parser_errposition(pstate, typeName->location)));
+				 node_parser.parser_errposition(pstate, typeName->location)));
 
 	typmodin = ((Form_pg_type) GETSTRUCT(typ))->typmodin;
 
@@ -205,7 +205,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier is not allowed for type \"%s\"",
 						TypeNameToString(typeName)),
-				 parser_errposition(pstate, typeName->location)));
+				 node_parser.parser_errposition(pstate, typeName->location)));
 
 	/*
 	 * Convert the list of raw-grammar-output expressions to a cstring array.
@@ -246,7 +246,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("type modifiers must be simple constants or identifiers"),
-					 parser_errposition(pstate, typeName->location)));
+					 node_parser.parser_errposition(pstate, typeName->location)));
 		datums[n++] = CStringGetDatum(cstr);
 	}
 
@@ -255,12 +255,12 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 								-2, false, 'c');
 
 	/* arrange to report location if type's typmodin function fails */
-	setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
+	node_parser.setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
 
 	result = DatumGetInt32(OidFunctionCall1(typmodin,
 											PointerGetDatum(arrtypmod)));
 
-	cancel_parser_errposition_callback(&pcbstate);
+	node_parser.cancel_parser_errposition_callback(&pcbstate);
 
 	pfree(datums);
 	pfree(arrtypmod);
@@ -279,13 +279,13 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" does not exist",
 						TypeNameToString(typeName)),
-				 parser_errposition(pstate, typeName->location)));
+				 node_parser.parser_errposition(pstate, typeName->location)));
 	if (!((Form_pg_type) GETSTRUCT(tup))->typisdefined)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" is only a shell",
 						TypeNameToString(typeName)),
-				 parser_errposition(pstate, typeName->location)));
+				 node_parser.parser_errposition(pstate, typeName->location)));
 	return tup;
 };
 

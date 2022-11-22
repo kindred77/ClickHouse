@@ -4,6 +4,7 @@
 #include <Interpreters/orcaopt/pgoptnew/ClauseParser.h>
 #include <Interpreters/orcaopt/pgoptnew/CoerceParser.h>
 #include <Interpreters/orcaopt/pgoptnew/TargetParser.h>
+#include <Interpreters/orcaopt/pgoptnew/NodeParser.h>
 
 namespace DB
 {
@@ -14,6 +15,7 @@ private:
     ClauseParser clause_parser;
     TargetParser target_parser;
     CoerceParser coerce_parser;
+    NodeParser node_parser;
 public:
 	explicit SelectParser();
 

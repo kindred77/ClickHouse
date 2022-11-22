@@ -146,7 +146,18 @@ public:
 
     duckdb_libpgquery::PGNode *
     make_row_comparison_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
-					   duckdb_libpgquery::PGList *largs, duckdb_libpgquery::PGList *rargs, int location);
+					   duckdb_libpgquery::PGList *largs, duckdb_libpgquery::PGList *rargs,
+                       int location);
+
+    duckdb_libpgquery::PGExpr *
+    make_distinct_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
+                duckdb_libpgquery::PGNode *ltree, duckdb_libpgquery::PGNode *rtree,
+				int location);
+
+    duckdb_libpgquery::PGNode *
+    make_row_distinct_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
+					 duckdb_libpgquery::PGRowExpr *lrow, duckdb_libpgquery::PGRowExpr *rrow,
+					 int location);
 };
 
 }

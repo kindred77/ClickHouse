@@ -86,7 +86,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 								context,
 								format_type_be(ptype),
 								format_type_be(ntype)),
-						 parser_errposition(pstate, exprLocation(nexpr))));
+						 node_parser.parser_errposition(pstate, exprLocation(nexpr))));
 			}
 			else if (!pispreferred &&
 					 can_coerce_type(1, &ptype, &ntype, PG_COERCION_IMPLICIT) &&
@@ -129,9 +129,9 @@ CoerceParser::parser_coercion_errposition(PGParseState *pstate,
 							PGNode *input_expr)
 {
 	if (coerce_location >= 0)
-		parser_errposition(pstate, coerce_location);
+		node_parser.parser_errposition(pstate, coerce_location);
 	else
-		parser_errposition(pstate, exprLocation(input_expr));
+		node_parser.parser_errposition(pstate, exprLocation(input_expr));
 };
 
 PGNode *
@@ -515,7 +515,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		 * Set up to point at the constant's text if the input routine throws
 		 * an error.
 		 */
-		setup_parser_errposition_callback(&pcbstate, pstate, con->location);
+		node_parser.setup_parser_errposition_callback(&pcbstate, pstate, con->location);
 
 		/*
 		 * We assume here that UNKNOWN's internal representation is the same
@@ -567,7 +567,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		}
 #endif
 
-		cancel_parser_errposition_callback(&pcbstate);
+		node_parser.cancel_parser_errposition_callback(&pcbstate);
 
 		result = (PGNode *) newcon;
 
@@ -1187,7 +1187,7 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName, "boolean",
 							format_type_be(inputTypeId)),
-					 parser_errposition(pstate, exprLocation(node))));
+					 node_parser.parser_errposition(pstate, exprLocation(node))));
 		node = newnode;
 	}
 
@@ -1197,7 +1197,7 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 		/* translator: %s is name of a SQL construct, eg WHERE */
 				 errmsg("argument of %s must not return a set",
 						constructName),
-				 parser_errposition(pstate, exprLocation(node))));
+				 node_parser.parser_errposition(pstate, exprLocation(node))));
 
 	return node;
 };
@@ -1386,7 +1386,7 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 						context,
 						format_type_be(inputTypeId),
 						format_type_be(targetTypeId)),
-				 parser_errposition(pstate, exprLocation(node))));
+				 node_parser.parser_errposition(pstate, exprLocation(node))));
 	return node;
 };
 
@@ -1396,9 +1396,9 @@ CoerceParser::parser_coercion_errposition(PGParseState *pstate,
 							PGNode *input_expr)
 {
 	if (coerce_location >= 0)
-		parser_errposition(pstate, coerce_location);
+		node_parser.parser_errposition(pstate, coerce_location);
 	else
-		parser_errposition(pstate, exprLocation(input_expr));
+		node_parser.parser_errposition(pstate, exprLocation(input_expr));
 };
 
 Oid
