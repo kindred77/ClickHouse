@@ -162,6 +162,13 @@ public:
 
     duckdb_libpgquery::PGWindowClause *
     findWindowClause(duckdb_libpgquery::PGList *wclist, const char *name);
+
+    int
+    get_matching_location(int sortgroupref, duckdb_libpgquery::PGList *sortgrouprefs,
+                    duckdb_libpgquery::PGList *exprs);
+
+    void
+    checkExprIsVarFree(PGParseState *pstate, duckdb_libpgquery::PGNode *n, const char *constructName);
 };
 
 }

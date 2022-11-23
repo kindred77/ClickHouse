@@ -641,7 +641,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 			 * Check for sub-array expressions, if we haven't already found
 			 * one.
 			 */
-			if (!newa->multidims && type_is_array(exprType(newe)))
+			if (!newa->multidims && get_element_type(exprType(newe)) != InvalidOid)
 				newa->multidims = true;
 		}
 

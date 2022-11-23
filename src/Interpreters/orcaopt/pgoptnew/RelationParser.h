@@ -163,6 +163,10 @@ public:
 	void
 	get_rte_attribute_type(duckdb_libpgquery::PGRangeTblEntry *rte, PGAttrNumber attnum,
 					   Oid *vartype, int32 *vartypmod, Oid *varcollid);
+	
+	void
+	check_lateral_ref_ok(PGParseState *pstate, PGParseNamespaceItem *nsitem,
+					 int location);
 };
 
 }

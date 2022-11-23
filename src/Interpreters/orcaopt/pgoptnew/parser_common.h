@@ -325,16 +325,50 @@ static inline Datum Int64GetDatum(int64 i64) { return (Datum) i64; };
 
 #define DatumGetPointer(X) ((Pointer) (X))
 #define PointerGetDatum(X) ((Datum) (X))
+#define PointerIsValid(pointer) ((const void*)(pointer) != NULL)
+
 static inline Datum CStringGetDatum(const char *p) { return PointerGetDatum(p); };
 static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; } ;
 static inline char *DatumGetCString(Datum d) { return (char* ) DatumGetPointer(d); };
+
+static const int oldprecedence_l[] = {
+	0, 10, 10, 3, 2, 8, 4, 5, 6, 4, 5, 6, 7, 8, 9
+};
+static const int oldprecedence_r[] = {
+	0, 10, 10, 3, 2, 8, 4, 5, 6, 1, 1, 1, 7, 8, 9
+};
 
 #define FLOAT8PASSBYVAL true
 
 #define MAX_FUZZY_DISTANCE				3
 #define MaxTupleAttributeNumber 1664	/* 8 * 208 */
 
-#define ERROR		20
+/* Error level codes */
+#define DEBUG5		10			/* Debugging messages, in categories of
+								 * decreasing detail. */
+#define DEBUG4		11
+#define DEBUG3		12
+#define DEBUG2		13
+#define DEBUG1		14			/* used by GUC debug_* variables */
+#define LOG			15			/* Server operational messages; sent only to
+								 * server log by default. */
+#define LOG_SERVER_ONLY 16		/* Same as LOG for server reporting, but never
+								 * sent to client. */
+#define COMMERROR	LOG_SERVER_ONLY /* Client communication problems; same as
+									 * LOG for server reporting, but never
+									 * sent to client. */
+#define INFO		17			/* Messages specifically requested by user (eg
+								 * VACUUM VERBOSE output); always sent to
+								 * client regardless of client_min_messages,
+								 * but by default not sent to server log. */
+#define NOTICE		18			/* Helpful messages to users about query
+								 * operation; sent to client and not to server
+								 * log by default. */
+#define WARNING		19			/* Warnings.  NOTICE is for expected messages
+								 * like implicit sequence creation by SERIAL.
+								 * WARNING is for unexpected messages. */
+#define ERROR		20			/* user error - abort transaction; return to
+								 * known state */
 
 #define AGGKIND_NORMAL			'n'
 #define AGGKIND_ORDERED_SET		'o'
@@ -466,6 +500,35 @@ static inline char *DatumGetCString(Datum d) { return (char* ) DatumGetPointer(d
 
 #define Min(x, y)		((x) < (y) ? (x) : (y))
 #define Max(x, y)		((x) > (y) ? (x) : (y))
+
+size_t
+strlcpy(char *dst, const char *src, size_t siz)
+{
+	char	   *d = dst;
+	const char *s = src;
+	size_t		n = siz;
+
+	/* Copy as many bytes as will fit */
+	if (n != 0)
+	{
+		while (--n != 0)
+		{
+			if ((*d++ = *s++) == '\0')
+				break;
+		}
+	}
+
+	/* Not enough room in dst, add NUL and traverse rest of src */
+	if (n == 0)
+	{
+		if (siz != 0)
+			*d = '\0';			/* NUL-terminate dst */
+		while (*s++)
+			;
+	}
+
+	return (s - src - 1);		/* count does not include NUL */
+}
 
 /*
  * count_nonjunk_tlist_entries

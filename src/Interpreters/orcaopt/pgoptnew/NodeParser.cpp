@@ -263,7 +263,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 	PGConst	   *con;
 	Datum		val;
 	int64		val64;
-	Oid			typeid;
+	Oid			typeoid;
 	int			typelen;
 	bool		typebyval;
 	PGParseCallbackState pcbstate;
@@ -273,7 +273,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 		case T_PGInteger:
 			val = Int32GetDatum(intVal(value));
 
-			typeid = INT4OID;
+			typeoid = INT4OID;
 			typelen = sizeof(int32);
 			typebyval = true;
 			break;
@@ -292,7 +292,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 				{
 					val = Int32GetDatum(val32);
 
-					typeid = INT4OID;
+					typeoid = INT4OID;
 					typelen = sizeof(int32);
 					typebyval = true;
 				}
@@ -300,7 +300,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 				{
 					val = Int64GetDatum(val64);
 
-					typeid = INT8OID;
+					typeoid = INT8OID;
 					typelen = sizeof(int64);
 					typebyval = FLOAT8PASSBYVAL;	/* int8 and float8 alike */
 				}
@@ -315,7 +315,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 										  Int32GetDatum(-1));
 				cancel_parser_errposition_callback(&pcbstate);
 
-				typeid = NUMERICOID;
+				typeoid = NUMERICOID;
 				typelen = -1;	/* variable len */
 				typebyval = false;
 			}
@@ -329,7 +329,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			 */
 			val = CStringGetDatum(strVal(value));
 
-			typeid = UNKNOWNOID;	/* will be coerced later */
+			typeoid = UNKNOWNOID;	/* will be coerced later */
 			typelen = -2;		/* cstring-style varwidth type */
 			typebyval = false;
 			break;
@@ -342,7 +342,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 									  ObjectIdGetDatum(InvalidOid),
 									  Int32GetDatum(-1));
 			cancel_parser_errposition_callback(&pcbstate);
-			typeid = BITOID;
+			typeoid = BITOID;
 			typelen = -1;
 			typebyval = false;
 			break;
@@ -364,7 +364,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			return NULL;		/* keep compiler quiet */
 	}
 
-	con = makeConst(typeid,
+	con = makeConst(typeoid,
 					-1,			/* typmod -1 is OK for all cases */
 					InvalidOid, /* all cases are uncollatable types */
 					typelen,

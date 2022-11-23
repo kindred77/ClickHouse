@@ -141,6 +141,11 @@ public:
 								 Oid rettype,
 								 bool allow_poly);
 
+	bool
+	check_generic_type_consistency(const Oid *actual_arg_types,
+							   const Oid *declared_arg_types,
+							   int nargs);
+
 	duckdb_libpgquery::PGNode *
 	coerce_to_specific_type_typmod(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
 							   Oid targetTypeId, int32 targetTypmod,

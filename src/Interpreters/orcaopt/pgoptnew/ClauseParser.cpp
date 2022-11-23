@@ -1841,6 +1841,23 @@ ClauseParser::transformGroupClause(PGParseState *pstate, PGList *grouplist,
 	return result;
 };
 
+int
+ClauseParser::get_matching_location(int sortgroupref, PGList *sortgrouprefs,
+                    PGList *exprs)
+{
+	PGListCell   *lcs;
+	PGListCell   *lce;
+
+	forboth(lcs, sortgrouprefs, lce, exprs)
+	{
+		if (lfirst_int(lcs) == sortgroupref)
+			return exprLocation((PGNode *) lfirst(lce));
+	}
+	/* if no match, caller blew it */
+	elog(ERROR, "get_matching_location: no matching sortgroupref");
+	return -1;					/* keep compiler quiet */
+};
+
 PGList *
 ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctlist,
 						  PGList **targetlist,
@@ -1940,6 +1957,21 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctli
 	Assert(result != NIL);
 
 	return result;
+};
+
+void
+ClauseParser::checkExprIsVarFree(PGParseState *pstate, PGNode *n, const char *constructName)
+{
+	if (contain_vars_of_level(n, 0))
+	{
+		node_parser.parser_errposition(pstate,
+						locate_var_of_level(n, 0));
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+		/* translator: %s is name of a SQL construct, eg LIMIT */
+				 errmsg("argument of %s must not contain variables",
+						constructName)));
+	}
 };
 
 PGNode *
