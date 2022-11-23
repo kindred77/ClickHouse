@@ -116,10 +116,12 @@ NodeParser::transformContainerSubscripts(PGParseState *pstate,
 												PG_COERCE_IMPLICIT_CAST,
 												-1);
 				if (subexpr == NULL)
+				{
+					parser_errposition(pstate, exprLocation(ai->lidx));
 					ereport(ERROR,
 							(errcode(ERRCODE_DATATYPE_MISMATCH),
-							 errmsg("array subscript must have type integer"),
-							 parser_errposition(pstate, exprLocation(ai->lidx))));
+							 errmsg("array subscript must have type integer")));
+				}
 			}
 			else if (!ai->is_slice)
 			{
@@ -153,10 +155,12 @@ NodeParser::transformContainerSubscripts(PGParseState *pstate,
 											PG_COERCE_IMPLICIT_CAST,
 											-1);
 			if (subexpr == NULL)
+			{
+				parser_errposition(pstate, exprLocation(ai->uidx));
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("array subscript must have type integer"),
-						 parser_errposition(pstate, exprLocation(ai->uidx))));
+						 errmsg("array subscript must have type integer")));
+			}
 		}
 		else
 		{
@@ -184,14 +188,16 @@ NodeParser::transformContainerSubscripts(PGParseState *pstate,
 										PG_COERCE_IMPLICIT_CAST,
 										-1);
 		if (newFrom == NULL)
+		{
+			parser_errposition(pstate, exprLocation(assignFrom));
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("array assignment requires type %s"
 							" but expression is of type %s",
 							format_type_be(typeneeded),
 							format_type_be(typesource)),
-					 errhint("You will need to rewrite or cast the expression."),
-					 parser_errposition(pstate, exprLocation(assignFrom))));
+					 errhint("You will need to rewrite or cast the expression.")));
+		}
 		assignFrom = newFrom;
 	}
 
@@ -254,17 +260,17 @@ NodeParser::make_var(PGParseState *pstate, PGRangeTblEntry *rte, int attrno, int
 PGConst *
 NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 {
-	Const	   *con;
+	PGConst	   *con;
 	Datum		val;
 	int64		val64;
 	Oid			typeid;
 	int			typelen;
 	bool		typebyval;
-	ParseCallbackState pcbstate;
+	PGParseCallbackState pcbstate;
 
 	switch (nodeTag(value))
 	{
-		case T_Integer:
+		case T_PGInteger:
 			val = Int32GetDatum(intVal(value));
 
 			typeid = INT4OID;
@@ -272,7 +278,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			typebyval = true;
 			break;
 
-		case T_Float:
+		case T_PGFloat:
 			/* could be an oversize integer as well as a float ... */
 			if (scanint8(strVal(value), true, &val64))
 			{
@@ -315,7 +321,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			}
 			break;
 
-		case T_String:
+		case T_PGString:
 
 			/*
 			 * We assume here that UNKNOWN's internal representation is the
@@ -328,7 +334,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			typebyval = false;
 			break;
 
-		case T_BitString:
+		case T_PGBitString:
 			/* arrange to report location if bit_in() fails */
 			setup_parser_errposition_callback(&pcbstate, pstate, location);
 			val = DirectFunctionCall3(bit_in,
@@ -341,7 +347,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			typebyval = false;
 			break;
 
-		case T_Null:
+		case T_PGNull:
 			/* return a null const */
 			con = makeConst(UNKNOWNOID,
 							-1,

@@ -78,6 +78,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 				 */
 				if (context == NULL)
 					return InvalidOid;
+				node_parser.parser_errposition(pstate, exprLocation(nexpr));
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 				/*------
@@ -85,8 +86,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 						 errmsg("%s types %s and %s cannot be matched",
 								context,
 								format_type_be(ptype),
-								format_type_be(ntype)),
-						 node_parser.parser_errposition(pstate, exprLocation(nexpr))));
+								format_type_be(ntype))));
 			}
 			else if (!pispreferred &&
 					 can_coerce_type(1, &ptype, &ntype, PG_COERCION_IMPLICIT) &&
@@ -172,12 +172,14 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 				  NULL, &args);
 	}
 	else
+	{
+		parser_coercion_errposition(pstate, location, node);
 		ereport(ERROR,
 				(errcode(ERRCODE_CANNOT_COERCE),
 				 errmsg("cannot cast type %s to %s",
 						format_type_be(RECORDOID),
-						format_type_be(targetTypeId)),
-				 parser_coercion_errposition(pstate, location, node)));
+						format_type_be(targetTypeId))));
+	}
 
 	/*
 	 * Look up the composite type, accounting for possibility that what we are
@@ -210,13 +212,15 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 		}
 
 		if (arg == NULL)
+		{
+			parser_coercion_errposition(pstate, location, node);
 			ereport(ERROR,
 					(errcode(ERRCODE_CANNOT_COERCE),
 					 errmsg("cannot cast type %s to %s",
 							format_type_be(RECORDOID),
 							format_type_be(targetTypeId)),
-					 errdetail("Input has too few columns."),
-					 parser_coercion_errposition(pstate, location, node)));
+					 errdetail("Input has too few columns.")));
+		}
 		expr = (PGNode *) lfirst(arg);
 		exprtype = exprType(expr);
 
@@ -228,6 +232,8 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 									  PG_COERCE_IMPLICIT_CAST,
 									  -1);
 		if (cexpr == NULL)
+		{
+			parser_coercion_errposition(pstate, location, expr);
 			ereport(ERROR,
 					(errcode(ERRCODE_CANNOT_COERCE),
 					 errmsg("cannot cast type %s to %s",
@@ -236,20 +242,22 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 					 errdetail("Cannot cast type %s to %s in column %d.",
 							   format_type_be(exprtype),
 							   format_type_be(attr->atttypid),
-							   ucolno),
-					 parser_coercion_errposition(pstate, location, expr)));
+							   ucolno)));
+		}
 		newargs = lappend(newargs, cexpr);
 		ucolno++;
 		arg = lnext(arg);
 	}
 	if (arg != NULL)
+	{
+		parser_coercion_errposition(pstate, location, node);
 		ereport(ERROR,
 				(errcode(ERRCODE_CANNOT_COERCE),
 				 errmsg("cannot cast type %s to %s",
 						format_type_be(RECORDOID),
 						format_type_be(targetTypeId)),
-				 errdetail("Input has too many columns."),
-				 parser_coercion_errposition(pstate, location, node)));
+				 errdetail("Input has too many columns.")));
+	}
 
 	ReleaseTupleDesc(tupdesc);
 
@@ -1181,23 +1189,27 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 										PG_COERCE_IMPLICIT_CAST,
 										-1);
 		if (newnode == NULL)
+		{
+			node_parser.parser_errposition(pstate, exprLocation(node));
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 			/* translator: first %s is name of a SQL construct, eg WHERE */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName, "boolean",
-							format_type_be(inputTypeId)),
-					 node_parser.parser_errposition(pstate, exprLocation(node))));
+							format_type_be(inputTypeId))));
+		}
 		node = newnode;
 	}
 
 	if (expression_returns_set(node))
+	{
+		node_parser.parser_errposition(pstate, exprLocation(node));
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 		/* translator: %s is name of a SQL construct, eg WHERE */
 				 errmsg("argument of %s must not return a set",
-						constructName),
-				 node_parser.parser_errposition(pstate, exprLocation(node))));
+						constructName)));
+	}
 
 	return node;
 };
@@ -1379,14 +1391,16 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 		node = coerce_type(pstate, node, inputTypeId, targetTypeId, -1,
 						   PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 	else
+	{
+		node_parser.parser_errposition(pstate, exprLocation(node));
 		ereport(ERROR,
 				(errcode(ERRCODE_CANNOT_COERCE),
 		/* translator: first %s is name of a SQL construct, eg CASE */
 				 errmsg("%s could not convert type %s to %s",
 						context,
 						format_type_be(inputTypeId),
-						format_type_be(targetTypeId)),
-				 node_parser.parser_errposition(pstate, exprLocation(node))));
+						format_type_be(targetTypeId))));
+	}
 	return node;
 };
 
@@ -1719,24 +1733,28 @@ CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
 										PG_COERCE_IMPLICIT_CAST,
 										-1);
 		if (newnode == NULL)
+		{
+			node_parser.parser_errposition(pstate, exprLocation(node));
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 			/* translator: first %s is name of a SQL construct, eg LIMIT */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName,
 							format_type_be(targetTypeId),
-							format_type_be(inputTypeId)),
-					 node_parser.parser_errposition(pstate, exprLocation(node))));
+							format_type_be(inputTypeId))));
+		}
 		node = newnode;
 	}
 
 	if (expression_returns_set(node))
+	{
+		node_parser.parser_errposition(pstate, exprLocation(node));
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 		/* translator: %s is name of a SQL construct, eg LIMIT */
 				 errmsg("argument of %s must not return a set",
-						constructName),
-				 node_parser.parser_errposition(pstate, exprLocation(node))));
+						constructName)));
+	}
 
 	return node;
 };

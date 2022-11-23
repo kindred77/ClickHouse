@@ -75,11 +75,13 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 
 		if (ctequery->commandType != PG_CMD_SELECT &&
 			ctequery->returningList == NIL)
+		{
+			node_parser.parser_errposition(pstate, rv->location);
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("WITH query \"%s\" does not have a RETURNING clause",
-							cte->ctename),
-					 node_parser.parser_errposition(pstate, rv->location)));
+							cte->ctename)));
+		}
 	}
 
 	rte->coltypes = cte->ctecoltypes;
@@ -299,6 +301,8 @@ RelationParser::errorMissingRTE(PGParseState *pstate, PGRangeVar *relation)
 		badAlias = rte->eref->aliasname;
 
 	if (rte)
+	{
+		node_parser.parser_errposition(pstate, relation->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_TABLE),
 				 errmsg("invalid reference to FROM-clause entry for table \"%s\"",
@@ -307,14 +311,16 @@ RelationParser::errorMissingRTE(PGParseState *pstate, PGRangeVar *relation)
 				  errhint("Perhaps you meant to reference the table alias \"%s\".",
 						  badAlias) :
 				  errhint("There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
-						  rte->eref->aliasname)),
-				 node_parser.parser_errposition(pstate, relation->location)));
+						  rte->eref->aliasname))));
+	}
 	else
+	{
+		node_parser.parser_errposition(pstate, relation->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_TABLE),
 				 errmsg("missing FROM-clause entry for table \"%s\"",
-						relation->relname),
-				 node_parser.parser_errposition(pstate, relation->location)));
+						relation->relname)));
+	}
 };
 
 void
@@ -352,6 +358,7 @@ RelationParser::errorMissingColumn(PGParseState *pstate,
 		 * Handle case where there is zero or one column suggestions to hint,
 		 * including exact matches referenced but not visible.
 		 */
+		node_parser.parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 relname ?
@@ -361,8 +368,7 @@ RelationParser::errorMissingColumn(PGParseState *pstate,
 				 errhint("Perhaps you meant to reference the column \"%s.%s\".",
 						 state->rfirst->eref->aliasname, closestfirst) :
 				 errhint("There is a column named \"%s\" in table \"%s\", but it cannot be referenced from this part of the query.",
-						 colname, state->rfirst->eref->aliasname) : 0,
-				 node_parser.parser_errposition(pstate, location)));
+						 colname, state->rfirst->eref->aliasname) : 0));
 	}
 	else
 	{
@@ -372,6 +378,7 @@ RelationParser::errorMissingColumn(PGParseState *pstate,
 		closestsecond = strVal(list_nth(state->rsecond->eref->colnames,
 										state->second - 1));
 
+		node_parser.parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 relname ?
@@ -379,8 +386,7 @@ RelationParser::errorMissingColumn(PGParseState *pstate,
 				 errmsg("column \"%s\" does not exist", colname),
 				 errhint("Perhaps you meant to reference the column \"%s.%s\" or the column \"%s.%s\".",
 						 state->rfirst->eref->aliasname, closestfirst,
-						 state->rsecond->eref->aliasname, closestsecond),
-				 node_parser.parser_errposition(pstate, location)));
+						 state->rsecond->eref->aliasname, closestsecond)));
 	}
 };
 
@@ -1397,11 +1403,13 @@ RelationParser::scanNameSpaceForRelid(PGParseState *pstate, Oid relid, int locat
 			rte->alias == NULL)
 		{
 			if (result)
+			{
+				node_parser.parser_errposition(pstate, location);
 				ereport(ERROR,
 						(errcode(ERRCODE_AMBIGUOUS_ALIAS),
 						 errmsg("table reference %u is ambiguous",
-								relid),
-						 node_parser.parser_errposition(pstate, location)));
+								relid)));
+			}
 			check_lateral_ref_ok(pstate, nsitem, location);
 			result = rte;
 		}
@@ -1430,11 +1438,13 @@ RelationParser::scanNameSpaceForRefname(PGParseState *pstate, const char *refnam
 		if (strcmp(rte->eref->aliasname, refname) == 0)
 		{
 			if (result)
+			{
+				node_parser.parser_errposition(pstate, location);
 				ereport(ERROR,
 						(errcode(ERRCODE_AMBIGUOUS_ALIAS),
 						 errmsg("table reference \"%s\" is ambiguous",
-								refname),
-						 node_parser.parser_errposition(pstate, location)));
+								refname)));
+			}
 			check_lateral_ref_ok(pstate, nsitem, location);
 			result = rte;
 		}
@@ -1786,11 +1796,13 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, con
 		if (strcmp(attcolname, colname) == 0)
 		{
 			if (result)
+			{
+				node_parser.parser_errposition(pstate, location);
 				ereport(ERROR,
 						(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 						 errmsg("column reference \"%s\" is ambiguous",
-								colname),
-						 node_parser.parser_errposition(pstate, location)));
+								colname)));
+			}
 			var = node_parser.make_var(pstate, rte, attnum, location);
 			/* Require read access to the column */
 			markVarForSelectPriv(pstate, var, rte);
@@ -1835,22 +1847,26 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, con
 		/* In constraint check, no system column is allowed except tableOid */
 		if (pstate->p_expr_kind == EXPR_KIND_CHECK_CONSTRAINT &&
 			attnum < InvalidAttrNumber && attnum != TableOidAttributeNumber)
+		{
+			node_parser.parser_errposition(pstate, location);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 					 errmsg("system column \"%s\" reference in check constraint is invalid",
-							colname),
-					 node_parser.parser_errposition(pstate, location)));
+							colname)));
+		}
 
 		/*
 		 * In generated column, no system column is allowed except tableOid.
 		 */
 		if (pstate->p_expr_kind == EXPR_KIND_GENERATED_COLUMN &&
 			attnum < InvalidAttrNumber && attnum != TableOidAttributeNumber)
+		{
+			node_parser.parser_errposition(pstate, location);
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 					 errmsg("cannot use system column \"%s\" in column generation expression",
-							colname),
-					 node_parser.parser_errposition(pstate, location)));
+							colname)));
+		}
 
 		if (attnum != InvalidAttrNumber)
 		{
@@ -1866,7 +1882,7 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, con
 									  Int16GetDatum(attnum)) &&
 				get_rel_relkind(rte->relid) != RELKIND_VIEW)
 			{
-				var = make_var(pstate, rte, attnum, location);
+				var = node_parser.make_var(pstate, rte, attnum, location);
 				/* Require read access to the column */
 				markVarForSelectPriv(pstate, var, rte);
 				result = (PGNode *) var;
@@ -1908,11 +1924,13 @@ RelationParser::colNameToVar(PGParseState *pstate, const char *colname, bool loc
 			if (newresult)
 			{
 				if (result)
+				{
+					node_parser.parser_errposition(pstate, location);
 					ereport(ERROR,
 							(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 							 errmsg("column reference \"%s\" is ambiguous",
-									colname),
-							 node_parser.parser_errposition(pstate, location)));
+									colname)));
+				}
 				check_lateral_ref_ok(pstate, nsitem, location);
 				result = newresult;
 			}

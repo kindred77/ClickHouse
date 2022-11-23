@@ -40,11 +40,13 @@ CTEParser::transformWithClause(PGParseState *pstate, PGWithClause *withClause)
 			PGCommonTableExpr *cte2 = (PGCommonTableExpr *) lfirst(rest);
 
 			if (strcmp(cte->ctename, cte2->ctename) == 0)
+			{
+				node_parser.parser_errposition(pstate, cte2->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_DUPLICATE_ALIAS),
 						 errmsg("WITH query name \"%s\" specified more than once",
-								cte2->ctename),
-						 parser_errposition(pstate, cte2->location)));
+								cte2->ctename)));
+			}
 		}
 
 		cte->cterecursive = false;

@@ -947,22 +947,27 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 			/* reject aggregates and window functions */
 			if (pstate->p_hasAggs &&
 				contain_aggs_of_level((PGNode *) tle->expr, 0))
+			{
+				node_parser.parser_errposition(pstate,
+								locate_agg_of_level((PGNode *) tle->expr, 0));
 				ereport(ERROR,
 						(errcode(ERRCODE_GROUPING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("aggregate functions are not allowed in %s",
-								expr_parser.ParseExprKindName(exprKind)),
-						 node_parser.parser_errposition(pstate,
-											locate_agg_of_level((PGNode *) tle->expr, 0))));
+								expr_parser.ParseExprKindName(exprKind))));
+			}
+
 			if (pstate->p_hasWindowFuncs &&
 				contain_windowfuncs((PGNode *) tle->expr))
+			{
+				node_parser.parser_errposition(pstate,
+								locate_windowfunc((PGNode *) tle->expr));
 				ereport(ERROR,
 						(errcode(ERRCODE_WINDOWING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("window functions are not allowed in %s",
-								expr_parser.ParseExprKindName(exprKind)),
-						 node_parser.parser_errposition(pstate,
-											locate_windowfunc((PGNode *) tle->expr))));
+								expr_parser.ParseExprKindName(exprKind))));
+			}
 			break;
 		case EXPR_KIND_ORDER_BY:
 			/* no extra checks needed */
@@ -1063,6 +1068,8 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 					if (target_result != NULL)
 					{
 						if (!equal(target_result->expr, tle->expr))
+						{
+							node_parser.parser_errposition(pstate, location);
 							ereport(ERROR,
 									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 
@@ -1070,8 +1077,8 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 							  translator: first %s is name of a SQL construct, eg ORDER BY */
 									 errmsg("%s \"%s\" is ambiguous",
 											expr_parser.ParseExprKindName(exprKind),
-											name),
-									 node_parser.parser_errposition(pstate, location)));
+											name)));
+						}
 					}
 					else
 						target_result = tle;
@@ -1094,12 +1101,14 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 		int			target_pos;
 
 		if (!IsA(val, PGInteger))
+		{
+			node_parser.parser_errposition(pstate, location);
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 			/* translator: %s is name of a SQL construct, eg ORDER BY */
 					 errmsg("non-integer constant in %s",
-							expr_parser.ParseExprKindName(exprKind)),
-					 node_parser.parser_errposition(pstate, location)));
+							expr_parser.ParseExprKindName(exprKind))));
+		}
 
 		target_pos = intVal(val);
 		foreach(tl, *tlist)
@@ -1116,12 +1125,12 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 				}
 			}
 		}
+		node_parser.parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 		/* translator: %s is name of a SQL construct, eg ORDER BY */
 				 errmsg("%s position %d is not in select list",
-						expr_parser.ParseExprKindName(exprKind), target_pos),
-				 node_parser.parser_errposition(pstate, location)));
+						expr_parser.ParseExprKindName(exprKind), target_pos)));
 	}
 
 	/*
@@ -1408,13 +1417,15 @@ ClauseParser::transformDistinctClause(PGParseState *pstate,
 		PGTargetEntry *tle = get_sortgroupclause_tle(scl, *targetlist);
 
 		if (tle->resjunk)
+		{
+			node_parser.parser_errposition(pstate,
+								exprLocation((PGNode *) tle->expr));
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 					 is_agg ?
 					 errmsg("in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list") :
-					 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
-					 node_parser.parser_errposition(pstate,
-										exprLocation((PGNode *) tle->expr))));
+					 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list")));
+		}
 		result = lappend(result, copyObject(scl));
 	}
 
@@ -1727,10 +1738,12 @@ ClauseParser::transformGroupingSet(PGList **flatresult,
 	if (gset->kind == GROUPING_SET_CUBE)
 	{
 		if (list_length(content) > 12)
+		{
+			node_parser.parser_errposition(pstate, gset->location);
 			ereport(ERROR,
 					(errcode(ERRCODE_TOO_MANY_COLUMNS),
-					 errmsg("CUBE is limited to 12 elements"),
-					 node_parser.parser_errposition(pstate, gset->location)));
+					 errmsg("CUBE is limited to 12 elements")));
+		}
 	}
 
 	return (PGNode *) makeGroupingSet(gset->kind, content, gset->location);
@@ -1875,13 +1888,15 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctli
 		if (list_member_int(sortgrouprefs, scl->tleSortGroupRef))
 		{
 			if (skipped_sortitem)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-						 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
-						 node_parser.parser_errposition(pstate,
+			{
+				node_parser.parser_errposition(pstate,
 											get_matching_location(scl->tleSortGroupRef,
 																  sortgrouprefs,
-																  distinctlist))));
+																  distinctlist));
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+						 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions")));
+			}
 			else
 				result = lappend(result, copyObject(scl));
 		}
@@ -1907,10 +1922,12 @@ ClauseParser::transformDistinctOnClause(PGParseState *pstate, PGList *distinctli
 		if (targetIsInSortList(tle, InvalidOid, result))
 			continue;			/* already in list (with some semantics) */
 		if (skipped_sortitem)
+		{
+			node_parser.parser_errposition(pstate, exprLocation(dexpr));
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
-					 node_parser.parser_errposition(pstate, exprLocation(dexpr))));
+					 errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions")));
+		}
 		result = addTargetToGroupList(pstate, tle,
 									  result, *targetlist,
 									  exprLocation(dexpr));
@@ -1996,10 +2013,12 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		 */
 		if (windef->name &&
 			findWindowClause(result, windef->name) != NULL)
+		{
+			node_parser.parser_errposition(pstate, windef->location);
 			ereport(ERROR,
 					(errcode(ERRCODE_WINDOWING_ERROR),
-					 errmsg("window \"%s\" is already defined", windef->name),
-					 node_parser.parser_errposition(pstate, windef->location)));
+					 errmsg("window \"%s\" is already defined", windef->name)));
+		}
 
 		/*
 		 * If it references a previous window, look that up.
@@ -2008,11 +2027,13 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		{
 			refwc = findWindowClause(result, windef->refname);
 			if (refwc == NULL)
+			{
+				node_parser.parser_errposition(pstate, windef->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("window \"%s\" does not exist",
-								windef->refname),
-						 node_parser.parser_errposition(pstate, windef->location)));
+								windef->refname)));
+			}
 		}
 
 		/*
@@ -2057,11 +2078,13 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		if (refwc)
 		{
 			if (partitionClause)
+			{
+				node_parser.parser_errposition(pstate, windef->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_WINDOWING_ERROR),
 						 errmsg("cannot override PARTITION BY clause of window \"%s\"",
-								windef->refname),
-						 node_parser.parser_errposition(pstate, windef->location)));
+								windef->refname)));
+			}
 			wc->partitionClause = (PGList *)copyObject(refwc->partitionClause);
 		}
 		else
@@ -2069,11 +2092,13 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		if (refwc)
 		{
 			if (orderClause && refwc->orderClause)
+			{
+				node_parser.parser_errposition(pstate, windef->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_WINDOWING_ERROR),
 						 errmsg("cannot override ORDER BY clause of window \"%s\"",
-								windef->refname),
-						 node_parser.parser_errposition(pstate, windef->location)));
+								windef->refname)));
+			}
 			if (orderClause)
 			{
 				wc->orderClause = orderClause;
@@ -2099,18 +2124,20 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 			 */
 			if (windef->name ||
 				orderClause || windef->frameOptions != FRAMEOPTION_DEFAULTS)
+			{
+				node_parser.parser_errposition(pstate, windef->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_WINDOWING_ERROR),
 						 errmsg("cannot copy window \"%s\" because it has a frame clause",
-								windef->refname),
-						 node_parser.parser_errposition(pstate, windef->location)));
+								windef->refname)));
+			}
 			/* Else this clause is just OVER (foo), so say this: */
+			node_parser.parser_errposition(pstate, windef->location);
 			ereport(ERROR,
 					(errcode(ERRCODE_WINDOWING_ERROR),
 			errmsg("cannot copy window \"%s\" because it has a frame clause",
 				   windef->refname),
-					 errhint("Omit the parentheses in this OVER clause."),
-					 node_parser.parser_errposition(pstate, windef->location)));
+					 errhint("Omit the parentheses in this OVER clause.")));
 		}
 
 		/*
@@ -2150,10 +2177,12 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 			int16		rangestrategy;
 
 			if (list_length(wc->orderClause) != 1)
+			{
+				node_parser.parser_errposition(pstate, windef->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_WINDOWING_ERROR),
-						 errmsg("RANGE with offset PRECEDING/FOLLOWING requires exactly one ORDER BY column"),
-						 node_parser.parser_errposition(pstate, windef->location)));
+						 errmsg("RANGE with offset PRECEDING/FOLLOWING requires exactly one ORDER BY column")));
+			}
 			sortcl = castNode(PGSortGroupClause, linitial(wc->orderClause));
 			sortkey = get_sortgroupclause_expr(sortcl, *targetlist);
 			/* Find the sort operator in pg_amop */
@@ -2173,10 +2202,12 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
 		if (wc->frameOptions & FRAMEOPTION_GROUPS)
 		{
 			if (wc->orderClause == NIL)
+			{
+				node_parser.parser_errposition(pstate, windef->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_WINDOWING_ERROR),
-						 errmsg("GROUPS mode requires an ORDER BY clause"),
-						 node_parser.parser_errposition(pstate, windef->location)));
+						 errmsg("GROUPS mode requires an ORDER BY clause")));
+			}
 		}
 
 		/* Process frame offset expressions */

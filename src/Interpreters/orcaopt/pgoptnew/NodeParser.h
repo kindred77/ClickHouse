@@ -42,8 +42,7 @@ public:
 	duckdb_libpgquery::PGConst *
 	make_const(PGParseState *pstate, duckdb_libpgquery::PGValue *value, int location);
 
-	void
-	parser_errposition(PGParseState *pstate, int location);
+	void parser_errposition(PGParseState *pstate, int location);
 };
 
 }

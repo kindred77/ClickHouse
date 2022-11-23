@@ -50,11 +50,11 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 		switch (list_length(typeName->names))
 		{
 			case 1:
+				node_parser.parser_errposition(pstate, typeName->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too few dotted names): %s",
-								NameListToString(typeName->names)),
-						 node_parser.parser_errposition(pstate, typeName->location)));
+								NameListToString(typeName->names))));
 				break;
 			case 2:
 				rel->relname = strVal(linitial(typeName->names));
@@ -72,11 +72,11 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 				field = strVal(lfourth(typeName->names));
 				break;
 			default:
+				node_parser.parser_errposition(pstate, typeName->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too many dotted names): %s",
-								NameListToString(typeName->names)),
-						 node_parser.parser_errposition(pstate, typeName->location)));
+								NameListToString(typeName->names))));
 				break;
 		}
 
@@ -94,11 +94,13 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 			if (missing_ok)
 				typoid = InvalidOid;
 			else
+			{
+				node_parser.parser_errposition(pstate, typeName->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_COLUMN),
 						 errmsg("column \"%s\" of relation \"%s\" does not exist",
-								field, rel->relname),
-						 node_parser.parser_errposition(pstate, typeName->location)));
+								field, rel->relname)));
+			}
 		}
 		else
 		{
@@ -192,20 +194,24 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 	 * typmodin function.
 	 */
 	if (!((Form_pg_type) GETSTRUCT(typ))->typisdefined)
+	{
+		node_parser.parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier cannot be specified for shell type \"%s\"",
-						TypeNameToString(typeName)),
-				 node_parser.parser_errposition(pstate, typeName->location)));
+						TypeNameToString(typeName))));
+	}
 
 	typmodin = ((Form_pg_type) GETSTRUCT(typ))->typmodin;
 
 	if (typmodin == InvalidOid)
+	{
+		node_parser.parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier is not allowed for type \"%s\"",
-						TypeNameToString(typeName)),
-				 node_parser.parser_errposition(pstate, typeName->location)));
+						TypeNameToString(typeName))));
+	}
 
 	/*
 	 * Convert the list of raw-grammar-output expressions to a cstring array.
@@ -243,10 +249,12 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 				cstr = strVal(linitial(cr->fields));
 		}
 		if (!cstr)
+		{
+			node_parser.parser_errposition(pstate, typeName->location);
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("type modifiers must be simple constants or identifiers"),
-					 node_parser.parser_errposition(pstate, typeName->location)));
+					 errmsg("type modifiers must be simple constants or identifiers")));
+		}
 		datums[n++] = CStringGetDatum(cstr);
 	}
 
@@ -275,17 +283,21 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 
 	tup = LookupTypeName(pstate, typeName, typmod_p, false);
 	if (tup == NULL)
+	{
+		node_parser.parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" does not exist",
-						TypeNameToString(typeName)),
-				 node_parser.parser_errposition(pstate, typeName->location)));
+						TypeNameToString(typeName))));
+	}
 	if (!((Form_pg_type) GETSTRUCT(tup))->typisdefined)
+	{
+		node_parser.parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" is only a shell",
-						TypeNameToString(typeName)),
-				 node_parser.parser_errposition(pstate, typeName->location)));
+						TypeNameToString(typeName))));
+	}
 	return tup;
 };
 

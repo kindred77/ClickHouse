@@ -47,11 +47,6 @@ public:
 				  duckdb_libpgquery::PGCommonTableExpr *parentCTE,
 				  duckdb_libpgquery::PGLockingClause *lockclause_from_parent,
 				  bool resolve_unknowns);
-
-    void
-    transformLockingClause(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry,
-                        duckdb_libpgquery::PGLockingClause *lc,
-					    bool pushedDown);
 };
 
 }

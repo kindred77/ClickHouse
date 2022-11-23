@@ -100,192 +100,6 @@ SelectParser::markTargetListOrigins(PGParseState *pstate, PGList *targetlist)
 	}
 };
 
-void
-SelectParser::transformLockingClause(PGParseState *pstate, PGQuery *qry,
-                        PGLockingClause *lc,
-					    bool pushedDown)
-{
-	PGList	   *lockedRels = lc->lockedRels;
-	PGListCell   *l;
-	PGListCell   *rt;
-	Index		i;
-	PGLockingClause *allrels;
-
-	CheckSelectLocking(qry, lc->strength);
-
-	/* make a clause we can pass down to subqueries to select all rels */
-	allrels = makeNode(PGLockingClause);
-	allrels->lockedRels = NIL;	/* indicates all rels */
-	allrels->strength = lc->strength;
-	allrels->waitPolicy = lc->waitPolicy;
-
-	if (lockedRels == NIL)
-	{
-		/* all regular tables used in query */
-		i = 0;
-		foreach(rt, qry->rtable)
-		{
-			PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(rt);
-
-			++i;
-			switch (rte->rtekind)
-			{
-				case PG_RTE_RELATION:
-					if (rel_is_external_table(rte->relid))
-						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("SELECT FOR UPDATE/SHARE cannot be applied to external tables")));
-
-					applyLockingClause(qry, i, lc->strength, lc->waitPolicy,
-									   pushedDown);
-					rte->requiredPerms |= ACL_SELECT_FOR_UPDATE;
-					break;
-				case PG_RTE_SUBQUERY:
-					applyLockingClause(qry, i, lc->strength, lc->waitPolicy,
-									   pushedDown);
-
-					/*
-					 * FOR UPDATE/SHARE of subquery is propagated to all of
-					 * subquery's rels, too.  We could do this later (based on
-					 * the marking of the subquery RTE) but it is convenient
-					 * to have local knowledge in each query level about which
-					 * rels need to be opened with RowShareLock.
-					 */
-					transformLockingClause(pstate, rte->subquery,
-										   allrels, true);
-					break;
-				default:
-					/* ignore JOIN, SPECIAL, FUNCTION, VALUES, CTE RTEs */
-					break;
-			}
-		}
-	}
-	else
-	{
-		/* just the named tables */
-		foreach(l, lockedRels)
-		{
-			PGRangeVar   *thisrel = (PGRangeVar *) lfirst(l);
-
-			/* For simplicity we insist on unqualified alias names here */
-			if (thisrel->catalogname || thisrel->schemaname)
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-				/*------
-				  translator: %s is a SQL row locking clause such as FOR UPDATE */
-						 errmsg("%s must specify unqualified relation names",
-								LCS_asString(lc->strength)),
-						 node_parser.parser_errposition(pstate, thisrel->location)));
-
-			i = 0;
-			foreach(rt, qry->rtable)
-			{
-				PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(rt);
-
-				++i;
-				if (strcmp(rte->eref->aliasname, thisrel->relname) == 0)
-				{
-					switch (rte->rtekind)
-					{
-						case PG_RTE_RELATION:
-							if (rel_is_external_table(rte->relid))
-								ereport(ERROR,
-										(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-										 errmsg("SELECT FOR UPDATE/SHARE cannot be applied to external tables")));
-							applyLockingClause(qry, i, lc->strength,
-											   lc->waitPolicy, pushedDown);
-							rte->requiredPerms |= ACL_SELECT_FOR_UPDATE;
-							break;
-						case PG_RTE_SUBQUERY:
-							applyLockingClause(qry, i, lc->strength,
-											   lc->waitPolicy, pushedDown);
-							/* see comment above */
-							transformLockingClause(pstate, rte->subquery,
-												   allrels, true);
-							break;
-						case PG_RTE_JOIN:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a join",
-											LCS_asString(lc->strength)),
-									 node_parser.parser_errposition(pstate, thisrel->location)));
-							break;
-						case PG_RTE_FUNCTION:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a function",
-											LCS_asString(lc->strength)),
-									 node_parser.parser_errposition(pstate, thisrel->location)));
-							break;
-						case PG_RTE_TABLEFUNC:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a table function",
-											LCS_asString(lc->strength)),
-									 node_parser.parser_errposition(pstate, thisrel->location)));
-							break;
-						// case PG_RTE_TABLEFUNCTION:
-						// 	ereport(ERROR,
-						// 			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						// 			 errmsg("SELECT FOR UPDATE/SHARE cannot be applied to a table function")));
-						// 	break;
-						case PG_RTE_VALUES:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to VALUES",
-											LCS_asString(lc->strength)),
-									 node_parser.parser_errposition(pstate, thisrel->location)));
-							break;
-						case PG_RTE_CTE:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a WITH query",
-											LCS_asString(lc->strength)),
-									 node_parser.parser_errposition(pstate, thisrel->location)));
-							break;
-						case RTE_NAMEDTUPLESTORE:
-							ereport(ERROR,
-									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							/*------
-							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-									 errmsg("%s cannot be applied to a named tuplestore",
-											LCS_asString(lc->strength)),
-									 node_parser.parser_errposition(pstate, thisrel->location)));
-							break;
-
-							/* Shouldn't be possible to see RTE_RESULT here */
-
-						default:
-							elog(ERROR, "unrecognized RTE type: %d",
-								 (int) rte->rtekind);
-							break;
-					}
-					break;		/* out of foreach loop */
-				}
-			}
-			if (rt == NULL)
-				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_TABLE),
-				/*------
-				  translator: %s is a SQL row locking clause such as FOR UPDATE */
-						 errmsg("relation \"%s\" in %s clause not found in FROM clause",
-								thisrel->relname,
-								LCS_asString(lc->strength)),
-						 node_parser.parser_errposition(pstate, thisrel->location)));
-		}
-	}
-};
-
 PGQuery *
 SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 {
@@ -304,12 +118,11 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	}
 
 	/* Complain if we get called from someplace where INTO is not allowed */
+	node_parser.parser_errposition(pstate, exprLocation((PGNode *) stmt->intoClause));
 	if (stmt->intoClause)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("SELECT ... INTO is not allowed here"),
-				 node_parser.parser_errposition(pstate,
-									exprLocation((PGNode *) stmt->intoClause))));
+				 errmsg("SELECT ... INTO is not allowed here")));
 
 	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
 	pstate->p_locking_clause = stmt->lockingClause;
@@ -419,11 +232,11 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	if (pstate->p_hasTblValueExpr)
 		func_parser.parseCheckTableFunctions(pstate, qry);
 
-	foreach(l, stmt->lockingClause)
-	{
-		transformLockingClause(pstate, qry,
-							   (PGLockingClause *) lfirst(l), false);
-	}
+	// foreach(l, stmt->lockingClause)
+	// {
+	// 	transformLockingClause(pstate, qry,
+	// 						   (PGLockingClause *) lfirst(l), false);
+	// }
 
 	collation_parser.assign_query_collations(pstate, qry);
 

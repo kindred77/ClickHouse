@@ -52,10 +52,10 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 		aggloc = locate_agg_of_level((PGNode *) args, agglevel);
 		if (aggloc < 0)
 			aggloc = locate_agg_of_level((PGNode *) filter, agglevel);
+		node_parser.parser_errposition(pstate, aggloc);
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
-				 errmsg("aggregate function calls cannot be nested"),
-				 node_parser.parser_errposition(pstate, aggloc)));
+				 errmsg("aggregate function calls cannot be nested")));
 	}
 
 	/*
@@ -75,19 +75,23 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 									  check_agg_arguments_walker,
 									  (void *) &context);
 		if (context.min_varlevel >= 0 && context.min_varlevel < agglevel)
-			ereport(ERROR,
-					(errcode(ERRCODE_GROUPING_ERROR),
-					 errmsg("outer-level aggregate cannot contain a lower-level variable in its direct arguments"),
-					 node_parser.parser_errposition(pstate,
+		{
+			node_parser.parser_errposition(pstate,
 										locate_var_of_level((PGNode *) directargs,
-															context.min_varlevel))));
-		if (context.min_agglevel >= 0 && context.min_agglevel <= agglevel)
+															context.min_varlevel));
 			ereport(ERROR,
 					(errcode(ERRCODE_GROUPING_ERROR),
-					 errmsg("aggregate function calls cannot be nested"),
-					 node_parser.parser_errposition(pstate,
+					 errmsg("outer-level aggregate cannot contain a lower-level variable in its direct arguments")));
+		}
+		if (context.min_agglevel >= 0 && context.min_agglevel <= agglevel)
+		{
+			node_parser.parser_errposition(pstate,
 										locate_agg_of_level((PGNode *) directargs,
-															context.min_agglevel))));
+															context.min_agglevel));
+			ereport(ERROR,
+					(errcode(ERRCODE_GROUPING_ERROR),
+					 errmsg("aggregate function calls cannot be nested")));
+		}
 	}
 	return agglevel;
 };
@@ -375,10 +379,12 @@ AggParser::check_agglevels_and_constraints(PGParseState *pstate, PGNode *expr)
 	}
 
 	if (err)
+	{
+		node_parser.parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
-				 errmsg_internal("%s", err),
-				 node_parser.parser_errposition(pstate, location)));
+				 errmsg_internal("%s", err)));
+	}
 
 	if (errkind)
 	{
@@ -388,12 +394,12 @@ AggParser::check_agglevels_and_constraints(PGParseState *pstate, PGNode *expr)
 		else
 			/* translator: %s is name of a SQL construct, eg GROUP BY */
 			err = _("grouping operations are not allowed in %s");
-
+		
+		node_parser.parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
 				 errmsg_internal(err,
-								 expr_parser.ParseExprKindName(pstate->p_expr_kind)),
-				 node_parser.parser_errposition(pstate, location)));
+								 expr_parser.ParseExprKindName(pstate->p_expr_kind))));
 	}
 };
 
@@ -406,10 +412,12 @@ AggParser::transformGroupingFunc(PGParseState *pstate, PGGroupingFunc *p)
 	PGGroupingFunc *result = makeNode(PGGroupingFunc);
 
 	if (list_length(args) > 31)
+	{
+		node_parser.parser_errposition(pstate, p->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
-				 errmsg("GROUPING must have fewer than 32 arguments"),
-				 node_parser.parser_errposition(pstate, p->location)));
+				 errmsg("GROUPING must have fewer than 32 arguments")));
+	}
 
 	foreach(lc, args)
 	{
@@ -548,12 +556,12 @@ AggParser::transformAggregateCall(PGParseState *pstate, PGAggref *agg,
 				{
 					PGNode	   *expr = get_sortgroupclause_expr(sortcl, tlist);
 
+					node_parser.parser_errposition(pstate, exprLocation(expr));
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_FUNCTION),
 							 errmsg("could not identify an ordering operator for type %s",
 									format_type_be(exprType(expr))),
-							 errdetail("Aggregates with DISTINCT must be able to sort their inputs."),
-							 node_parser.parser_errposition(pstate, exprLocation(expr))));
+							 errdetail("Aggregates with DISTINCT must be able to sort their inputs.")));
 				}
 			}
 		}
@@ -587,11 +595,13 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	 */
 	if (pstate->p_hasWindowFuncs &&
 		contain_windowfuncs((PGNode *) wfunc->args))
+	{
+		node_parser.parser_errposition(pstate,
+									locate_windowfunc((PGNode *) wfunc->args));
 		ereport(ERROR,
 				(errcode(ERRCODE_WINDOWING_ERROR),
-				 errmsg("window function calls cannot be nested"),
-				 node_parser.parser_errposition(pstate,
-									locate_windowfunc((PGNode *) wfunc->args))));
+				 errmsg("window function calls cannot be nested"),));
+	}
 
 	/*
 	 * Check to see if the window function is in an invalid place within the
@@ -722,17 +732,22 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 			 */
 	}
 	if (err)
+	{
+		node_parser.parser_errposition(pstate, wfunc->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_WINDOWING_ERROR),
-				 errmsg_internal("%s", err),
-				 node_parser.parser_errposition(pstate, wfunc->location)));
+				 errmsg_internal("%s", err)));
+	}
+
 	if (errkind)
+	{
+		node_parser.parser_errposition(pstate, wfunc->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_WINDOWING_ERROR),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("window functions are not allowed in %s",
-						ParseExprKindName(pstate->p_expr_kind)),
-				 node_parser.parser_errposition(pstate, wfunc->location)));
+						ParseExprKindName(pstate->p_expr_kind))));
+	}
 
 	/*
 	 * If the OVER clause just specifies a window name, find that WINDOW
@@ -780,10 +795,12 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 			}
 		}
 		if (lc == NULL)			/* didn't find it? */
+		{
+			node_parser.parser_errposition(pstate, windef->location);
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("window \"%s\" does not exist", name),
-					 node_parser.parser_errposition(pstate, windef->location)));
+					 errmsg("window \"%s\" does not exist", name)));
+		}
 	}
 	else
 	{
@@ -852,25 +869,27 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 		PGList	   *gsets = expand_grouping_sets(qry->groupingSets, 4096);
 
 		if (!gsets)
-			ereport(ERROR,
-					(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-					 errmsg("too many grouping sets present (maximum 4096)"),
-					 parser_errposition(pstate,
+		{
+			node_parser.parser_errposition(pstate,
 										qry->groupClause
 										? exprLocation((PGNode *) qry->groupClause)
-										: exprLocation((PGNode *) qry->groupingSets))));
+										: exprLocation((PGNode *) qry->groupingSets));
+			ereport(ERROR,
+					(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+					 errmsg("too many grouping sets present (maximum 4096)")));
+		}
 
 		/*
 		 * The intersection will often be empty, so help things along by
 		 * seeding the intersect with the smallest set.
 		 */
-		gset_common = linitial(gsets);
+		gset_common = (PGList *)linitial(gsets);
 
 		if (gset_common)
 		{
 			for_each_cell(l, lnext(list_head(gsets)))
 			{
-				gset_common = list_intersection_int(gset_common, lfirst(l));
+				gset_common = list_intersection_int(gset_common, (PGList *)lfirst(l));
 				if (!gset_common)
 					break;
 			}
@@ -942,7 +961,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 	have_non_var_grouping = false;
 	foreach(l, groupClauses)
 	{
-		PGTargetEntry *tle = lfirst(l);
+		PGTargetEntry *tle = (PGTargetEntry *)lfirst(l);
 
 		if (!IsA(tle->expr, PGVar))
 		{
@@ -992,11 +1011,12 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 	 * Per spec, aggregates can't appear in a recursive term.
 	 */
 	if (pstate->p_hasAggs && hasSelfRefRTEs)
+	{
+		node_parser.parser_errposition(pstate, locate_agg_of_level((PGNode *) qry, 0));
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_RECURSION),
-				 errmsg("aggregate functions are not allowed in a recursive query's recursive term"),
-				 parser_errposition(pstate,
-									locate_agg_of_level((Node *) qry, 0))));
+				 errmsg("aggregate functions are not allowed in a recursive query's recursive term")));
+	}
 };
 
 }

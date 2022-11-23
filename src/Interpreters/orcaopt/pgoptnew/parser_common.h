@@ -13,6 +13,7 @@
 #include <nodes/nodes.hpp>
 #include <nodes/pg_list.hpp>
 #include <nodes/bitmapset.hpp>
+#include <nodes/lockoptions.hpp>
 #include <pg_functions.hpp>
 #include <access/attnum.hpp>
 //#include <c.h>
@@ -136,6 +137,20 @@ struct PGParseNamespaceItem
 	bool		p_lateral_ok;	/* If so, does join type allow use? */
 };
 
+/*
+ * This enum represents the different strengths of FOR UPDATE/SHARE clauses.
+ * The ordering here is important, because the highest numerical value takes
+ * precedence when a RTE is specified multiple ways.  See applyLockingClause.
+ */
+// typedef enum LockClauseStrength
+// {
+// 	LCS_NONE,					/* no such clause - only used in PlanRowMark */
+// 	LCS_FORKEYSHARE,			/* FOR KEY SHARE */
+// 	LCS_FORSHARE,				/* FOR SHARE */
+// 	LCS_FORNOKEYUPDATE,			/* FOR NO KEY UPDATE */
+// 	LCS_FORUPDATE				/* FOR UPDATE */
+// } LockClauseStrength;
+
 typedef enum PGPostgresParserErrors {
 	ERRCODE_SYNTAX_ERROR,
 	ERRCODE_FEATURE_NOT_SUPPORTED,
@@ -164,7 +179,9 @@ typedef enum PGPostgresParserErrors {
 	ERRCODE_UNDEFINED_TABLE,
 	ERRCODE_DUPLICATE_ALIAS,
 	ERRCODE_AMBIGUOUS_ALIAS,
-	ERRCODE_PROGRAM_LIMIT_EXCEEDED
+	ERRCODE_PROGRAM_LIMIT_EXCEEDED,
+	ERRCODE_STATEMENT_TOO_COMPLEX,
+	ERRCODE_INVALID_RECURSION
 } PGPostgresParserErrors;
 
 typedef struct ErrorContextCallback
@@ -448,6 +465,7 @@ static inline char *DatumGetCString(Datum d) { return (char* ) DatumGetPointer(d
 	((typid) == RECORDOID)
 
 #define Min(x, y)		((x) < (y) ? (x) : (y))
+#define Max(x, y)		((x) > (y) ? (x) : (y))
 
 /*
  * count_nonjunk_tlist_entries
