@@ -220,25 +220,25 @@ NodeParser::transformContainerSubscripts(PGParseState *pstate,
 	return sbsref;
 };
 
-void
-NodeParser::setup_parser_errposition_callback(PGParseCallbackState *pcbstate,
-								  PGParseState *pstate, int location)
-{
-	/* Setup error traceback support for ereport() */
-	pcbstate->pstate = pstate;
-	pcbstate->location = location;
-	pcbstate->errcallback.callback = pcb_error_callback;
-	pcbstate->errcallback.arg = (void *) pcbstate;
-	pcbstate->errcallback.previous = error_context_stack;
-	error_context_stack = &pcbstate->errcallback;
-};
+// void
+// NodeParser::setup_parser_errposition_callback(PGParseCallbackState *pcbstate,
+// 								  PGParseState *pstate, int location)
+// {
+// 	/* Setup error traceback support for ereport() */
+// 	pcbstate->pstate = pstate;
+// 	pcbstate->location = location;
+// 	pcbstate->errcallback.callback = pcb_error_callback;
+// 	pcbstate->errcallback.arg = (void *) pcbstate;
+// 	pcbstate->errcallback.previous = error_context_stack;
+// 	error_context_stack = &pcbstate->errcallback;
+// };
 
-void
-NodeParser::cancel_parser_errposition_callback(PGParseCallbackState *pcbstate)
-{
-	/* Pop the error context stack */
-	error_context_stack = pcbstate->errcallback.previous;
-};
+// void
+// NodeParser::cancel_parser_errposition_callback(PGParseCallbackState *pcbstate)
+// {
+// 	/* Pop the error context stack */
+// 	error_context_stack = pcbstate->errcallback.previous;
+// };
 
 PGVar *
 NodeParser::make_var(PGParseState *pstate, PGRangeTblEntry *rte, int attrno, int location)
@@ -376,21 +376,21 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 	return con;
 };
 
-void
-NodeParser::parser_errposition(PGParseState *pstate, int location)
-{
-	int			pos;
+// void
+// NodeParser::parser_errposition(PGParseState *pstate, int location)
+// {
+// 	int			pos;
 
-	/* No-op if location was not provided */
-	if (location < 0)
-		return;
-	/* Can't do anything if source text is not available */
-	if (pstate == NULL || pstate->p_sourcetext == NULL)
-		return;
-	/* Convert offset to character number */
-	pos = pg_mbstrlen_with_len(pstate->p_sourcetext, location) + 1;
-	/* And pass it to the ereport mechanism */
-	errposition(pos);
-};
+// 	/* No-op if location was not provided */
+// 	if (location < 0)
+// 		return;
+// 	/* Can't do anything if source text is not available */
+// 	if (pstate == NULL || pstate->p_sourcetext == NULL)
+// 		return;
+// 	/* Convert offset to character number */
+// 	pos = pg_mbstrlen_with_len(pstate->p_sourcetext, location) + 1;
+// 	/* And pass it to the ereport mechanism */
+// 	errposition(pos);
+// };
 
 }

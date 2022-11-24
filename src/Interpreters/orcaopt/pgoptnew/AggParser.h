@@ -16,6 +16,10 @@ struct check_agg_arguments_context
 	int			sublevels_up;
 };
 
+extern bool
+check_agg_arguments_walker(duckdb_libpgquery::PGNode *node,
+						   check_agg_arguments_context *context);
+
 class AggParser
 {
 private:
