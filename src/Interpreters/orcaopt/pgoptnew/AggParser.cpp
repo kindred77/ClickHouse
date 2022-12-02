@@ -104,7 +104,7 @@ check_agg_arguments_walker(PGNode *node,
 
 		context->sublevels_up++;
 		result = pg_query_tree_walker((PGQuery *) node,
-								   check_agg_arguments_walker,
+								   (walker_func)check_agg_arguments_walker,
 								   (void *) context,
 								   0);
 		context->sublevels_up--;
@@ -112,7 +112,7 @@ check_agg_arguments_walker(PGNode *node,
 	}
 
 	return pg_expression_tree_walker(node,
-								  check_agg_arguments_walker,
+								  (walker_func)check_agg_arguments_walker,
 								  (void *) context);
 };
 
@@ -130,12 +130,12 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 	context.min_agglevel = -1;
 	context.sublevels_up = 0;
 
-	(void) expression_tree_walker((PGNode *) args,
-								  check_agg_arguments_walker,
+	(void) pg_expression_tree_walker((PGNode *) args,
+								  (walker_func)check_agg_arguments_walker,
 								  (void *) &context);
 
-	(void) expression_tree_walker((PGNode *) filter,
-								  check_agg_arguments_walker,
+	(void) pg_expression_tree_walker((PGNode *) filter,
+								  (walker_func)check_agg_arguments_walker,
 								  (void *) &context);
 
 	/*
@@ -161,9 +161,9 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 	{
 		int			aggloc;
 
-		aggloc = locate_agg_of_level((PGNode *) args, agglevel);
+		aggloc = pg_locate_agg_of_level((PGNode *) args, agglevel);
 		if (aggloc < 0)
-			aggloc = locate_agg_of_level((PGNode *) filter, agglevel);
+			aggloc = pg_locate_agg_of_level((PGNode *) filter, agglevel);
 		node_parser.parser_errposition(pstate, aggloc);
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
@@ -183,13 +183,13 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 	{
 		context.min_varlevel = -1;
 		context.min_agglevel = -1;
-		(void) expression_tree_walker((PGNode *) directargs,
-									  check_agg_arguments_walker,
+		(void) pg_expression_tree_walker((PGNode *) directargs,
+									  (walker_func)check_agg_arguments_walker,
 									  (void *) &context);
 		if (context.min_varlevel >= 0 && context.min_varlevel < agglevel)
 		{
 			node_parser.parser_errposition(pstate,
-										locate_var_of_level((PGNode *) directargs,
+										pg_locate_var_of_level((PGNode *) directargs,
 															context.min_varlevel));
 			ereport(ERROR,
 					(errcode(ERRCODE_GROUPING_ERROR),
@@ -198,7 +198,7 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 		if (context.min_agglevel >= 0 && context.min_agglevel <= agglevel)
 		{
 			node_parser.parser_errposition(pstate,
-										locate_agg_of_level((PGNode *) directargs,
+										pg_locate_agg_of_level((PGNode *) directargs,
 															context.min_agglevel));
 			ereport(ERROR,
 					(errcode(ERRCODE_GROUPING_ERROR),
@@ -1124,7 +1124,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 	 */
 	if (pstate->p_hasAggs && hasSelfRefRTEs)
 	{
-		node_parser.parser_errposition(pstate, locate_agg_of_level((PGNode *) qry, 0));
+		node_parser.parser_errposition(pstate, pg_locate_agg_of_level((PGNode *) qry, 0));
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_RECURSION),
 				 errmsg("aggregate functions are not allowed in a recursive query's recursive term")));

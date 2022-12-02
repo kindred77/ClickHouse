@@ -1,8 +1,5 @@
 #include <Interpreters/orcaopt/pgoptnew/walkers.h>
 
-namespace DB
-{
-
 using namespace duckdb_libpgquery;
 
 bool
@@ -566,7 +563,7 @@ pg_query_tree_walker(PGQuery *query,
 	}
 	if (!(flags & QTW_IGNORE_RANGE_TABLE))
 	{
-		if (range_table_walker(query->rtable, walker, context, flags))
+		if (pg_range_table_walker(query->rtable, walker, context, flags))
 			return true;
 	}
 	if (query->utilityStmt)
@@ -622,29 +619,14 @@ pg_contain_aggs_of_level_walker(PGNode *node,
 		bool		result;
 
 		context->sublevels_up++;
-		result = query_tree_walker((PGQuery *) node,
+		result = pg_query_tree_walker((PGQuery *) node,
 								   contain_aggs_of_level_walker,
 								   context, 0);
 		context->sublevels_up--;
 		return result;
 	}
-	return expression_tree_walker(node, contain_aggs_of_level_walker,
+	return pg_expression_tree_walker(node, contain_aggs_of_level_walker,
 								  context);
-};
-
-bool
-pg_query_or_expression_tree_walker(PGNode *node,
-								walker_func walker,
-								void *context,
-								int flags)
-{
-	if (node && IsA(node, PGQuery))
-		return query_tree_walker((PGQuery *) node,
-								 walker,
-								 context,
-								 flags);
-	else
-		return walker(node, (assign_collations_context*)context);
 };
 
 bool
@@ -672,7 +654,7 @@ pg_contain_windowfuncs_walker(PGNode *node, void *context)
 	if (IsA(node, PGWindowFunc))
 		return true;			/* abort the tree traversal and return true */
 	/* Mustn't recurse into subselects */
-	return expression_tree_walker(node, contain_windowfuncs_walker,
+	return pg_expression_tree_walker(node, contain_windowfuncs_walker,
 								  context);
 };
 
@@ -683,7 +665,7 @@ pg_contain_windowfuncs(PGNode *node)
 	 * Must be prepared to start with a Query or a bare expression tree; if
 	 * it's a Query, we don't want to increment sublevels_up.
 	 */
-	return query_or_expression_tree_walker(node,
+	return pg_query_or_expression_tree_walker(node,
 										   contain_windowfuncs_walker,
 										   NULL,
 										   0);
@@ -696,7 +678,7 @@ pg_query_or_expression_tree_walker(PGNode *node,
 								int flags)
 {
 	if (node && IsA(node, PGQuery))
-		return query_tree_walker((PGQuery *) node,
+		return pg_query_tree_walker((PGQuery *) node,
 								 walker,
 								 context,
 								 flags);
@@ -704,4 +686,122 @@ pg_query_or_expression_tree_walker(PGNode *node,
 		return walker(node, (assign_collations_context*)context);
 };
 
-}
+
+bool
+pg_locate_agg_of_level_walker(PGNode *node,
+		locate_agg_of_level_context *context)
+{
+	if (node == NULL)
+		return false;
+	if (IsA(node, PGAggref))
+	{
+		if (((PGAggref *) node)->agglevelsup == context->sublevels_up &&
+			((PGAggref *) node)->location >= 0)
+		{
+			context->agg_location = ((PGAggref *) node)->location;
+			return true;		/* abort the tree traversal and return true */
+		}
+		/* else fall through to examine argument */
+	}
+	if (IsA(node, PGGroupingFunc))
+	{
+		if (((PGGroupingFunc *) node)->agglevelsup == context->sublevels_up &&
+			((PGGroupingFunc *) node)->location >= 0)
+		{
+			context->agg_location = ((PGGroupingFunc *) node)->location;
+			return true;		/* abort the tree traversal and return true */
+		}
+	}
+	if (IsA(node, PGQuery))
+	{
+		/* Recurse into subselects */
+		bool		result;
+
+		context->sublevels_up++;
+		result = pg_query_tree_walker((PGQuery *) node,
+								   (walker_func)pg_locate_agg_of_level_walker,
+								   (void *) context, 0);
+		context->sublevels_up--;
+		return result;
+	}
+	return pg_expression_tree_walker(node, (walker_func)pg_locate_agg_of_level_walker,
+								  (void *) context);
+};
+
+int
+pg_locate_agg_of_level(PGNode *node, int levelsup)
+{
+	locate_agg_of_level_context context;
+
+	context.agg_location = -1;	/* in case we find nothing */
+	context.sublevels_up = levelsup;
+
+	/*
+	 * Must be prepared to start with a Query or a bare expression tree; if
+	 * it's a Query, we don't want to increment sublevels_up.
+	 */
+	(void) pg_query_or_expression_tree_walker(node,
+										   (walker_func)pg_locate_agg_of_level_walker,
+										   (void *) &context,
+										   0);
+
+	return context.agg_location;
+};
+
+int
+pg_locate_var_of_level(PGNode *node, int levelsup)
+{
+	locate_var_of_level_context context;
+
+	context.var_location = -1;	/* in case we find nothing */
+	context.sublevels_up = levelsup;
+
+	(void) pg_query_or_expression_tree_walker(node,
+										   (walker_func)pg_locate_var_of_level_walker,
+										   (void *) &context,
+										   0);
+
+	return context.var_location;
+};
+
+bool
+pg_locate_var_of_level_walker(PGNode *node,
+						   locate_var_of_level_context *context)
+{
+	if (node == NULL)
+		return false;
+	if (IsA(node, PGVar))
+	{
+		PGVar		   *var = (PGVar *) node;
+
+		if (var->varlevelsup == context->sublevels_up &&
+			var->location >= 0)
+		{
+			context->var_location = var->location;
+			return true;		/* abort tree traversal and return true */
+		}
+		return false;
+	}
+	if (IsA(node, PGCurrentOfExpr))
+	{
+		/* since CurrentOfExpr doesn't carry location, nothing we can do */
+		return false;
+	}
+	/* No extra code needed for PlaceHolderVar; just look in contained expr */
+	if (IsA(node, PGQuery))
+	{
+		/* Recurse into subselects */
+		bool		result;
+
+		context->sublevels_up++;
+		result = pg_query_tree_walker((PGQuery *) node,
+								   (walker_func)pg_locate_var_of_level_walker,
+								   (void *) context,
+								   0);
+		context->sublevels_up--;
+		return result;
+	}
+	return pg_expression_tree_walker(node,
+								  (walker_func)pg_locate_var_of_level_walker,
+								  (void *) context);
+};

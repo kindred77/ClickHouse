@@ -18,6 +18,18 @@ typedef struct
 	int			location2;		/* location of expr that set collation2 */
 } assign_collations_context;
 
+typedef struct
+{
+	int			agg_location;
+	int			sublevels_up;
+} locate_agg_of_level_context;
+
+typedef struct
+{
+	int			var_location;
+	int			sublevels_up;
+} locate_var_of_level_context;
+
 typedef bool (*walker_func) (duckdb_libpgquery::PGNode *node, assign_collations_context *context);
 
 extern bool
@@ -61,3 +73,17 @@ pg_query_or_expression_tree_walker(duckdb_libpgquery::PGNode *node,
 								walker_func walker,
 								void *context,
 								int flags);
+
+extern bool
+locate_agg_of_level_walker(duckdb_libpgquery::PGNode *node,
+		locate_agg_of_level_context *context);
+
+extern int
+pg_locate_agg_of_level(duckdb_libpgquery::PGNode *node, int levelsup);
+
+extern int
+pg_locate_var_of_level(duckdb_libpgquery::PGNode *node, int levelsup);
+
+extern bool
+pg_locate_var_of_level_walker(duckdb_libpgquery::PGNode *node,
+				locate_var_of_level_context *context);
