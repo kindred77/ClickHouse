@@ -271,8 +271,6 @@ typedef enum
 	COLLATE_EXPLICIT			/* collation was derived explicitly */
 } CollateStrength;
 
-typedef signed int int32;
-
 /*
  * Arrays are varlena objects, so must meet the varlena convention that
  * the first int32 of the object contains the total object size in bytes.
@@ -313,6 +311,9 @@ bool		SQL_inheritance = true;
 
 typedef signed short int16;
 typedef long int int64;
+typedef signed int int32;
+typedef unsigned int uint32;	/* == 32 bits */
+
 typedef int64 Datum;
 typedef char TYPCATEGORY;
 typedef char *Pointer;

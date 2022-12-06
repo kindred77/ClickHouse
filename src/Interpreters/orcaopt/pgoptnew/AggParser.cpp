@@ -164,7 +164,7 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 		aggloc = pg_locate_agg_of_level((PGNode *) args, agglevel);
 		if (aggloc < 0)
 			aggloc = pg_locate_agg_of_level((PGNode *) filter, agglevel);
-		node_parser.parser_errposition(pstate, aggloc);
+		parser_errposition(pstate, aggloc);
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
 				 errmsg("aggregate function calls cannot be nested")));
@@ -188,7 +188,7 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 									  (void *) &context);
 		if (context.min_varlevel >= 0 && context.min_varlevel < agglevel)
 		{
-			node_parser.parser_errposition(pstate,
+			parser_errposition(pstate,
 										pg_locate_var_of_level((PGNode *) directargs,
 															context.min_varlevel));
 			ereport(ERROR,
@@ -197,7 +197,7 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 		}
 		if (context.min_agglevel >= 0 && context.min_agglevel <= agglevel)
 		{
-			node_parser.parser_errposition(pstate,
+			parser_errposition(pstate,
 										pg_locate_agg_of_level((PGNode *) directargs,
 															context.min_agglevel));
 			ereport(ERROR,
@@ -492,7 +492,7 @@ AggParser::check_agglevels_and_constraints(PGParseState *pstate, PGNode *expr)
 
 	if (err)
 	{
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
 				 errmsg_internal("%s", err)));
@@ -507,7 +507,7 @@ AggParser::check_agglevels_and_constraints(PGParseState *pstate, PGNode *expr)
 			/* translator: %s is name of a SQL construct, eg GROUP BY */
 			err = _("grouping operations are not allowed in %s");
 		
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
 				 errmsg_internal(err,
@@ -525,7 +525,7 @@ AggParser::transformGroupingFunc(PGParseState *pstate, PGGroupingFunc *p)
 
 	if (list_length(args) > 31)
 	{
-		node_parser.parser_errposition(pstate, p->location);
+		parser_errposition(pstate, p->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
 				 errmsg("GROUPING must have fewer than 32 arguments")));
@@ -668,7 +668,7 @@ AggParser::transformAggregateCall(PGParseState *pstate, PGAggref *agg,
 				{
 					PGNode	   *expr = get_sortgroupclause_expr(sortcl, tlist);
 
-					node_parser.parser_errposition(pstate, exprLocation(expr));
+					parser_errposition(pstate, exprLocation(expr));
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_FUNCTION),
 							 errmsg("could not identify an ordering operator for type %s",
@@ -706,13 +706,13 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	 * already rejected any window funcs or aggs within the filter.
 	 */
 	if (pstate->p_hasWindowFuncs &&
-		contain_windowfuncs((PGNode *) wfunc->args))
+		pg_contain_windowfuncs((PGNode *) wfunc->args))
 	{
-		node_parser.parser_errposition(pstate,
-									locate_windowfunc((PGNode *) wfunc->args));
+		parser_errposition(pstate,
+									pg_locate_windowfunc((PGNode *) wfunc->args));
 		ereport(ERROR,
 				(errcode(ERRCODE_WINDOWING_ERROR),
-				 errmsg("window function calls cannot be nested"),));
+				 errmsg("window function calls cannot be nested")));
 	}
 
 	/*
@@ -845,7 +845,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	}
 	if (err)
 	{
-		node_parser.parser_errposition(pstate, wfunc->location);
+		parser_errposition(pstate, wfunc->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_WINDOWING_ERROR),
 				 errmsg_internal("%s", err)));
@@ -853,12 +853,12 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 
 	if (errkind)
 	{
-		node_parser.parser_errposition(pstate, wfunc->location);
+		parser_errposition(pstate, wfunc->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_WINDOWING_ERROR),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("window functions are not allowed in %s",
-						ParseExprKindName(pstate->p_expr_kind))));
+						expr_parser.ParseExprKindName(pstate->p_expr_kind))));
 	}
 
 	/*
@@ -908,7 +908,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 		}
 		if (lc == NULL)			/* didn't find it? */
 		{
-			node_parser.parser_errposition(pstate, windef->location);
+			parser_errposition(pstate, windef->location);
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("window \"%s\" does not exist", name)));
@@ -952,6 +952,204 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	pstate->p_hasWindowFuncs = true;
 };
 
+PGList *
+AggParser::expand_groupingset_node(PGGroupingSet *gs)
+{
+	PGList	   *result = NIL;
+
+	switch (gs->kind)
+	{
+		case GROUPING_SET_EMPTY:
+			result = list_make1(NIL);
+			break;
+
+		case GROUPING_SET_SIMPLE:
+			result = list_make1(gs->content);
+			break;
+
+		case GROUPING_SET_ROLLUP:
+			{
+				PGList	   *rollup_val = gs->content;
+				PGListCell   *lc;
+				int			curgroup_size = list_length(gs->content);
+
+				while (curgroup_size > 0)
+				{
+					PGList	   *current_result = NIL;
+					int			i = curgroup_size;
+
+					foreach(lc, rollup_val)
+					{
+						PGGroupingSet *gs_current = (PGGroupingSet *) lfirst(lc);
+
+						Assert(gs_current->kind == GROUPING_SET_SIMPLE);
+
+						current_result
+							= list_concat(current_result,
+										  list_copy(gs_current->content));
+
+						/* If we are done with making the current group, break */
+						if (--i == 0)
+							break;
+					}
+
+					result = lappend(result, current_result);
+					--curgroup_size;
+				}
+
+				result = lappend(result, NIL);
+			}
+			break;
+
+		case GROUPING_SET_CUBE:
+			{
+				PGList	   *cube_list = gs->content;
+				int			number_bits = list_length(cube_list);
+				uint32		num_sets;
+				uint32		i;
+
+				/* parser should cap this much lower */
+				Assert(number_bits < 31);
+
+				num_sets = (1U << number_bits);
+
+				for (i = 0; i < num_sets; i++)
+				{
+					PGList	   *current_result = NIL;
+					PGListCell   *lc;
+					uint32		mask = 1U;
+
+					foreach(lc, cube_list)
+					{
+						PGGroupingSet *gs_current = (PGGroupingSet *) lfirst(lc);
+
+						Assert(gs_current->kind == GROUPING_SET_SIMPLE);
+
+						if (mask & i)
+						{
+							current_result
+								= list_concat(current_result,
+											  list_copy(gs_current->content));
+						}
+
+						mask <<= 1;
+					}
+
+					result = lappend(result, current_result);
+				}
+			}
+			break;
+
+		case GROUPING_SET_SETS:
+			{
+				ListCell   *lc;
+
+				foreach(lc, gs->content)
+				{
+					PGList	   *current_result = expand_groupingset_node((PGGroupingSet *)lfirst(lc));
+
+					result = list_concat(result, current_result);
+				}
+			}
+			break;
+	}
+
+	return result;
+};
+
+int
+cmp_list_len_asc(const void *a, const void *b)
+{
+	int			la = list_length(*(PGList *const *) a);
+	int			lb = list_length(*(PGList *const *) b);
+
+	return (la > lb) ? 1 : (la == lb) ? 0 : -1;
+};
+
+PGList *
+AggParser::expand_grouping_sets(PGList *groupingSets, int limit)
+{
+	PGList	   *expanded_groups = NIL;
+	PGList	   *result = NIL;
+	double		numsets = 1;
+	PGListCell   *lc;
+
+	if (groupingSets == NIL)
+		return NIL;
+
+	foreach(lc, groupingSets)
+	{
+		PGList	   *current_result = NIL;
+		PGGroupingSet *gs = (PGGroupingSet *)lfirst(lc);
+
+		current_result = expand_groupingset_node(gs);
+
+		Assert(current_result != NIL);
+
+		numsets *= list_length(current_result);
+
+		if (limit >= 0 && numsets > limit)
+			return NIL;
+
+		expanded_groups = lappend(expanded_groups, current_result);
+	}
+
+	/*
+	 * Do cartesian product between sublists of expanded_groups. While at it,
+	 * remove any duplicate elements from individual grouping sets (we must
+	 * NOT change the number of sets though)
+	 */
+
+	foreach(lc, (PGList *) linitial(expanded_groups))
+	{
+		result = lappend(result, list_union_int(NIL, (PGList *) lfirst(lc)));
+	}
+
+	for_each_cell(lc, lnext(list_head(expanded_groups)))
+	{
+		PGList	   *p = (PGList *)lfirst(lc);
+		PGList	   *new_result = NIL;
+		PGListCell   *lc2;
+
+		foreach(lc2, result)
+		{
+			PGList	   *q = (PGList *)lfirst(lc2);
+			PGListCell   *lc3;
+
+			foreach(lc3, p)
+			{
+				new_result = lappend(new_result,
+									 list_union_int(q, (PGList *) lfirst(lc3)));
+			}
+		}
+		result = new_result;
+	}
+
+	if (list_length(result) > 1)
+	{
+		int			result_len = list_length(result);
+		PGList	  **buf = (PGList **)palloc(sizeof(PGList *) * result_len);
+		PGList	  **ptr = buf;
+
+		foreach(lc, result)
+		{
+			*ptr++ = (PGList *)lfirst(lc);
+		}
+
+		qsort(buf, result_len, sizeof(PGList *), cmp_list_len_asc);
+
+		result = NIL;
+		ptr = buf;
+
+		while (result_len-- > 0)
+			result = lappend(result, *ptr++);
+
+		pfree(buf);
+	}
+
+	return result;
+};
+
 void
 AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 {
@@ -982,7 +1180,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 
 		if (!gsets)
 		{
-			node_parser.parser_errposition(pstate,
+			parser_errposition(pstate,
 										qry->groupClause
 										? exprLocation((PGNode *) qry->groupClause)
 										: exprLocation((PGNode *) qry->groupingSets));
@@ -1058,7 +1256,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 	 * entries are RTE_JOIN kind.
 	 */
 	if (hasJoinRTEs)
-		groupClauses = (PGList *) flatten_join_alias_vars(qry,
+		groupClauses = (PGList *) pg_flatten_join_alias_vars(qry,
 														(PGNode *) groupClauses);
 
 	/*
@@ -1102,7 +1300,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 							groupClauses, hasJoinRTEs,
 							have_non_var_grouping);
 	if (hasJoinRTEs)
-		clause = flatten_join_alias_vars(qry, clause);
+		clause = pg_flatten_join_alias_vars(qry, clause);
 	check_ungrouped_columns(clause, pstate, qry,
 							groupClauses, groupClauseCommonVars,
 							have_non_var_grouping,
@@ -1113,7 +1311,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 							groupClauses, hasJoinRTEs,
 							have_non_var_grouping);
 	if (hasJoinRTEs)
-		clause = flatten_join_alias_vars(qry, clause);
+		clause = pg_flatten_join_alias_vars(qry, clause);
 	check_ungrouped_columns(clause, pstate, qry,
 							groupClauses, groupClauseCommonVars,
 							have_non_var_grouping,
@@ -1124,7 +1322,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 	 */
 	if (pstate->p_hasAggs && hasSelfRefRTEs)
 	{
-		node_parser.parser_errposition(pstate, pg_locate_agg_of_level((PGNode *) qry, 0));
+		parser_errposition(pstate, pg_locate_agg_of_level((PGNode *) qry, 0));
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_RECURSION),
 				 errmsg("aggregate functions are not allowed in a recursive query's recursive term")));
