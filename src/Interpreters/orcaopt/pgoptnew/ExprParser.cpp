@@ -552,7 +552,7 @@ ExprParser::transformIndirection(PGParseState *pstate, PGAIndirection *ind)
 		{
 			PGNode	   *newresult;
 
-			Assert(IsA(n, String));
+			Assert(IsA(n, PGString));
 
 			/* process subscripts before this field selection */
 			if (subscripts)

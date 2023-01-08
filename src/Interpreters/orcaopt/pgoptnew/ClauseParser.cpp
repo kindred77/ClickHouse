@@ -1,5 +1,5 @@
 #include <Interpreters/orcaopt/pgoptnew/ClauseParser.h>
-//#include <Interpreters/orcaopt/pgoptnew/walkers.h>
+#include <Interpreters/orcaopt/pgoptnew/walkers.h>
 
 using namespace duckdb_libpgquery;
 
@@ -946,10 +946,10 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 		case EXPR_KIND_GROUP_BY:
 			/* reject aggregates and window functions */
 			if (pstate->p_hasAggs &&
-				contain_aggs_of_level((PGNode *) tle->expr, 0))
+				pg_contain_aggs_of_level((PGNode *) tle->expr, 0))
 			{
 				node_parser.parser_errposition(pstate,
-								locate_agg_of_level((PGNode *) tle->expr, 0));
+								pg_locate_agg_of_level((PGNode *) tle->expr, 0));
 				ereport(ERROR,
 						(errcode(ERRCODE_GROUPING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
@@ -958,10 +958,10 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 			}
 
 			if (pstate->p_hasWindowFuncs &&
-				contain_windowfuncs((PGNode *) tle->expr))
+				pg_contain_windowfuncs((PGNode *) tle->expr))
 			{
 				node_parser.parser_errposition(pstate,
-								locate_windowfunc((PGNode *) tle->expr));
+								pg_locate_windowfunc((PGNode *) tle->expr));
 				ereport(ERROR,
 						(errcode(ERRCODE_WINDOWING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
@@ -1965,7 +1965,7 @@ ClauseParser::checkExprIsVarFree(PGParseState *pstate, PGNode *n, const char *co
 	if (contain_vars_of_level(n, 0))
 	{
 		node_parser.parser_errposition(pstate,
-						locate_var_of_level(n, 0));
+						pg_locate_var_of_level(n, 0));
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 		/* translator: %s is name of a SQL construct, eg LIMIT */
