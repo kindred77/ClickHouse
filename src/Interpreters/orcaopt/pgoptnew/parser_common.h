@@ -181,7 +181,9 @@ typedef enum PGPostgresParserErrors {
 	ERRCODE_AMBIGUOUS_ALIAS,
 	ERRCODE_PROGRAM_LIMIT_EXCEEDED,
 	ERRCODE_STATEMENT_TOO_COMPLEX,
-	ERRCODE_INVALID_RECURSION
+	ERRCODE_INVALID_RECURSION,
+
+	ERRCODE_COLLATION_MISMATCH
 } PGPostgresParserErrors;
 
 typedef struct ErrorContextCallback
@@ -270,6 +272,8 @@ typedef enum
 	COLLATE_CONFLICT,			/* we had a conflict of implicit collations */
 	COLLATE_EXPLICIT			/* collation was derived explicitly */
 } CollateStrength;
+
+#define DEFAULT_COLLATION_OID	100
 
 /*
  * Arrays are varlena objects, so must meet the varlena convention that
