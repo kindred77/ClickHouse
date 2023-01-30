@@ -819,6 +819,65 @@ Oid CoerceParser::select_common_type(PGList *typeids, const char *context)
     return ptype;
 };
 
+PGNode * CoerceParser::coerce_to_target_type(
+        PGParseState * pstate,
+        PGNode * expr,
+        Oid exprtype,
+        Oid targettype,
+        int32 targettypmod,
+        PGCoercionContext ccontext,
+        PGCoercionForm cformat,
+        int location)
+{
+    PGNode * result;
+
+    if (!can_coerce_type(1, &exprtype, &targettype, ccontext))
+        return NULL;
+
+    result = coerce_type(pstate, expr, exprtype, targettype, targettypmod, ccontext, cformat, location);
+
+    /*
+	 * If the target is a fixed-length type, it may need a length coercion as
+	 * well as a type coercion.  If we find ourselves adding both, force the
+	 * inner coercion node to implicit display form.
+	 */
+    result = coerce_type_typmod(
+        result,
+        targettype,
+        targettypmod,
+        cformat,
+        (cformat != PG_COERCE_IMPLICIT_CAST),
+        (result != expr && !IsA(result, PGConst) && !IsA(result, PGVar)));
+
+    return result;
+};
+
+PGNode * CoerceParser::coerce_to_bigint(PGParseState * pstate,
+      PGNode * node, const char * constructName)
+{
+    Oid inputTypeId = exprType(node);
+
+    if (inputTypeId != INT8OID)
+    {
+        node = coerce_to_target_type(pstate, node, inputTypeId, INT8OID, -1, PG_COERCION_ASSIGNMENT, PG_COERCE_IMPLICIT_CAST, -1);
+        if (node == NULL)
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_DATATYPE_MISMATCH),
+                 /* translator: first %s is name of a SQL construct, eg LIMIT */
+                 errmsg("argument of %s must be type bigint, not type %s", constructName, format_type_be(inputTypeId))));
+    }
+
+    if (expression_returns_set(node))
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_DATATYPE_MISMATCH),
+             /* translator: %s is name of a SQL construct, eg LIMIT */
+             errmsg("argument of %s must not return a set", constructName)));
+
+    return node;
+};
+
 PGNode * CoerceParser::coerce_to_boolean(PGParseState * pstate,
 		PGNode * node, const char * constructName)
 {

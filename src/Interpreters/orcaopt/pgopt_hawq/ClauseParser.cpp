@@ -208,7 +208,7 @@ PGNode * ClauseParser::transformWhereClause(PGParseState * pstate,
     if (clause == NULL)
         return NULL;
 
-    qual = transformExpr(pstate, clause);
+    qual = expr_parser.transformExpr(pstate, clause);
 
     qual = coerce_parser.coerce_to_boolean(pstate, qual, constructName);
 
@@ -1557,9 +1557,9 @@ PGNode * ClauseParser::transformLimitClause(PGParseState * pstate,
     if (clause == NULL)
         return NULL;
 
-    qual = transformExpr(pstate, clause);
+    qual = expr_parser.transformExpr(pstate, clause);
 
-    qual = coerce_to_bigint(pstate, qual, constructName);
+    qual = coerce_parser.coerce_to_bigint(pstate, qual, constructName);
 
     /*
 	 * LIMIT can't refer to any vars or aggregates of the current query; we

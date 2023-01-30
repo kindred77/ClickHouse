@@ -70,8 +70,21 @@ public:
 
     Oid select_common_type(duckdb_libpgquery::PGList *typeids, const char *context);
 
+    duckdb_libpgquery::PGNode * coerce_to_target_type(
+        PGParseState * pstate,
+        duckdb_libpgquery::PGNode * expr,
+        Oid exprtype,
+        Oid targettype,
+        int32 targettypmod,
+        duckdb_libpgquery::PGCoercionContext ccontext,
+        duckdb_libpgquery::PGCoercionForm cformat,
+        int location);
+
     duckdb_libpgquery::PGNode * coerce_to_boolean(PGParseState * pstate,
-		duckdb_libpgquery::PGNode * node, const char * constructName);
+		  duckdb_libpgquery::PGNode * node, const char * constructName);
+
+    duckdb_libpgquery::PGNode * coerce_to_bigint(PGParseState * pstate,
+      duckdb_libpgquery::PGNode * node, const char * constructName);
 
     duckdb_libpgquery::PGVar * coerce_unknown_var(
         PGParseState * pstate,
