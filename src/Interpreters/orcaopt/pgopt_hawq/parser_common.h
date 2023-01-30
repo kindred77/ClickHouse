@@ -205,6 +205,8 @@ typedef PGIndex Index;
 
 typedef PGOid Oid;
 
+typedef PGBitmapset *PGRelids;
+
 struct PGColumn
 {
 	Oid oid;

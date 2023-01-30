@@ -20,6 +20,11 @@ public:
 
     duckdb_libpgquery::PGRangeTblEntry * GetRTEByRangeTablePosn(PGParseState * pstate, int varno, int sublevels_up);
 
+    duckdb_libpgquery::PGNode * scanRTEForColumn(PGParseState * pstate,
+      duckdb_libpgquery::PGRangeTblEntry * rte, char * colname, int location);
+
+    duckdb_libpgquery::PGNode * colNameToVar(PGParseState * pstate, char * colname, bool localonly, int location);
+
     duckdb_libpgquery::PGTargetEntry * get_tle_by_resno(duckdb_libpgquery::PGList * tlist,
 		PGAttrNumber resno);
 

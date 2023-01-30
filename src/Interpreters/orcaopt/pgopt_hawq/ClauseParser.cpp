@@ -218,7 +218,7 @@ PGNode * ClauseParser::transformWhereClause(PGParseState * pstate,
 PGNode * ClauseParser::transformFromClauseItem(
         PGParseState * pstate, PGNode * n,
         PGRangeTblEntry ** top_rte, int * top_rti,
-        PGList ** relnamespace, Relids * containedRels)
+        PGList ** relnamespace, PGRelids * containedRels)
 {
 	PGNode                   *result;
     ParseStateBreadCrumb    savebreadcrumb;
@@ -315,7 +315,7 @@ PGNode * ClauseParser::transformFromClauseItem(
 		PGRangeTblEntry *r_rte;
 		int			l_rtindex;
 		int			r_rtindex;
-		Relids		l_containedRels,
+		PGRelids		l_containedRels,
 					r_containedRels,
 					my_containedRels;
 		PGList	   *l_relnamespace,
@@ -622,7 +622,7 @@ void ClauseParser::transformFromClause(PGParseState * pstate, PGList * frmList)
         PGRangeTblEntry * rte = NULL;
         int rtindex = 0;
         PGList * relnamespace = NULL;
-        Relids containedRels = NULL;
+        PGRelids containedRels = NULL;
 
         n = transformFromClauseItem(pstate, n, &rte, &rtindex, &relnamespace, &containedRels);
         checkNameSpaceConflicts(pstate, pstate->p_relnamespace, relnamespace);
@@ -647,7 +647,7 @@ PGTargetEntry * ClauseParser::findTargetlistEntrySQL99(PGParseState * pstate,
 	 * resjunk target here, though the SQL92 cases above must ignore resjunk
 	 * targets.
 	 */
-    expr = transformExpr(pstate, node);
+    expr = expr_parser.transformExpr(pstate, node);
 
     foreach (tl, *tlist)
     {
@@ -740,7 +740,7 @@ PGTargetEntry * ClauseParser::findTargetlistEntrySQL92(PGParseState * pstate,
 			 * breaks no cases that are legal per spec, and it seems a more
 			 * self-consistent behavior.
 			 */
-            if (colNameToVar(pstate, name, true, location) != NULL)
+            if (relation_parser.colNameToVar(pstate, name, true, location) != NULL)
                 name = NULL;
         }
 
@@ -811,6 +811,34 @@ PGTargetEntry * ClauseParser::findTargetlistEntrySQL92(PGParseState * pstate,
     return findTargetlistEntrySQL99(pstate, node, tlist);
 };
 
+bool ClauseParser::targetIsInSortGroupList(PGTargetEntry * tle,
+        PGList * sortgroupList)
+{
+    Index ref = tle->ressortgroupref;
+    PGListCell * l;
+
+    /* no need to scan list if tle has no marker */
+    if (ref == 0)
+        return false;
+
+    foreach (l, sortgroupList)
+    {
+        PGNode * node = (PGNode *)lfirst(l);
+
+        /* Skip the empty grouping set */
+        if (node == NULL)
+            continue;
+
+        if (IsA(node, GroupClause) || IsA(node, SortClause))
+        {
+            GroupClause * gc = (GroupClause *)node;
+            if (gc->tleSortGroupRef == ref)
+                return true;
+        }
+    }
+    return false;
+};
+
 PGList * ClauseParser::addTargetToSortList(
         PGParseState * pstate,
         PGTargetEntry * tle,
@@ -847,7 +875,7 @@ PGList * ClauseParser::addTargetToSortList(
                 tobe_type = TEXTOID;
                 tobe_typmod = -1;
             }
-            tle->expr = (PGExpr *)coerce_type(
+            tle->expr = (PGExpr *)coerce_parser.coerce_type(
                 pstate, (PGNode *)tle->expr, restype, tobe_type, tobe_typmod, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
             restype = tobe_type;
         }
@@ -940,7 +968,7 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
 
             if (restype == UNKNOWNOID)
                 tle->expr
-                    = (PGExpr *)coerce_type(pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
+                    = (PGExpr *)coerce_parser.coerce_type(pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 
             /*
 			 * The tle_list will be used to match with the ORDER by element below.

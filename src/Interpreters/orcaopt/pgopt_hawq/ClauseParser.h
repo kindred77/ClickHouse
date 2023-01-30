@@ -4,6 +4,7 @@
 #include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/SelectParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
+#include <Interpreters/orcaopt/pgopt_hawq/ExprParser.h>
 
 namespace DB
 {
@@ -14,6 +15,7 @@ private:
   RelationParser relation_parser;
   SelectParser select_parser;
   CoerceParser coerce_parser;
+  ExprParser expr_parser;
 public:
 	explicit ClauseParser();
 
@@ -35,9 +37,12 @@ public:
         duckdb_libpgquery::PGRangeTblEntry ** top_rte,
         int * top_rti,
         duckdb_libpgquery::PGList ** relnamespace,
-        Relids * containedRels);
-duckdb_libpgqueryetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
+        PGRelids * containedRels);
+    duckdb_libpgqueryetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
         duckdb_libpgquery::PGNode * node, duckdb_libpgquery::PGList ** tlist, int clause);
+
+    bool targetIsInSortGroupList(duckdb_libpgquery::PGTargetEntry * tle,
+        duckdb_libpgquery::PGList * sortgroupList);
 
     duckdb_libpgquery::PGList * addTargetToSortList(
         PGParseState * pstate,

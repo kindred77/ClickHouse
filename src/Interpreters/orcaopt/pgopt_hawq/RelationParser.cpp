@@ -48,6 +48,119 @@ PGTargetEntry * RelationParser::get_tle_by_resno(PGList * tlist,
 	return NULL;
 };
 
+PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate,
+      PGRangeTblEntry * rte, char * colname, int location)
+{
+    PGNode * result = NULL;
+    int attnum = 0;
+    PGListCell * c;
+
+    /*
+	 * Scan the user column names (or aliases) for a match. Complain if
+	 * multiple matches.
+	 *
+	 * Note: eref->colnames may include entries for dropped columns, but those
+	 * will be empty strings that cannot match any legal SQL identifier, so we
+	 * don't bother to test for that case here.
+	 *
+	 * Should this somehow go wrong and we try to access a dropped column,
+	 * we'll still catch it by virtue of the checks in
+	 * get_rte_attribute_type(), which is called by make_var().  That routine
+	 * has to do a cache lookup anyway, so the check there is cheap.
+	 */
+    foreach (c, rte->eref->colnames)
+    {
+        attnum++;
+        if (strcmp(strVal(lfirst(c)), colname) == 0)
+        {
+            if (result)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_AMBIGUOUS_COLUMN),
+                     errmsg("column reference \"%s\" is ambiguous", colname),
+                     errOmitLocation(true),
+                     parser_errposition(pstate, location)));
+            result = (PGNode *)make_var(pstate, rte, attnum, location);
+            /* Require read access */
+            rte->requiredPerms |= ACL_SELECT;
+        }
+    }
+
+    /*
+	 * If we have a unique match, return it.  Note that this allows a user
+	 * alias to override a system column name (such as OID) without error.
+	 */
+    if (result)
+        return result;
+
+    /*
+	 * If the RTE represents a real table, consider system column names.
+	 */
+    if (rte->rtekind == PG_RTE_RELATION)
+    {
+        /* quick check to see if name could be a system column */
+        attnum = specialAttNum(colname);
+        if (attnum != InvalidAttrNumber)
+        {
+            /* now check to see if column actually is defined */
+            if (caql_getcount(
+                    NULL,
+                    cql("SELECT COUNT(*) FROM pg_attribute "
+                        " WHERE attrelid = :1 "
+                        " AND attnum = :2 ",
+                        ObjectIdGetDatum(rte->relid),
+                        Int16GetDatum(attnum))))
+            {
+                result = (PGNode *)make_var(pstate, rte, attnum, location);
+                /* Require read access */
+                rte->requiredPerms |= ACL_SELECT;
+            }
+        }
+    }
+
+    return result;
+};
+
+PGNode * RelationParser::colNameToVar(PGParseState * pstate, char * colname,
+    bool localonly, int location)
+{
+    PGNode * result = NULL;
+    PGParseState * orig_pstate = pstate;
+
+    while (pstate != NULL)
+    {
+        PGListCell * l;
+
+        foreach (l, pstate->p_varnamespace)
+        {
+            PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(l);
+            PGNode * newresult;
+
+            /* use orig_pstate here to get the right sublevels_up */
+            newresult = scanRTEForColumn(orig_pstate, rte, colname, location);
+
+            if (newresult)
+            {
+                if (result)
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_AMBIGUOUS_COLUMN),
+                         errmsg("column reference \"%s\" is ambiguous", colname),
+                         errOmitLocation(true),
+                         parser_errposition(orig_pstate, location)));
+                result = newresult;
+            }
+        }
+
+        if (result != NULL || localonly)
+            break; /* found, or don't want to look at parent */
+
+        pstate = pstate->parentParseState;
+    }
+
+    return result;
+};
+
 PGRangeTblEntry * RelationParser::GetRTEByRangeTablePosn(
 	PGParseState * pstate,
 	int varno, int sublevels_up)
