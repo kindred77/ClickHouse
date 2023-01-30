@@ -442,6 +442,314 @@ bool CoerceParser::can_coerce_type(int nargs, Oid *input_typeids, Oid *target_ty
     return true;
 };
 
+PGNode * CoerceParser::coerce_type(
+        PGParseState * pstate,
+        PGNode * node,
+        Oid inputTypeId,
+        Oid targetTypeId,
+        int32 targetTypeMod,
+        PGCoercionContext ccontext,
+        PGCoercionForm cformat,
+        int location)
+{
+    PGNode * result;
+    Oid funcId;
+
+    if (targetTypeId == inputTypeId || node == NULL)
+    {
+        /* no conversion needed */
+        return node;
+    }
+    if (targetTypeId == ANYOID || targetTypeId == ANYELEMENTOID || (targetTypeId == ANYARRAYOID && inputTypeId != UNKNOWNOID))
+    {
+        /*
+		 * Assume can_coerce_type verified that implicit coercion is okay.
+		 *
+		 * Note: by returning the unmodified node here, we are saying that
+		 * it's OK to treat an UNKNOWN constant as a valid input for a
+		 * function accepting ANY or ANYELEMENT.  This should be all right,
+		 * since an UNKNOWN value is still a perfectly valid Datum.  However
+		 * an UNKNOWN value is definitely *not* an array, and so we mustn't
+		 * accept it for ANYARRAY.  (Instead, we will call anyarray_in below,
+		 * which will produce an error.)
+		 *
+		 * NB: we do NOT want a RelabelType here.
+		 */
+
+        /*
+		 * BUG BUG 
+		 * JIRA MPP-3786
+		 *
+		 * Special handling for ANYARRAY type.  
+		 */
+        if (targetTypeId == ANYARRAYOID && IsA(node, PGConst))
+        {
+            PGConst * con = (PGConst *)node;
+            PGConst * newcon = makeNode(PGConst);
+            Oid elemoid = get_element_type(inputTypeId);
+
+            if (elemoid == InvalidOid)
+                ereport(ERROR, (errcode(ERRCODE_DATATYPE_MISMATCH), errmsg("Cannot convert non-Array type to ANYARRAY")));
+
+            memcpy(newcon, con, sizeof(PGConst));
+            newcon->consttype = ANYARRAYOID;
+
+            return (PGNode *)newcon;
+        }
+
+        return node;
+    }
+    if (inputTypeId == UNKNOWNOID && IsA(node, PGConst))
+    {
+        /*
+		 * Input is a string constant with previously undetermined type. Apply
+		 * the target type's typinput function to it to produce a constant of
+		 * the target type.
+		 *
+		 * NOTE: this case cannot be folded together with the other
+		 * constant-input case, since the typinput function does not
+		 * necessarily behave the same as a type conversion function. For
+		 * example, int4's typinput function will reject "1.2", whereas
+		 * float-to-int type conversion will round to integer.
+		 *
+		 * XXX if the typinput function is not immutable, we really ought to
+		 * postpone evaluation of the function call until runtime. But there
+		 * is no way to represent a typinput function call as an expression
+		 * tree, because C-string values are not Datums. (XXX This *is*
+		 * possible as of 7.3, do we want to do it?)
+		 */
+        PGConst * con = (PGConst *)node;
+        PGConst * newcon = makeNode(PGConst);
+        Oid baseTypeId;
+        int32 baseTypeMod;
+        int32 inputTypeMod;
+        Type targetType;
+
+        /*
+		 * If the target type is a domain, we want to call its base type's
+		 * input routine, not domain_in().	This is to avoid premature failure
+		 * when the domain applies a typmod: existing input routines follow
+		 * implicit-coercion semantics for length checks, which is not always
+		 * what we want here.  The needed check will be applied properly
+		 * inside coerce_to_domain().
+		 */
+        baseTypeMod = targetTypeMod;
+        baseTypeId = getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
+
+        if (baseTypeId == INTERVALOID)
+            inputTypeMod = baseTypeMod;
+        else
+            inputTypeMod = -1;
+
+        targetType = typeidType(baseTypeId);
+
+        newcon->consttype = baseTypeId;
+        newcon->consttypmod = inputTypeMod;
+        newcon->constlen = typeLen(targetType);
+        newcon->constbyval = typeByVal(targetType);
+        newcon->constisnull = con->constisnull;
+
+        /*
+		 * We pass typmod -1 to the input routine, primarily because existing
+		 * input routines follow implicit-coercion semantics for length
+		 * checks, which is not always what we want here. Any length
+		 * constraint will be applied later by our caller.
+		 *
+		 * We assume here that UNKNOWN's internal representation is the same
+		 * as CSTRING.
+		 */
+        if (!con->constisnull)
+            newcon->constvalue = stringTypeDatum(targetType, DatumGetCString(con->constvalue), inputTypeMod);
+        else
+            newcon->constvalue = stringTypeDatum(targetType, NULL, inputTypeMod);
+
+        result = (PGNode *)newcon;
+
+        /* If target is a domain, apply constraints. */
+        if (baseTypeId != targetTypeId)
+            result = coerce_to_domain(result, baseTypeId, baseTypeMod, targetTypeId, cformat, location, false, false);
+
+        ReleaseType(targetType);
+
+        return result;
+    }
+    if (inputTypeId == UNKNOWNOID && IsA(node, PGParam) && ((PGParam *)node)->paramkind == PG_PARAM_EXTERN && pstate != NULL
+        && pstate->p_variableparams)
+    {
+        /*
+		 * Input is a Param of previously undetermined type, and we want to
+		 * update our knowledge of the Param's type.  Find the topmost
+		 * ParseState and update the state.
+		 */
+        PGParam * param = (PGParam *)node;
+        int paramno = param->paramid;
+        PGParseState * toppstate;
+
+        toppstate = pstate;
+        while (toppstate->parentParseState != NULL)
+            toppstate = toppstate->parentParseState;
+
+        if (paramno <= 0 || /* shouldn't happen, but... */
+            paramno > toppstate->p_numparams)
+            ereport(ERROR, (errcode(ERRCODE_UNDEFINED_PARAMETER), errmsg("there is no parameter $%d", paramno)));
+
+        if (toppstate->p_paramtypes[paramno - 1] == UNKNOWNOID)
+        {
+            /* We've successfully resolved the type */
+            toppstate->p_paramtypes[paramno - 1] = targetTypeId;
+        }
+        else if (toppstate->p_paramtypes[paramno - 1] == targetTypeId)
+        {
+            /* We previously resolved the type, and it matches */
+        }
+        else
+        {
+            /* Ooops */
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_AMBIGUOUS_PARAMETER),
+                 errmsg("inconsistent types deduced for parameter $%d", paramno),
+                 errdetail("%s versus %s", format_type_be(toppstate->p_paramtypes[paramno - 1]), format_type_be(targetTypeId))));
+        }
+
+        param->paramtype = targetTypeId;
+
+        return (PGNode *)param;
+    }
+    if (pstate != NULL && inputTypeId == UNKNOWNOID && IsA(node, PGVar))
+    {
+        /*
+         * CDB:  Var of type UNKNOWN probably comes from an untyped Const
+         * or Param in the targetlist of a range subquery.  For a successful
+         * conversion we must coerce the underlying Const or Param to a
+         * proper type and remake the Var.
+         */
+        int32 baseTypeMod = -1;
+        Oid baseTypeId = getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
+        PGVar * fixvar = coerce_unknown_var(pstate, (PGVar *)node, baseTypeId, baseTypeMod, ccontext, cformat, 0);
+        node = (PGNode *)fixvar;
+        inputTypeId = fixvar->vartype;
+        if (targetTypeId == inputTypeId)
+            return node;
+        else
+        {
+            /* 
+			 * That didn't work, so, try and cast the unknown value to
+			 * what ever the user wants. If it can't be done, they'll
+			 * get an IO error later.
+			 */
+
+            Oid outfunc = InvalidOid;
+            bool outtypisvarlena = false;
+            Oid infunc = InvalidOid;
+            Oid intypioparam = InvalidOid;
+            PGFuncExpr * fe;
+            PGList * args = NIL;
+
+            getTypeOutputInfo(UNKNOWNOID, &outfunc, &outtypisvarlena);
+            getTypeInputInfo(targetTypeId, &infunc, &intypioparam);
+
+            Insist(OidIsValid(outfunc));
+            Insist(OidIsValid(infunc));
+
+            /* do unknownout(Var) */
+            fe = makeFuncExpr(outfunc, CSTRINGOID, list_make1(node), cformat);
+
+            /* 
+			 * Now pass the above as an argument to the input function of the
+			 * type we're casting to
+			 */
+            args = list_make3(
+                fe,
+                makeConst(OIDOID, -1, sizeof(Oid), ObjectIdGetDatum(intypioparam), false, true),
+                makeConst(INT4OID, -1, sizeof(int32), Int32GetDatum(-1), false, true));
+            fe = makeFuncExpr(infunc, targetTypeId, args, cformat);
+            return (PGNode *)fe;
+        }
+    }
+    if (find_coercion_pathway(targetTypeId, inputTypeId, ccontext, &funcId))
+    {
+        if (OidIsValid(funcId))
+        {
+            /*
+			 * Generate an expression tree representing run-time application
+			 * of the conversion function.	If we are dealing with a domain
+			 * target type, the conversion function will yield the base type,
+			 * and we need to extract the correct typmod to use from the
+			 * domain's typtypmod.
+			 */
+            Oid baseTypeId;
+            int32 baseTypeMod;
+
+            baseTypeMod = targetTypeMod;
+            baseTypeId = getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
+
+            result = build_coercion_expression(node, funcId, baseTypeId, baseTypeMod, cformat, (cformat != COERCE_IMPLICIT_CAST));
+
+            /*
+			 * If domain, coerce to the domain type and relabel with domain
+			 * type ID.  We can skip the internal length-coercion step if the
+			 * selected coercion function was a type-and-length coercion.
+			 */
+            if (targetTypeId != baseTypeId)
+                result = coerce_to_domain(
+                    result, baseTypeId, baseTypeMod, targetTypeId, cformat, location, true, exprIsLengthCoercion(result, NULL));
+        }
+        else
+        {
+            /*
+			 * We don't need to do a physical conversion, but we do need to
+			 * attach a RelabelType node so that the expression will be seen
+			 * to have the intended type when inspected by higher-level code.
+			 *
+			 * Also, domains may have value restrictions beyond the base type
+			 * that must be accounted for.	If the destination is a domain
+			 * then we won't need a RelabelType node.
+			 */
+            result = coerce_to_domain(node, InvalidOid, -1, targetTypeId, cformat, location, false, false);
+            if (result == node)
+            {
+                /*
+				 * XXX could we label result with exprTypmod(node) instead of
+				 * default -1 typmod, to save a possible length-coercion
+				 * later? Would work if both types have same interpretation of
+				 * typmod, which is likely but not certain.
+				 */
+                result = (PGNode *)makeRelabelType((PGExpr *)result, targetTypeId, -1, cformat);
+            }
+        }
+        return result;
+    }
+    if (inputTypeId == RECORDOID && ISCOMPLEX(targetTypeId))
+    {
+        /* Coerce a RECORD to a specific complex type */
+        return coerce_record_to_complex(pstate, node, targetTypeId, ccontext, cformat);
+    }
+    if (targetTypeId == RECORDOID && ISCOMPLEX(inputTypeId))
+    {
+        /* Coerce a specific complex type to RECORD */
+        /* NB: we do NOT want a RelabelType here */
+        return node;
+    }
+    if (typeInheritsFrom(inputTypeId, targetTypeId))
+    {
+        /*
+		 * Input class type is a subclass of target, so generate an
+		 * appropriate runtime conversion (removing unneeded columns and
+		 * possibly rearranging the ones that are wanted).
+		 */
+        PGConvertRowtypeExpr * r = makeNode(PGConvertRowtypeExpr);
+
+        r->arg = (PGExpr *)node;
+        r->resulttype = targetTypeId;
+        r->convertformat = cformat;
+        return (Node *)r;
+    }
+    /* If we get here, caller blew it */
+    elog(ERROR, "failed to find conversion function from %s to %s", format_type_be(inputTypeId), format_type_be(targetTypeId));
+    return NULL; /* keep compiler quiet */
+};
+
 Oid CoerceParser::select_common_type(PGList *typeids, const char *context)
 {
     Oid ptype;

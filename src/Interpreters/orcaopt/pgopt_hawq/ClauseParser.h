@@ -36,15 +36,7 @@ public:
         int * top_rti,
         duckdb_libpgquery::PGList ** relnamespace,
         Relids * containedRels);
-
-    bool interpretInhOption(InhOption inhOpt);
-
-    void transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGList *frmList);
-
-    duckdb_libpgquery::PGTargetEntry * findTargetlistEntrySQL99(PGParseState * pstate,
-        duckdb_libpgquery::PGNode * node, duckdb_libpgquery::PGList ** tlist);
-
-    duckdb_libpgquery::PGTargetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
+duckdb_libpgqueryetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
         duckdb_libpgquery::PGNode * node, duckdb_libpgquery::PGList ** tlist, int clause);
 
     duckdb_libpgquery::PGList * addTargetToSortList(
@@ -63,6 +55,18 @@ public:
     duckdb_libpgquery::PGList * transformGroupClause(PGParseState * pstate,
         duckdb_libpgquery::PGList * grouplist, duckdb_libpgquery::PGList ** targetlist,
         duckdb_libpgquery::PGList * sortClause, bool useSQL99);
+
+    duckdb_libpgquery::PGList * transformScatterClause(PGParseState * pstate,
+        duckdb_libpgquery::PGList * scatterlist, duckdb_libpgquery::PGList ** targetlist);
+
+    void transformWindowClause(PGParseState * pstate, duckdb_libpgquery::PGQuery * qry);
+
+    duckdb_libpgquery::PGList * transformDistinctClause(PGParseState * pstate,
+        duckdb_libpgquery::PGList * distinctlist, duckdb_libpgquery::PGList ** targetlist,
+        duckdb_libpgquery::PGList ** sortClause, duckdb_libpgquery::PGList ** groupClause);
+
+    duckdb_libpgquery::PGNode * transformLimitClause(PGParseState * pstate,
+        duckdb_libpgquery::PGNode * clause, const char * constructName);
 };
 
 }

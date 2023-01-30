@@ -5,6 +5,16 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+PGFromExpr * SelectParser::makeFromExpr(PGList *fromlist,
+        PGNode *quals)
+{
+    PGFromExpr * f = makeNode(PGFromExpr);
+
+    f->fromlist = fromlist;
+    f->quals = quals;
+    return f;
+};
+
 PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
         PGSelectStmt * stmt)
 {
@@ -74,7 +84,7 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
         true, /* fix unknowns */
         false /* use SQL92 rules */);
 
-    qry->groupClause = transformGroupClause(pstate, stmt->groupClause, &qry->targetList, qry->sortClause, false /* useSQL92 rules */);
+    qry->groupClause = clause_parser.transformGroupClause(pstate, stmt->groupClause, &qry->targetList, qry->sortClause, false /* useSQL92 rules */);
 
     /*
    * SCATTER BY clause on a table function TableValueExpr subquery.
@@ -85,7 +95,7 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
    * allowed.
    */
     Insist(!(stmt->scatterClause && stmt->intoClause));
-    qry->scatterClause = transformScatterClause(pstate, stmt->scatterClause, &qry->targetList);
+    qry->scatterClause = clause_parser.transformScatterClause(pstate, stmt->scatterClause, &qry->targetList);
 
     /* Having clause */
     qry->havingQual = pstate->having_qual;
@@ -94,12 +104,12 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
     /*
    * Process WINDOW clause.
    */
-    transformWindowClause(pstate, qry);
+    clause_parser.transformWindowClause(pstate, qry);
 
-    qry->distinctClause = transformDistinctClause(pstate, stmt->distinctClause, &qry->targetList, &qry->sortClause, &qry->groupClause);
+    qry->distinctClause = clause_parser.transformDistinctClause(pstate, stmt->distinctClause, &qry->targetList, &qry->sortClause, &qry->groupClause);
 
-    qry->limitOffset = transformLimitClause(pstate, stmt->limitOffset, "OFFSET");
-    qry->limitCount = transformLimitClause(pstate, stmt->limitCount, "LIMIT");
+    qry->limitOffset = clause_parser.transformLimitClause(pstate, stmt->limitOffset, "OFFSET");
+    qry->limitCount = clause_parser.transformLimitClause(pstate, stmt->limitCount, "LIMIT");
 
     /* CDB: Cursor position not available for errors below this point. */
     pstate->p_breadcrumb.node = NULL;

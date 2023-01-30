@@ -940,20 +940,20 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
 
             if (restype == UNKNOWNOID)
                 tle->expr
-                    = (Expr *)coerce_type(pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, COERCION_IMPLICIT, COERCE_IMPLICIT_CAST, -1);
+                    = (PGExpr *)coerce_type(pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 
             /*
 			 * The tle_list will be used to match with the ORDER by element below.
 			 * We only append the tle to tle_list when node is not a
 			 * GroupingClause or tle->expr is not a RowExpr.
 			 */
-            if (node != NULL && !IsA(node, GroupingClause) && !IsA(tle->expr, RowExpr))
+            if (node != NULL && !IsA(node, GroupingClause) && !IsA(tle->expr, PGRowExpr))
                 tle_list = lappend(tle_list, tle);
         }
     }
 
     /* create first group clauses based on sort clauses */
-    List * tle_list_remainder = NIL;
+    PGList * tle_list_remainder = NIL;
     result = create_group_clause(tle_list, *targetlist, sortClause, &tle_list_remainder);
 
     /*
@@ -976,8 +976,8 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
 
     foreach (l, reorder_grouplist)
     {
-        Node * node = (Node *)lfirst(l);
-        TargetEntry * tle;
+        PGNode * node = (PGNode *)lfirst(l);
+        PGTargetEntry * tle;
         GroupClause * gc;
         Oid sort_op;
 
@@ -990,7 +990,7 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
             result = lappend(result, tmp);
         }
 
-        else if (IsA(node, RowExpr))
+        else if (IsA(node, PGRowExpr))
         {
             /* The top level RowExprs are handled differently with other expressions.
 			 * We convert each argument into GroupClause and append them
@@ -998,7 +998,7 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
 			 *
 			 * Note that RowExprs are not added into the final targetlist.
 			 */
-            result = transformRowExprToGroupClauses(pstate, (RowExpr *)node, result, *targetlist);
+            result = transformRowExprToGroupClauses(pstate, (PGRowExpr *)node, result, *targetlist);
         }
 
         else
@@ -1012,7 +1012,7 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
             if (targetIsInSortGroupList(tle, result))
                 continue;
 
-            sort_op = ordering_oper_opid(exprType((Node *)tle->expr));
+            sort_op = ordering_oper_opid(exprType((PGNode *)tle->expr));
             gc = make_group_clause(tle, *targetlist, sort_op);
             result = lappend(result, gc);
         }
@@ -1022,8 +1022,8 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
 	 * extensions.
 	 */
     {
-        List * grp_tles = NIL;
-        ListCell * lc;
+        PGList * grp_tles = NIL;
+        PGListCell * lc;
         grouping_rewrite_ctx ctx;
 
         /* Find all unique target entries appeared in reorder_grouplist. */
@@ -1045,13 +1045,13 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
 
         ctx.grp_tles = grp_tles;
         ctx.pstate = pstate;
-        expression_tree_walker((Node *)*targetlist, grouping_rewrite_walker, (void *)&ctx);
+        expression_tree_walker((PGNode *)*targetlist, grouping_rewrite_walker, (void *)&ctx);
 
         /*
 		 * The expression might be present in a window clause as well
 		 * so process those.
 		 */
-        expression_tree_walker((Node *)pstate->p_win_clauses, grouping_rewrite_walker, (void *)&ctx);
+        expression_tree_walker((PGNode *)pstate->p_win_clauses, grouping_rewrite_walker, (void *)&ctx);
 
         /*
 		 * The expression might be present in the having clause as well.
@@ -1064,6 +1064,506 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
     freeGroupList(reorder_grouplist);
 
     return result;
+};
+
+PGList * ClauseParser::transformScatterClause(PGParseState * pstate,
+        PGList * scatterlist, PGList ** targetlist)
+{
+    PGList * outlist = NIL;
+    PGListCell * olitem;
+
+    /* Special case handling for SCATTER RANDOMLY */
+    if (list_length(scatterlist) == 1 && linitial(scatterlist) == NULL)
+        return list_make1(NULL);
+
+    /* preprocess the scatter clause, lookup TLEs */
+    foreach (olitem, scatterlist)
+    {
+        PGNode * node = lfirst(olitem);
+        PGTargetEntry * tle;
+
+        tle = findTargetlistEntrySQL99(pstate, node, targetlist);
+
+        /* coerce unknown to text */
+        if (exprType((PGNode *)tle->expr) == UNKNOWNOID)
+        {
+            tle->expr
+                = (PGExpr *)coerce_parser.coerce_type(pstate, (PGNode *)tle->expr, UNKNOWNOID, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
+        }
+
+        outlist = lappend(outlist, tle->expr);
+    }
+    return outlist;
+};
+
+void ClauseParser::transformWindowClause(PGParseState * pstate, PGQuery * qry)
+{
+    PGListCell * w;
+    PGList * winout = NIL;
+    PGList * winin = pstate->p_win_clauses;
+    Index clauseno = -1;
+
+    /*
+	 * We have two lists of window specs: one in the ParseState -- put there
+	 * when we find the OVER(...) clause in the targetlist and the other
+	 * is windowClause, a list of named window clauses. So, we concatenate
+	 * them together.
+	 *
+	 * Note that we're careful place those found in the target list at
+	 * the end because the spec might refer to a named clause and we'll
+	 * after to know about those first.
+	 */
+
+    foreach (w, winin)
+    {
+        WindowSpec * ws = lfirst(w);
+        WindowSpec * newspec = makeNode(WindowSpec);
+        PGListCell * tmp;
+        bool found = false;
+
+        clauseno++;
+
+        /* Include this WindowSpec's location in error messages. */
+        pstate->p_breadcrumb.node = (PGNode *)ws;
+
+        if (checkExprHasWindFuncs((PGNode *)ws))
+        {
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_SYNTAX_ERROR),
+                 errmsg("cannot use window function in a window "
+                        "specification"),
+                 errOmitLocation(true)));
+        }
+        /*
+		 * Loop through those clauses we've already processed to
+		 * a) check that the name passed in is not already taken and
+		 * b) look up the parent window spec.
+		 *
+		 * This is obvious O(n^2) but n is small.
+		 */
+        if (ws->parent || ws->name)
+        {
+            /*
+			 * Firstly, check that the parent is not a reference to this
+			 * window specification.
+			 */
+            if (ws->parent && ws->name && strcmp(ws->parent, ws->name) == 0)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+                     errmsg("window \"%s\" cannot reference itself", ws->name),
+                     errOmitLocation(true)));
+
+            foreach (tmp, winout)
+            {
+                WindowSpec * ws2 = lfirst(tmp);
+
+                /* Only check if the name exists if wc->name is not NULL */
+                if (ws->name != NULL && strcmp(ws2->name, ws->name) == 0)
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_DUPLICATE_OBJECT),
+                         errmsg(
+                             "window name \"%s\" occurs more than once "
+                             "in WINDOW clause",
+                             ws->name),
+                         errOmitLocation(true)));
+
+                /*
+				 * If this spec has a parent reference, we need to test that
+				 * the following rules are met. Given the following:
+				 *
+				 * 		OVER (myspec ...) ... WINDOW myspec AS (...)
+				 *
+				 * the OVER clause cannot have a partitioning clause; only
+				 * the OVER clause or myspec can have an ORDER clause; myspec
+				 * cannot have a framing clause.
+				 */
+
+                /*
+				 * XXX: these errors could apply to any number of clauses in the
+				 * query and may be considered ambiguous by the user. Perhaps a
+				 * location (see FuncCall) would help?
+				 */
+                if (ws->parent && ws2->name && strcmp(ws->parent, ws2->name) == 0)
+                {
+                    found = true;
+                    if (ws->partition != NIL)
+                        ereport(
+                            ERROR,
+                            (errcode(ERRCODE_SYNTAX_ERROR),
+                             errmsg("PARTITION BY not allowed when "
+                                    "an existing window name is specified"),
+                             errOmitLocation(true)));
+
+                    if (ws->order != NIL && ws2->order != NIL)
+                        ereport(
+                            ERROR,
+                            (errcode(ERRCODE_SYNTAX_ERROR),
+                             errmsg("conflicting ORDER BY clauses in window "
+                                    "specification"),
+                             errOmitLocation(true)));
+
+                    /*
+					 * We only want to disallow the specification of a
+					 * framing clause when the target list form is like:
+					 *
+					 *  foo() OVER (w1 ORDER BY baz) ...
+					 */
+                    if (!(ws->partition == NIL && ws->order == NIL && ws->name == NULL) && ws2->frame)
+                        ereport(
+                            ERROR,
+                            (errcode(ERRCODE_SYNTAX_ERROR),
+                             errmsg(
+                                 "window specification \"%s\" cannot have "
+                                 "a framing clause",
+                                 ws2->name),
+                             errhint("Window specifications which are "
+                                     "referenced by other window "
+                                     "specifications cannot have framing "
+                                     "clauses"),
+                             errOmitLocation(true),
+                             parser_errposition(pstate, ws2->location)));
+
+                    /*
+					 * The specifications are valid so just copy the details
+					 * from the parent spec.
+					 */
+                    newspec->parent = ws2->name;
+                    /* XXX: some parameters might not be processed! */
+                    newspec->partition = copyObject(ws2->partition);
+
+                    if (ws->order == NIL && ws2->order != NIL)
+                        newspec->order = copyObject(ws2->order);
+
+                    newspec->frame = copyObject(ws2->frame);
+                }
+            }
+
+            if (!found && ws->parent)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_SYNTAX_ERROR), errmsg("window specification \"%s\" not found", ws->parent), errOmitLocation(true)));
+        }
+
+        newspec->name = ws->name;
+        newspec->location = ws->location;
+
+        /*
+		 * Process partition, if one is defined and if it isn't already
+		 * in newspec.
+		 */
+        if (!newspec->partition && ws->partition)
+        {
+            newspec->partition
+                = transformSortClause(pstate, ws->partition, &qry->targetList, true /* fix unknowns */, false /* use SQL92 rules */);
+        }
+        /* order is just like partition */
+        if (ws->order || newspec->order)
+        {
+            /*
+			 * Only do this if it came from the new definition
+			 */
+            if (ws->order != NIL && newspec->order == NIL)
+            {
+                newspec->order
+                    = transformSortClause(pstate, ws->order, &qry->targetList, true /* fix unknowns */, false /* use SQL92 rules */);
+            }
+        }
+
+        /* Refresh our breadcrumb in case transformSortClause stepped on it. */
+        pstate->p_breadcrumb.node = (PGNode *)ws;
+
+        /*
+		 * Finally, process the framing clause. parseProcessWindFunc() will
+		 * have picked up window functions that do not support framing.
+		 *
+		 * What we do need to do is the following:
+		 * - If BETWEEN has been specified, the trailing bound is not
+		 *   UNBOUNDED FOLLOWING; the leading bound is not UNBOUNDED
+		 *   PRECEDING; if the first bound specifies CURRENT ROW, the
+		 *   second bound shall not specify a PRECEDING bound; if the
+		 *   first bound specifies a FOLLOWING bound, the second bound
+		 *   shall not specify a PRECEDING or CURRENT ROW bound.
+		 *
+		 * - If the user did not specify BETWEEN, the bound is assumed to be
+		 *   a trailing bound and the leading bound is set to CURRENT ROW.
+		 *   We're careful not to set is_between here because the user did not
+		 *   specify it.
+		 *
+		 * - If RANGE is specified: the ORDER BY clause of the window spec
+		 *   may specify only one column; the type of that column must support
+		 *   +/- <integer> operations and must be merge-joinable.
+		 */
+        if (ws->frame)
+        {
+            /* with that out of the way, we may proceed */
+            WindowFrame * nf = copyObject(ws->frame);
+
+            /*
+			 * Framing is only supported on specifications with an ordering
+			 * clause.
+			 */
+            if (!ws->order && !newspec->order)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_SYNTAX_ERROR),
+                     errmsg("window specifications with a framing clause "
+                            "must have an ORDER BY clause"),
+                     errOmitLocation(true)));
+
+            if (nf->is_between)
+            {
+                Assert(PointerIsValid(nf->trail));
+                Assert(PointerIsValid(nf->lead));
+
+                if (nf->trail->kind == WINDOW_UNBOUND_FOLLOWING)
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_SYNTAX_ERROR),
+                         errmsg("conflicting bounds in window framing "
+                                "clause"),
+                         errhint("First bound of BETWEEN clause in window "
+                                 "specification cannot be UNBOUNDED FOLLOWING"),
+                         errOmitLocation(true)));
+                if (nf->lead->kind == WINDOW_UNBOUND_PRECEDING)
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_SYNTAX_ERROR),
+                         errmsg("conflicting bounds in window framing "
+                                "clause"),
+                         errhint("Second bound of BETWEEN clause in window "
+                                 "specification cannot be UNBOUNDED PRECEDING"),
+                         errOmitLocation(true)));
+                if (nf->trail->kind == WINDOW_CURRENT_ROW
+                    && (nf->lead->kind == WINDOW_BOUND_PRECEDING || nf->lead->kind == WINDOW_UNBOUND_PRECEDING))
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_SYNTAX_ERROR),
+                         errmsg("conflicting bounds in window framing "
+                                "clause"),
+                         errhint("Second bound cannot be PRECEDING "
+                                 "when first bound is CURRENT ROW"),
+                         errOmitLocation(true)));
+                if ((nf->trail->kind == WINDOW_BOUND_FOLLOWING || nf->trail->kind == WINDOW_UNBOUND_FOLLOWING)
+                    && !(nf->lead->kind == WINDOW_BOUND_FOLLOWING || nf->lead->kind == WINDOW_UNBOUND_FOLLOWING))
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_SYNTAX_ERROR),
+                         errmsg("conflicting bounds in window framing "
+                                "clause"),
+                         errhint("Second bound must be FOLLOWING if first "
+                                 "bound is FOLLOWING"),
+                         errOmitLocation(true)));
+            }
+            else
+            {
+                /*
+				 * If only a single bound has been specified, set the
+				 * leading bound to CURRENT ROW
+				 */
+                WindowFrameEdge * e = makeNode(WindowFrameEdge);
+
+                Assert(!PointerIsValid(nf->lead));
+
+                e->kind = WINDOW_CURRENT_ROW;
+                nf->lead = e;
+            }
+
+            transformWindowFrameEdge(pstate, nf->trail, newspec, qry, nf->is_rows);
+            transformWindowFrameEdge(pstate, nf->lead, newspec, qry, nf->is_rows);
+            newspec->frame = nf;
+        }
+
+        /* finally, check function restriction with this spec. */
+        winref_checkspec(pstate, qry, clauseno, PointerIsValid(newspec->order), PointerIsValid(newspec->frame));
+
+        winout = lappend(winout, newspec);
+    }
+
+    /* If there are no window functions in the targetlist,
+	 * forget the window clause.
+	 */
+    if (!pstate->p_hasWindFuncs)
+    {
+        pstate->p_win_clauses = NIL;
+        qry->windowClause = NIL;
+    }
+    else
+    {
+        qry->windowClause = winout;
+    }
+};
+
+PGList * ClauseParser::transformDistinctClause(PGParseState * pstate,
+        PGList * distinctlist, PGList ** targetlist,
+        PGList ** sortClause, PGList ** groupClause)
+{
+    PGList * result = NIL;
+    PGListCell * slitem;
+    PGListCell * dlitem;
+
+    /* No work if there was no DISTINCT clause */
+    if (distinctlist == NIL)
+        return NIL;
+
+    if (linitial(distinctlist) == NULL)
+    {
+        /* We had SELECT DISTINCT */
+
+        if (!pstate->p_hasAggs && !pstate->p_hasWindFuncs && *groupClause == NIL)
+        {
+            /*
+			 * MPP-15040
+			 * turn distinct clause into grouping clause to make both sort-based
+			 * and hash-based grouping implementations viable plan options
+			 */
+
+            return transformDistinctToGroupBy(pstate, targetlist, sortClause, groupClause);
+        }
+
+        /*
+		 * All non-resjunk elements from target list that are not already in
+		 * the sort list should be added to it.  (We don't really care what
+		 * order the DISTINCT fields are checked in, so we can leave the
+		 * user's ORDER BY spec alone, and just add additional sort keys to it
+		 * to ensure that all targetlist items get sorted.)
+		 */
+        *sortClause = addAllTargetsToSortList(pstate, *sortClause, *targetlist, true);
+
+        /*
+		 * Now, DISTINCT list consists of all non-resjunk sortlist items.
+		 * Actually, all the sortlist items had better be non-resjunk!
+		 * Otherwise, user wrote SELECT DISTINCT with an ORDER BY item that
+		 * does not appear anywhere in the SELECT targetlist, and we can't
+		 * implement that with only one sorting pass...
+		 */
+        foreach (slitem, *sortClause)
+        {
+            SortClause * scl = (SortClause *)lfirst(slitem);
+            PGTargetEntry * tle = get_sortgroupclause_tle(scl, *targetlist);
+
+            if (tle->resjunk)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+                     errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
+                     errOmitLocation(true)));
+            else
+                result = lappend(result, copyObject(scl));
+        }
+    }
+    else
+    {
+        /* We had SELECT DISTINCT ON (expr, ...) */
+
+        /*
+		 * If the user writes both DISTINCT ON and ORDER BY, then the two
+		 * expression lists must match (until one or the other runs out).
+		 * Otherwise the ORDER BY requires a different sort order than the
+		 * DISTINCT does, and we can't implement that with only one sort pass
+		 * (and if we do two passes, the results will be rather
+		 * unpredictable). However, it's OK to have more DISTINCT ON
+		 * expressions than ORDER BY expressions; we can just add the extra
+		 * DISTINCT values to the sort list, much as we did above for ordinary
+		 * DISTINCT fields.
+		 *
+		 * Actually, it'd be OK for the common prefixes of the two lists to
+		 * match in any order, but implementing that check seems like more
+		 * trouble than it's worth.
+		 */
+        PGListCell * nextsortlist = list_head(*sortClause);
+
+        foreach (dlitem, distinctlist)
+        {
+            PGTargetEntry * tle;
+
+            tle = findTargetlistEntrySQL92(pstate, lfirst(dlitem), targetlist, DISTINCT_ON_CLAUSE);
+
+            if (nextsortlist != NULL)
+            {
+                SortClause * scl = (SortClause *)lfirst(nextsortlist);
+
+                if (tle->ressortgroupref != scl->tleSortGroupRef)
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+                         errmsg("SELECT DISTINCT ON expressions must match initial ORDER BY expressions"),
+                         errOmitLocation(true)));
+                result = lappend(result, copyObject(scl));
+                nextsortlist = lnext(nextsortlist);
+            }
+            else
+            {
+                *sortClause = addTargetToSortList(pstate, tle, *sortClause, *targetlist, SORTBY_ASC, NIL, true);
+
+                /*
+				 * Probably, the tle should always have been added at the end
+				 * of the sort list ... but search to be safe.
+				 */
+                foreach (slitem, *sortClause)
+                {
+                    SortClause * scl = (SortClause *)lfirst(slitem);
+
+                    if (tle->ressortgroupref == scl->tleSortGroupRef)
+                    {
+                        result = lappend(result, copyObject(scl));
+                        break;
+                    }
+                }
+                if (slitem == NULL) /* should not happen */
+                    elog(ERROR, "failed to add DISTINCT ON clause to target list");
+            }
+        }
+    }
+
+    return result;
+};
+
+PGNode * ClauseParser::transformLimitClause(PGParseState * pstate,
+        PGNode * clause, const char * constructName)
+{
+    PGNode * qual;
+
+    if (clause == NULL)
+        return NULL;
+
+    qual = transformExpr(pstate, clause);
+
+    qual = coerce_to_bigint(pstate, qual, constructName);
+
+    /*
+	 * LIMIT can't refer to any vars or aggregates of the current query; we
+	 * don't allow subselects either (though that case would at least be
+	 * sensible)
+	 */
+    if (contain_vars_of_level(qual, 0))
+    {
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+             /* translator: %s is name of a SQL construct, eg LIMIT */
+             errmsg("argument of %s must not contain variables", constructName)));
+    }
+    if (checkExprHasAggs(qual))
+    {
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_GROUPING_ERROR),
+             /* translator: %s is name of a SQL construct, eg LIMIT */
+             errmsg("argument of %s must not contain aggregates", constructName)));
+    }
+    if (contain_subplans(qual))
+    {
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+             /* translator: %s is name of a SQL construct, eg LIMIT */
+             errmsg("argument of %s must not contain subqueries", constructName)));
+    }
+
+    return qual;
 };
 
 }

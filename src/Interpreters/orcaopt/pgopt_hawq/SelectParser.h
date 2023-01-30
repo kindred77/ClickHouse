@@ -31,6 +31,9 @@ public:
     duckdb_libpgquery::PGList * do_parse_analyze(duckdb_libpgquery::PGNode * parseTree,
         PGParseState * pstate);
 
+    duckdb_libpgquery::PGFromExpr *makeFromExpr(duckdb_libpgquery::PGList *fromlist,
+        duckdb_libpgquery::PGNode *quals);
+
     duckdb_libpgquery::PGList *
     parse_analyze(duckdb_libpgquery::PGNode * parseTree,
         const char * sourceText, Oid * paramTypes, int numParams);

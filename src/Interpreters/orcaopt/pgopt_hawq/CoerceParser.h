@@ -56,6 +56,16 @@ public:
 
     bool can_coerce_type(int nargs, Oid * input_typeids, Oid * target_typeids, duckdb_libpgquery::PGCoercionContext ccontext);
 
+    duckdb_libpgquery::PGNode * coerce_type(
+        PGParseState * pstate,
+        duckdb_libpgquery::PGNode * node,
+        Oid inputTypeId,
+        Oid targetTypeId,
+        int32 targetTypeMod,
+        duckdb_libpgquery::PGCoercionContext ccontext,
+        duckdb_libpgquery::PGCoercionForm cformat,
+        int location);
+
     CATEGORY TypeCategory(Oid inType);
 
     Oid select_common_type(duckdb_libpgquery::PGList *typeids, const char *context);
