@@ -683,4 +683,323 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForSubquery(PGParseState * p
 	return rte;
 };
 
+PGRangeTblEntry * RelationParser::scanNameSpaceForRelid(PGParseState * pstate, Oid relid)
+{
+    PGRangeTblEntry * result = NULL;
+    PGListCell * l;
+
+    foreach (l, pstate->p_relnamespace)
+    {
+        PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(l);
+
+        /* yes, the test for alias == NULL should be there... */
+        if (rte->rtekind == PG_RTE_RELATION && rte->relid == relid && rte->alias == NULL)
+        {
+            if (result)
+                ereport(ERROR, (errcode(ERRCODE_AMBIGUOUS_ALIAS), errmsg("table reference %u is ambiguous", relid)));
+            result = rte;
+        }
+    }
+    return result;
+};
+
+PGRangeTblEntry * RelationParser::scanNameSpaceForRefname(PGParseState * pstate, const char * refname)
+{
+    PGRangeTblEntry * result = NULL;
+    PGListCell * l;
+
+    foreach (l, pstate->p_relnamespace)
+    {
+        PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(l);
+
+        if (strcmp(rte->eref->aliasname, refname) == 0)
+        {
+            if (result)
+                ereport(ERROR, (errcode(ERRCODE_AMBIGUOUS_ALIAS), errmsg("table reference \"%s\" is ambiguous", refname)));
+            result = rte;
+        }
+    }
+    return result;
+};
+
+PGRangeTblEntry * RelationParser::refnameRangeTblEntryHelper(
+        PGParseState * pstate, const char * refname, Oid relId, int * sublevels_up)
+{
+    while (pstate != NULL)
+    {
+        PGRangeTblEntry * result = NULL;
+
+        if (OidIsValid(relId))
+        {
+            result = scanNameSpaceForRelid(pstate, relId);
+        }
+        else
+        {
+            result = scanNameSpaceForRefname(pstate, refname);
+        }
+
+        if (result)
+        {
+            return result;
+        }
+
+        if (NULL == sublevels_up)
+        {
+            break;
+        }
+
+        (*sublevels_up)++;
+        pstate = pstate->parentParseState;
+    }
+
+    return NULL;
+};
+
+PGRangeTblEntry * RelationParser::refnameRangeTblEntryHelperSchemaQualified(
+        PGParseState * pstate, Oid dboid, const char * nspname, const char * refname,
+        int * sublevels_up)
+{
+    Oid nspid = LookupNamespaceId(nspname, dboid);
+    if (!OidIsValid(nspid))
+    {
+        return NULL;
+    }
+    Oid relid = get_relname_relid(refname, nspid);
+    if (!OidIsValid(relid))
+    {
+        return NULL;
+    }
+
+    return refnameRangeTblEntryHelper(pstate, refname, relid, sublevels_up);
+};
+
+PGRangeTblEntry * RelationParser::refnameRangeTblEntry(
+        PGParseState * pstate, const char * catalogname,
+        const char * schemaname, const char * refname, int location, int * sublevels_up)
+{
+    Oid relId = InvalidOid;
+
+    if (sublevels_up)
+    {
+        *sublevels_up = 0;
+    }
+
+    if (NULL == catalogname && NULL == schemaname)
+    {
+        /* simple unqualified name: search the rangevars of the query */
+        return refnameRangeTblEntryHelper(pstate, refname, InvalidOid /*relId*/, sublevels_up);
+    }
+
+    if (NULL != catalogname && NULL != schemaname)
+    {
+        /* fully qualified table name: catalog.schema.refname */
+        Oid dboid = GetCatalogId(catalogname);
+        Oid namespaceId = LookupExplicitNamespace(schemaname, dboid);
+        relId = get_relname_relid(refname, namespaceId);
+
+        if (!OidIsValid(relId))
+        {
+            return NULL;
+        }
+
+        return refnameRangeTblEntryHelper(pstate, refname, relId, sublevels_up);
+    }
+
+    /* namespace-qualified name: schema.refname: consider both the current database and HCatalog */
+    Assert(NULL != schemaname);
+
+    Oid dboidCurrent = GetCatalogId(NULL /*catalogname*/);
+    int slevelsUpCurrent = 0;
+
+    int * pslevelsUpCurrent = NULL;
+
+    if (NULL != sublevels_up)
+        pslevelsUpCurrent = &slevelsUpCurrent;
+
+    PGRangeTblEntry * rteCurrent = refnameRangeTblEntryHelperSchemaQualified(pstate, dboidCurrent, schemaname, refname, pslevelsUpCurrent);
+
+    if (NULL == rteCurrent)
+        return NULL;
+
+    if (NULL != rteCurrent)
+    {
+        if (NULL != sublevels_up)
+        {
+            *sublevels_up = *pslevelsUpCurrent;
+        }
+        return rteCurrent;
+    }
+};
+
+PGRangeTblEntry * RelationParser::searchRangeTable(PGParseState * pstate,
+        PGRangeVar * relation)
+{
+    Oid relId = InvalidOid;
+    const char * refname = relation->relname;
+    PGCommonTableExpr * cte = NULL;
+    Index ctelevelsup = 0;
+
+    /*
+	 * If it's an unqualified name, check for possible CTE matches. A CTE
+	 * hides any real relation matches.  If no CTE, look for a matching
+	 * relation.
+	 */
+    if (!relation->schemaname)
+        cte = scanNameSpaceForCTE(pstate, refname, &ctelevelsup);
+    if (!cte)
+        relId = RangeVarGetRelid(relation, true, true /*allowHcatalog*/);
+
+    Index levelsup = 0;
+    while (pstate != NULL)
+    {
+        PGListCell * l;
+
+        foreach (l, pstate->p_rtable)
+        {
+            PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(l);
+
+            if (OidIsValid(relId) && rte->rtekind == PG_RTE_RELATION && rte->relid == relId)
+                return rte;
+
+            if (rte->rtekind == PG_RTE_CTE && cte != NULL && rte->ctelevelsup + levelsup == ctelevelsup && strcmp(rte->ctename, refname) == 0)
+                return rte;
+
+            if (rte->eref != NULL && rte->eref->aliasname != NULL && strcmp(rte->eref->aliasname, refname) == 0)
+                return rte;
+        }
+
+        pstate = pstate->parentParseState;
+        levelsup++;
+    }
+    return NULL;
+};
+
+void RelationParser::warnAutoRange(PGParseState * pstate, PGRangeVar * relation, int location)
+{
+    PGRangeTblEntry * rte;
+    int sublevels_up;
+    const char * badAlias = NULL;
+
+    /*
+	 * Check to see if there are any potential matches in the query's
+	 * rangetable.	This affects the message we provide.
+	 */
+    rte = searchRangeTable(pstate, relation);
+
+    /*
+	 * If we found a match that has an alias and the alias is visible in the
+	 * namespace, then the problem is probably use of the relation's real name
+	 * instead of its alias, ie "SELECT foo.* FROM foo f". This mistake is
+	 * common enough to justify a specific hint.
+	 *
+	 * If we found a match that doesn't meet those criteria, assume the
+	 * problem is illegal use of a relation outside its scope, as in the
+	 * MySQL-ism "SELECT ... FROM a, b LEFT JOIN c ON (a.x = c.y)".
+	 */
+    if (rte && rte->alias && strcmp(rte->eref->aliasname, relation->relname) != 0
+        && refnameRangeTblEntry(pstate, NULL /*catalogname*/, NULL, rte->eref->aliasname, location, &sublevels_up) == rte)
+        badAlias = rte->eref->aliasname;
+
+    if (!add_missing_from)
+    {
+        if (rte)
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_UNDEFINED_TABLE),
+                 errmsg("invalid reference to FROM-clause entry for table \"%s\"", relation->relname),
+                 (badAlias ? errhint("Perhaps you meant to reference the table alias \"%s\".", badAlias)
+                           : errhint(
+                               "There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
+                               rte->eref->aliasname)),
+                 errOmitLocation(true),
+                 parser_errposition(pstate, location)));
+        else
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_UNDEFINED_TABLE),
+                 (pstate->parentParseState ? errmsg("missing FROM-clause entry in subquery for table \"%s\"", relation->relname)
+                                           : errmsg("missing FROM-clause entry for table \"%s\"", relation->relname)),
+                 errOmitLocation(true),
+                 parser_errposition(pstate, location)));
+    }
+    else
+    {
+        /* just issue a warning */
+        ereport(
+            NOTICE,
+            (errcode(ERRCODE_UNDEFINED_TABLE),
+             (pstate->parentParseState ? errmsg("adding missing FROM-clause entry in subquery for table \"%s\"", relation->relname)
+                                       : errmsg("adding missing FROM-clause entry for table \"%s\"", relation->relname)),
+             (badAlias ? errhint("Perhaps you meant to reference the table alias \"%s\".", badAlias)
+                       : (rte ? errhint(
+                              "There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
+                              rte->eref->aliasname)
+                              : 0)),
+             errOmitLocation(true),
+             parser_errposition(pstate, location)));
+    }
+};
+
+void RelationParser::addRTEtoQuery(PGParseState * pstate, PGRangeTblEntry * rte,
+        bool addToJoinList, bool addToRelNameSpace, bool addToVarNameSpace)
+{
+    if (addToJoinList)
+    {
+        int rtindex = RTERangeTablePosn(pstate, rte, NULL);
+        PGRangeTblRef * rtr = makeNode(PGRangeTblRef);
+
+        rtr->rtindex = rtindex;
+        pstate->p_joinlist = lappend(pstate->p_joinlist, rtr);
+    }
+    if (addToRelNameSpace)
+        pstate->p_relnamespace = lappend(pstate->p_relnamespace, rte);
+    if (addToVarNameSpace)
+        pstate->p_varnamespace = lappend(pstate->p_varnamespace, rte);
+};
+
+PGRangeTblEntry * RelationParser::addImplicitRTE(PGParseState * pstate, PGRangeVar * relation,
+        int location)
+{
+    PGRangeTblEntry * rte;
+
+    /* issue warning or error as needed */
+    warnAutoRange(pstate, relation, location);
+
+    /*
+	 * Note that we set inFromCl true, so that the RTE will be listed
+	 * explicitly if the parsetree is ever decompiled by ruleutils.c. This
+	 * provides a migration path for views/rules that were originally written
+	 * with implicit-RTE syntax.
+	 */
+    rte = addRangeTableEntry(pstate, relation, NULL, false, true);
+    /* Add to joinlist and relnamespace, but not varnamespace */
+    addRTEtoQuery(pstate, rte, true, true, false);
+
+    return rte;
+};
+
+PGList * RelationParser::expandRelAttrs(PGParseState * pstate, PGRangeTblEntry * rte,
+        int rtindex, int sublevels_up, int location)
+{
+    PGList *names, *vars;
+    PGListCell *name, *var;
+    PGList * te_list = NIL;
+
+    expandRTE(rte, rtindex, sublevels_up, location, false, &names, &vars);
+
+    forboth(name, names, var, vars)
+    {
+        char * label = strVal(lfirst(name));
+        PGNode * varnode = (PGNode *)lfirst(var);
+        PGTargetEntry * te;
+
+        te = makeTargetEntry((PGExpr *)varnode, (PGAttrNumber)pstate->p_next_resno++, label, false);
+        te_list = lappend(te_list, te);
+    }
+
+    Assert(name == NULL && var == NULL); /* lists not the same length? */
+
+    return te_list;
+};
+
 }

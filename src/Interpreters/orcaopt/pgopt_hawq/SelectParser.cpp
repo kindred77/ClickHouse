@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgoptnew/SelectParser.h>
+#include <Interpreters/orcaopt/pgopt_hawq/SelectParser.h>
 
 using namespace duckdb_libpgquery;
 
@@ -459,6 +459,18 @@ SelectParser::parse_analyze(PGNode *parseTree, const char *sourceText, Oid *para
     pstate->p_paramtypes = paramTypes;
     pstate->p_numparams = numParams;
     pstate->p_variableparams = false;
+
+    result = do_parse_analyze(parseTree, pstate);
+
+    free_parsestate(&pstate);
+
+    return result;
+};
+
+PGList * SelectParser::parse_sub_analyze(PGNode * parseTree, PGParseState * parentParseState)
+{
+    PGParseState * pstate = make_parsestate(parentParseState);
+    PGList * result;
 
     result = do_parse_analyze(parseTree, pstate);
 

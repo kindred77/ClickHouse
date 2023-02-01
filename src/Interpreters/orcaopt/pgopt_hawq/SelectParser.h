@@ -37,6 +37,8 @@ public:
     duckdb_libpgquery::PGList *
     parse_analyze(duckdb_libpgquery::PGNode * parseTree,
         const char * sourceText, Oid * paramTypes, int numParams);
+
+    duckdb_libpgquery::PGList * parse_sub_analyze(duckdb_libpgquery::PGNode * parseTree, PGParseState * parentParseState);
 };
 
 }

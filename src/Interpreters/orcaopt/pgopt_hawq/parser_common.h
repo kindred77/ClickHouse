@@ -205,7 +205,7 @@ typedef PGIndex Index;
 
 typedef PGOid Oid;
 
-typedef PGBitmapset *PGRelids;
+typedef duckdb_libpgquery::PGBitmapset *PGRelids;
 
 struct PGColumn
 {

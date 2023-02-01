@@ -159,7 +159,7 @@ PGTargetEntry * TargetParser::transformTargetEntry(PGParseState * pstate,
 {
     /* Transform the node if caller didn't do it already */
     if (expr == NULL)
-        expr = transformExpr(pstate, node);
+        expr = expr_parser.transformExpr(pstate, node);
 
     if (colname == NULL && !resjunk)
     {
@@ -291,7 +291,7 @@ void TargetParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle
                 PGVar * aliasvar;
 
                 Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
-                aliasvar = (Var *)list_nth(rte->joinaliasvars, attnum - 1);
+                aliasvar = (PGVar *)list_nth(rte->joinaliasvars, attnum - 1);
                 markTargetListOrigin(pstate, tle, aliasvar, netlevelsup);
             }
             break;
@@ -315,6 +315,402 @@ void TargetParser::markTargetListOrigins(PGParseState *pstate, PGList *targetlis
 
         markTargetListOrigin(pstate, tle, (PGVar *)tle->expr, 0);
     }
+};
+
+PGList * TargetParser::ExpandAllTables(PGParseState * pstate)
+{
+    PGList * target = NIL;
+    PGListCell * l;
+
+    /* Check for SELECT *; */
+    if (!pstate->p_varnamespace)
+        ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), errmsg("SELECT * with no tables specified is not valid")));
+
+    foreach (l, pstate->p_varnamespace)
+    {
+        PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(l);
+        int rtindex = relation_parser.RTERangeTablePosn(pstate, rte, NULL);
+
+        /* Require read access --- see comments in setTargetTable() */
+        rte->requiredPerms |= ACL_SELECT;
+
+        target = list_concat(target, relation_parser.expandRelAttrs(pstate, rte, rtindex, 0, -1));
+    }
+
+    return target;
+};
+
+PGList * TargetParser::ExpandColumnRefStar(PGParseState * pstate, PGColumnRef * cref, bool targetlist)
+{
+    PGList * fields = cref->fields;
+    int numnames = list_length(fields);
+
+    if (numnames == 1)
+    {
+        /*
+		 * Target item is a bare '*', expand all tables
+		 *
+		 * (e.g., SELECT * FROM emp, dept)
+		 *
+		 * Since the grammar only accepts bare '*' at top level of SELECT, we
+		 * need not handle the targetlist==false case here.  However, we must
+		 * test for it because the grammar currently fails to distinguish
+		 * a quoted name "*" from a real asterisk.
+		 */
+        if (!targetlist)
+            elog(ERROR, "invalid use of *");
+
+        return ExpandAllTables(pstate);
+    }
+    else
+    {
+        /*
+		 * Target item is relation.*, expand that table
+		 *
+		 * (e.g., SELECT emp.*, dname FROM emp, dept)
+		 */
+        char * catalogname = NULL;
+        char * schemaname = NULL;
+        char * relname = NULL;
+        PGRangeTblEntry * rte;
+        int sublevels_up;
+        int rtindex;
+
+        switch (numnames)
+        {
+            case 2:
+                relname = strVal(linitial(fields));
+                break;
+            case 3:
+                schemaname = strVal(linitial(fields));
+                relname = strVal(lsecond(fields));
+                break;
+            case 4: {
+                catalogname = strVal(linitial(fields));
+                schemaname = strVal(lsecond(fields));
+                relname = strVal(lthird(fields));
+                break;
+            }
+            default:
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_SYNTAX_ERROR),
+                     errmsg("improper qualified name (too many dotted names): %s", NameListToString(fields)),
+                     parser_errposition(pstate, cref->location)));
+                schemaname = NULL; /* keep compiler quiet */
+                relname = NULL;
+                break;
+        }
+
+        rte = relation_parser.refnameRangeTblEntry(pstate, catalogname, schemaname, relname, cref->location, &sublevels_up);
+        if (rte == NULL)
+        {
+            rte = relation_parser.addImplicitRTE(pstate, makeRangeVar(catalogname, schemaname, relname, cref->location), cref->location);
+        }
+
+        /* Require read access --- see comments in setTargetTable() */
+        rte->requiredPerms |= ACL_SELECT;
+
+        rtindex = relation_parser.RTERangeTablePosn(pstate, rte, &sublevels_up);
+
+        if (targetlist)
+            return relation_parser.expandRelAttrs(pstate, rte, rtindex, sublevels_up, cref->location);
+        else
+        {
+            PGList * vars;
+
+            relation_parser.expandRTE(rte, rtindex, sublevels_up, cref->location, false, NULL, &vars);
+            return vars;
+        }
+    }
+};
+
+TupleDesc TargetParser::expandRecordVariable(PGParseState * pstate, PGVar * var, int levelsup)
+{
+    TupleDesc tupleDesc;
+    int netlevelsup;
+    PGRangeTblEntry * rte;
+    PGAttrNumber attnum;
+    PGNode * expr;
+
+    /* Check my caller didn't mess up */
+    Assert(IsA(var, PGVar));
+    Assert(var->vartype == RECORDOID);
+
+    netlevelsup = var->varlevelsup + levelsup;
+    rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+    attnum = var->varattno;
+
+    if (attnum == InvalidAttrNumber)
+    {
+        /* Whole-row reference to an RTE, so expand the known fields */
+        PGList *names, *vars;
+        PGListCell *lname, *lvar;
+        int i;
+
+        relation_parser.expandRTE(rte, var->varno, 0, -1, false, &names, &vars);
+
+        tupleDesc = CreateTemplateTupleDesc(list_length(vars), false);
+        i = 1;
+        forboth(lname, names, lvar, vars)
+        {
+            char * label = strVal(lfirst(lname));
+            PGNode * varnode = (PGNode *)lfirst(lvar);
+
+            TupleDescInitEntry(tupleDesc, (PGAttrNumber)i, label, exprType(varnode), exprTypmod(varnode), 0);
+            i++;
+        }
+        Assert(lname == NULL && lvar == NULL); /* lists same length? */
+
+        return tupleDesc;
+    }
+
+    expr = (PGNode *)var; /* default if we can't drill down */
+
+    switch (rte->rtekind)
+    {
+        case PG_RTE_RELATION:
+        // case RTE_SPECIAL:
+        case PG_RTE_VALUES:
+
+            /*
+			 * This case should not occur: a column of a table or values list
+			 * shouldn't have type RECORD.  Fall through and fail (most
+			 * likely) at the bottom.
+			 */
+            break;
+        case PG_RTE_SUBQUERY: {
+            /* Subselect-in-FROM: examine sub-select's output expr */
+            PGTargetEntry * ste = relation_parser.get_tle_by_resno(rte->subquery->targetList, attnum);
+
+            if (ste == NULL || ste->resjunk)
+                elog(ERROR, "subquery %s does not have attribute %d", rte->eref->aliasname, attnum);
+            expr = (PGNode *)ste->expr;
+            if (IsA(expr, PGVar))
+            {
+                /*
+					 * Recurse into the sub-select to see what its Var refers
+					 * to.	We have to build an additional level of ParseState
+					 * to keep in step with varlevelsup in the subselect.
+					 */
+                PGParseState mypstate;
+
+                MemSet(&mypstate, 0, sizeof(mypstate));
+                mypstate.parentParseState = pstate;
+                mypstate.p_rtable = rte->subquery->rtable;
+                /* don't bother filling the rest of the fake pstate */
+
+                return expandRecordVariable(&mypstate, (PGVar *)expr, 0);
+            }
+            /* else fall through to inspect the expression */
+        }
+        break;
+        case PG_RTE_CTE:
+            if (!rte->self_reference)
+            {
+                /* Similar to RTE_SUBQUERY */
+                PGCommonTableExpr * cte = cte_parser.GetCTEForRTE(pstate, rte, netlevelsup);
+                Assert(cte != NULL);
+
+                PGTargetEntry * ste = relation_parser.get_tle_by_resno(GetCTETargetList(cte), attnum);
+                if (ste == NULL || ste->resjunk)
+                    elog(ERROR, "WITH query %s does not have attribute %d", cte->ctename, attnum);
+
+                expr = (PGNode *)ste->expr;
+                if (IsA(expr, PGVar))
+                {
+                    /*
+					 * Recurse into the sub-select to see what its Var refers
+					 * to.	We have to build an additional level of ParseState
+					 * to keep in step with varlevelsup in the subselect.
+					 */
+                    PGParseState mypstate;
+
+                    MemSet(&mypstate, 0, sizeof(mypstate));
+
+                    for (Index levelsup = 0; levelsup < rte->ctelevelsup + netlevelsup; levelsup++)
+                        pstate = pstate->parentParseState;
+
+                    mypstate.parentParseState = pstate;
+                    mypstate.p_rtable = ((PGQuery *)cte->ctequery)->rtable;
+                    /* don't bother filling the rest of the fake pstate */
+
+                    return expandRecordVariable(&mypstate, (PGVar *)expr, 0);
+                }
+                /* else fall through to inspect the expression */
+            }
+            break;
+        case PG_RTE_JOIN:
+            /* Join RTE --- recursively inspect the alias variable */
+            Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
+            expr = (PGNode *)list_nth(rte->joinaliasvars, attnum - 1);
+            if (IsA(expr, PGVar))
+                return expandRecordVariable(pstate, (PGVar *)expr, netlevelsup);
+            /* else fall through to inspect the expression */
+            break;
+        // case RTE_TABLEFUNCTION:
+        case PG_RTE_FUNCTION:
+
+            /*
+			 * We couldn't get here unless a function is declared with one of
+			 * its result columns as RECORD, which is not allowed.
+			 */
+            break;
+        case RTE_VOID:
+            Insist(0);
+            break;
+    }
+
+    /*
+	 * We now have an expression we can't expand any more, so see if
+	 * get_expr_result_type() can do anything with it.	If not, pass to
+	 * lookup_rowtype_tupdesc() which will probably fail, but will give an
+	 * appropriate error message while failing.
+	 */
+    if (get_expr_result_type(expr, NULL, &tupleDesc) != TYPEFUNC_COMPOSITE)
+        tupleDesc = lookup_rowtype_tupdesc_copy(exprType(expr), exprTypmod(expr));
+
+    return tupleDesc;
+};
+
+PGList * TargetParser::ExpandIndirectionStar(PGParseState * pstate, PGAIndirection * ind, bool targetlist)
+{
+    PGList * result = NIL;
+    PGNode * expr;
+    TupleDesc tupleDesc;
+    int numAttrs;
+    int i;
+
+    /* Strip off the '*' to create a reference to the rowtype object */
+    ind = copyObject(ind);
+    ind->indirection = list_truncate(ind->indirection, list_length(ind->indirection) - 1);
+
+    /* And transform that */
+    expr = transformExpr(pstate, (PGNode *)ind);
+
+    /*
+	 * Verify it's a composite type, and get the tupdesc.  We use
+	 * get_expr_result_type() because that can handle references to functions
+	 * returning anonymous record types.  If that fails, use
+	 * lookup_rowtype_tupdesc(), which will almost certainly fail as well, but
+	 * it will give an appropriate error message.
+	 *
+	 * If it's a Var of type RECORD, we have to work even harder: we have to
+	 * find what the Var refers to, and pass that to get_expr_result_type.
+	 * That task is handled by expandRecordVariable().
+	 */
+    if (IsA(expr, PGVar) && ((PGVar *)expr)->vartype == RECORDOID)
+        tupleDesc = expandRecordVariable(pstate, (PGVar *)expr, 0);
+    else if (get_expr_result_type(expr, NULL, &tupleDesc) != TYPEFUNC_COMPOSITE)
+        tupleDesc = lookup_rowtype_tupdesc_copy(exprType(expr), exprTypmod(expr));
+    Assert(tupleDesc);
+
+    /* Generate a list of references to the individual fields */
+    numAttrs = tupleDesc->natts;
+    for (i = 0; i < numAttrs; i++)
+    {
+        Form_pg_attribute att = tupleDesc->attrs[i];
+        PGNode * fieldnode;
+
+        if (att->attisdropped)
+            continue;
+
+        /*
+		 * If we got a whole-row Var from the rowtype reference, we can expand
+		 * the fields as simple Vars.  Otherwise we must generate multiple
+		 * copies of the rowtype reference and do FieldSelects.
+		 */
+        if (IsA(expr, PGVar) && ((PGVar *)expr)->varattno == InvalidAttrNumber)
+        {
+            PGVar * var = (PGVar *)expr;
+
+            fieldnode = (PGNode *)makeVar(var->varno, i + 1, att->atttypid, att->atttypmod, var->varlevelsup);
+        }
+        else
+        {
+            PGFieldSelect * fselect = makeNode(PGFieldSelect);
+
+            fselect->arg = (PGExpr *)copyObject(expr);
+            fselect->fieldnum = i + 1;
+            fselect->resulttype = att->atttypid;
+            fselect->resulttypmod = att->atttypmod;
+
+            fieldnode = (PGNode *)fselect;
+        }
+
+        if (targetlist)
+        {
+            /* add TargetEntry decoration */
+            PGTargetEntry * te;
+
+            te = makeTargetEntry((PGExpr *)fieldnode, (PGAttrNumber)pstate->p_next_resno++, pstrdup(NameStr(att->attname)), false);
+            result = lappend(result, te);
+        }
+        else
+            result = lappend(result, fieldnode);
+    }
+
+    return result;
+};
+
+PGList * TargetParser::transformExpressionList(PGParseState * pstate, PGList * exprlist)
+{
+    PGList * result = NIL;
+    PGListCell * lc;
+    ParseStateBreadCrumb savebreadcrumb;
+
+    /* CDB: Push error location stack.  Must pop before return! */
+    Assert(pstate);
+    savebreadcrumb = pstate->p_breadcrumb;
+    pstate->p_breadcrumb.pop = &savebreadcrumb;
+
+    foreach (lc, exprlist)
+    {
+        PGNode * e = (PGNode *)lfirst(lc);
+
+        /* CDB: Drop a breadcrumb in case of error. */
+        pstate->p_breadcrumb.node = (PGNode *)e;
+
+        /*
+		 * Check for "something.*".  Depending on the complexity of the
+		 * "something", the star could appear as the last name in ColumnRef,
+		 * or as the last indirection item in A_Indirection.
+		 */
+        if (IsA(e, PGColumnRef))
+        {
+            PGColumnRef * cref = (PGColumnRef *)e;
+
+            if (strcmp(strVal(llast(cref->fields)), "*") == 0)
+            {
+                /* It is something.*, expand into multiple items */
+                result = list_concat(result, ExpandColumnRefStar(pstate, cref, false));
+                continue;
+            }
+        }
+        else if (IsA(e, PGAIndirection))
+        {
+            PGAIndirection * ind = (PGAIndirection *)e;
+            PGNode * lastitem = llast(ind->indirection);
+
+            if (IsA(lastitem, String) && strcmp(strVal(lastitem), "*") == 0)
+            {
+                /* It is something.*, expand into multiple items */
+                result = list_concat(result, ExpandIndirectionStar(pstate, ind, false));
+                continue;
+            }
+        }
+
+        /*
+		 * Not "something.*", so transform as a single expression
+		 */
+        result = lappend(result, expr_parser.transformExpr(pstate, e));
+    }
+
+    /* CDB: Pop error location stack. */
+    Assert(pstate->p_breadcrumb.pop == &savebreadcrumb);
+    pstate->p_breadcrumb = savebreadcrumb;
+
+    return result;
 };
 
 }

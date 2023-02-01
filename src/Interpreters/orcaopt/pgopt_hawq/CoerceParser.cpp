@@ -904,6 +904,24 @@ PGNode * CoerceParser::coerce_to_boolean(PGParseState * pstate,
     return node;
 };
 
+PGNode * CoerceParser::coerce_to_common_type(PGParseState * pstate, PGNode * node,
+      Oid targetTypeId, const char * context)
+{
+    Oid inputTypeId = exprType(node);
+
+    if (inputTypeId == targetTypeId)
+        return node; /* no work */
+    if (can_coerce_type(1, &inputTypeId, &targetTypeId, PG_COERCION_IMPLICIT))
+        node = coerce_type(pstate, node, inputTypeId, targetTypeId, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
+    else
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_CANNOT_COERCE),
+             /* translator: first %s is name of a SQL construct, eg CASE */
+             errmsg("%s could not convert type %s to %s", context, format_type_be(inputTypeId), format_type_be(targetTypeId))));
+    return node;
+};
+
 PGVar * CoerceParser::coerce_unknown_var(
         PGParseState * pstate,
         PGVar * var,
@@ -1020,6 +1038,164 @@ void CoerceParser::fixup_unknown_vars_in_targetlist(PGParseState * pstate,
             tle->expr = (PGExpr *)coerce_unknown_var(pstate, (PGVar *)tle->expr, UNKNOWNOID, -1, PG_COERCION_IMPLICIT, COERCE_DONTCARE, 0);
         }
     }
+};
+
+Oid CoerceParser::enforce_generic_type_consistency(Oid * actual_arg_types, Oid * declared_arg_types,
+      int nargs, Oid rettype)
+{
+    int j;
+    bool have_generics = false;
+    bool have_unknowns = false;
+    Oid elem_typeid = InvalidOid;
+    Oid array_typeid = InvalidOid;
+    Oid array_typelem;
+    bool have_anyelement = (rettype == ANYELEMENTOID);
+
+    /*
+	 * Loop through the arguments to see if we have any that are ANYARRAY or
+	 * ANYELEMENT. If so, require the actual types to be self-consistent
+	 */
+    for (j = 0; j < nargs; j++)
+    {
+        Oid actual_type = actual_arg_types[j];
+
+        if (declared_arg_types[j] == ANYELEMENTOID)
+        {
+            have_generics = have_anyelement = true;
+            if (actual_type == UNKNOWNOID)
+            {
+                have_unknowns = true;
+                continue;
+            }
+            if (OidIsValid(elem_typeid) && actual_type != elem_typeid)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_DATATYPE_MISMATCH),
+                     errmsg("arguments declared \"anyelement\" are not all alike"),
+                     errdetail("%s versus %s", format_type_be(elem_typeid), format_type_be(actual_type))));
+            elem_typeid = actual_type;
+        }
+        else if (declared_arg_types[j] == ANYARRAYOID)
+        {
+            have_generics = true;
+            if (actual_type == UNKNOWNOID)
+            {
+                have_unknowns = true;
+                continue;
+            }
+            if (OidIsValid(array_typeid) && actual_type != array_typeid)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_DATATYPE_MISMATCH),
+                     errmsg("arguments declared \"anyarray\" are not all alike"),
+                     errdetail("%s versus %s", format_type_be(array_typeid), format_type_be(actual_type))));
+            array_typeid = actual_type;
+        }
+    }
+
+    /*
+	 * Fast Track: if none of the arguments are ANYARRAY or ANYELEMENT, return
+	 * the unmodified rettype.
+	 */
+    if (!have_generics)
+        return rettype;
+
+    /* Get the element type based on the array type, if we have one */
+    if (OidIsValid(array_typeid))
+    {
+        if (array_typeid == ANYARRAYOID && !have_anyelement)
+        {
+            /* Special case for ANYARRAY input: okay iff no ANYELEMENT */
+            array_typelem = InvalidOid;
+        }
+        else
+        {
+            array_typelem = get_element_type(array_typeid);
+            if (!OidIsValid(array_typelem))
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_DATATYPE_MISMATCH),
+                     errmsg("argument declared \"anyarray\" is not an array but type %s", format_type_be(array_typeid))));
+        }
+
+        if (!OidIsValid(elem_typeid))
+        {
+            /*
+			 * if we don't have an element type yet, use the one we just got
+			 */
+            elem_typeid = array_typelem;
+        }
+        else if (array_typelem != elem_typeid)
+        {
+            /* otherwise, they better match */
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_DATATYPE_MISMATCH),
+                 errmsg("argument declared \"anyarray\" is not consistent with argument declared \"anyelement\""),
+                 errdetail("%s versus %s", format_type_be(array_typeid), format_type_be(elem_typeid)),
+                 errOmitLocation(true)));
+        }
+    }
+    else if (!OidIsValid(elem_typeid))
+    {
+        /* Only way to get here is if all the generic args are UNKNOWN */
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_DATATYPE_MISMATCH),
+             errmsg("could not determine anyarray/anyelement type because input has type \"unknown\""),
+             errOmitLocation(true)));
+    }
+
+    /*
+	 * If we had any unknown inputs, re-scan to assign correct types
+	 */
+    if (have_unknowns)
+    {
+        for (j = 0; j < nargs; j++)
+        {
+            Oid actual_type = actual_arg_types[j];
+
+            if (actual_type != UNKNOWNOID)
+                continue;
+
+            if (declared_arg_types[j] == ANYELEMENTOID)
+                declared_arg_types[j] = elem_typeid;
+            else if (declared_arg_types[j] == ANYARRAYOID)
+            {
+                if (!OidIsValid(array_typeid))
+                {
+                    array_typeid = get_array_type(elem_typeid);
+                    if (!OidIsValid(array_typeid))
+                        ereport(
+                            ERROR,
+                            (errcode(ERRCODE_UNDEFINED_OBJECT),
+                             errmsg("could not find array type for data type %s", format_type_be(elem_typeid))));
+                }
+                declared_arg_types[j] = array_typeid;
+            }
+        }
+    }
+
+    /* if we return ANYARRAYOID use the appropriate argument type */
+    if (rettype == ANYARRAYOID)
+    {
+        if (!OidIsValid(array_typeid))
+        {
+            array_typeid = get_array_type(elem_typeid);
+            if (!OidIsValid(array_typeid))
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("could not find array type for data type %s", format_type_be(elem_typeid))));
+        }
+        return array_typeid;
+    }
+
+    /* if we return ANYELEMENTOID use the appropriate argument type */
+    if (rettype == ANYELEMENTOID)
+        return elem_typeid;
+
+    /* we don't return a generic type; send back the original return type */
+    return rettype;
 };
 
 }

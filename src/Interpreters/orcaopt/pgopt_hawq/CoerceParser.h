@@ -95,8 +95,12 @@ public:
         PGCoercionForm cformat,
         int levelsup);
 
-    void fixup_unknown_vars_in_targetlist(PGParseState * pstate,
-		duckdb_libpgquery::PGList * targetlist);
+    void fixup_unknown_vars_in_targetlist(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist);
+
+    Oid enforce_generic_type_consistency(Oid * actual_arg_types, Oid * declared_arg_types, int nargs, Oid rettype);
+
+    duckdb_libpgquery::PGNode * coerce_to_common_type(PGParseState * pstate, duckdb_libpgquery::PGNode * node,
+      Oid targetTypeId, const char * context);
 };
 
 }

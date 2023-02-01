@@ -4,6 +4,7 @@
 
 #include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/CTEParser.h>
+#include <Interpreters/orcaopt/pgopt_hawq/ExprParser.h>
 
 namespace DB
 {
@@ -13,6 +14,7 @@ class TargetParser
 private:
     RelationParser relation_parser;
     CTEParser cte_parser;
+    ExprParser expr_parser;
 public:
 	explicit TargetParser();
 
@@ -31,6 +33,16 @@ public:
 					 duckdb_libpgquery::PGVar *var, int levelsup);
 
     void markTargetListOrigins(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist);
+
+    TupleDesc expandRecordVariable(PGParseState * pstate, duckdb_libpgquery::PGVar * var, int levelsup);
+
+    duckdb_libpgquery::PGList * ExpandIndirectionStar(PGParseState * pstate, duckdb_libpgquery::PGAIndirection * ind, bool targetlist);
+
+    duckdb_libpgquery::PGList * ExpandColumnRefStar(PGParseState * pstate, duckdb_libpgquery::PGColumnRef * cref, bool targetlist);
+
+    duckdb_libpgquery::PGList * ExpandAllTables(PGParseState * pstate);
+
+    duckdb_libpgquery::PGList * transformExpressionList(PGParseState * pstate, duckdb_libpgquery::PGList * exprlist);
 };
 
 }
