@@ -1199,6 +1199,147 @@ PGList * ClauseParser::transformSortClause(PGParseState * pstate,
     return sortlist;
 };
 
+PGList * ClauseParser::findListTargetlistEntries(PGParseState * pstate, PGNode * node,
+        PGList ** tlist, bool in_grpext, bool ignore_in_grpext, bool useSQL99)
+{
+    PGList * result_list = NIL;
+
+    /*
+	 * In GROUP BY clauses, empty grouping set () is supported as 'NIL'
+	 * in the list. If this is the case, we simply skip it.
+	 */
+    if (node == NULL)
+        return result_list;
+
+    if (IsA(node, GroupingClause))
+    {
+        PGListCell * gl;
+        GroupingClause * gc = (GroupingClause *)node;
+
+        foreach (gl, gc->groupsets)
+        {
+            PGList * subresult_list;
+
+            subresult_list = findListTargetlistEntries(pstate, lfirst(gl), tlist, true, ignore_in_grpext, useSQL99);
+
+            result_list = list_concat(result_list, subresult_list);
+        }
+    }
+
+    /*
+	 * In GROUP BY clause, we handle RowExpr specially here. When
+	 * RowExprs appears immediately inside a grouping extension, we do
+	 * not want to append the target entries for their arguments into
+	 * result_list. This is because we do not want the order of
+	 * these target entries in the result list from transformGroupClause()
+	 * to be affected by ORDER BY.
+	 *
+	 * However, if ignore_in_grpext is set, we will always append
+	 * these target enties.
+	 */
+    else if (IsA(node, PGRowExpr))
+    {
+        PGList * args = ((PGRowExpr *)node)->args;
+        PGListCell * lc;
+
+        foreach (lc, args)
+        {
+            PGNode * rowexpr_arg = lfirst(lc);
+            PGTargetEntry * tle;
+
+            if (useSQL99)
+                tle = findTargetlistEntrySQL99(pstate, rowexpr_arg, tlist);
+            else
+                tle = findTargetlistEntrySQL92(pstate, rowexpr_arg, tlist, GROUP_CLAUSE);
+
+            /* If RowExpr does not appear immediately inside a GROUPING SETS,
+			 * we append its targetlit to the given targetlist.
+			 */
+            if (ignore_in_grpext || !in_grpext)
+                result_list = lappend(result_list, tle);
+        }
+    }
+
+    else
+    {
+        PGTargetEntry * tle;
+
+        if (useSQL99)
+            tle = findTargetlistEntrySQL99(pstate, node, tlist);
+        else
+            tle = findTargetlistEntrySQL92(pstate, node, tlist, GROUP_CLAUSE);
+
+        result_list = lappend(result_list, tle);
+    }
+
+    return result_list;
+};
+
+void ClauseParser::freeGroupList(PGList * grouplist)
+{
+    PGListCell * gl;
+
+    if (grouplist == NULL)
+        return;
+
+    foreach (gl, grouplist)
+    {
+        PGNode * node = (PGNode *)lfirst(gl);
+        if (node == NULL)
+            continue;
+        if (IsA(node, GroupingClause))
+        {
+            GroupingClause * gc = (GroupingClause *)node;
+            freeGroupList(gc->groupsets);
+            pfree(gc);
+        }
+
+        else
+        {
+            pfree(node);
+        }
+    }
+
+    pfree(grouplist);
+};
+
+PGList * ClauseParser::reorderGroupList(PGList * grouplist)
+{
+    PGList * result = NIL;
+    PGListCell * gl;
+    PGList * sub_list = NIL;
+
+    foreach (gl, grouplist)
+    {
+        PGNode * node = (PGNode *)lfirst(gl);
+
+        if (node == NULL)
+        {
+            /* Append an empty set. */
+            result = list_concat(result, list_make1(NIL));
+        }
+
+        else if (IsA(node, GroupingClause))
+        {
+            GroupingClause * gc = (GroupingClause *)node;
+            GroupingClause * new_gc = makeNode(GroupingClause);
+
+            new_gc->groupType = gc->groupType;
+            new_gc->groupsets = reorderGroupList(gc->groupsets);
+
+            sub_list = lappend(sub_list, new_gc);
+        }
+        else
+        {
+            PGNode * new_node = (PGNode *)copyObject(node);
+            result = lappend(result, new_node);
+        }
+    }
+
+    result = list_concat(result, sub_list);
+    return result;
+};
+
 PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
         PGList * grouplist, PGList ** targetlist,
         PGList * sortClause, bool useSQL99)
@@ -1337,18 +1478,18 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
 
         ctx.grp_tles = grp_tles;
         ctx.pstate = pstate;
-        expression_tree_walker((PGNode *)*targetlist, grouping_rewrite_walker, (void *)&ctx);
+        pg_expression_tree_walker((PGNode *)*targetlist, pg_grouping_rewrite_walker, (void *)&ctx);
 
         /*
 		 * The expression might be present in a window clause as well
 		 * so process those.
 		 */
-        expression_tree_walker((PGNode *)pstate->p_win_clauses, grouping_rewrite_walker, (void *)&ctx);
+        pg_expression_tree_walker((PGNode *)pstate->p_win_clauses, pg_grouping_rewrite_walker, (void *)&ctx);
 
         /*
 		 * The expression might be present in the having clause as well.
 		 */
-        expression_tree_walker(pstate->having_qual, grouping_rewrite_walker, (void *)&ctx);
+        pg_expression_tree_walker(pstate->having_qual, pg_grouping_rewrite_walker, (void *)&ctx);
     }
 
     list_free(tle_list);
