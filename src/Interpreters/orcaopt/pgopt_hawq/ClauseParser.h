@@ -5,6 +5,7 @@
 #include <Interpreters/orcaopt/pgopt_hawq/SelectParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/ExprParser.h>
+#include <Interpreters/orcaopt/pgopt_hawq/TargetParser.h>
 
 namespace DB
 {
@@ -16,6 +17,7 @@ private:
   SelectParser select_parser;
   CoerceParser coerce_parser;
   ExprParser expr_parser;
+  TargetParser target_parser;
 public:
 	explicit ClauseParser();
 
@@ -28,6 +30,8 @@ public:
     duckdb_libpgquery::PGRangeTblEntry * transformRangeSubselect(PGParseState * pstate,
         duckdb_libpgquery::PGRangeSubselect * r);
 
+    // duckdb_libpgquery::PGRangeTblEntry * transformRangeFunction(PGParseState * pstate, duckdb_libpgquery::PGRangeFunction * r);
+
     duckdb_libpgquery::PGNode * transformWhereClause(PGParseState * pstate,
         duckdb_libpgquery::PGNode * clause, const char * constructName);
 
@@ -38,6 +42,20 @@ public:
         int * top_rti,
         duckdb_libpgquery::PGList ** relnamespace,
         PGRelids * containedRels);
+
+    void
+    extractRemainingColumns(duckdb_libpgquery::PGList * common_colnames, duckdb_libpgquery::PGList * src_colnames,
+        duckdb_libpgquery::PGList * src_colvars, duckdb_libpgquery::PGList ** res_colnames,
+        duckdb_libpgquery::PGList ** res_colvars);
+
+    duckdb_libpgquery::PGNode * transformJoinUsingClause(PGParseState * pstate, duckdb_libpgquery::PGList * leftVars,
+        duckdb_libpgquery::PGList * rightVars);
+
+    duckdb_libpgquery::PGNode * transformJoinOnClause(
+        PGParseState * pstate, duckdb_libpgquery::PGJoinExpr * j, duckdb_libpgquery::PGRangeTblEntry * l_rte,
+        duckdb_libpgquery::PGRangeTblEntry * r_rte, duckdb_libpgquery::PGList * relnamespace,
+        PGRelids containedRels);
+
     duckdb_libpgqueryetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
         duckdb_libpgquery::PGNode * node, duckdb_libpgquery::PGList ** tlist, int clause);
 

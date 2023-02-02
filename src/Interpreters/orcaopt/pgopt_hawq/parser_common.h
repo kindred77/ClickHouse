@@ -128,6 +128,12 @@ struct PGParseState
 	void	   *p_ref_hook_state;	/* common passthrough link for above */
 };
 
+typedef struct ParseStateBreadCrumb
+{
+    duckdb_libpgquery::PGNode * node;
+    struct ParseStateBreadCrumb * pop;
+} ParseStateBreadCrumb;
+
 struct PGParseNamespaceItem
 {
 	duckdb_libpgquery::PGRangeTblEntry *p_rte;		/* The relation's rangetable entry */
@@ -508,6 +514,8 @@ static const int oldprecedence_r[] = {
 #define Min(x, y)		((x) < (y) ? (x) : (y))
 #define Max(x, y)		((x) > (y) ? (x) : (y))
 
+#define NameStr(name)	((name).data)
+
 size_t
 strlcpy(char *dst, const char *src, size_t siz)
 {
@@ -579,6 +587,15 @@ make_parsestate(PGParseState *parentParseState)
 	}
 
 	return pstate;
+};
+
+duckdb_libpgquery::PGValue * makeString(char * str)
+{
+    duckdb_libpgquery::PGValue * v = makeNode(duckdb_libpgquery::PGValue);
+
+    v->type = duckdb_libpgquery::T_PGString;
+    v->val.str = str;
+    return v;
 };
 
 void

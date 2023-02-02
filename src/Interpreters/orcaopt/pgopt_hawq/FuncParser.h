@@ -31,6 +31,11 @@ public:
         WindowSpec * over,
         int location,
         duckdb_libpgquery::PGNode * agg_filter);
+
+    int func_match_argtypes(
+        int nargs, Oid * input_typeids, FuncCandidateList raw_candidates, FuncCandidateList * candidates) /* return value */;
+
+    FuncCandidateList func_select_candidate(int nargs, Oid * input_typeids, FuncCandidateList candidates);
 };
 
 }

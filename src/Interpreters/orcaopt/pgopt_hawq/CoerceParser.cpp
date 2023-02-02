@@ -1198,4 +1198,17 @@ Oid CoerceParser::enforce_generic_type_consistency(Oid * actual_arg_types, Oid *
     return rettype;
 };
 
+void CoerceParser::fixup_unknown_vars_in_exprlist(PGParseState * pstate, PGList * exprlist)
+{
+    PGListCell * cell;
+
+    foreach (cell, exprlist)
+    {
+        if (IsA(lfirst(cell), PGVar) && ((PGVar *)lfirst(cell))->vartype == UNKNOWNOID)
+        {
+            lfirst(cell) = coerce_unknown_var(pstate, (PGVar *)lfirst(cell), UNKNOWNOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_DONTCARE, 0);
+        }
+    }
+};
+
 }

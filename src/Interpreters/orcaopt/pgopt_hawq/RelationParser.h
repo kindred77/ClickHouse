@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
+#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
 
 #include <Storages/IStorage.h>
 
@@ -12,7 +13,7 @@ namespace DB
 class RelationParser
 {
 private:
-
+    CoerceParser coerce_parser;
 public:
     explicit RelationParser();
 
@@ -81,6 +82,24 @@ public:
 
     duckdb_libpgquery::PGList * expandRelAttrs(PGParseState * pstate, duckdb_libpgquery::PGRangeTblEntry * rte,
         int rtindex, int sublevels_up, int location);
+
+    void expandRelation(Oid relid, duckdb_libpgquery::PGAlias * eref, int rtindex,
+        int sublevels_up, bool include_dropped, duckdb_libpgquery::PGList ** colnames,
+        duckdb_libpgquery::PGList ** colvars);
+
+    void buildRelationAliases(TupleDesc tupdesc, duckdb_libpgquery::PGAlias * alias,
+        duckdb_libpgquery::PGAlias * eref);
+
+    // duckdb_libpgquery::PGRangeTblEntry *
+    // addRangeTableEntryForFunction(PGParseState * pstate, char * funcname, duckdb_libpgquery::PGNode * funcexpr,
+    //     duckdb_libpgquery::PGRangeFunction * rangefunc, bool inFromCl);
+
+    void buildScalarFunctionAlias(duckdb_libpgquery::PGNode * funcexpr, char * funcname,
+        duckdb_libpgquery::PGAlias * alias, duckdb_libpgquery::PGAlias * eref);
+
+    duckdb_libpgquery::PGRangeTblEntry * addRangeTableEntryForJoin(PGParseState * pstate, duckdb_libpgquery::PGList * colnames,
+        duckdb_libpgquery::PGJoinType jointype, duckdb_libpgquery::PGList * aliasvars, duckdb_libpgquery::PGAlias * alias,
+        bool inFromCl);
 };
 
 }

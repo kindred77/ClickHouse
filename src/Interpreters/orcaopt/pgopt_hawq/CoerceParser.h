@@ -38,6 +38,22 @@ typedef enum
 	COERCION_METHOD_INOUT = 'i' /* use input/output functions */
 } CoercionMethod;
 
+typedef enum CATEGORY
+{
+	INVALID_TYPE,
+	UNKNOWN_TYPE,
+	GENERIC_TYPE,
+	BOOLEAN_TYPE,
+	STRING_TYPE,
+	BITSTRING_TYPE,
+	NUMERIC_TYPE,
+	DATETIME_TYPE,
+	TIMESPAN_TYPE,
+	GEOMETRIC_TYPE,
+	NETWORK_TYPE,
+	USER_TYPE
+} CATEGORY;
+
 class CoerceParser
 {
 private:
@@ -80,11 +96,9 @@ public:
         duckdb_libpgquery::PGCoercionForm cformat,
         int location);
 
-    duckdb_libpgquery::PGNode * coerce_to_boolean(PGParseState * pstate,
-		  duckdb_libpgquery::PGNode * node, const char * constructName);
+    duckdb_libpgquery::PGNode * coerce_to_boolean(PGParseState * pstate, duckdb_libpgquery::PGNode * node, const char * constructName);
 
-    duckdb_libpgquery::PGNode * coerce_to_bigint(PGParseState * pstate,
-      duckdb_libpgquery::PGNode * node, const char * constructName);
+    duckdb_libpgquery::PGNode * coerce_to_bigint(PGParseState * pstate, duckdb_libpgquery::PGNode * node, const char * constructName);
 
     duckdb_libpgquery::PGVar * coerce_unknown_var(
         PGParseState * pstate,
@@ -99,8 +113,10 @@ public:
 
     Oid enforce_generic_type_consistency(Oid * actual_arg_types, Oid * declared_arg_types, int nargs, Oid rettype);
 
-    duckdb_libpgquery::PGNode * coerce_to_common_type(PGParseState * pstate, duckdb_libpgquery::PGNode * node,
-      Oid targetTypeId, const char * context);
+    duckdb_libpgquery::PGNode *
+    coerce_to_common_type(PGParseState * pstate, duckdb_libpgquery::PGNode * node, Oid targetTypeId, const char * context);
+
+    void fixup_unknown_vars_in_exprlist(PGParseState * pstate, duckdb_libpgquery::PGList * exprlist);
 };
 
 }

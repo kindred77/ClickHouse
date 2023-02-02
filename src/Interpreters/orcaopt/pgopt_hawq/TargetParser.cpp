@@ -586,7 +586,7 @@ PGList * TargetParser::ExpandIndirectionStar(PGParseState * pstate, PGAIndirecti
     ind->indirection = list_truncate(ind->indirection, list_length(ind->indirection) - 1);
 
     /* And transform that */
-    expr = transformExpr(pstate, (PGNode *)ind);
+    expr = expr_parser.transformExpr(pstate, (PGNode *)ind);
 
     /*
 	 * Verify it's a composite type, and get the tupdesc.  We use

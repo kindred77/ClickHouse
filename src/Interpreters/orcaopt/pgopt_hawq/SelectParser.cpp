@@ -15,6 +15,37 @@ PGFromExpr * SelectParser::makeFromExpr(PGList *fromlist,
     return f;
 };
 
+void SelectParser::applyColumnNames(PGList * dst, PGList * src)
+{
+    PGListCell * dst_item;
+    PGListCell * src_item;
+
+    src_item = list_head(src);
+
+    foreach (dst_item, dst)
+    {
+        PGTargetEntry * d = (PGTargetEntry *)lfirst(dst_item);
+        PGColumnDef * s;
+
+        /* junk targets don't count */
+        if (d->resjunk)
+            continue;
+
+        /* fewer ColumnDefs than target entries is OK */
+        if (src_item == NULL)
+            break;
+
+        s = (PGColumnDef *)lfirst(src_item);
+        src_item = lnext(src_item);
+
+        d->resname = pstrdup(s->colname);
+    }
+
+    /* more ColumnDefs than target entries is not OK */
+    if (src_item != NULL)
+        ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), errmsg("CREATE TABLE AS specifies too many column names"), errOmitLocation(true)));
+};
+
 PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
         PGSelectStmt * stmt)
 {
@@ -263,12 +294,12 @@ PGQuery * SelectParser::transformStmt(
         //     result = transformUpdateStmt(pstate, (UpdateStmt *)parseTree);
         //     break;
 
-        case T_SelectStmt: {
+        case T_PGSelectStmt: {
             PGSelectStmt * n = (PGSelectStmt *)parseTree;
 
             if (n->valuesLists)
                 //result = transformValuesClause(pstate, n);
-            else if (n->op == SETOP_NONE)
+            else if (n->op == PG_SETOP_NONE)
                 result = transformSelectStmt(pstate, n);
             else
                 //result = transformSetOperationStmt(pstate, n);
@@ -358,7 +389,7 @@ SelectParser::do_parse_analyze(PGNode *parseTree, PGParseState *pstate)
    * nefarious: special KeepMe case in cdbpartition.c:atpxPart_validate_spec
    */
     if (pstate->parentParseState == NULL && query->utilityStmt
-        && (IsA(query->utilityStmt, CreateStmt) && ((CreateStmt *)query->utilityStmt)->base.partitionBy
+        && (IsA(query->utilityStmt, PGCreateStmt) && ((PGCreateStmt *)query->utilityStmt)->base.partitionBy
             || IsA(query->utilityStmt, CreateExternalStmt) && ((CreateExternalStmt *)query->utilityStmt)->base.partitionBy))
     {
         /*
@@ -377,7 +408,7 @@ SelectParser::do_parse_analyze(PGNode *parseTree, PGParseState *pstate)
 
             Assert(IsA(q, PGQuery));
 
-            if (IsA(q->utilityStmt, AlterTableStmt))
+            if (IsA(q->utilityStmt, PGAlterTableStmt))
                 alters = lappend(alters, q);
             else
                 others = lappend(others, q);
@@ -399,10 +430,10 @@ SelectParser::do_parse_analyze(PGNode *parseTree, PGParseState *pstate)
         alters = NIL;
         for (j = 0; j < i; j++)
         {
-            AlterTableStmt * n;
+            PGAlterTableStmt * n;
             alters = lappend(alters, stmts[j]);
 
-            n = (AlterTableStmt *)((PGQuery *)stmts[j])->utilityStmt;
+            n = (PGAlterTableStmt *)((PGQuery *)stmts[j])->utilityStmt;
         }
         result = list_concat(result, others);
         result = list_concat(result, alters);
@@ -422,12 +453,12 @@ SelectParser::do_parse_analyze(PGNode *parseTree, PGParseState *pstate)
 
         if (q == query)
         {
-            q->querySource = QSRC_ORIGINAL;
+            q->querySource = PG_QSRC_ORIGINAL;
             q->canSetTag = true;
         }
         else
         {
-            q->querySource = QSRC_PARSER;
+            q->querySource = PG_QSRC_PARSER;
             q->canSetTag = false;
         }
     }
@@ -439,20 +470,7 @@ PGList *
 SelectParser::parse_analyze(PGNode *parseTree, const char *sourceText, Oid *paramTypes,
                     int numParams)
 {
-	PGParseState *pstate = palloc0(sizeof(PGParseState));
-    pstate->parentParseState = parentParseState;
-
-    /* Fill in fields that don't start at null/false/zero */
-    pstate->p_next_resno = 1;
-
-    if (parentParseState)
-    {
-        pstate->p_sourcetext = parentParseState->p_sourcetext;
-        pstate->p_variableparams = parentParseState->p_variableparams;
-        pstate->p_setopTypes = parentParseState->p_setopTypes;
-        pstate->p_setopTypmods = parentParseState->p_setopTypmods;
-    }
-
+    PGParseState * pstate = node_parser.make_parsestate(NULL);
     PGList * result;
 
     pstate->p_sourcetext = sourceText;
@@ -462,19 +480,19 @@ SelectParser::parse_analyze(PGNode *parseTree, const char *sourceText, Oid *para
 
     result = do_parse_analyze(parseTree, pstate);
 
-    free_parsestate(&pstate);
+    node_parser.free_parsestate(&pstate);
 
     return result;
 };
 
 PGList * SelectParser::parse_sub_analyze(PGNode * parseTree, PGParseState * parentParseState)
 {
-    PGParseState * pstate = make_parsestate(parentParseState);
+    PGParseState * pstate = node_parser.make_parsestate(parentParseState);
     PGList * result;
 
     result = do_parse_analyze(parseTree, pstate);
 
-    free_parsestate(&pstate);
+    node_parser.free_parsestate(&pstate);
 
     return result;
 };

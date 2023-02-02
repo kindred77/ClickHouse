@@ -105,7 +105,7 @@ void CTEParser::analyzeCTE(PGParseState *pstate, PGCommonTableExpr *cte)
 
     PGList * queryList;
 
-    queryList = parse_sub_analyze(cte->ctequery, pstate);
+    queryList = select_parser.parse_sub_analyze(cte->ctequery, pstate);
     Assert(list_length(queryList) == 1);
 
     PGQuery * query = (PGQuery *)linitial(queryList);

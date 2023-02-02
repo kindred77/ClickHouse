@@ -3,6 +3,7 @@
 #include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
 #include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/NodeParser.h>
+#include <Interpreters/orcaopt/pgopt_hawq/SelectParser.h>
 
 namespace DB
 {
@@ -12,6 +13,7 @@ class CTEParser
 private:
 	RelationParser relation_parser;
 	NodeParser node_parser;
+	SelectParser select_parser;
 public:
 	explicit CTEParser();
 

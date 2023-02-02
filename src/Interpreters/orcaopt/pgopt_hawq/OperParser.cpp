@@ -5,6 +5,45 @@ namespace DB
 
 using namespace duckdb_libpgquery;
 
+FuncDetailCode OperParser::oper_select_candidate(int nargs, Oid * input_typeids, FuncCandidateList candidates,
+		Oid * operOid)
+{
+    int ncandidates;
+
+    /*
+	 * Delete any candidates that cannot actually accept the given input
+	 * types, whether directly or by coercion.
+	 */
+    ncandidates = func_parser.func_match_argtypes(nargs, input_typeids, candidates, &candidates);
+
+    /* Done if no candidate or only one candidate survives */
+    if (ncandidates == 0)
+    {
+        *operOid = InvalidOid;
+        return FUNCDETAIL_NOTFOUND;
+    }
+    if (ncandidates == 1)
+    {
+        *operOid = candidates->oid;
+        return FUNCDETAIL_NORMAL;
+    }
+
+    /*
+	 * Use the same heuristics as for ambiguous functions to resolve the
+	 * conflict.
+	 */
+    candidates = func_parser.func_select_candidate(nargs, input_typeids, candidates);
+
+    if (candidates)
+    {
+        *operOid = candidates->oid;
+        return FUNCDETAIL_NORMAL;
+    }
+
+    *operOid = InvalidOid;
+    return FUNCDETAIL_MULTIPLE; /* failed to select a best candidate */
+};
+
 Operator OperParser::right_oper(PGParseState * pstate, PGList * op,
 		Oid arg, bool noError, int location)
 {

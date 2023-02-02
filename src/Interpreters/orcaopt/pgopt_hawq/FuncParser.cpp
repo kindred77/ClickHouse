@@ -652,4 +652,276 @@ PGNode * FuncParser::ParseFuncOrColumn(
     return retval;
 };
 
+int FuncParser::func_match_argtypes(
+        int nargs, Oid * input_typeids, FuncCandidateList raw_candidates, FuncCandidateList * candidates)
+{
+    FuncCandidateList current_candidate;
+    FuncCandidateList next_candidate;
+    int ncandidates = 0;
+
+    *candidates = NULL;
+
+    for (current_candidate = raw_candidates; current_candidate != NULL; current_candidate = next_candidate)
+    {
+        next_candidate = current_candidate->next;
+        if (coerce_parser.can_coerce_type(nargs, input_typeids, current_candidate->args, PG_COERCION_IMPLICIT))
+        {
+            current_candidate->next = *candidates;
+            *candidates = current_candidate;
+            ncandidates++;
+        }
+    }
+
+    return ncandidates;
+};
+
+FuncCandidateList FuncParser::func_select_candidate(int nargs, Oid * input_typeids, FuncCandidateList candidates)
+{
+    FuncCandidateList current_candidate;
+    FuncCandidateList last_candidate;
+    Oid * current_typeids;
+    Oid current_type;
+    int i;
+    int ncandidates;
+    int nbestMatch, nmatch;
+    Oid input_base_typeids[FUNC_MAX_ARGS];
+    CATEGORY slot_category[FUNC_MAX_ARGS], current_category;
+    bool slot_has_preferred_type[FUNC_MAX_ARGS];
+    bool resolved_unknowns;
+
+    /* protect local fixed-size arrays */
+    if (nargs > FUNC_MAX_ARGS)
+        ereport(ERROR, (errcode(ERRCODE_TOO_MANY_ARGUMENTS), errmsg("cannot pass more than %d arguments to a function", FUNC_MAX_ARGS)));
+
+    /*
+	 * If any input types are domains, reduce them to their base types. This
+	 * ensures that we will consider functions on the base type to be "exact
+	 * matches" in the exact-match heuristic; it also makes it possible to do
+	 * something useful with the type-category heuristics. Note that this
+	 * makes it difficult, but not impossible, to use functions declared to
+	 * take a domain as an input datatype.	Such a function will be selected
+	 * over the base-type function only if it is an exact match at all
+	 * argument positions, and so was already chosen by our caller.
+	 */
+    for (i = 0; i < nargs; i++)
+        input_base_typeids[i] = getBaseType(input_typeids[i]);
+
+    /*
+	 * Run through all candidates and keep those with the most matches on
+	 * exact types. Keep all candidates if none match.
+	 */
+    ncandidates = 0;
+    nbestMatch = 0;
+    last_candidate = NULL;
+    for (current_candidate = candidates; current_candidate != NULL; current_candidate = current_candidate->next)
+    {
+        current_typeids = current_candidate->args;
+        nmatch = 0;
+        for (i = 0; i < nargs; i++)
+        {
+            if (input_base_typeids[i] != UNKNOWNOID && current_typeids[i] == input_base_typeids[i])
+                nmatch++;
+        }
+
+        /* take this one as the best choice so far? */
+        if ((nmatch > nbestMatch) || (last_candidate == NULL))
+        {
+            nbestMatch = nmatch;
+            candidates = current_candidate;
+            last_candidate = current_candidate;
+            ncandidates = 1;
+        }
+        /* no worse than the last choice, so keep this one too? */
+        else if (nmatch == nbestMatch)
+        {
+            last_candidate->next = current_candidate;
+            last_candidate = current_candidate;
+            ncandidates++;
+        }
+        /* otherwise, don't bother keeping this one... */
+    }
+
+    if (last_candidate) /* terminate rebuilt list */
+        last_candidate->next = NULL;
+
+    if (ncandidates == 1)
+        return candidates;
+
+    /*
+	 * Still too many candidates? Now look for candidates which have either
+	 * exact matches or preferred types at the args that will require
+	 * coercion. (Restriction added in 7.4: preferred type must be of same
+	 * category as input type; give no preference to cross-category
+	 * conversions to preferred types.)  Keep all candidates if none match.
+	 */
+    for (i = 0; i < nargs; i++) /* avoid multiple lookups */
+        slot_category[i] = coerce_parser.TypeCategory(input_base_typeids[i]);
+    ncandidates = 0;
+    nbestMatch = 0;
+    last_candidate = NULL;
+    for (current_candidate = candidates; current_candidate != NULL; current_candidate = current_candidate->next)
+    {
+        current_typeids = current_candidate->args;
+        nmatch = 0;
+        for (i = 0; i < nargs; i++)
+        {
+            if (input_base_typeids[i] != UNKNOWNOID)
+            {
+                if (current_typeids[i] == input_base_typeids[i] || coerce_parser.IsPreferredType(slot_category[i], current_typeids[i]))
+                    nmatch++;
+            }
+        }
+
+        if ((nmatch > nbestMatch) || (last_candidate == NULL))
+        {
+            nbestMatch = nmatch;
+            candidates = current_candidate;
+            last_candidate = current_candidate;
+            ncandidates = 1;
+        }
+        else if (nmatch == nbestMatch)
+        {
+            last_candidate->next = current_candidate;
+            last_candidate = current_candidate;
+            ncandidates++;
+        }
+    }
+
+    if (last_candidate) /* terminate rebuilt list */
+        last_candidate->next = NULL;
+
+    if (ncandidates == 1)
+        return candidates;
+
+    /*
+	 * Still too many candidates? Try assigning types for the unknown columns.
+	 *
+	 * NOTE: for a binary operator with one unknown and one non-unknown input,
+	 * we already tried the heuristic of looking for a candidate with the
+	 * known input type on both sides (see binary_oper_exact()). That's
+	 * essentially a special case of the general algorithm we try next.
+	 *
+	 * We do this by examining each unknown argument position to see if we can
+	 * determine a "type category" for it.	If any candidate has an input
+	 * datatype of STRING category, use STRING category (this bias towards
+	 * STRING is appropriate since unknown-type literals look like strings).
+	 * Otherwise, if all the candidates agree on the type category of this
+	 * argument position, use that category.  Otherwise, fail because we
+	 * cannot determine a category.
+	 *
+	 * If we are able to determine a type category, also notice whether any of
+	 * the candidates takes a preferred datatype within the category.
+	 *
+	 * Having completed this examination, remove candidates that accept the
+	 * wrong category at any unknown position.	Also, if at least one
+	 * candidate accepted a preferred type at a position, remove candidates
+	 * that accept non-preferred types.
+	 *
+	 * If we are down to one candidate at the end, we win.
+	 */
+    resolved_unknowns = false;
+    for (i = 0; i < nargs; i++)
+    {
+        bool have_conflict;
+
+        if (input_base_typeids[i] != UNKNOWNOID)
+            continue;
+        resolved_unknowns = true; /* assume we can do it */
+        slot_category[i] = INVALID_TYPE;
+        slot_has_preferred_type[i] = false;
+        have_conflict = false;
+        for (current_candidate = candidates; current_candidate != NULL; current_candidate = current_candidate->next)
+        {
+            current_typeids = current_candidate->args;
+            current_type = current_typeids[i];
+            current_category = coerce_parser.TypeCategory(current_type);
+            if (slot_category[i] == INVALID_TYPE)
+            {
+                /* first candidate */
+                slot_category[i] = current_category;
+                slot_has_preferred_type[i] = coerce_parser.IsPreferredType(current_category, current_type);
+            }
+            else if (current_category == slot_category[i])
+            {
+                /* more candidates in same category */
+                slot_has_preferred_type[i] |= coerce_parser.IsPreferredType(current_category, current_type);
+            }
+            else
+            {
+                /* category conflict! */
+                if (current_category == STRING_TYPE)
+                {
+                    /* STRING always wins if available */
+                    slot_category[i] = current_category;
+                    slot_has_preferred_type[i] = IsPreferredType(current_category, current_type);
+                }
+                else
+                {
+                    /*
+					 * Remember conflict, but keep going (might find STRING)
+					 */
+                    have_conflict = true;
+                }
+            }
+        }
+        if (have_conflict && slot_category[i] != STRING_TYPE)
+        {
+            /* Failed to resolve category conflict at this position */
+            resolved_unknowns = false;
+            break;
+        }
+    }
+
+    if (resolved_unknowns)
+    {
+        /* Strip non-matching candidates */
+        ncandidates = 0;
+        last_candidate = NULL;
+        for (current_candidate = candidates; current_candidate != NULL; current_candidate = current_candidate->next)
+        {
+            bool keepit = true;
+
+            current_typeids = current_candidate->args;
+            for (i = 0; i < nargs; i++)
+            {
+                if (input_base_typeids[i] != UNKNOWNOID)
+                    continue;
+                current_type = current_typeids[i];
+                current_category = coerce_parser.TypeCategory(current_type);
+                if (current_category != slot_category[i])
+                {
+                    keepit = false;
+                    break;
+                }
+                if (slot_has_preferred_type[i] && !coerce_parser.IsPreferredType(current_category, current_type))
+                {
+                    keepit = false;
+                    break;
+                }
+            }
+            if (keepit)
+            {
+                /* keep this candidate */
+                last_candidate = current_candidate;
+                ncandidates++;
+            }
+            else
+            {
+                /* forget this candidate */
+                if (last_candidate)
+                    last_candidate->next = current_candidate->next;
+                else
+                    candidates = current_candidate->next;
+            }
+        }
+        if (last_candidate) /* terminate rebuilt list */
+            last_candidate->next = NULL;
+    }
+
+    if (ncandidates == 1)
+        return candidates;
+
+    return NULL; /* failed to select a best candidate */
+};
+
 }

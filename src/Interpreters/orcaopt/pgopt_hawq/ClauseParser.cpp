@@ -215,6 +215,270 @@ PGNode * ClauseParser::transformWhereClause(PGParseState * pstate,
     return qual;
 };
 
+// PGRangeTblEntry * ClauseParser::transformRangeFunction(PGParseState * pstate, PGRangeFunction * r)
+// {
+//     PGNode * funcexpr;
+//     char * funcname;
+//     PGRangeTblEntry * rte;
+
+//     /*
+// 	 * Get function name for possible use as alias.  We use the same
+// 	 * transformation rules as for a SELECT output expression.	For a FuncCall
+// 	 * node, the result will be the function name, but it is possible for the
+// 	 * grammar to hand back other node types.
+// 	 */
+//     funcname = target_parser.FigureColname(r->funccallnode);
+
+//     if (funcname)
+//     {
+//         if (pg_strncasecmp(funcname, GP_DIST_RANDOM_NAME, sizeof(GP_DIST_RANDOM_NAME)) == 0)
+//         {
+//             /* OK, now we need to check the arguments and generate a RTE */
+//             PGFuncCall * fc;
+//             PGRangeVar * rel;
+
+//             fc = (PGFuncCall *)r->funccallnode;
+
+//             if (list_length(fc->args) != 1)
+//                 elog(ERROR, "Invalid %s syntax.", GP_DIST_RANDOM_NAME);
+
+//             if (IsA(linitial(fc->args), PGAConst))
+//             {
+//                 PGAConst * arg_val;
+//                 char * schemaname;
+//                 char * tablename;
+
+//                 arg_val = linitial(fc->args);
+//                 if (!IsA(&arg_val->val, String))
+//                 {
+//                     elog(ERROR, "%s: invalid argument type, non-string in value", GP_DIST_RANDOM_NAME);
+//                 }
+
+//                 schemaname = strVal(&arg_val->val);
+//                 tablename = strchr(schemaname, '.');
+//                 if (tablename)
+//                 {
+//                     *tablename = 0;
+//                     tablename++;
+//                 }
+//                 else
+//                 {
+//                     /* no schema */
+//                     tablename = schemaname;
+//                     schemaname = NULL;
+//                 }
+
+//                 /* Got the name of the table, now we need to build the RTE for the table. */
+//                 rel = makeRangeVar(NULL /*catalogname*/, schemaname, tablename, arg_val->location);
+//                 rel->location = arg_val->location;
+
+//                 rte = relation_parser.addRangeTableEntry(pstate, rel, r->alias, false, true);
+
+//                 /* Now we set our special attribute in the rte. */
+//                 rte->forceDistRandom = true;
+
+//                 return rte;
+//             }
+//             else
+//             {
+//                 elog(ERROR, "%s: invalid argument type", GP_DIST_RANDOM_NAME);
+//             }
+//         }
+//     }
+
+//     /*
+// 	 * Transform the raw expression.
+// 	 */
+//     funcexpr = expr_parser.transformExpr(pstate, r->funccallnode);
+
+//     /*
+// 	 * The function parameters cannot make use of any variables from other
+// 	 * FROM items.	(Compare to transformRangeSubselect(); the coding is
+// 	 * different though because we didn't parse as a sub-select with its own
+// 	 * level of namespace.)
+// 	 *
+// 	 * XXX this will need further work to support SQL99's LATERAL() feature,
+// 	 * wherein such references would indeed be legal.
+// 	 */
+//     if (pstate->p_relnamespace || pstate->p_varnamespace)
+//     {
+//         if (contain_vars_of_level(funcexpr, 0))
+//             ereport(
+//                 ERROR,
+//                 (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+//                  errmsg("function expression in FROM may not refer to other relations of same query level"),
+//                  errOmitLocation(true)));
+//     }
+
+//     /*
+// 	 * Disallow aggregate functions in the expression.	(No reason to postpone
+// 	 * this check until parseCheckAggregates.)
+// 	 */
+//     if (pstate->p_hasAggs)
+//     {
+//         if (checkExprHasAggs(funcexpr))
+//             ereport(
+//                 ERROR,
+//                 (errcode(ERRCODE_GROUPING_ERROR),
+//                  errmsg("cannot use aggregate function in function expression in FROM"),
+//                  errOmitLocation(true)));
+//     }
+
+//     /*
+// 	 * OK, build an RTE for the function.
+// 	 */
+//     rte = relation_parser.addRangeTableEntryForFunction(pstate, funcname, funcexpr, r, true);
+
+//     /*
+// 	 * If a coldeflist was supplied, ensure it defines a legal set of names
+// 	 * (no duplicates) and datatypes (no pseudo-types, for instance).
+// 	 * addRangeTableEntryForFunction looked up the type names but didn't check
+// 	 * them further than that.
+// 	 */
+//     if (r->coldeflist)
+//     {
+//         TupleDesc tupdesc;
+
+//         tupdesc = BuildDescFromLists(rte->eref->colnames, rte->funccoltypes, rte->funccoltypmods);
+//         CheckAttributeNamesTypes(tupdesc, RELKIND_COMPOSITE_TYPE);
+//     }
+
+//     return rte;
+// };
+
+PGNode * ClauseParser::transformJoinUsingClause(PGParseState * pstate, PGList * leftVars,
+        PGList * rightVars)
+{
+    PGNode * result = NULL;
+    PGListCell *lvars, *rvars;
+
+    /*
+	 * We cheat a little bit here by building an untransformed operator tree
+	 * whose leaves are the already-transformed Vars.  This is OK because
+	 * transformExpr() won't complain about already-transformed subnodes.
+	 */
+    forboth(lvars, leftVars, rvars, rightVars)
+    {
+        PGNode * lvar = (PGNode *)lfirst(lvars);
+        PGNode * rvar = (PGNode *)lfirst(rvars);
+        PGAExpr * e;
+
+        e = makeSimpleA_Expr(PG_AEXPR_OP, "=", copyObject(lvar), copyObject(rvar), -1);
+
+        if (result == NULL)
+            result = (PGNode *)e;
+        else
+        {
+            PGAExpr * a;
+
+            a = makeA_Expr(AEXPR_AND, NIL, result, (PGNode *)e, -1);
+            result = (PGNode *)a;
+        }
+    }
+
+    /*
+	 * Since the references are already Vars, and are certainly from the input
+	 * relations, we don't have to go through the same pushups that
+	 * transformJoinOnClause() does.  Just invoke transformExpr() to fix up
+	 * the operators, and we're done.
+	 */
+    result = expr_parser.transformExpr(pstate, result);
+
+    result = coerce_parser.coerce_to_boolean(pstate, result, "JOIN/USING");
+
+    return result;
+};
+
+PGNode * ClauseParser::transformJoinOnClause(
+        PGParseState * pstate, PGJoinExpr * j, PGRangeTblEntry * l_rte,
+        PGRangeTblEntry * r_rte, PGList * relnamespace,
+        PGRelids containedRels)
+{
+    PGNode * result;
+    PGList * save_relnamespace;
+    PGList * save_varnamespace;
+    PGRelids clause_varnos;
+    int varno;
+
+    /*
+	 * This is a tad tricky, for two reasons.  First, the namespace that the
+	 * join expression should see is just the two subtrees of the JOIN plus
+	 * any outer references from upper pstate levels.  So, temporarily set
+	 * this pstate's namespace accordingly.  (We need not check for refname
+	 * conflicts, because transformFromClauseItem() already did.) NOTE: this
+	 * code is OK only because the ON clause can't legally alter the namespace
+	 * by causing implicit relation refs to be added.
+	 */
+    save_relnamespace = pstate->p_relnamespace;
+    save_varnamespace = pstate->p_varnamespace;
+
+    pstate->p_relnamespace = relnamespace;
+    pstate->p_varnamespace = list_make2(l_rte, r_rte);
+
+    result = transformWhereClause(pstate, j->quals, "JOIN/ON");
+
+    pstate->p_relnamespace = save_relnamespace;
+    pstate->p_varnamespace = save_varnamespace;
+
+    /*
+	 * Second, we need to check that the ON condition doesn't refer to any
+	 * rels outside the input subtrees of the JOIN.  It could do that despite
+	 * our hack on the namespace if it uses fully-qualified names. So, grovel
+	 * through the transformed clause and make sure there are no bogus
+	 * references.	(Outer references are OK, and are ignored here.)
+	 */
+    clause_varnos = pull_varnos(result);
+    clause_varnos = bms_del_members(clause_varnos, containedRels);
+    if ((varno = bms_first_member(clause_varnos)) >= 0)
+    {
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+             errmsg("JOIN/ON clause refers to \"%s\", which is not part of JOIN", rt_fetch(varno, pstate->p_rtable)->eref->aliasname)));
+    }
+    bms_free(clause_varnos);
+
+    return result;
+};
+
+void ClauseParser::extractRemainingColumns(PGList * common_colnames, PGList * src_colnames,
+        PGList * src_colvars, PGList ** res_colnames,
+        PGList ** res_colvars)
+{
+    PGList * new_colnames = NIL;
+    PGList * new_colvars = NIL;
+    PGListCell *lnames, *lvars;
+
+    Assert(list_length(src_colnames) == list_length(src_colvars));
+
+    forboth(lnames, src_colnames, lvars, src_colvars)
+    {
+        char * colname = strVal(lfirst(lnames));
+        bool match = false;
+        PGListCell * cnames;
+
+        foreach (cnames, common_colnames)
+        {
+            char * ccolname = strVal(lfirst(cnames));
+
+            if (strcmp(colname, ccolname) == 0)
+            {
+                match = true;
+                break;
+            }
+        }
+
+        if (!match)
+        {
+            new_colnames = lappend(new_colnames, lfirst(lnames));
+            new_colvars = lappend(new_colvars, lfirst(lvars));
+        }
+    }
+
+    *res_colnames = new_colnames;
+    *res_colvars = new_colvars;
+};
+
 PGNode * ClauseParser::transformFromClauseItem(
         PGParseState * pstate, PGNode * n,
         PGRangeTblEntry ** top_rte, int * top_rti,
@@ -288,25 +552,25 @@ PGNode * ClauseParser::transformFromClauseItem(
 		rtr->rtindex = rtindex;
 		result = (PGNode *) rtr;
 	}
-	else if (IsA(n, PGRangeFunction))
-	{
-		/* function is like a plain relation */
-		PGRangeTblRef *rtr;
-		PGRangeTblEntry *rte;
-		int			rtindex;
+	// else if (IsA(n, PGRangeFunction))
+	// {
+	// 	/* function is like a plain relation */
+	// 	PGRangeTblRef *rtr;
+	// 	PGRangeTblEntry *rte;
+	// 	int			rtindex;
 
-		rte = transformRangeFunction(pstate, (PGRangeFunction *) n);
-		/* assume new rte is at end */
-		rtindex = list_length(pstate->p_rtable);
-		Assert(rte == rt_fetch(rtindex, pstate->p_rtable));
-		*top_rte = rte;
-		*top_rti = rtindex;
-		*relnamespace = list_make1(rte);
-		*containedRels = bms_make_singleton(rtindex);
-		rtr = makeNode(PGRangeTblRef);
-		rtr->rtindex = rtindex;
-		result = (PGNode *) rtr;
-	}
+	// 	rte = transformRangeFunction(pstate, (PGRangeFunction *) n);
+	// 	/* assume new rte is at end */
+	// 	rtindex = list_length(pstate->p_rtable);
+	// 	Assert(rte == rt_fetch(rtindex, pstate->p_rtable));
+	// 	*top_rte = rte;
+	// 	*top_rti = rtindex;
+	// 	*relnamespace = list_make1(rte);
+	// 	*containedRels = bms_make_singleton(rtindex);
+	// 	rtr = makeNode(PGRangeTblRef);
+	// 	rtr->rtindex = rtindex;
+	// 	result = (PGNode *) rtr;
+	// }
 	else if (IsA(n, PGJoinExpr))
 	{
 		/* A newfangled join expression */
@@ -558,7 +822,7 @@ PGNode * ClauseParser::transformFromClauseItem(
 		/*
 		 * Now build an RTE for the result of the join
 		 */
-		rte = addRangeTableEntryForJoin(pstate,
+		rte = relation_parser.addRangeTableEntryForJoin(pstate,
 										res_colnames,
 										j->jointype,
 										res_colvars,
@@ -625,7 +889,7 @@ void ClauseParser::transformFromClause(PGParseState * pstate, PGList * frmList)
         PGRelids containedRels = NULL;
 
         n = transformFromClauseItem(pstate, n, &rte, &rtindex, &relnamespace, &containedRels);
-        checkNameSpaceConflicts(pstate, pstate->p_relnamespace, relnamespace);
+        relation_parser.checkNameSpaceConflicts(pstate, pstate->p_relnamespace, relnamespace);
         pstate->p_joinlist = lappend(pstate->p_joinlist, n);
         pstate->p_relnamespace = list_concat(pstate->p_relnamespace, relnamespace);
         pstate->p_varnamespace = lappend(pstate->p_varnamespace, rte);
@@ -662,7 +926,7 @@ PGTargetEntry * ClauseParser::findTargetlistEntrySQL99(PGParseState * pstate,
 	 * end of the target list.	This target is given resjunk = TRUE so that it
 	 * will not be projected into the final tuple.
 	 */
-    target_result = transformTargetEntry(pstate, node, expr, NULL, true);
+    target_result = target_parser.transformTargetEntry(pstate, node, expr, NULL, true);
 
     *tlist = lappend(*tlist, target_result);
 
@@ -851,7 +1115,7 @@ PGList * ClauseParser::addTargetToSortList(
     /* avoid making duplicate sortlist entries */
     if (!targetIsInSortGroupList(tle, sortlist))
     {
-        PGSortClause * sortcl = makeNode(PGSortClause);
+        SortClause * sortcl = makeNode(SortClause);
         Oid restype = exprType((PGNode *)tle->expr);
 
         /* if tlist item is an UNKNOWN literal, change it to TEXT */

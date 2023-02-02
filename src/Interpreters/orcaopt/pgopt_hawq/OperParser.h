@@ -16,6 +16,9 @@ private:
 public:
 	explicit OperParser();
 
+    FuncDetailCode oper_select_candidate(int nargs, Oid * input_typeids, FuncCandidateList candidates,
+		Oid * operOid) /* output argument */;
+
     Operator right_oper(PGParseState * pstate, duckdb_libpgquery::PGList * op,
 		Oid arg, bool noError, int location);
 

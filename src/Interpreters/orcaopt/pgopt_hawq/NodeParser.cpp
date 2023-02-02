@@ -96,4 +96,39 @@ PGConst * NodeParser::make_const(PGParseState * pstate,
     return con;
 };
 
+PGParseState * NodeParser::make_parsestate(PGParseState * parentParseState)
+{
+    PGParseState * pstate;
+
+    pstate = palloc0(sizeof(PGParseState));
+
+    pstate->parentParseState = parentParseState;
+
+    /* Fill in fields that don't start at null/false/zero */
+    pstate->p_next_resno = 1;
+
+    if (parentParseState)
+    {
+        pstate->p_sourcetext = parentParseState->p_sourcetext;
+        pstate->p_variableparams = parentParseState->p_variableparams;
+        pstate->p_setopTypes = parentParseState->p_setopTypes;
+        pstate->p_setopTypmods = parentParseState->p_setopTypmods;
+    }
+
+    return pstate;
+};
+
+void NodeParser::free_parsestate(PGParseState ** pstate)
+{
+    if (pstate == NULL || *pstate == NULL)
+        return; /* already freed? */
+
+    if ((*pstate)->p_namecache)
+        hash_destroy((*pstate)->p_namecache);
+
+    pfree(*pstate);
+    *pstate = NULL;
+    return;
+};
+
 }

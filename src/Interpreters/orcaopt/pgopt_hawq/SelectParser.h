@@ -5,6 +5,7 @@
 #include <Interpreters/orcaopt/pgopt_hawq/ClauseParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/AggParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/TargetParser.h>
+#include <Interpreters/orcaopt/pgopt_hawq/NodeParser.h>
 
 namespace DB
 {
@@ -16,8 +17,11 @@ private:
     ClauseParser clause_parser;
     AggParser agg_parser;
     TargetParser target_parser;
+    NodeParser node_parser;
 public:
 	explicit SelectParser();
+
+    void applyColumnNames(duckdb_libpgquery::PGList * dst, duckdb_libpgquery::PGList * src);
 
     duckdb_libpgquery::PGQuery * transformSelectStmt(PGParseState * pstate,
         duckdb_libpgquery::PGSelectStmt * stmt);
