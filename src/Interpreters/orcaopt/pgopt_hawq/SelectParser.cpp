@@ -297,12 +297,14 @@ PGQuery * SelectParser::transformStmt(
         case T_PGSelectStmt: {
             PGSelectStmt * n = (PGSelectStmt *)parseTree;
 
-            if (n->valuesLists)
-                //result = transformValuesClause(pstate, n);
-            else if (n->op == PG_SETOP_NONE)
-                result = transformSelectStmt(pstate, n);
-            else
-                //result = transformSetOperationStmt(pstate, n);
+            // if (n->valuesLists)
+            //     result = transformValuesClause(pstate, n);
+            // else if (n->op == PG_SETOP_NONE)
+            //     result = transformSelectStmt(pstate, n);
+            // else
+            //     result = transformSetOperationStmt(pstate, n);
+            if (n->op == PG_SETOP_NONE)
+                 result = transformSelectStmt(pstate, n);
         }
         break;
 

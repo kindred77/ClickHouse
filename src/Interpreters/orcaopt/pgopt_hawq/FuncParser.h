@@ -3,6 +3,7 @@
 #include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
 
 #include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
+#include <Interpreters/orcaopt/pgopt_hawq/AggParser.h>
 
 namespace DB
 {
@@ -11,6 +12,7 @@ class FuncParser
 {
 private:
     CoerceParser coerce_parser;
+    AggParser agg_parser;
 public:
 	explicit FuncParser();
 
@@ -28,7 +30,7 @@ public:
         bool agg_distinct,
         bool func_variadic,
         bool is_column,
-        WindowSpec * over,
+        duckdb_libpgquery::PGWindowDef * over,
         int location,
         duckdb_libpgquery::PGNode * agg_filter);
 

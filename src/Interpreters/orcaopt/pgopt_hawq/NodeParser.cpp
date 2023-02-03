@@ -1,8 +1,9 @@
 #include <Interpreters/orcaopt/pgopt_hawq/NodeParser.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
-using namespace duckdb_libpgquery;
 
 PGConst * NodeParser::make_const(PGParseState * pstate,
 		PGValue * value, int location)

@@ -16,42 +16,69 @@ namespace DB
 
 typedef struct pg_grouping_rewrite_ctx
 {
-    PGList * grp_tles;
+    duckdb_libpgquery::PGList * grp_tles;
     PGParseState * pstate;
 } pg_grouping_rewrite_ctx;
 
 bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context)
 {
+    using duckdb_libpgquery::PGListCell;
+    using duckdb_libpgquery::PGList;
+    using duckdb_libpgquery::PGNode;
+    using duckdb_libpgquery::PGTargetEntry;
+    using duckdb_libpgquery::PGRangeTblEntry;
+    using duckdb_libpgquery::PGVar;
+    using duckdb_libpgquery::PGRowExpr;
+
+    using duckdb_libpgquery::PGAExpr;
+    using duckdb_libpgquery::PGColumnRef;
+    using duckdb_libpgquery::PGAConst;
+    using duckdb_libpgquery::PGTypeCast;
+    using duckdb_libpgquery::PGGroupingFunc;
+    using duckdb_libpgquery::PGSortBy;
+    using duckdb_libpgquery::T_PGAExpr;
+    using duckdb_libpgquery::T_PGColumnRef;
+    using duckdb_libpgquery::T_PGAConst;
+    using duckdb_libpgquery::T_PGTypeCast;
+    using duckdb_libpgquery::T_PGGroupingFunc;
+    using duckdb_libpgquery::T_PGVar;
+    using duckdb_libpgquery::T_PGRowExpr;
+    using duckdb_libpgquery::T_PGSortBy;
+
+    using duckdb_libpgquery::errcode;
+    using duckdb_libpgquery::errmsg;
+    using duckdb_libpgquery::makeInteger;
+
     pg_grouping_rewrite_ctx * ctx = (pg_grouping_rewrite_ctx *)context;
 
     if (node == NULL)
         return false;
 
-    if (IsA(node, duckdb_libpgquery::PGAConst))
+    if (IsA(node, PGAConst))
     {
         return false;
     }
-    else if (IsA(node, duckdb_libpgquery::PGAExpr))
+    else if (IsA(node, PGAExpr))
     {
         /* could be seen inside an untransformed window clause */
         return false;
     }
-    else if (IsA(node, duckdb_libpgquery::PGColumnRef))
+    else if (IsA(node, PGColumnRef))
     {
         /* could be seen inside an untransformed window clause */
         return false;
     }
-    else if (IsA(node, duckdb_libpgquery::PGTypeCast))
+    else if (IsA(node, PGTypeCast))
     {
         return false;
     }
-    else if (IsA(node, duckdb_libpgquery::PGGroupingFunc))
+    else if (IsA(node, PGGroupingFunc))
     {
-        duckdb_libpgquery::PGGroupingFunc * gf = (duckdb_libpgquery::PGGroupingFunc *)node;
-        duckdb_libpgquery::PGListCell * arg_lc;
-        duckdb_libpgquery::PGList * newargs = NIL;
+        PGGroupingFunc * gf = (PGGroupingFunc *)node;
+        PGListCell * arg_lc;
+        PGList * newargs = NIL;
 
-        gf->ngrpcols = list_length(ctx->grp_tles);
+        //gf->ngrpcols = list_length(ctx->grp_tles);
 
         /*
 		 * For each argument in gf->args, find its position in grp_tles,
@@ -61,14 +88,14 @@ bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context
         foreach (arg_lc, gf->args)
         {
             long i = 0;
-            duckdb_libpgquery::PGNode * node = lfirst(arg_lc);
-            duckdb_libpgquery::PGListCell * grp_lc = NULL;
+            PGNode * node_arg = (PGNode *)lfirst(arg_lc);
+            PGListCell * grp_lc = NULL;
 
             foreach (grp_lc, ctx->grp_tles)
             {
-                duckdb_libpgquery::PGTargetEntry * grp_tle = (duckdb_libpgquery::PGTargetEntry *)lfirst(grp_lc);
+                PGTargetEntry * grp_tle = (PGTargetEntry *)lfirst(grp_lc);
 
-                if (equal(grp_tle->expr, node))
+                if (equal(grp_tle->expr, node_arg))
                     break;
                 i++;
             }
@@ -76,31 +103,31 @@ bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context
             /* Find a column not in GROUP BY clause */
             if (grp_lc == NULL)
             {
-                duckdb_libpgquery::PGRangeTblEntry * rte;
+                PGRangeTblEntry * rte;
                 const char * attname;
-                duckdb_libpgquery::PGVar * var = (duckdb_libpgquery::PGVar *)node;
+                PGVar * var = (PGVar *)node_arg;
 
                 /* Do not allow expressions inside a grouping function. */
-                if (IsA(node, duckdb_libpgquery::PGRowExpr))
+                if (IsA(node_arg, PGRowExpr))
                     ereport(
                         ERROR,
                         (errcode(ERRCODE_GROUPING_ERROR),
                          errmsg("row type can not be used inside a grouping function."),
                          errOmitLocation(true)));
 
-                if (!IsA(node, duckdb_libpgquery::PGVar))
+                if (!IsA(node_arg, PGVar))
                     ereport(
                         ERROR,
                         (errcode(ERRCODE_GROUPING_ERROR),
                          errmsg("expression in a grouping fuction does not appear in GROUP BY."),
                          errOmitLocation(true)));
 
-                Assert(IsA(node, duckdb_libpgquery::PGVar));
-                Assert(var->varno > 0);
-                Assert(var->varno <= list_length(ctx->pstate->p_rtable));
+                Assert(IsA(node_arg, PGVar))
+                Assert(var->varno > 0)
+                Assert(var->varno <= list_length(ctx->pstate->p_rtable))
 
                 rte = rt_fetch(var->varno, ctx->pstate->p_rtable);
-                attname = get_rte_attribute_name(rte, var->varattno);
+                attname = RelationParser::get_rte_attribute_name(rte, var->varattno);
 
                 ereport(
                     ERROR,
@@ -116,17 +143,17 @@ bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context
         list_free_deep(gf->args);
         gf->args = newargs;
     }
-    else if (IsA(node, duckdb_libpgquery::PGSortBy))
+    else if (IsA(node, PGSortBy))
     {
         /*
 		 * When WindowSpec leaves the main parser, partition and order
 		 * clauses will be lists of SortBy structures. Process them here to
 		 * avoid muddying up the expression_tree_walker().
 		 */
-        duckdb_libpgquery::PGSortBy * s = (duckdb_libpgquery::PGSortBy *)node;
+        PGSortBy * s = (PGSortBy *)node;
         return pg_grouping_rewrite_walker(s->node, context);
     }
-    return pg_expression_tree_walker(node, pg_grouping_rewrite_walker, context);
+    return pg_expression_tree_walker(node, (walker_func)pg_grouping_rewrite_walker, context);
 };
 
 class ClauseParser
@@ -175,7 +202,7 @@ public:
         duckdb_libpgquery::PGRangeTblEntry * r_rte, duckdb_libpgquery::PGList * relnamespace,
         PGRelids containedRels);
 
-    duckdb_libpgqueryetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
+    duckdb_libpgqueryet::TargetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
         duckdb_libpgquery::PGNode * node, duckdb_libpgquery::PGList ** tlist, int clause);
 
     bool targetIsInSortGroupList(duckdb_libpgquery::PGTargetEntry * tle,

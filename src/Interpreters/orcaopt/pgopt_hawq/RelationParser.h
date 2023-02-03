@@ -3,8 +3,6 @@
 #include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
 #include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
 
-#include <Storages/IStorage.h>
-
 #include <optional>
 
 namespace DB
@@ -100,6 +98,17 @@ public:
     duckdb_libpgquery::PGRangeTblEntry * addRangeTableEntryForJoin(PGParseState * pstate, duckdb_libpgquery::PGList * colnames,
         duckdb_libpgquery::PGJoinType jointype, duckdb_libpgquery::PGList * aliasvars, duckdb_libpgquery::PGAlias * alias,
         bool inFromCl);
+
+    void expandTupleDesc(
+        TupleDesc tupdesc,
+        duckdb_libpgquery::PGAlias * eref,
+        int rtindex,
+        int sublevels_up,
+        bool include_dropped,
+        duckdb_libpgquery::PGList ** colnames,
+        duckdb_libpgquery::PGList ** colvars);
+
+    static char * get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, PGAttrNumber attnum);
 };
 
 }

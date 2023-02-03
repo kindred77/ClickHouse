@@ -115,7 +115,7 @@ PGNode * FuncParser::ParseFuncOrColumn(
         bool agg_distinct,
         bool func_variadic,
         bool is_column,
-        WindowSpec * over,
+        PGWindowDef * over,
         int location,
         PGNode * agg_filter)
 {
@@ -516,7 +516,7 @@ PGNode * FuncParser::ParseFuncOrColumn(
             int winspec = 0;
             PGListCell * over_lc = NULL;
 
-            transformWindowSpec(pstate, over);
+            agg_parser.transformWindowSpec(pstate, over);
 
             foreach (over_lc, pstate->p_win_clauses)
             {

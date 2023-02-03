@@ -55,7 +55,7 @@ int TargetParser::FigureColnameInternal(PGNode * node, char ** name)
         }
         break;
         case T_PGFuncCall:
-            *name = strVal(llast(((FuncCall *)node)->funcname));
+            *name = strVal(llast(((PGFuncCall *)node)->funcname));
             return 2;
         case T_PGAExpr:
             /* make nullif() act like a regular function */

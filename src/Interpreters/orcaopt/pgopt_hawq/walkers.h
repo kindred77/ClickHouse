@@ -64,7 +64,7 @@ typedef struct
 	bool		        ignore_min_sublevels_up;
 } IncrementVarSublevelsUp_context;
 
-typedef bool (*walker_func) (duckdb_libpgquery::PGNode *node, assign_collations_context *context);
+typedef bool (*walker_func) (duckdb_libpgquery::PGNode *node, void *context);
 
 extern bool
 pg_expression_tree_walker(duckdb_libpgquery::PGNode *node,

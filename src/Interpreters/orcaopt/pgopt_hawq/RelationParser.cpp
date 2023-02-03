@@ -174,6 +174,63 @@ PGRangeTblEntry * RelationParser::GetRTEByRangeTablePosn(
     return rt_fetch(varno, pstate->p_rtable);
 };
 
+void RelationParser::expandTupleDesc(
+        TupleDesc tupdesc,
+        PGAlias * eref,
+        int rtindex,
+        int sublevels_up,
+        bool include_dropped,
+        PGList ** colnames,
+        PGList ** colvars)
+{
+    int maxattrs = tupdesc->natts;
+    int numaliases = list_length(eref->colnames);
+    int varattno;
+
+    for (varattno = 0; varattno < maxattrs; varattno++)
+    {
+        Form_pg_attribute attr = tupdesc->attrs[varattno];
+
+        if (attr->attisdropped)
+        {
+            if (include_dropped)
+            {
+                if (colnames)
+                    *colnames = lappend(*colnames, makeString(pstrdup("")));
+                if (colvars)
+                {
+                    /*
+					 * can't use atttypid here, but it doesn't really matter
+					 * what type the Const claims to be.
+					 */
+                    *colvars = lappend(*colvars, makeNullConst(INT4OID, -1));
+                }
+            }
+            continue;
+        }
+
+        if (colnames)
+        {
+            char * label;
+
+            if (varattno < numaliases)
+                label = strVal(list_nth(eref->colnames, varattno));
+            else
+                label = NameStr(attr->attname);
+            *colnames = lappend(*colnames, makeString(pstrdup(label)));
+        }
+
+        if (colvars)
+        {
+            PGVar * varnode;
+
+            varnode = makeVar(rtindex, attr->attnum, attr->atttypid, attr->atttypmod, sublevels_up);
+
+            *colvars = lappend(*colvars, varnode);
+        }
+    }
+};
+
 void RelationParser::expandRelation(Oid relid, PGAlias * eref, int rtindex,
         int sublevels_up, bool include_dropped, PGList ** colnames,
         PGList ** colvars)
@@ -1409,6 +1466,62 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForJoin(PGParseState * pstat
         pstate->p_rtable = lappend(pstate->p_rtable, rte);
 
     return rte;
+};
+
+char * RelationParser::get_rte_attribute_name(PGRangeTblEntry * rte, PGAttrNumber attnum)
+{
+    const char * name;
+
+    if (attnum == InvalidAttrNumber)
+        return "*";
+
+    /*
+	 * If there is a user-written column alias, use it.
+	 */
+    if (rte->alias && attnum > 0 && attnum <= list_length(rte->alias->colnames))
+        return strVal(list_nth(rte->alias->colnames, attnum - 1));
+
+    /*
+     * CDB: Pseudo columns have negative attribute numbers below the
+     * lowest system attribute number.
+     */
+    if (attnum <= FirstLowInvalidHeapAttributeNumber)
+    {
+        CdbRelColumnInfo * rci = cdb_rte_find_pseudo_column(rte, attnum);
+
+        if (!rci)
+            goto bogus;
+        return rci->colname;
+    }
+
+    /*
+	 * If the RTE is a relation, go to the system catalogs not the
+	 * eref->colnames list.  This is a little slower but it will give the
+	 * right answer if the column has been renamed since the eref list was
+	 * built (which can easily happen for rules).
+	 */
+    if (rte->rtekind == PG_RTE_RELATION)
+        return get_relid_attribute_name(rte->relid, attnum);
+
+    /*
+	 * Otherwise use the column name from eref.  There should always be one.
+	 */
+    if (rte->eref != NULL && attnum > 0 && attnum <= list_length(rte->eref->colnames))
+        return strVal(list_nth(rte->eref->colnames, attnum - 1));
+
+    /* CDB: Get name of sysattr even if relid is no good (e.g. SubqueryScan) */
+    if (attnum < 0 && attnum > FirstLowInvalidHeapAttributeNumber)
+    {
+        Form_pg_attribute att_tup = SystemAttributeDefinition(attnum, true);
+
+        return NameStr(att_tup->attname);
+    }
+
+bogus:
+    /* else caller gave us a bogus attnum */
+    name = (rte->eref && rte->eref->aliasname) ? rte->eref->aliasname : "*BOGUS*";
+    ereport(WARNING, (errcode(ERRCODE_INTERNAL_ERROR), errmsg_internal("invalid attnum %d for rangetable entry %s", attnum, name)));
+    return "*BOGUS*";
 };
 
 }

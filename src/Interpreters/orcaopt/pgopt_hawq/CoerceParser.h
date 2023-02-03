@@ -57,18 +57,18 @@ typedef enum CATEGORY
 class CoerceParser
 {
 private:
-	FuncParser func_parser;
-	TypeParser type_parser;
-	RelationParser relation_parser;
+    FuncParser func_parser;
+    TypeParser type_parser;
+    RelationParser relation_parser;
 public:
-	explicit CoerceParser();
+    explicit CoerceParser();
 
     bool check_generic_type_consistency(Oid * actual_arg_types, Oid * declared_arg_types, int nargs);
 
     bool IsPreferredType(CATEGORY category, Oid type);
 
     bool find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
-		CoercionContext ccontext, Oid * funcid);
+		duckdb_libpgquery::PGCoercionContext ccontext, Oid * funcid);
 
     bool can_coerce_type(int nargs, Oid * input_typeids, Oid * target_typeids, duckdb_libpgquery::PGCoercionContext ccontext);
 
@@ -105,8 +105,8 @@ public:
         duckdb_libpgquery::PGVar * var,
         Oid targetTypeId,
         int32 targetTypeMod,
-        PGCoercionContext ccontext,
-        PGCoercionForm cformat,
+        duckdb_libpgquery::PGCoercionContext ccontext,
+        duckdb_libpgquery::PGCoercionForm cformat,
         int levelsup);
 
     void fixup_unknown_vars_in_targetlist(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist);

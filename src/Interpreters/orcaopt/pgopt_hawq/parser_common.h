@@ -3,6 +3,9 @@
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wold-style-cast"
 #pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#pragma clang diagnostic ignored "-Wreserved-identifier"
+#pragma clang diagnostic ignored "-Wcast-align"
+#pragma clang diagnostic ignored "-Wcomma"
 #else
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #endif
@@ -11,9 +14,11 @@
 #include <nodes/makefuncs.hpp>
 #include <nodes/nodeFuncs.hpp>
 #include <nodes/nodes.hpp>
+#include <nodes/primnodes.hpp>
 #include <nodes/pg_list.hpp>
 #include <nodes/bitmapset.hpp>
 #include <nodes/lockoptions.hpp>
+#include <nodes/value.hpp>
 #include <pg_functions.hpp>
 #include <access/attnum.hpp>
 //#include <c.h>
@@ -21,6 +26,19 @@
 #include <Common/Exception.h>
 
 #include<string.h>
+
+bool		SQL_inheritance = true;
+
+typedef signed short int16;
+typedef long int int64;
+typedef signed int int32;
+typedef unsigned int uint32;	/* == 32 bits */
+typedef int32 int4;
+typedef int16 int2;
+
+typedef int64 Datum;
+typedef char TYPCATEGORY;
+typedef char *Pointer;
 
 typedef enum 
 {
@@ -84,7 +102,7 @@ struct PGParseState
 	duckdb_libpgquery::PGList	   *p_ctenamespace; /* current namespace for common table exprs */
 	duckdb_libpgquery::PGList	   *p_future_ctes;	/* common table exprs not yet in namespace */
 	duckdb_libpgquery::PGCommonTableExpr *p_parent_cte;	/* this query's containing CTE */
-	Relation	p_target_relation;	/* INSERT/UPDATE/DELETE target rel */
+	//Relation	p_target_relation;	/* INSERT/UPDATE/DELETE target rel */
 	duckdb_libpgquery::PGRangeTblEntry *p_target_rangetblentry;	/* target rel's RTE */
 	bool		p_is_insert;	/* process assignment like INSERT not UPDATE */
 	duckdb_libpgquery::PGList	   *p_windowdefs;	/* raw representations of window clauses */
@@ -136,11 +154,11 @@ typedef struct ParseStateBreadCrumb
 
 struct PGParseNamespaceItem
 {
-	duckdb_libpgquery::PGRangeTblEntry *p_rte;		/* The relation's rangetable entry */
-	bool		p_rel_visible;	/* Relation name is visible? */
-	bool		p_cols_visible; /* Column names visible as unqualified refs? */
-	bool		p_lateral_only; /* Is only visible to LATERAL expressions? */
-	bool		p_lateral_ok;	/* If so, does join type allow use? */
+    duckdb_libpgquery::PGRangeTblEntry * p_rte; /* The relation's rangetable entry */
+    bool p_rel_visible; /* Relation name is visible? */
+    bool p_cols_visible; /* Column names visible as unqualified refs? */
+    bool p_lateral_only; /* Is only visible to LATERAL expressions? */
+    bool p_lateral_ok; /* If so, does join type allow use? */
 };
 
 /*
@@ -213,21 +231,180 @@ typedef PGOid Oid;
 
 typedef duckdb_libpgquery::PGBitmapset *PGRelids;
 
-struct PGColumn
-{
-	Oid oid;
-	String name;
-	NameAndTypePair name_and_type;
-	Oid type_oid;
-	Oid type_modifier_oid;
-	Oid collation_oid;
-};
+// struct PGColumn
+// {
+// 	Oid oid;
+// 	String name;
+// 	NameAndTypePair name_and_type;
+// 	Oid type_oid;
+// 	Oid type_modifier_oid;
+// 	Oid collation_oid;
+// };
 
-struct PGRelation
+// struct PGRelation
+// {
+// 	Oid oid;
+// 	std::vector<PGColumn> columns;
+// };
+
+#define NAMEDATALEN 64
+
+typedef struct nameData
 {
-	Oid oid;
-	std::vector<PGColumn> columns;
-};
+    char data[NAMEDATALEN];
+} NameData;
+typedef NameData * Name;
+
+typedef struct _Form_pg_attribute
+{
+    Oid attrelid; /* OID of relation containing this attribute */
+    NameData attname; /* name of attribute */
+
+    /*
+	 * atttypid is the OID of the instance in Catalog Class pg_type that
+	 * defines the data type of this attribute (e.g. int4).  Information in
+	 * that instance is redundant with the attlen, attbyval, and attalign
+	 * attributes of this instance, so they had better match or Postgres will
+	 * fail.
+	 */
+    Oid atttypid;
+
+    /*
+	 * attstattarget is the target number of statistics datapoints to collect
+	 * during VACUUM ANALYZE of this column.  A zero here indicates that we do
+	 * not wish to collect any stats about this column. A "-1" here indicates
+	 * that no value has been explicitly set for this column, so ANALYZE
+	 * should use the default setting.
+	 */
+    int4 attstattarget;
+
+    /*
+	 * attlen is a copy of the typlen field from pg_type for this attribute.
+	 * See atttypid comments above.
+	 */
+    int2 attlen;
+
+    /*
+	 * attnum is the "attribute number" for the attribute:	A value that
+	 * uniquely identifies this attribute within its class. For user
+	 * attributes, Attribute numbers are greater than 0 and not greater than
+	 * the number of attributes in the class. I.e. if the Class pg_class says
+	 * that Class XYZ has 10 attributes, then the user attribute numbers in
+	 * Class pg_attribute must be 1-10.
+	 *
+	 * System attributes have attribute numbers less than 0 that are unique
+	 * within the class, but not constrained to any particular range.
+	 *
+	 * Note that (attnum - 1) is often used as the index to an array.
+	 */
+    int2 attnum;
+
+    /*
+	 * attndims is the declared number of dimensions, if an array type,
+	 * otherwise zero.
+	 */
+    int4 attndims;
+
+    /*
+	 * fastgetattr() uses attcacheoff to cache byte offsets of attributes in
+	 * heap tuples.  The value actually stored in pg_attribute (-1) indicates
+	 * no cached value.  But when we copy these tuples into a tuple
+	 * descriptor, we may then update attcacheoff in the copies. This speeds
+	 * up the attribute walking process.
+	 */
+    int4 attcacheoff;
+
+    /*
+	 * atttypmod records type-specific data supplied at table creation time
+	 * (for example, the max length of a varchar field).  It is passed to
+	 * type-specific input and output functions as the third argument. The
+	 * value will generally be -1 for types that do not need typmod.
+	 */
+    int4 atttypmod;
+
+    /*
+	 * attbyval is a copy of the typbyval field from pg_type for this
+	 * attribute.  See atttypid comments above.
+	 */
+    bool attbyval;
+
+    /*----------
+	 * attstorage tells for VARLENA attributes, what the heap access
+	 * methods can do to it if a given tuple doesn't fit into a page.
+	 * Possible values are
+	 *		'p': Value must be stored plain always
+	 *		'e': Value can be stored in "secondary" relation (if relation
+	 *			 has one, see pg_class.reltoastrelid)
+	 *		'm': Value can be stored compressed inline
+	 *		'x': Value can be stored compressed inline or in "secondary"
+	 * Note that 'm' fields can also be moved out to secondary storage,
+	 * but only as a last resort ('e' and 'x' fields are moved first).
+	 *----------
+	 */
+    char attstorage;
+
+    /*
+	 * attalign is a copy of the typalign field from pg_type for this
+	 * attribute.  See atttypid comments above.
+	 */
+    char attalign;
+
+    /* This flag represents the "NOT NULL" constraint */
+    bool attnotnull;
+
+    /* Has DEFAULT value or not */
+    bool atthasdef;
+
+    /* Is dropped (ie, logically invisible) or not */
+    bool attisdropped;
+
+    /* Has a local definition (hence, do not drop when attinhcount is 0) */
+    bool attislocal;
+
+    /* Number of times inherited from direct parent relation(s) */
+    int4 attinhcount;
+
+    /*
+	 * VARIABLE LENGTH FIELDS start here.  These fields may be NULL, too.
+	 *
+	 * NOTE: the following fields are not present in tuple descriptors!
+	 */
+
+    /* Column-level access permissions */
+} * Form_pg_attribute;
+
+typedef struct _TupleDesc
+{
+    int natts; /* number of attributes in the tuple */
+    Form_pg_attribute * attrs;
+    /* attrs[N] is a pointer to the description of Attribute Number N+1 */
+    //TupleConstr *constr;		/* constraints, or NULL if none */
+    Oid tdtypeid; /* composite type ID for tuple type */
+    int32 tdtypmod; /* typmod for tuple type */
+    bool tdhasoid; /* tuple has oid attribute in its header */
+    int tdrefcount; /* reference count, or -1 if not counting */
+} * TupleDesc;
+
+typedef struct _Form_pg_operator
+{
+    NameData oprname; /* name of operator */
+    Oid oprnamespace; /* OID of namespace containing this oper */
+    Oid oprowner; /* operator owner */
+    char oprkind; /* 'l', 'r', or 'b' */
+    bool oprcanhash; /* can be used in hash join? */
+    Oid oprleft; /* left arg type, or 0 if 'l' oprkind */
+    Oid oprright; /* right arg type, or 0 if 'r' oprkind */
+    Oid oprresult; /* result datatype */
+    Oid oprcom; /* OID of commutator oper, or 0 if none */
+    Oid oprnegate; /* OID of negator oper, or 0 if none */
+    Oid oprlsortop; /* OID of left sortop, if mergejoinable */
+    Oid oprrsortop; /* OID of right sortop, if mergejoinable */
+    Oid oprltcmpop; /* OID of "l<r" oper, if mergejoinable */
+    Oid oprgtcmpop; /* OID of "l>r" oper, if mergejoinable */
+    Oid oprcode; /* OID of underlying function */
+    Oid oprrest; /* OID of restriction estimator, or 0 */
+    Oid oprjoin; /* OID of join estimator, or 0 */
+} * Form_pg_operator;
 
 typedef enum
 {
@@ -318,17 +495,6 @@ typedef struct OprCacheKey
 	Oid			right_arg;		/* Right input OID, or 0 if postfix op */
 	Oid			search_path[MAX_CACHED_PATH_LEN];
 } OprCacheKey;
-
-bool		SQL_inheritance = true;
-
-typedef signed short int16;
-typedef long int int64;
-typedef signed int int32;
-typedef unsigned int uint32;	/* == 32 bits */
-
-typedef int64 Datum;
-typedef char TYPCATEGORY;
-typedef char *Pointer;
 
 static inline Datum BoolGetDatum(bool b) { return (b ? 1 : 0); } 
 
@@ -553,9 +719,9 @@ int
 count_nonjunk_tlist_entries(duckdb_libpgquery::PGList *tlist)
 {
 	int			len = 0;
-	duckdb_libpgquery::PGListCell   *l;
+    duckdb_libpgquery::PGListCell * l;
 
-	foreach(l, tlist)
+    foreach(l, tlist)
 	{
 		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(l);
 
@@ -591,32 +757,34 @@ make_parsestate(PGParseState *parentParseState)
 
 duckdb_libpgquery::PGValue * makeString(char * str)
 {
-    duckdb_libpgquery::PGValue * v = makeNode(duckdb_libpgquery::PGValue);
+	using duckdb_libpgquery::PGValue;
+	using duckdb_libpgquery::T_PGValue;
+    PGValue * v = makeNode(PGValue);
 
     v->type = duckdb_libpgquery::T_PGString;
     v->val.str = str;
     return v;
 };
 
-void
-setup_parser_errposition_callback(PGParseCallbackState *pcbstate,
-								  PGParseState *pstate, int location)
-{
-	/* Setup error traceback support for ereport() */
-	pcbstate->pstate = pstate;
-	pcbstate->location = location;
-	pcbstate->errcallback.callback = pcb_error_callback;
-	pcbstate->errcallback.arg = (void *) pcbstate;
-	pcbstate->errcallback.previous = error_context_stack;
-	error_context_stack = &pcbstate->errcallback;
-};
+// void
+// setup_parser_errposition_callback(PGParseCallbackState *pcbstate,
+// 								  PGParseState *pstate, int location)
+// {
+// 	/* Setup error traceback support for ereport() */
+// 	pcbstate->pstate = pstate;
+// 	pcbstate->location = location;
+// 	pcbstate->errcallback.callback = pcb_error_callback;
+// 	pcbstate->errcallback.arg = (void *) pcbstate;
+// 	pcbstate->errcallback.previous = error_context_stack;
+// 	error_context_stack = &pcbstate->errcallback;
+// };
 
-void
-cancel_parser_errposition_callback(PGParseCallbackState *pcbstate)
-{
-	/* Pop the error context stack */
-	error_context_stack = pcbstate->errcallback.previous;
-};
+// void
+// cancel_parser_errposition_callback(PGParseCallbackState *pcbstate)
+// {
+// 	/* Pop the error context stack */
+// 	error_context_stack = pcbstate->errcallback.previous;
+// };
 
 void
 parser_errposition(PGParseState *pstate, int location)
@@ -642,100 +810,100 @@ free_parsestate(PGParseState *pstate)
 	pstate = NULL;
 };
 
-duckdb_libpgquery::PGTargetEntry *
-get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)
-{
-	duckdb_libpgquery::PGListCell   *l;
+// duckdb_libpgquery::PGTargetEntry *
+// get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)
+// {
+// 	duckdb_libpgquery::PGListCell   *l;
 
-	foreach(l, targetList)
-	{
-		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(l);
+// 	foreach(l, targetList)
+// 	{
+// 		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(l);
 
-		if (tle->ressortgroupref == sortref)
-			return tle;
-	}
+// 		if (tle->ressortgroupref == sortref)
+// 			return tle;
+// 	}
 
-	/*
-	 * XXX: we probably should catch this earlier, but we have a
-	 * few queries in the regression suite that hit this.
-	 */
-	duckdb_libpgquery::ereport(ERROR,
-			(duckdb_libpgquery::errcode(duckdb_libpgquery::PG_ERRCODE_SYNTAX_ERROR),
-			 duckdb_libpgquery::errmsg("ORDER/GROUP BY expression not found in targetlist")));
-	return NULL;				/* keep compiler quiet */
-};
+// 	/*
+// 	 * XXX: we probably should catch this earlier, but we have a
+// 	 * few queries in the regression suite that hit this.
+// 	 */
+// 	duckdb_libpgquery::ereport(ERROR,
+// 			(duckdb_libpgquery::errcode(ERRCODE_SYNTAX_ERROR),
+// 			 duckdb_libpgquery::errmsg("ORDER/GROUP BY expression not found in targetlist")));
+// 	return NULL;				/* keep compiler quiet */
+// };
 
-duckdb_libpgquery::PGTargetEntry *
-get_sortgroupclause_tle(duckdb_libpgquery::PGSortGroupClause *sgClause,
-						duckdb_libpgquery::PGList *targetList)
-{
-	return get_sortgroupref_tle(sgClause->tleSortGroupRef, targetList);
-};
+// duckdb_libpgquery::PGTargetEntry *
+// get_sortgroupclause_tle(duckdb_libpgquery::PGSortGroupClause *sgClause,
+// 						duckdb_libpgquery::PGList *targetList)
+// {
+// 	return get_sortgroupref_tle(sgClause->tleSortGroupRef, targetList);
+// };
 
-duckdb_libpgquery::PGNode *
-get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause *sgClause,
-	duckdb_libpgquery::PGList *targetList)
-{
-	duckdb_libpgquery::PGTargetEntry *tle = get_sortgroupclause_tle(sgClause, targetList);
+// duckdb_libpgquery::PGNode *
+// get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause *sgClause,
+// 	duckdb_libpgquery::PGList *targetList)
+// {
+// 	duckdb_libpgquery::PGTargetEntry *tle = get_sortgroupclause_tle(sgClause, targetList);
 
-	return (duckdb_libpgquery::PGNode *) tle->expr;
-};
+// 	return (duckdb_libpgquery::PGNode *) tle->expr;
+// };
 
-bool
-contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up);
+// bool
+// contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up);
 
-bool
-contain_vars_of_level(duckdb_libpgquery::PGNode *node, int levelsup)
-{
-	int			sublevels_up = levelsup;
+// bool
+// contain_vars_of_level(duckdb_libpgquery::PGNode *node, int levelsup)
+// {
+// 	int			sublevels_up = levelsup;
 
-	return query_or_expression_tree_walker(node,
-										   contain_vars_of_level_walker,
-										   (void *) &sublevels_up,
-										   0);
-};
+// 	return query_or_expression_tree_walker(node,
+// 										   contain_vars_of_level_walker,
+// 										   (void *) &sublevels_up,
+// 										   0);
+// };
 
-bool
-contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up)
-{
-	using duckdb_libpgquery::PGVar;
-	using duckdb_libpgquery::PGCurrentOfExpr;
-	//using duckdb_libpgquery::PGPlaceHolderVar;
-	using duckdb_libpgquery::PGQuery;
-	if (node == NULL)
-		return false;
-	if (IsA(node, PGVar))
-	{
-		if (((PGVar *) node)->varlevelsup == *sublevels_up)
-			return true;		/* abort tree traversal and return true */
-		return false;
-	}
-	if (IsA(node, PGCurrentOfExpr))
-	{
-		if (*sublevels_up == 0)
-			return true;
-		return false;
-	}
-	// if (IsA(node, PGPlaceHolderVar))
-	// {
-	// 	if (((PGPlaceHolderVar *) node)->phlevelsup == *sublevels_up)
-	// 		return true;		/* abort the tree traversal and return true */
-	// 	/* else fall through to check the contained expr */
-	// }
-	if (IsA(node, PGQuery))
-	{
-		/* Recurse into subselects */
-		bool		result;
+// bool
+// contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up)
+// {
+// 	using duckdb_libpgquery::PGVar;
+// 	using duckdb_libpgquery::PGCurrentOfExpr;
+// 	//using duckdb_libpgquery::PGPlaceHolderVar;
+// 	using duckdb_libpgquery::PGQuery;
+// 	if (node == NULL)
+// 		return false;
+// 	if (IsA(node, PGVar))
+// 	{
+// 		if (((PGVar *) node)->varlevelsup == *sublevels_up)
+// 			return true;		/* abort tree traversal and return true */
+// 		return false;
+// 	}
+// 	if (IsA(node, PGCurrentOfExpr))
+// 	{
+// 		if (*sublevels_up == 0)
+// 			return true;
+// 		return false;
+// 	}
+// 	// if (IsA(node, PGPlaceHolderVar))
+// 	// {
+// 	// 	if (((PGPlaceHolderVar *) node)->phlevelsup == *sublevels_up)
+// 	// 		return true;		/* abort the tree traversal and return true */
+// 	// 	/* else fall through to check the contained expr */
+// 	// }
+// 	if (IsA(node, PGQuery))
+// 	{
+// 		/* Recurse into subselects */
+// 		bool		result;
 
-		(*sublevels_up)++;
-		result = query_tree_walker((PGQuery *) node,
-								   contain_vars_of_level_walker,
-								   (void *) sublevels_up,
-								   0);
-		(*sublevels_up)--;
-		return result;
-	}
-	return expression_tree_walker(node,
-								  contain_vars_of_level_walker,
-								  (void *) sublevels_up);
-};
+// 		(*sublevels_up)++;
+// 		result = query_tree_walker((PGQuery *) node,
+// 								   contain_vars_of_level_walker,
+// 								   (void *) sublevels_up,
+// 								   0);
+// 		(*sublevels_up)--;
+// 		return result;
+// 	}
+// 	return expression_tree_walker(node,
+// 								  contain_vars_of_level_walker,
+// 								  (void *) sublevels_up);
+// };

@@ -1,175 +1,142 @@
 #include <Interpreters/orcaopt/pgopt_hawq/AggParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/walkers.h>
 
-namespace DB
-{
 using namespace duckdb_libpgquery;
 
-bool
-check_agg_arguments_walker(PGNode *node,
-						   check_agg_arguments_context *context)
+namespace DB
 {
-	if (node == NULL)
-		return false;
-	if (IsA(node, PGVar))
-	{
-		int			varlevelsup = ((PGVar *) node)->varlevelsup;
 
-		/* convert levelsup to frame of reference of original query */
-		varlevelsup -= context->sublevels_up;
-		/* ignore local vars of subqueries */
-		if (varlevelsup >= 0)
-		{
-			if (context->min_varlevel < 0 ||
-				context->min_varlevel > varlevelsup)
-				context->min_varlevel = varlevelsup;
-		}
-		return false;
-	}
-	if (IsA(node, PGAggref))
-	{
-		int			agglevelsup = ((PGAggref *) node)->agglevelsup;
-
-		/* convert levelsup to frame of reference of original query */
-		agglevelsup -= context->sublevels_up;
-		/* ignore local aggs of subqueries */
-		if (agglevelsup >= 0)
-		{
-			if (context->min_agglevel < 0 ||
-				context->min_agglevel > agglevelsup)
-				context->min_agglevel = agglevelsup;
-		}
-		/* no need to examine args of the inner aggregate */
-		return false;
-	}
-	if (IsA(node, PGGroupingFunc))
-	{
-		int			agglevelsup = ((PGGroupingFunc *) node)->agglevelsup;
-
-		/* convert levelsup to frame of reference of original query */
-		agglevelsup -= context->sublevels_up;
-		/* ignore local aggs of subqueries */
-		if (agglevelsup >= 0)
-		{
-			if (context->min_agglevel < 0 ||
-				context->min_agglevel > agglevelsup)
-				context->min_agglevel = agglevelsup;
-		}
-		/* Continue and descend into subtree */
-	}
-	// if (IsA(node, PGGroupId))
-	// {
-	// 	int			agglevelsup = ((PGGroupId *) node)->agglevelsup;
-
-	// 	/* convert levelsup to frame of reference of original query */
-	// 	agglevelsup -= context->sublevels_up;
-	// 	/* ignore local aggs of subqueries */
-	// 	if (agglevelsup >= 0)
-	// 	{
-	// 		if (context->min_agglevel < 0 ||
-	// 			context->min_agglevel > agglevelsup)
-	// 			context->min_agglevel = agglevelsup;
-	// 	}
-	// 	/* Continue and descend into subtree */
-	// }
-	/*
-	 * SRFs and window functions can be rejected immediately, unless we are
-	 * within a sub-select within the aggregate's arguments; in that case
-	 * they're OK.
-	 */
-	if (context->sublevels_up == 0)
-	{
-		if ((IsA(node, PGFuncExpr) &&((PGFuncExpr *) node)->funcretset) ||
-			(IsA(node, PGOpExpr) &&((PGOpExpr *) node)->opretset))
-		{
-			parser_errposition(context->pstate, exprLocation(node));
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("aggregate function calls cannot contain set-returning function calls"),
-					 errhint("You might be able to move the set-returning function into a LATERAL FROM item.")));
-		}
-		if (IsA(node, PGWindowFunc))
-		{
-			parser_errposition(context->pstate,
-										((PGWindowFunc *) node)->location);
-			ereport(ERROR,
-					(errcode(ERRCODE_GROUPING_ERROR),
-					 errmsg("aggregate function calls cannot contain window function calls")));
-		}
-	}
-	if (IsA(node, PGQuery))
-	{
-		/* Recurse into subselects */
-		bool		result;
-
-		context->sublevels_up++;
-		result = pg_query_tree_walker((PGQuery *) node,
-								   (walker_func)check_agg_arguments_walker,
-								   (void *) context,
-								   0);
-		context->sublevels_up--;
-		return result;
-	}
-
-	return pg_expression_tree_walker(node,
-								  (walker_func)check_agg_arguments_walker,
-								  (void *) context);
-};
-
-void AggParser::transformWindowSpec(PGParseState * pstate, WindowSpec * spec)
+void AggParser::transformWindowSpec(PGParseState * pstate, PGWindowDef * spec)
 {
     PGListCell * lc2;
-    PGList * new = NIL;
+    PGList * nl = NIL;
 
-    foreach (lc2, spec->partition)
+    foreach (lc2, spec->partitionClause)
     {
         PGNode * n = (PGNode *)lfirst(lc2);
         PGSortBy * sb;
 
-        Assert(IsA(n, PGSortBy));
+        Assert(IsA(n, PGSortBy))
 
         sb = (PGSortBy *)n;
 
-        sb->node = (PGNode *)transformExpr(pstate, sb->node);
-        new = lappend(new, (void *)sb);
+        sb->node = (PGNode *)expr_parser.transformExpr(pstate, sb->node);
+        nl = lappend(nl, (void *)sb);
     }
-    spec->partition = new;
+    spec->partitionClause = nl;
 
-    new = NIL;
-    foreach (lc2, spec->order)
+    nl = NIL;
+    foreach (lc2, spec->orderClause)
     {
         PGNode * n = (PGNode *)lfirst(lc2);
         PGSortBy * sb;
 
-        Assert(IsA(n, PGSortBy));
+        Assert(IsA(n, PGSortBy))
 
         sb = (PGSortBy *)n;
 
-        sb->node = (PGNode *)transformExpr(pstate, sb->node);
-        new = lappend(new, (void *)sb);
+        sb->node = (PGNode *)expr_parser.transformExpr(pstate, sb->node);
+        nl = lappend(nl, (void *)sb);
     }
-    spec->order = new;
+    spec->orderClause = nl;
 
-    if (spec->frame)
-    {
-        PGWindowFrame * frame = spec->frame;
+	//TODO
+    // if (spec->frame)
+    // {
+    //     PGWindowFrame * frame = spec->frame;
 
-        if (frame->trail)
-            frame->trail->val = transformExpr(pstate, frame->trail->val);
-        if (frame->lead)
-            frame->lead->val = transformExpr(pstate, frame->lead->val);
-    }
+    //     if (frame->trail)
+    //         frame->trail->val = transformExpr(pstate, frame->trail->val);
+    //     if (frame->lead)
+    //         frame->lead->val = transformExpr(pstate, frame->lead->val);
+    // }
 };
 
 void AggParser::transformWindowSpecExprs(PGParseState * pstate)
 {
     PGListCell * lc;
 
-    foreach (lc, pstate->p_win_clauses)
+    foreach (lc, pstate->p_windowdefs)
     {
-        PGWindowSpec * s = (PGWindowSpec *)lfirst(lc);
+        PGWindowDef * s = (PGWindowDef *)lfirst(lc);
         transformWindowSpec(pstate, s);
     }
+};
+
+void AggParser::check_call(PGParseState * pstate, PGNode * call)
+{
+    int min_varlevel = -1;
+    bool is_agg = IsA(call, PGAggref);
+
+    /*
+	 * The call's level is the same as the level of the lowest-level
+	 * variable or aggregate in its arguments; or if it contains no variables
+	 * at all, we presume it to be local.
+	 */
+    if (is_agg)
+        min_varlevel = find_minimum_var_level((PGNode *)((PGAggref *)call)->args);
+    else
+        min_varlevel = find_minimum_var_level((PGNode *)((PGWindowDef *)call)->args);
+
+    /*
+	 * An aggregate can't directly contain another aggregate call of the same
+	 * level (though outer aggs are okay).	We can skip this check if we
+	 * didn't find any local vars or aggs.
+	 */
+    if (min_varlevel == 0 && is_agg)
+    {
+        if (checkExprHasAggs((PGNode *)((PGAggref *)call)->args))
+            ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls may not be nested"), errOmitLocation(true)));
+
+        if (checkExprHasWindFuncs((PGNode *)((PGAggref *)call)->args))
+        {
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_GROUPING_ERROR),
+                 errmsg("window functions may not be used as arguments to "
+                        "aggregates"),
+                 errOmitLocation(true)));
+        }
+    }
+
+    /*
+	 * Window functions, on the other hand, may contain nested aggregates
+	 * but not nested window refs.
+	 */
+    if (min_varlevel == 0 && !is_agg)
+    {
+        if (checkExprHasWindFuncs((PGNode *)((PGWindowDef *)call)->args))
+        {
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_GROUPING_ERROR),
+                 errmsg("cannot use window function as an argument "
+                        "to another window function"),
+                 errOmitLocation(true)));
+        }
+    }
+
+    if (min_varlevel < 0)
+        min_varlevel = 0;
+
+    if (is_agg)
+        ((PGAggref *)call)->agglevelsup = min_varlevel;
+    else
+        ((PGWindowDef *)call)->winlevelsup = min_varlevel;
+
+    /* Mark the correct pstate as having aggregates */
+    while (min_varlevel-- > 0)
+        pstate = pstate->parentParseState;
+
+    if (is_agg)
+        pstate->p_hasAggs = true;
+    else
+        pstate->p_hasWindowFuncs = true;
+};
+
+void AggParser::transformWindowFuncCall(PGParseState * pstate, PGWindowDef * wind)
+{
+	check_call(pstate, (PGNode *)wind);
 };
 
 }

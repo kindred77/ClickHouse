@@ -6,6 +6,7 @@
 #include <Interpreters/orcaopt/pgopt_hawq/AggParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/TargetParser.h>
 #include <Interpreters/orcaopt/pgopt_hawq/NodeParser.h>
+#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
 
 namespace DB
 {
@@ -18,6 +19,7 @@ private:
     AggParser agg_parser;
     TargetParser target_parser;
     NodeParser node_parser;
+    CoerceParser coerce_parser;
 public:
 	explicit SelectParser();
 

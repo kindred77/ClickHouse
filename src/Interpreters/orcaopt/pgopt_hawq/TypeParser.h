@@ -5,8 +5,6 @@
 namespace DB
 {
 
-typedef HeapTuple Type;
-
 class TypeParser
 {
 private:
