@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/TargetParser.h>
+#include <Interpreters/orcaopt/TargetParser.h>
 
 using namespace duckdb_libpgquery;
 

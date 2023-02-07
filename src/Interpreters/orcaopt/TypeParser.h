@@ -1,10 +1,9 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
+#include <Interpreters/orcaopt/parser_common.h>
 
 namespace DB
 {
-
 class TypeParser
 {
 private:
@@ -18,5 +17,4 @@ public:
 
     Oid typenameTypeId(PGParseState * pstate, const duckdb_libpgquery::PGTypeName * typname);
 };
-
 }

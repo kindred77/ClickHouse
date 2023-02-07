@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/OperParser.h>
+#include <Interpreters/orcaopt/OperParser.h>
 
 namespace DB
 {
@@ -313,7 +313,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
                  errmsg("op ANY/ALL (array) requires array on right side"),
-                 errOmitLocation(true),
+                //  errOmitLocation(true),
                  parser_errposition(pstate, location)));
     }
 
@@ -342,14 +342,14 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
             ERROR,
             (errcode(ERRCODE_WRONG_OBJECT_TYPE),
              errmsg("op ANY/ALL (array) requires operator to yield boolean"),
-             errOmitLocation(true),
+             /* errOmitLocation(true), */
              parser_errposition(pstate, location)));
     if (get_func_retset(opform->oprcode))
         ereport(
             ERROR,
             (errcode(ERRCODE_WRONG_OBJECT_TYPE),
              errmsg("op ANY/ALL (array) requires operator not to return a set"),
-             errOmitLocation(true),
+             /* errOmitLocation(true), */
              parser_errposition(pstate, location)));
 
     /*
@@ -362,7 +362,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
             ERROR,
             (errcode(ERRCODE_UNDEFINED_OBJECT),
              errmsg("could not find array type for data type %s", format_type_be(declared_arg_types[1])),
-             errOmitLocation(true),
+             /* errOmitLocation(true), */
              parser_errposition(pstate, location)));
     actual_arg_types[1] = atypeId;
     declared_arg_types[1] = res_atypeId;

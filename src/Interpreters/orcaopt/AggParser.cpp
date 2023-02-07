@@ -1,5 +1,5 @@
-#include <Interpreters/orcaopt/pgopt_hawq/AggParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/walkers.h>
+#include <Interpreters/orcaopt/AggParser.h>
+#include <Interpreters/orcaopt/walkers.h>
 
 using namespace duckdb_libpgquery;
 
@@ -86,7 +86,7 @@ void AggParser::check_call(PGParseState * pstate, PGNode * call)
     if (min_varlevel == 0 && is_agg)
     {
         if (checkExprHasAggs((PGNode *)((PGAggref *)call)->args))
-            ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls may not be nested"), errOmitLocation(true)));
+            ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls may not be nested")/* , errOmitLocation(true) */));
 
         if (checkExprHasWindFuncs((PGNode *)((PGAggref *)call)->args))
         {
@@ -94,8 +94,8 @@ void AggParser::check_call(PGParseState * pstate, PGNode * call)
                 ERROR,
                 (errcode(ERRCODE_GROUPING_ERROR),
                  errmsg("window functions may not be used as arguments to "
-                        "aggregates"),
-                 errOmitLocation(true)));
+                        "aggregates")/* ,
+                 errOmitLocation(true) */));
         }
     }
 
@@ -111,8 +111,8 @@ void AggParser::check_call(PGParseState * pstate, PGNode * call)
                 ERROR,
                 (errcode(ERRCODE_GROUPING_ERROR),
                  errmsg("cannot use window function as an argument "
-                        "to another window function"),
-                 errOmitLocation(true)));
+                        "to another window function")/* ,
+                 errOmitLocation(true) */));
         }
     }
 

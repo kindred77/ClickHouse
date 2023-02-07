@@ -27,6 +27,32 @@
 
 #include<string.h>
 
+class RelationParser;
+class CTEParser;
+class ExprParser;
+class ClauseParser;
+class AggParser;
+class TargetParser;
+class NodeParser;
+class CoerceParser;
+class FuncParser;
+class OperParser;
+class TypeParser;
+class SelectParser;
+
+using RelationParserPtr = std::unique_ptr<RelationParser>;
+using CTEParserPtr = std::unique_ptr<CTEParser>;
+using ExprParserPtr = std::unique_ptr<ExprParser>;
+using ClauseParserPtr = std::unique_ptr<ClauseParser>;
+using AggParserPtr = std::unique_ptr<AggParser>;
+using TargetParserPtr = std::unique_ptr<TargetParser>;
+using NodeParserPtr = std::unique_ptr<NodeParser>;
+using CoerceParserPtr = std::unique_ptr<CoerceParser>;
+using FuncParserPtr = std::unique_ptr<FuncParser>;
+using OperParserPtr = std::unique_ptr<OperParser>;
+using TypeParserPtr = std::unique_ptr<TypeParser>;
+using SelectParserPtr = std::unique_ptr<SelectParser>;
+
 bool		SQL_inheritance = true;
 
 typedef signed short int16;

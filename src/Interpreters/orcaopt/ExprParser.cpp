@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/ExprParser.h>
+#include <Interpreters/orcaopt/ExprParser.h>
 
 using namespace duckdb_libpgquery;
 
@@ -16,7 +16,7 @@ PGNode * ExprParser::typecast_expression(PGParseState * pstate,
     if (inputType == InvalidOid)
         return expr; /* do nothing if NULL input */
 
-    expr = coerce_parser.coerce_to_target_type(pstate, expr, inputType, targetType, typname->typmod, PG_COERCION_EXPLICIT, COERCE_EXPLICIT_CAST, -1);
+    expr = coerce_parser.coerce_to_target_type(pstate, expr, inputType, targetType, typname->typmod, PG_COERCION_EXPLICIT, PG_COERCE_EXPLICIT_CAST, -1);
     if (expr == NULL)
         ereport(
             ERROR,

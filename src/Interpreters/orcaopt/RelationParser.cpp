@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
+#include <Interpreters/orcaopt/RelationParser.h>
 
 using namespace duckdb_libpgquery;
 

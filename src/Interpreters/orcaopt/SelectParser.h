@@ -1,12 +1,12 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
-#include <Interpreters/orcaopt/pgopt_hawq/CTEParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/ClauseParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/AggParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/TargetParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/NodeParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
+#include <Interpreters/orcaopt/parser_common.h>
+#include <Interpreters/orcaopt/CTEParser.h>
+#include <Interpreters/orcaopt/ClauseParser.h>
+#include <Interpreters/orcaopt/AggParser.h>
+#include <Interpreters/orcaopt/TargetParser.h>
+#include <Interpreters/orcaopt/NodeParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
 
 namespace DB
 {
@@ -14,12 +14,12 @@ namespace DB
 class SelectParser
 {
 private:
-    CTEParser cte_parser;
-    ClauseParser clause_parser;
-    AggParser agg_parser;
-    TargetParser target_parser;
-    NodeParser node_parser;
-    CoerceParser coerce_parser;
+    CTEParserPtr cte_parser_ptr;
+    ClauseParserPtr clause_parser_ptr;
+    AggParserPtr agg_parser_ptr;
+    TargetParserPtr target_parser_ptr;
+    NodeParserPtr node_parser_ptr;
+    CoerceParserPtr coerce_parser_ptr;
 public:
 	explicit SelectParser();
 
@@ -46,5 +46,4 @@ public:
 
     duckdb_libpgquery::PGList * parse_sub_analyze(duckdb_libpgquery::PGNode * parseTree, PGParseState * parentParseState);
 };
-
 }

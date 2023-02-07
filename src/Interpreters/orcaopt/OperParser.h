@@ -1,9 +1,9 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
+#include <Interpreters/orcaopt/parser_common.h>
 
-#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/FuncParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/FuncParser.h>
 
 namespace DB
 {
@@ -11,8 +11,8 @@ namespace DB
 class OperParser
 {
 private:
-	CoerceParser coerce_parser;
-	FuncParser func_parser;
+	CoerceParserPtr coerce_parser_ptr;
+	FuncParserPtr func_parser_ptr;
 public:
 	explicit OperParser();
 
@@ -39,5 +39,4 @@ public:
 		bool useOr, duckdb_libpgquery::PGNode * ltree, duckdb_libpgquery::PGNode * rtree,
 		int location);
 };
-
 }

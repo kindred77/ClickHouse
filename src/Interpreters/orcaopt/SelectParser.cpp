@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/SelectParser.h>
+#include <Interpreters/orcaopt/SelectParser.h>
 
 using namespace duckdb_libpgquery;
 

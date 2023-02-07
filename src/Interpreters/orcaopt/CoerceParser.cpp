@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
 
 using namespace duckdb_libpgquery;
 

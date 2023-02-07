@@ -1,9 +1,9 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
+#include <Interpreters/orcaopt/parser_common.h>
 
-#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/AggParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/AggParser.h>
 
 namespace DB
 {
@@ -11,8 +11,8 @@ namespace DB
 class FuncParser
 {
 private:
-    CoerceParser coerce_parser;
-    AggParser agg_parser;
+    CoerceParserPtr coerce_parser_ptr;
+    AggParserPtr agg_parser_ptr;
 public:
 	explicit FuncParser();
 
@@ -39,5 +39,4 @@ public:
 
     FuncCandidateList func_select_candidate(int nargs, Oid * input_typeids, FuncCandidateList candidates);
 };
-
 }

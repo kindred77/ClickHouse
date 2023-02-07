@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/TypeParser.h>
+#include <Interpreters/orcaopt/TypeParser.h>
 
 namespace DB
 {

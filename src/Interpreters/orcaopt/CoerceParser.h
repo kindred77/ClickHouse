@@ -1,14 +1,13 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
+#include <Interpreters/orcaopt/parser_common.h>
 
-#include <Interpreters/orcaopt/pgopt_hawq/FuncParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/TypeParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
+#include <Interpreters/orcaopt/FuncParser.h>
+#include <Interpreters/orcaopt/TypeParser.h>
+#include <Interpreters/orcaopt/RelationParser.h>
 
 namespace DB
 {
-
 /* Result codes for find_coercion_pathway */
 typedef enum
 {
@@ -57,9 +56,9 @@ typedef enum CATEGORY
 class CoerceParser
 {
 private:
-    FuncParser func_parser;
-    TypeParser type_parser;
-    RelationParser relation_parser;
+    FuncParserPtr func_parser_ptr;
+    TypeParserPtr type_parser_ptr;
+    RelationParserPtr relation_parser_ptr;
 public:
     explicit CoerceParser();
 
@@ -118,5 +117,4 @@ public:
 
     void fixup_unknown_vars_in_exprlist(PGParseState * pstate, duckdb_libpgquery::PGList * exprlist);
 };
-
 }

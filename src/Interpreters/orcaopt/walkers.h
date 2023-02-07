@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
+#include <Interpreters/orcaopt/parser_common.h>
 
 typedef struct
 {

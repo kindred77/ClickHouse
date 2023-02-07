@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/walkers.h>
+#include <Interpreters/orcaopt/walkers.h>
 
 using namespace duckdb_libpgquery;
 

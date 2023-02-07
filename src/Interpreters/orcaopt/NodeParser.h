@@ -1,10 +1,9 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
+#include <Interpreters/orcaopt/parser_common.h>
 
 namespace DB
 {
-
 class NodeParser
 {
 private:
@@ -19,5 +18,4 @@ public:
 
     void free_parsestate(PGParseState ** pstate);
 };
-
 }

@@ -1,14 +1,14 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
-#include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/OperParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/NodeParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/TypeParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/FuncParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/SelectParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/TargetParser.h>
+#include <Interpreters/orcaopt/parser_common.h>
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/OperParser.h>
+#include <Interpreters/orcaopt/NodeParser.h>
+#include <Interpreters/orcaopt/TypeParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/FuncParser.h>
+#include <Interpreters/orcaopt/SelectParser.h>
+#include <Interpreters/orcaopt/TargetParser.h>
 
 namespace DB
 {
@@ -16,14 +16,14 @@ namespace DB
 class ExprParser
 {
 private:
-    RelationParser relation_parser;
-    OperParser oper_parser;
-    NodeParser node_parser;
-    TypeParser type_parser;
-    CoerceParser coerce_parser;
-    FuncParser func_parser;
-    SelectParser select_parser;
-    TargetParser target_parser;
+    RelationParserPtr relation_parser_ptr;
+    OperParserPtr oper_parser_ptr;
+    NodeParserPtr node_parser_ptr;
+    TypeParserPtr type_parser_ptr;
+    CoerceParserPtr coerce_parser_ptr;
+    FuncParserPtr func_parser_ptr;
+    SelectParserPtr select_parser_ptr;
+    TargetParserPtr target_parser_ptr;
     bool		operator_precedence_warning = false;
     bool		Transform_null_equals = false;
 public:
@@ -96,5 +96,4 @@ public:
     duckdb_libpgquery::PGNode * transformWholeRowRef(PGParseState * pstate, char * catalogname,
         char * schemaname, char * relname, int location);
 };
-
 }

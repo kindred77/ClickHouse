@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
-#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
+#include <Interpreters/orcaopt/parser_common.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
 
 #include <optional>
 
@@ -11,7 +11,7 @@ namespace DB
 class RelationParser
 {
 private:
-    CoerceParser coerce_parser;
+    CoerceParserPtr coerce_parser_ptr;
 public:
     explicit RelationParser();
 
@@ -110,5 +110,4 @@ public:
 
     static char * get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, PGAttrNumber attnum);
 };
-
 }

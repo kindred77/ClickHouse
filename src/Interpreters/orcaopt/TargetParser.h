@@ -1,10 +1,10 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
+#include <Interpreters/orcaopt/parser_common.h>
 
-#include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/CTEParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/ExprParser.h>
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/CTEParser.h>
+#include <Interpreters/orcaopt/ExprParser.h>
 
 namespace DB
 {
@@ -12,9 +12,9 @@ namespace DB
 class TargetParser
 {
 private:
-    RelationParser relation_parser;
-    CTEParser cte_parser;
-    ExprParser expr_parser;
+    RelationParserPtr relation_parser_ptr;
+    CTEParserPtr cte_parser_ptr;
+    ExprParserPtr expr_parser_ptr;
 public:
 	explicit TargetParser();
 
@@ -44,5 +44,4 @@ public:
 
     duckdb_libpgquery::PGList * transformExpressionList(PGParseState * pstate, duckdb_libpgquery::PGList * exprlist);
 };
-
 }

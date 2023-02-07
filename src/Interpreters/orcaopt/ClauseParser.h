@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
-#include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/SelectParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/CoerceParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/ExprParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/TargetParser.h>
+#include <Interpreters/orcaopt/parser_common.h>
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/SelectParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/ExprParser.h>
+#include <Interpreters/orcaopt/TargetParser.h>
 
 #define ORDER_CLAUSE 0
 #define GROUP_CLAUSE 1
@@ -45,6 +45,7 @@ bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context
     using duckdb_libpgquery::T_PGRowExpr;
     using duckdb_libpgquery::T_PGSortBy;
 
+    using duckdb_libpgquery::ereport;
     using duckdb_libpgquery::errcode;
     using duckdb_libpgquery::errmsg;
     using duckdb_libpgquery::makeInteger;
@@ -112,15 +113,15 @@ bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context
                     ereport(
                         ERROR,
                         (errcode(ERRCODE_GROUPING_ERROR),
-                         errmsg("row type can not be used inside a grouping function."),
-                         errOmitLocation(true)));
+                         errmsg("row type can not be used inside a grouping function.")/* ,
+                         errOmitLocation(true) */));
 
                 if (!IsA(node_arg, PGVar))
                     ereport(
                         ERROR,
                         (errcode(ERRCODE_GROUPING_ERROR),
-                         errmsg("expression in a grouping fuction does not appear in GROUP BY."),
-                         errOmitLocation(true)));
+                         errmsg("expression in a grouping fuction does not appear in GROUP BY.")/* ,
+                         errOmitLocation(true) */));
 
                 Assert(IsA(node_arg, PGVar))
                 Assert(var->varno > 0)
@@ -132,8 +133,8 @@ bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context
                 ereport(
                     ERROR,
                     (errcode(ERRCODE_GROUPING_ERROR),
-                     errmsg("column \"%s\".\"%s\" is not in GROUP BY", rte->eref->aliasname, attname),
-                     errOmitLocation(true)));
+                     errmsg("column \"%s\".\"%s\" is not in GROUP BY", rte->eref->aliasname, attname)/* ,
+                     errOmitLocation(true) */));
             }
 
             newargs = lappend(newargs, makeInteger(i));
@@ -159,11 +160,11 @@ bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context
 class ClauseParser
 {
 private:
-  RelationParser relation_parser;
-  SelectParser select_parser;
-  CoerceParser coerce_parser;
-  ExprParser expr_parser;
-  TargetParser target_parser;
+  RelationParserPtr relation_parser_ptr;
+  SelectParserPtr select_parser_ptr;
+  CoerceParserPtr coerce_parser_ptr;
+  ExprParserPtr expr_parser_ptr;
+  TargetParserPtr target_parser_ptr;
 public:
 	explicit ClauseParser();
 
@@ -202,7 +203,7 @@ public:
         duckdb_libpgquery::PGRangeTblEntry * r_rte, duckdb_libpgquery::PGList * relnamespace,
         PGRelids containedRels);
 
-    duckdb_libpgqueryet::TargetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
+    duckdb_libpgquery::PGTargetEntry * findTargetlistEntrySQL92(PGParseState * pstate,
         duckdb_libpgquery::PGNode * node, duckdb_libpgquery::PGList ** tlist, int clause);
 
     bool targetIsInSortGroupList(duckdb_libpgquery::PGTargetEntry * tle,
@@ -244,5 +245,4 @@ public:
 
     void freeGroupList(duckdb_libpgquery::PGList * grouplist);
 };
-
 }

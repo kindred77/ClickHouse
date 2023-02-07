@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgopt_hawq/CTEParser.h>
+#include <Interpreters/orcaopt/CTEParser.h>
 
 namespace DB
 {

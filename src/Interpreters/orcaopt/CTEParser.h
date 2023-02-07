@@ -1,9 +1,9 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgopt_hawq/parser_common.h>
-#include <Interpreters/orcaopt/pgopt_hawq/RelationParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/NodeParser.h>
-#include <Interpreters/orcaopt/pgopt_hawq/SelectParser.h>
+#include <Interpreters/orcaopt/parser_common.h>
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/NodeParser.h>
+#include <Interpreters/orcaopt/SelectParser.h>
 
 namespace DB
 {
@@ -11,9 +11,9 @@ namespace DB
 class CTEParser
 {
 private:
-	RelationParser relation_parser;
-	NodeParser node_parser;
-	SelectParser select_parser;
+	RelationParserPtr relation_parser_ptr;
+	NodeParserPtr node_parser_ptr;
+	SelectParserPtr select_parser_ptr;
 public:
 	explicit CTEParser();
 
@@ -30,5 +30,4 @@ public:
     duckdb_libpgquery::PGCommonTableExpr * GetCTEForRTE(PGParseState * pstate,
 		duckdb_libpgquery::PGRangeTblEntry * rte, int rtelevelsup);
 };
-
 }
