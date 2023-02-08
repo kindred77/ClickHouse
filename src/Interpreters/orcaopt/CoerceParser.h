@@ -2,10 +2,6 @@
 
 #include <Interpreters/orcaopt/parser_common.h>
 
-#include <Interpreters/orcaopt/FuncParser.h>
-#include <Interpreters/orcaopt/TypeParser.h>
-#include <Interpreters/orcaopt/RelationParser.h>
-
 namespace DB
 {
 /* Result codes for find_coercion_pathway */
@@ -52,6 +48,13 @@ typedef enum CATEGORY
 	NETWORK_TYPE,
 	USER_TYPE
 } CATEGORY;
+
+class FuncParser;
+class TypeParser;
+class RelationParser;
+using FuncParserPtr = std::unique_ptr<FuncParser>;
+using TypeParserPtr = std::unique_ptr<TypeParser>;
+using RelationParserPtr = std::unique_ptr<RelationParser>;
 
 class CoerceParser
 {
@@ -117,4 +120,5 @@ public:
 
     void fixup_unknown_vars_in_exprlist(PGParseState * pstate, duckdb_libpgquery::PGList * exprlist);
 };
+
 }

@@ -2,11 +2,13 @@
 
 #include <Interpreters/orcaopt/parser_common.h>
 
-#include <Interpreters/orcaopt/CoerceParser.h>
-#include <Interpreters/orcaopt/FuncParser.h>
-
 namespace DB
 {
+
+class CoerceParser;
+class CoerceParser;
+using CoerceParserPtr = std::unique_ptr<CoerceParser>;
+using FuncParserPtr = std::unique_ptr<CoerceParser>;
 
 class OperParser
 {
@@ -39,4 +41,5 @@ public:
 		bool useOr, duckdb_libpgquery::PGNode * ltree, duckdb_libpgquery::PGNode * rtree,
 		int location);
 };
+
 }

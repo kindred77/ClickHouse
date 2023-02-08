@@ -1,5 +1,7 @@
 #include <Interpreters/orcaopt/RelationParser.h>
 
+#include <Interpreters/orcaopt/CoerceParser.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -683,73 +685,72 @@ PGRangeTblEntry * RelationParser::addRangeTableEntry(PGParseState * pstate,
 	return rte;
 };
 
-PGRangeTblEntry * RelationParser::addRangeTableEntryForSubquery(PGParseState * pstate,
-		PGQuery * subquery, PGAlias * alias, bool inFromCl)
+PGRangeTblEntry * addRangeTableEntryForSubquery(PGParseState * pstate, PGQuery * subquery,
+        PGAlias * alias, bool lateral, bool inFromCl)
 {
-	PGRangeTblEntry *rte = makeNode(PGRangeTblEntry);
-	char	   *refname = alias->aliasname;
-	PGAlias	   *eref;
-	int			numaliases;
-	int			varattno;
-	PGListCell   *tlistitem;
+    PGRangeTblEntry * rte = makeNode(PGRangeTblEntry);
+    char * refname = alias->aliasname;
+    PGAlias * eref;
+    int numaliases;
+    int varattno;
+    PGListCell * tlistitem;
 
-	rte->rtekind = PG_RTE_SUBQUERY;
-	rte->relid = InvalidOid;
-	rte->subquery = subquery;
-	rte->alias = alias;
+    rte->rtekind = PG_RTE_SUBQUERY;
+    rte->relid = InvalidOid;
+    rte->subquery = subquery;
+    rte->alias = alias;
 
-	eref = copyObject(alias);
-	numaliases = list_length(eref->colnames);
+    eref = copyObject(alias);
+    numaliases = list_length(eref->colnames);
 
-	/* fill in any unspecified alias columns */
-	varattno = 0;
-	foreach(tlistitem, subquery->targetList)
-	{
-		PGTargetEntry *te = (PGTargetEntry *) lfirst(tlistitem);
+    /* fill in any unspecified alias columns */
+    varattno = 0;
+    foreach (tlistitem, subquery->targetList)
+    {
+        PGTargetEntry * te = (PGTargetEntry *)lfirst(tlistitem);
 
-		if (te->resjunk)
-			continue;
-		varattno++;
-		Assert(varattno == te->resno);
-		if (varattno > numaliases)
-		{
-			char	   *attrname;
+        if (te->resjunk)
+            continue;
+        varattno++;
+        Assert(varattno == te->resno);
+        if (varattno > numaliases)
+        {
+            char * attrname;
 
-			attrname = pstrdup(te->resname);
-			eref->colnames = lappend(eref->colnames, makeString(attrname));
-		}
-	}
-	if (varattno < numaliases)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-				 errmsg("table \"%s\" has %d columns available but %d columns specified",
-						refname, varattno, numaliases)));
+            attrname = pstrdup(te->resname);
+            eref->colnames = lappend(eref->colnames, makeString(attrname));
+        }
+    }
+    if (varattno < numaliases)
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+             errmsg("table \"%s\" has %d columns available but %d columns specified", refname, varattno, numaliases)));
 
-	rte->eref = eref;
+    rte->eref = eref;
 
-	/*----------
-	 * Flags:
-	 * - this RTE should be expanded to include descendant tables,
-	 * - this RTE is in the FROM clause,
-	 * - this RTE should be checked for appropriate access rights.
+    /*
+	 * Set flags and access permissions.
 	 *
 	 * Subqueries are never checked for access rights.
-	 *----------
 	 */
-	rte->inh = false;			/* never true for subqueries */
-	rte->inFromCl = inFromCl;
+    rte->lateral = lateral;
+    rte->inh = false; /* never true for subqueries */
+    rte->inFromCl = inFromCl;
 
-	rte->requiredPerms = 0;
-	rte->checkAsUser = InvalidOid;
+    rte->requiredPerms = 0;
+    rte->checkAsUser = InvalidOid;
+    rte->selectedCols = NULL;
+    rte->modifiedCols = NULL;
 
-	/*
+    /*
 	 * Add completed RTE to pstate's range table list, but not to join list
 	 * nor namespace --- caller must do that if appropriate.
 	 */
-	if (pstate != NULL)
-		pstate->p_rtable = lappend(pstate->p_rtable, rte);
+    if (pstate != NULL)
+        pstate->p_rtable = lappend(pstate->p_rtable, rte);
 
-	return rte;
+    return rte;
 };
 
 PGRangeTblEntry * RelationParser::scanNameSpaceForRelid(PGParseState * pstate, Oid relid)
@@ -1432,7 +1433,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForJoin(PGParseState * pstat
     rte->alias = alias;
 
     /* transform any Vars of type UNKNOWNOID if we can */
-    coerce_parser.fixup_unknown_vars_in_exprlist(pstate, rte->joinaliasvars);
+    coerce_parser_ptr->fixup_unknown_vars_in_exprlist(pstate, rte->joinaliasvars);
 
     eref = alias ? (PGAlias *)copyObject(alias) : makeAlias("unnamed_join", NIL);
     numaliases = list_length(eref->colnames);
@@ -1466,6 +1467,44 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForJoin(PGParseState * pstat
         pstate->p_rtable = lappend(pstate->p_rtable, rte);
 
     return rte;
+};
+
+PGLockingClause * RelationParser::getLockedRefname(PGParseState * pstate, const char * refname)
+{
+    PGListCell * l;
+
+    /*
+	 * If we are in a subquery specified as locked FOR UPDATE/SHARE from
+	 * parent level, then act as though there's a generic FOR UPDATE here.
+	 */
+    if (pstate->p_lockclause_from_parent)
+        return pstate->p_lockclause_from_parent;
+
+    foreach (l, pstate->p_locking_clause)
+    {
+        PGLockingClause * lc = (PGLockingClause *)lfirst(l);
+
+        if (lc->lockedRels == NIL)
+        {
+            /* all tables used in query */
+            return lc;
+        }
+        else
+        {
+            /* just the named tables */
+            PGListCell * l2;
+
+            foreach (l2, lc->lockedRels)
+            {
+                PGRangeVar * thisrel = (PGRangeVar *)lfirst(l2);
+
+                if (strcmp(refname, thisrel->relname) == 0)
+                    return lc;
+            }
+        }
+    }
+
+    return NULL;
 };
 
 char * RelationParser::get_rte_attribute_name(PGRangeTblEntry * rte, PGAttrNumber attnum)

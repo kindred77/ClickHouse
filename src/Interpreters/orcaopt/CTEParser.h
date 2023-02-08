@@ -1,18 +1,19 @@
 #pragma once
 
 #include <Interpreters/orcaopt/parser_common.h>
-#include <Interpreters/orcaopt/RelationParser.h>
-#include <Interpreters/orcaopt/NodeParser.h>
-#include <Interpreters/orcaopt/SelectParser.h>
 
 namespace DB
 {
+
+class RelationParser;
+class SelectParser;
+using RelationParserPtr = std::unique_ptr<RelationParser>;
+using SelectParserPtr = std::unique_ptr<SelectParser>;
 
 class CTEParser
 {
 private:
 	RelationParserPtr relation_parser_ptr;
-	NodeParserPtr node_parser_ptr;
 	SelectParserPtr select_parser_ptr;
 public:
 	explicit CTEParser();
@@ -30,4 +31,5 @@ public:
     duckdb_libpgquery::PGCommonTableExpr * GetCTEForRTE(PGParseState * pstate,
 		duckdb_libpgquery::PGRangeTblEntry * rte, int rtelevelsup);
 };
+
 }

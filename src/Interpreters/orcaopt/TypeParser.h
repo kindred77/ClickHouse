@@ -17,4 +17,5 @@ public:
 
     Oid typenameTypeId(PGParseState * pstate, const duckdb_libpgquery::PGTypeName * typname);
 };
+
 }

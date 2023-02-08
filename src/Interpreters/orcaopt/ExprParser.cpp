@@ -1,5 +1,14 @@
 #include <Interpreters/orcaopt/ExprParser.h>
 
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/OperParser.h>
+#include <Interpreters/orcaopt/NodeParser.h>
+#include <Interpreters/orcaopt/TypeParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/FuncParser.h>
+#include <Interpreters/orcaopt/SelectParser.h>
+#include <Interpreters/orcaopt/TargetParser.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -11,12 +20,12 @@ PGNode * ExprParser::typecast_expression(PGParseState * pstate,
     Oid inputType = exprType(expr);
     Oid targetType;
 
-    targetType = type_parser.typenameTypeId(pstate, typname);
+    targetType = type_parser_ptr->typenameTypeId(pstate, typname);
 
     if (inputType == InvalidOid)
         return expr; /* do nothing if NULL input */
 
-    expr = coerce_parser.coerce_to_target_type(pstate, expr, inputType, targetType, typname->typmod, PG_COERCION_EXPLICIT, PG_COERCE_EXPLICIT_CAST, -1);
+    expr = coerce_parser_ptr->coerce_to_target_type(pstate, expr, inputType, targetType, typname->typmod, PG_COERCION_EXPLICIT, PG_COERCE_EXPLICIT_CAST, -1);
     if (expr == NULL)
         ereport(
             ERROR,
@@ -71,7 +80,7 @@ PGNode * ExprParser::transformColumnRef(PGParseState * pstate,
             char * name = strVal(linitial(cref->fields));
 
             /* Try to identify as an unqualified column */
-            node = relation_parser.colNameToVar(pstate, name, false, cref->location);
+            node = relation_parser_ptr->colNameToVar(pstate, name, false, cref->location);
 
             if (node == NULL)
             {
@@ -98,7 +107,7 @@ PGNode * ExprParser::transformColumnRef(PGParseState * pstate,
 					 * PostQUEL-inspired syntax.  The preferred form now is
 					 * "rel.*".
 					 */
-                if (relation_parser.refnameRangeTblEntry(pstate, NULL /*catalogname*/, NULL /*schemaname*/, name, cref->location, &levels_up) != NULL)
+                if (relation_parser_ptr->refnameRangeTblEntry(pstate, NULL /*catalogname*/, NULL /*schemaname*/, name, cref->location, &levels_up) != NULL)
                     node = transformWholeRowRef(pstate, NULL /*catalogname*/, NULL, name, cref->location);
                 else
                     ereport(
@@ -256,12 +265,12 @@ PGNode * ExprParser::transformWholeRowRef(PGParseState * pstate, char * catalogn
 
     /* Look up the referenced RTE, creating it if needed */
 
-    rte = relation_parser.refnameRangeTblEntry(pstate, catalogname, schemaname, relname, location, &sublevels_up);
+    rte = relation_parser_ptr->refnameRangeTblEntry(pstate, catalogname, schemaname, relname, location, &sublevels_up);
 
     if (rte == NULL)
-        rte = relation_parser.addImplicitRTE(pstate, makeRangeVar(catalogname, schemaname, relname, location), location);
+        rte = relation_parser_ptr->addImplicitRTE(pstate, makeRangeVar(catalogname, schemaname, relname, location), location);
 
-    vnum = relation_parser.RTERangeTablePosn(pstate, rte, &sublevels_up);
+    vnum = relation_parser_ptr->RTERangeTablePosn(pstate, rte, &sublevels_up);
 
     /* Build the appropriate referencing node */
 
@@ -373,7 +382,7 @@ PGNode * ExprParser::make_row_comparison_op(PGParseState * pstate,
         PGNode * rarg = (PGNode *)lfirst(r);
         PGOpExpr * cmp;
 
-        cmp = (PGOpExpr *)oper_parser.make_op(pstate, opname, larg, rarg, location);
+        cmp = (PGOpExpr *)oper_parser_ptr->make_op(pstate, opname, larg, rarg, location);
         Assert(IsA(cmp, PGOpExpr));
 
         /*
@@ -647,7 +656,7 @@ PGNode * ExprParser::transformAExprOp(PGParseState * pstate,
         /* CDB: Drop a breadcrumb in case of error. */
         pstate->p_breadcrumb.node = (PGNode *)a;
 
-        result = (PGNode *)oper_parser.make_op(pstate, a->name, lexpr, rexpr, a->location);
+        result = (PGNode *)oper_parser_ptr->make_op(pstate, a->name, lexpr, rexpr, a->location);
     }
 
     return result;
@@ -658,8 +667,8 @@ PGNode * ExprParser::transformAExprAnd(PGParseState * pstate, PGAExpr * a)
     PGNode * lexpr = transformExpr(pstate, a->lexpr);
     PGNode * rexpr = transformExpr(pstate, a->rexpr);
 
-    lexpr = coerce_parser.coerce_to_boolean(pstate, lexpr, "AND");
-    rexpr = coerce_parser.coerce_to_boolean(pstate, rexpr, "AND");
+    lexpr = coerce_parser_ptr->coerce_to_boolean(pstate, lexpr, "AND");
+    rexpr = coerce_parser_ptr->coerce_to_boolean(pstate, rexpr, "AND");
 
     return (PGNode *)makeBoolExpr(PG_AND_EXPR, list_make2(lexpr, rexpr), a->location);
 };
@@ -669,8 +678,8 @@ PGNode * ExprParser::transformAExprOr(PGParseState * pstate, PGAExpr * a)
     PGNode * lexpr = transformExpr(pstate, a->lexpr);
     PGNode * rexpr = transformExpr(pstate, a->rexpr);
 
-    lexpr = coerce_parser.coerce_to_boolean(pstate, lexpr, "OR");
-    rexpr = coerce_parser.coerce_to_boolean(pstate, rexpr, "OR");
+    lexpr = coerce_parser_ptr->coerce_to_boolean(pstate, lexpr, "OR");
+    rexpr = coerce_parser_ptr->coerce_to_boolean(pstate, rexpr, "OR");
 
     return (PGNode *)makeBoolExpr(PG_OR_EXPR, list_make2(lexpr, rexpr), a->location);
 };
@@ -679,7 +688,7 @@ PGNode * ExprParser::transformAExprNot(PGParseState * pstate, PGAExpr * a)
 {
     PGNode * rexpr = transformExpr(pstate, a->rexpr);
 
-    rexpr = coerce_parser.coerce_to_boolean(pstate, rexpr, "NOT");
+    rexpr = coerce_parser_ptr->coerce_to_boolean(pstate, rexpr, "NOT");
 
     return (PGNode *)makeBoolExpr(PG_NOT_EXPR, list_make1(rexpr), a->location);
 };
@@ -689,7 +698,7 @@ PGNode * ExprParser::transformAExprOpAny(PGParseState * pstate, PGAExpr * a)
     PGNode * lexpr = transformExpr(pstate, a->lexpr);
     PGNode * rexpr = transformExpr(pstate, a->rexpr);
 
-    return (PGNode *)oper_parser.make_scalar_array_op(pstate, a->name, true, lexpr, rexpr, a->location);
+    return (PGNode *)oper_parser_ptr->make_scalar_array_op(pstate, a->name, true, lexpr, rexpr, a->location);
 };
 
 PGNode * ExprParser::transformAExprOpAll(PGParseState * pstate, PGAExpr * a)
@@ -697,7 +706,7 @@ PGNode * ExprParser::transformAExprOpAll(PGParseState * pstate, PGAExpr * a)
     PGNode * lexpr = transformExpr(pstate, a->lexpr);
     PGNode * rexpr = transformExpr(pstate, a->rexpr);
 
-    return (PGNode *)oper_parser.make_scalar_array_op(pstate, a->name, false, lexpr, rexpr, a->location);
+    return (PGNode *)oper_parser_ptr->make_scalar_array_op(pstate, a->name, false, lexpr, rexpr, a->location);
 };
 
 PGNode * ExprParser::make_row_distinct_op(PGParseState * pstate, PGList * opname,
@@ -813,7 +822,7 @@ PGNode * ExprParser::transformAExprOf(PGParseState * pstate, PGAExpr * a)
     ltype = exprType(lexpr);
     foreach (telem, (PGList *)a->rexpr)
     {
-        rtype = type_parser.typenameTypeId(pstate, lfirst(telem));
+        rtype = type_parser_ptr->typenameTypeId(pstate, lfirst(telem));
         matched = (rtype == ltype);
         if (matched)
             break;
@@ -888,7 +897,7 @@ PGNode * ExprParser::transformAExprIn(PGParseState * pstate, PGAExpr * a)
 		 * LHS' type is first in the list, it will be preferred when there is
 		 * doubt (eg, when all the RHS items are unknown literals).
 		 */
-        scalar_type = coerce_parser.select_common_type(typeids, "IN");
+        scalar_type = coerce_parser_ptr->select_common_type(typeids, "IN");
 
         /* Do we have an array type to use? */
         array_type = get_array_type(scalar_type);
@@ -906,7 +915,7 @@ PGNode * ExprParser::transformAExprIn(PGParseState * pstate, PGAExpr * a)
             {
                 PGNode * rexpr = (PGNode *)lfirst(l);
 
-                rexpr = coerce_parser.coerce_to_common_type(pstate, rexpr, scalar_type, "IN");
+                rexpr = coerce_parser_ptr->coerce_to_common_type(pstate, rexpr, scalar_type, "IN");
                 aexprs = lappend(aexprs, rexpr);
             }
             newa = makeNode(PGArrayExpr);
@@ -915,7 +924,7 @@ PGNode * ExprParser::transformAExprIn(PGParseState * pstate, PGAExpr * a)
             newa->elements = aexprs;
             newa->multidims = false;
 
-            return (PGNode *)oper_parser.make_scalar_array_op(pstate, a->name, useOr, lexpr, (PGNode *)newa, a->location);
+            return (PGNode *)oper_parser_ptr->make_scalar_array_op(pstate, a->name, useOr, lexpr, (PGNode *)newa, a->location);
         }
     }
 
@@ -940,9 +949,9 @@ PGNode * ExprParser::transformAExprIn(PGParseState * pstate, PGAExpr * a)
                 pstate, a->name, (List *)copyObject(((RowExpr *)lexpr)->args), ((RowExpr *)rexpr)->args, a->location);
         }
         else
-            cmp = (Node *)oper_parser.make_op(pstate, a->name, copyObject(lexpr), rexpr, a->location);
+            cmp = (Node *)oper_parser_ptr->make_op(pstate, a->name, copyObject(lexpr), rexpr, a->location);
 
-        cmp = coerce_parser.coerce_to_boolean(pstate, cmp, "IN");
+        cmp = coerce_parser_ptr->coerce_to_boolean(pstate, cmp, "IN");
         if (result == NULL)
             result = cmp;
         else
@@ -970,7 +979,7 @@ PGNode * ExprParser::transformFuncCall(PGParseState * pstate, PGFuncCall * fn)
     pstate->p_breadcrumb.node = (PGNode *)fn;
 
     /* ... and hand off to ParseFuncOrColumn */
-    return func_parser.ParseFuncOrColumn(
+    return func_parser_ptr->ParseFuncOrColumn(
         pstate,
         fn->funcname,
         targs,
@@ -995,7 +1004,7 @@ PGNode * ExprParser::transformSubLink(PGParseState * pstate, PGSubLink * sublink
         return result;
 
     pstate->p_hasSubLinks = true;
-    qtrees = select_parser.parse_sub_analyze(sublink->subselect, pstate);
+    qtrees = select_parser_ptr->parse_sub_analyze(sublink->subselect, pstate);
 
     /*
 	 * Check that we got something reasonable.	Many of these conditions are
@@ -1149,7 +1158,7 @@ PGNode * ExprParser::transformCaseExpr(PGParseState * pstate, PGCaseExpr * c)
 		 * commonly seen.
 		 */
         if (exprType(arg) == UNKNOWNOID)
-            arg = coerce_parser.coerce_to_common_type(pstate, arg, TEXTOID, "CASE");
+            arg = coerce_parser_ptr->coerce_to_common_type(pstate, arg, TEXTOID, "CASE");
 
         placeholder = makeNode(PGCaseTestExpr);
         placeholder->typeId = exprType(arg);
@@ -1204,7 +1213,7 @@ PGNode * ExprParser::transformCaseExpr(PGParseState * pstate, PGCaseExpr * c)
         }
         neww->expr = (PGExpr *)transformExpr(pstate, warg);
 
-        neww->expr = (PGExpr *)coerce_parser.coerce_to_boolean(pstate, (PGNode *)neww->expr, "CASE/WHEN");
+        neww->expr = (PGExpr *)coerce_parser_ptr->coerce_to_boolean(pstate, (PGNode *)neww->expr, "CASE/WHEN");
 
         warg = (PGNode *)w->result;
         neww->result = (PGExpr *)transformExpr(pstate, warg);
@@ -1236,19 +1245,19 @@ PGNode * ExprParser::transformCaseExpr(PGParseState * pstate, PGCaseExpr * c)
     /* CDB: Drop a breadcrumb in case of error. */
     pstate->p_breadcrumb.node = (PGNode *)c;
 
-    ptype = coerce_parser.select_common_type(typeids, "CASE");
+    ptype = coerce_parser_ptr->select_common_type(typeids, "CASE");
     Assert(OidIsValid(ptype));
     newc->casetype = ptype;
 
     /* Convert default result clause, if necessary */
-    newc->defresult = (PGExpr *)coerce_parser.coerce_to_common_type(pstate, (PGNode *)newc->defresult, ptype, "CASE/ELSE");
+    newc->defresult = (PGExpr *)coerce_parser_ptr->coerce_to_common_type(pstate, (PGNode *)newc->defresult, ptype, "CASE/ELSE");
 
     /* Convert when-clause results, if necessary */
     foreach (l, newc->args)
     {
         PGCaseWhen * w = (PGCaseWhen *)lfirst(l);
 
-        w->result = (PGExpr *)coerce_parser.coerce_to_common_type(pstate, (PGNode *)w->result, ptype, "CASE/WHEN");
+        w->result = (PGExpr *)coerce_parser_ptr->coerce_to_common_type(pstate, (PGNode *)w->result, ptype, "CASE/WHEN");
     }
 
     return (PGNode *)newc;
@@ -1279,7 +1288,7 @@ PGNode * ExprParser::transformArrayExpr(PGParseState * pstate, PGArrayExpr * a)
     pstate->p_breadcrumb.node = (PGNode *)a;
 
     /* Select a common type for the elements */
-    element_type = coerce_parser.select_common_type(typeids, "ARRAY");
+    element_type = coerce_parser_ptr->select_common_type(typeids, "ARRAY");
 
     /* Coerce arguments to common type if necessary */
     foreach (element, newelems)
@@ -1287,7 +1296,7 @@ PGNode * ExprParser::transformArrayExpr(PGParseState * pstate, PGArrayExpr * a)
         PGNode * e = (PGNode *)lfirst(element);
         PGNode * newe;
 
-        newe = coerce_parser.coerce_to_common_type(pstate, e, element_type, "ARRAY");
+        newe = coerce_parser_ptr->coerce_to_common_type(pstate, e, element_type, "ARRAY");
         newcoercedelems = lappend(newcoercedelems, newe);
     }
 
@@ -1323,7 +1332,7 @@ PGNode * ExprParser::transformRowExpr(PGParseState * pstate, PGRowExpr * r)
     PGRowExpr * newr = makeNode(PGRowExpr);
 
     /* Transform the field expressions */
-    newr->args = target_parser.transformExpressionList(pstate, r->args);
+    newr->args = target_parser_ptr->transformExpressionList(pstate, r->args);
 
     /* Barring later casting, we consider the type RECORD */
     newr->row_typeid = RECORDOID;
@@ -1350,7 +1359,7 @@ PGNode * ExprParser::transformCoalesceExpr(PGParseState * pstate, PGCoalesceExpr
         typeids = lappend_oid(typeids, exprType(newe));
     }
 
-    newc->coalescetype = coerce_parser.select_common_type(typeids, "COALESCE");
+    newc->coalescetype = coerce_parser_ptr->select_common_type(typeids, "COALESCE");
 
     /* Convert arguments if necessary */
     foreach (args, newargs)
@@ -1358,7 +1367,7 @@ PGNode * ExprParser::transformCoalesceExpr(PGParseState * pstate, PGCoalesceExpr
         PGNode * e = (PGNode *)lfirst(args);
         PGNode * newe;
 
-        newe = coerce_parser.coerce_to_common_type(pstate, e, newc->coalescetype, "COALESCE");
+        newe = coerce_parser_ptr->coerce_to_common_type(pstate, e, newc->coalescetype, "COALESCE");
         newcoercedargs = lappend(newcoercedargs, newe);
     }
 
@@ -1385,7 +1394,7 @@ PGNode * ExprParser::transformMinMaxExpr(PGParseState * pstate, PGMinMaxExpr * m
         typeids = lappend_oid(typeids, exprType(newe));
     }
 
-    newm->minmaxtype = coerce_parser.select_common_type(typeids, "GREATEST/LEAST");
+    newm->minmaxtype = coerce_parser_ptr->select_common_type(typeids, "GREATEST/LEAST");
 
     /* Convert arguments if necessary */
     foreach (args, newargs)
@@ -1393,7 +1402,7 @@ PGNode * ExprParser::transformMinMaxExpr(PGParseState * pstate, PGMinMaxExpr * m
         PGNode * e = (PGNode *)lfirst(args);
         PGNode * newe;
 
-        newe = coerce_parser.coerce_to_common_type(pstate, e, newm->minmaxtype, "GREATEST/LEAST");
+        newe = coerce_parser_ptr->coerce_to_common_type(pstate, e, newm->minmaxtype, "GREATEST/LEAST");
         newcoercedargs = lappend(newcoercedargs, newe);
     }
 
@@ -1432,7 +1441,7 @@ PGNode * ExprParser::transformBooleanTest(PGParseState * pstate, PGBooleanTest *
 
     b->arg = (PGExpr *)transformExpr(pstate, (PGNode *)b->arg);
 
-    b->arg = (PGExpr *)coerce_parser.coerce_to_boolean(pstate, (PGNode *)b->arg, clausename);
+    b->arg = (PGExpr *)coerce_parser_ptr->coerce_to_boolean(pstate, (PGNode *)b->arg, clausename);
 
     return (PGNode *)b;
 };
@@ -1491,7 +1500,7 @@ PGNode * ExprParser::transformExpr(PGParseState * pstate,
             PGAConst * con = (PGAConst *)expr;
             PGValue * val = &con->val;
 
-            result = (PGNode *)node_parser.make_const(pstate, val, -1);
+            result = (PGNode *)node_parser_ptr->make_const(pstate, val, -1);
             if (con->typname != NULL)
                 result = typecast_expression(pstate, result, con->typname);
             break;
@@ -1615,7 +1624,7 @@ PGNode * ExprParser::transformExpr(PGParseState * pstate,
 
             PGCurrentOfExpr * c = (PGCurrentOfExpr *)expr;
             int sublevels_up;
-            c->cvarno = relation_parser.RTERangeTablePosn(pstate, pstate->p_target_rangetblentry, &sublevels_up);
+            c->cvarno = relation_parser_ptr->RTERangeTablePosn(pstate, pstate->p_target_rangetblentry, &sublevels_up);
             c->target_relid = pstate->p_target_rangetblentry->relid;
             Assert(sublevels_up == 0);
             result = expr;
@@ -1737,6 +1746,89 @@ PGNode * ExprParser::transformExpr(PGParseState * pstate,
     pstate->p_breadcrumb = savebreadcrumb;
 
     return result;
+};
+
+const char * ExprParser::ParseExprKindName(PGParseExprKind exprKind)
+{
+    switch (exprKind)
+    {
+        case EXPR_KIND_NONE:
+            return "invalid expression context";
+        case EXPR_KIND_OTHER:
+            return "extension expression";
+        case EXPR_KIND_JOIN_ON:
+            return "JOIN/ON";
+        case EXPR_KIND_JOIN_USING:
+            return "JOIN/USING";
+        case EXPR_KIND_FROM_SUBSELECT:
+            return "sub-SELECT in FROM";
+        case EXPR_KIND_FROM_FUNCTION:
+            return "function in FROM";
+        case EXPR_KIND_WHERE:
+            return "WHERE";
+        case EXPR_KIND_HAVING:
+            return "HAVING";
+        case EXPR_KIND_FILTER:
+            return "FILTER";
+        case EXPR_KIND_WINDOW_PARTITION:
+            return "window PARTITION BY";
+        case EXPR_KIND_WINDOW_ORDER:
+            return "window ORDER BY";
+        case EXPR_KIND_WINDOW_FRAME_RANGE:
+            return "window RANGE";
+        case EXPR_KIND_WINDOW_FRAME_ROWS:
+            return "window ROWS";
+        case EXPR_KIND_SELECT_TARGET:
+            return "SELECT";
+        case EXPR_KIND_INSERT_TARGET:
+            return "INSERT";
+        case EXPR_KIND_UPDATE_SOURCE:
+        case EXPR_KIND_UPDATE_TARGET:
+            return "UPDATE";
+        case EXPR_KIND_GROUP_BY:
+            return "GROUP BY";
+        case EXPR_KIND_ORDER_BY:
+            return "ORDER BY";
+        case EXPR_KIND_DISTINCT_ON:
+            return "DISTINCT ON";
+        case EXPR_KIND_LIMIT:
+            return "LIMIT";
+        case EXPR_KIND_OFFSET:
+            return "OFFSET";
+        case EXPR_KIND_RETURNING:
+            return "RETURNING";
+        case EXPR_KIND_VALUES:
+            return "VALUES";
+        case EXPR_KIND_CHECK_CONSTRAINT:
+        case EXPR_KIND_DOMAIN_CHECK:
+            return "CHECK";
+        case EXPR_KIND_COLUMN_DEFAULT:
+        case EXPR_KIND_FUNCTION_DEFAULT:
+            return "DEFAULT";
+        case EXPR_KIND_INDEX_EXPRESSION:
+            return "index expression";
+        case EXPR_KIND_INDEX_PREDICATE:
+            return "index predicate";
+        case EXPR_KIND_ALTER_COL_TRANSFORM:
+            return "USING";
+        case EXPR_KIND_EXECUTE_PARAMETER:
+            return "EXECUTE";
+        case EXPR_KIND_TRIGGER_WHEN:
+            return "WHEN";
+        case EXPR_KIND_PARTITION_EXPRESSION:
+            return "PARTITION BY";
+
+        case EXPR_KIND_SCATTER_BY:
+            return "SCATTER BY";
+
+            /*
+			 * There is intentionally no default: case here, so that the
+			 * compiler will warn if we add a new ParseExprKind without
+			 * extending this switch.  If we do see an unrecognized value at
+			 * runtime, we'll fall through to the "unrecognized" return.
+			 */
+    }
+    return "unrecognized expression kind";
 };
 
 }

@@ -1,5 +1,12 @@
 #include <Interpreters/orcaopt/SelectParser.h>
 
+#include <Interpreters/orcaopt/CTEParser.h>
+#include <Interpreters/orcaopt/ClauseParser.h>
+#include <Interpreters/orcaopt/AggParser.h>
+#include <Interpreters/orcaopt/TargetParser.h>
+#include <Interpreters/orcaopt/NodeParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -64,7 +71,7 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
     if (stmt->withClause != NULL)
     {
         qry->hasRecursive = stmt->withClause->recursive;
-        qry->cteList = cte_parser.transformWithClause(pstate, stmt->withClause);
+        qry->cteList = cte_parser_ptr->transformWithClause(pstate, stmt->withClause);
         qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
     }
 
@@ -78,44 +85,44 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
     pstate->p_win_clauses = stmt->windowClause;
 
     /* process the FROM clause */
-    clause_parser.transformFromClause(pstate, stmt->fromClause);
+    clause_parser_ptr->transformFromClause(pstate, stmt->fromClause);
 
     /* tidy up expressions in window clauses */
-    agg_parser.transformWindowSpecExprs(pstate);
+    agg_parser_ptr->transformWindowSpecExprs(pstate);
 
     /* transform targetlist */
-    qry->targetList = target_parser.transformTargetList(pstate, stmt->targetList);
+    qry->targetList = target_parser_ptr->transformTargetList(pstate, stmt->targetList);
 
     /* mark column origins */
-    target_parser.markTargetListOrigins(pstate, qry->targetList);
+    target_parser_ptr->markTargetListOrigins(pstate, qry->targetList);
 
     /* transform WHERE */
-    qual = clause_parser.transformWhereClause(pstate, stmt->whereClause, "WHERE");
+    qual = clause_parser_ptr->transformWhereClause(pstate, stmt->whereClause, "WHERE");
 
     /*
    * Initial processing of HAVING clause is just like WHERE clause.
    */
-    pstate->having_qual = clause_parser.transformWhereClause(pstate, stmt->havingClause, "HAVING");
+    pstate->having_qual = clause_parser_ptr->transformWhereClause(pstate, stmt->havingClause, "HAVING");
 
     /*
    * CDB: Untyped Const or Param nodes in a subquery in the FROM clause
    * might have been assigned proper types when we transformed the WHERE
    * clause, targetlist, etc.  Bring targetlist Var types up to date.
    */
-    coerce_parser.fixup_unknown_vars_in_targetlist(pstate, qry->targetList);
+    coerce_parser_ptr->fixup_unknown_vars_in_targetlist(pstate, qry->targetList);
 
     /*
    * Transform sorting/grouping stuff.  Do ORDER BY first because both
    * transformGroupClause and transformDistinctClause need the results.
    */
-    qry->sortClause = clause_parser.transformSortClause(
+    qry->sortClause = clause_parser_ptr->transformSortClause(
         pstate,
         stmt->sortClause,
         &qry->targetList,
         true, /* fix unknowns */
         false /* use SQL92 rules */);
 
-    qry->groupClause = clause_parser.transformGroupClause(pstate, stmt->groupClause, &qry->targetList, qry->sortClause, false /* useSQL92 rules */);
+    qry->groupClause = clause_parser_ptr->transformGroupClause(pstate, stmt->groupClause, &qry->targetList, qry->sortClause, false /* useSQL92 rules */);
 
     /*
    * SCATTER BY clause on a table function TableValueExpr subquery.
@@ -126,7 +133,7 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
    * allowed.
    */
     Insist(!(stmt->scatterClause && stmt->intoClause));
-    qry->scatterClause = clause_parser.transformScatterClause(pstate, stmt->scatterClause, &qry->targetList);
+    qry->scatterClause = clause_parser_ptr->transformScatterClause(pstate, stmt->scatterClause, &qry->targetList);
 
     /* Having clause */
     qry->havingQual = pstate->having_qual;
@@ -135,12 +142,12 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
     /*
    * Process WINDOW clause.
    */
-    clause_parser.transformWindowClause(pstate, qry);
+    clause_parser_ptr->transformWindowClause(pstate, qry);
 
-    qry->distinctClause = clause_parser.transformDistinctClause(pstate, stmt->distinctClause, &qry->targetList, &qry->sortClause, &qry->groupClause);
+    qry->distinctClause = clause_parser_ptr->transformDistinctClause(pstate, stmt->distinctClause, &qry->targetList, &qry->sortClause, &qry->groupClause);
 
-    qry->limitOffset = clause_parser.transformLimitClause(pstate, stmt->limitOffset, "OFFSET");
-    qry->limitCount = clause_parser.transformLimitClause(pstate, stmt->limitCount, "LIMIT");
+    qry->limitOffset = clause_parser_ptr->transformLimitClause(pstate, stmt->limitOffset, "OFFSET");
+    qry->limitCount = clause_parser_ptr->transformLimitClause(pstate, stmt->limitCount, "LIMIT");
 
     /* CDB: Cursor position not available for errors below this point. */
     pstate->p_breadcrumb.node = NULL;
@@ -197,9 +204,7 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
 
 PGQuery * SelectParser::transformStmt(
         PGParseState * pstate,
-        PGNode * parseTree,
-        PGList ** extras_before,
-        PGList ** extras_after)
+        PGNode * parseTree)
 {
     PGQuery * result = NULL;
 
@@ -346,8 +351,8 @@ SelectParser::do_parse_analyze(PGNode *parseTree, PGParseState *pstate)
     PGList * result = NIL;
 
     /* Lists to return extra commands from transformation */
-    PGList * extras_before = NIL;
-    PGList * extras_after = NIL;
+    //PGList * extras_before = NIL;
+    //PGList * extras_after = NIL;
     PGList * tmp = NIL;
     PGQuery * query;
     PGListCell * l;
@@ -360,7 +365,7 @@ SelectParser::do_parse_analyze(PGNode *parseTree, PGParseState *pstate)
     errcontext.previous = error_context_stack;
     error_context_stack = &errcontext;
 
-    query = transformStmt(pstate, parseTree, &extras_before, &extras_after);
+    query = transformStmt(pstate, parseTree);
 
     /* CDB: Pop error context callback stack. */
     error_context_stack = errcontext.previous;
@@ -371,13 +376,13 @@ SelectParser::do_parse_analyze(PGNode *parseTree, PGParseState *pstate)
     /* don't need to access result relation any more */
     release_pstate_resources(pstate);
 
-    foreach (l, extras_before)
-        result = list_concat(result, parse_sub_analyze(lfirst(l), pstate));
+    //foreach (l, extras_before)
+        //result = list_concat(result, parse_sub_analyze(lfirst(l), pstate));
 
     result = lappend(result, query);
 
-    foreach (l, extras_after)
-        tmp = list_concat(tmp, parse_sub_analyze(lfirst(l), pstate));
+    //foreach (l, extras_after)
+        //tmp = list_concat(tmp, parse_sub_analyze(lfirst(l), pstate));
 
     /*
    * If this is the top level query and it is a CreateStmt/CreateExternalStmt
@@ -472,7 +477,7 @@ PGList *
 SelectParser::parse_analyze(PGNode *parseTree, const char *sourceText, Oid *paramTypes,
                     int numParams)
 {
-    PGParseState * pstate = node_parser.make_parsestate(NULL);
+    PGParseState * pstate = node_parser_ptr->make_parsestate(NULL);
     PGList * result;
 
     pstate->p_sourcetext = sourceText;
@@ -482,21 +487,27 @@ SelectParser::parse_analyze(PGNode *parseTree, const char *sourceText, Oid *para
 
     result = do_parse_analyze(parseTree, pstate);
 
-    node_parser.free_parsestate(&pstate);
+    node_parser_ptr->free_parsestate(&pstate);
 
     return result;
 };
 
-PGList * SelectParser::parse_sub_analyze(PGNode * parseTree, PGParseState * parentParseState)
+PGQuery *
+SelectParser::parse_sub_analyze(duckdb_libpgquery::PGNode * parseTree, PGParseState * parentParseState,
+    PGCommonTableExpr * parentCTE, PGLockingClause * lockclause_from_parent)
 {
-    PGParseState * pstate = node_parser.make_parsestate(parentParseState);
-    PGList * result;
+    PGParseState *pstate = node_parser_ptr->make_parsestate(parentParseState);
+	PGQuery	   *query;
 
-    result = do_parse_analyze(parseTree, pstate);
+	pstate->p_parent_cte = parentCTE;
+	pstate->p_lockclause_from_parent = lockclause_from_parent;
 
-    node_parser.free_parsestate(&pstate);
+	//query = do_parse_analyze(parseTree, pstate);
+    query = transformStmt(pstate, parseTree);
 
-    return result;
+	node_parser_ptr->free_parsestate(pstate);
+
+	return query;
 };
 
 }

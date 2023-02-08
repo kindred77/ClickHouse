@@ -1,5 +1,9 @@
 #include <Interpreters/orcaopt/CoerceParser.h>
 
+#include <Interpreters/orcaopt/FuncParser.h>
+#include <Interpreters/orcaopt/TypeParser.h>
+#include <Interpreters/orcaopt/RelationParser.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -411,19 +415,19 @@ bool CoerceParser::can_coerce_type(int nargs, Oid *input_typeids, Oid *target_ty
 		 * If input is RECORD and target is a composite type, assume we can
 		 * coerce (may need tighter checking here)
 		 */
-        if (inputTypeId == RECORDOID && type_parser.typeidTypeRelid(targetTypeId) != InvalidOid)
+        if (inputTypeId == RECORDOID && type_parser_ptr->typeidTypeRelid(targetTypeId) != InvalidOid)
             continue;
 
         /*
 		 * If input is a composite type and target is RECORD, accept
 		 */
-        if (targetTypeId == RECORDOID && type_parser.typeidTypeRelid(inputTypeId) != InvalidOid)
+        if (targetTypeId == RECORDOID && type_parser_ptr->typeidTypeRelid(inputTypeId) != InvalidOid)
             continue;
 
         /*
 		 * If input is a class type that inherits from target, accept
 		 */
-        if (func_parser.typeInheritsFrom(inputTypeId, targetTypeId))
+        if (func_parser_ptr->typeInheritsFrom(inputTypeId, targetTypeId))
             continue;
 
         /*
@@ -944,7 +948,7 @@ PGVar * CoerceParser::coerce_unknown_var(
     if (!PointerIsValid(pstate))
         return var;
 
-    rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+    rte = relation_parser_ptr->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
 
     switch (rte->rtekind)
     {
@@ -985,7 +989,7 @@ PGVar * CoerceParser::coerce_unknown_var(
             Oid exprtype;
 
             /* Get referenced subquery result expr */
-            ste = relation_parser.get_tle_by_resno(rte->subquery->targetList, var->varattno);
+            ste = relation_parser_ptr->get_tle_by_resno(rte->subquery->targetList, var->varattno);
             Assert(ste && !ste->resjunk && ste->expr);
             targetexpr = (PGNode *)ste->expr;
 

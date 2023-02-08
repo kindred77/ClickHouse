@@ -1,10 +1,154 @@
 #include <Interpreters/orcaopt/ClauseParser.h>
+
 #include <Interpreters/orcaopt/walkers.h>
+
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/SelectParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/ExprParser.h>
+#include <Interpreters/orcaopt/TargetParser.h>
 
 using namespace duckdb_libpgquery;
 
 namespace DB
 {
+
+bool pg_grouping_rewrite_walker(PGNode * node, void * context)
+{
+    // using duckdb_libpgquery::PGListCell;
+    // using duckdb_libpgquery::PGList;
+    // using duckdb_libpgquery::PGNode;
+    // using duckdb_libpgquery::PGTargetEntry;
+    // using duckdb_libpgquery::PGRangeTblEntry;
+    // using duckdb_libpgquery::PGVar;
+    // using duckdb_libpgquery::PGRowExpr;
+
+    // using duckdb_libpgquery::PGAExpr;
+    // using duckdb_libpgquery::PGColumnRef;
+    // using duckdb_libpgquery::PGAConst;
+    // using duckdb_libpgquery::PGTypeCast;
+    // using duckdb_libpgquery::PGGroupingFunc;
+    // using duckdb_libpgquery::PGSortBy;
+    // using duckdb_libpgquery::T_PGAExpr;
+    // using duckdb_libpgquery::T_PGColumnRef;
+    // using duckdb_libpgquery::T_PGAConst;
+    // using duckdb_libpgquery::T_PGTypeCast;
+    // using duckdb_libpgquery::T_PGGroupingFunc;
+    // using duckdb_libpgquery::T_PGVar;
+    // using duckdb_libpgquery::T_PGRowExpr;
+    // using duckdb_libpgquery::T_PGSortBy;
+
+    // using duckdb_libpgquery::ereport;
+    // using duckdb_libpgquery::errcode;
+    // using duckdb_libpgquery::errmsg;
+    // using duckdb_libpgquery::makeInteger;
+
+    pg_grouping_rewrite_ctx * ctx = (pg_grouping_rewrite_ctx *)context;
+
+    if (node == NULL)
+        return false;
+
+    if (IsA(node, PGAConst))
+    {
+        return false;
+    }
+    else if (IsA(node, PGAExpr))
+    {
+        /* could be seen inside an untransformed window clause */
+        return false;
+    }
+    else if (IsA(node, PGColumnRef))
+    {
+        /* could be seen inside an untransformed window clause */
+        return false;
+    }
+    else if (IsA(node, PGTypeCast))
+    {
+        return false;
+    }
+    else if (IsA(node, PGGroupingFunc))
+    {
+        PGGroupingFunc * gf = (PGGroupingFunc *)node;
+        PGListCell * arg_lc;
+        PGList * newargs = NIL;
+
+        //gf->ngrpcols = list_length(ctx->grp_tles);
+
+        /*
+		 * For each argument in gf->args, find its position in grp_tles,
+		 * and increment its counts. Note that this is a O(n^2) algorithm,
+		 * but it should not matter that much.
+		 */
+        foreach (arg_lc, gf->args)
+        {
+            long i = 0;
+            PGNode * node_arg = (PGNode *)lfirst(arg_lc);
+            PGListCell * grp_lc = NULL;
+
+            foreach (grp_lc, ctx->grp_tles)
+            {
+                PGTargetEntry * grp_tle = (PGTargetEntry *)lfirst(grp_lc);
+
+                if (equal(grp_tle->expr, node_arg))
+                    break;
+                i++;
+            }
+
+            /* Find a column not in GROUP BY clause */
+            if (grp_lc == NULL)
+            {
+                PGRangeTblEntry * rte;
+                const char * attname;
+                PGVar * var = (PGVar *)node_arg;
+
+                /* Do not allow expressions inside a grouping function. */
+                if (IsA(node_arg, PGRowExpr))
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_GROUPING_ERROR),
+                         errmsg("row type can not be used inside a grouping function.")/* ,
+                         errOmitLocation(true) */));
+
+                if (!IsA(node_arg, PGVar))
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_GROUPING_ERROR),
+                         errmsg("expression in a grouping fuction does not appear in GROUP BY.")/* ,
+                         errOmitLocation(true) */));
+
+                Assert(IsA(node_arg, PGVar))
+                Assert(var->varno > 0)
+                Assert(var->varno <= list_length(ctx->pstate->p_rtable))
+
+                rte = rt_fetch(var->varno, ctx->pstate->p_rtable);
+                attname = RelationParser::get_rte_attribute_name(rte, var->varattno);
+
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_GROUPING_ERROR),
+                     errmsg("column \"%s\".\"%s\" is not in GROUP BY", rte->eref->aliasname, attname)/* ,
+                     errOmitLocation(true) */));
+            }
+
+            newargs = lappend(newargs, makeInteger(i));
+        }
+
+        /* Free gf->args since we do not need it any more. */
+        list_free_deep(gf->args);
+        gf->args = newargs;
+    }
+    else if (IsA(node, PGSortBy))
+    {
+        /*
+		 * When WindowSpec leaves the main parser, partition and order
+		 * clauses will be lists of SortBy structures. Process them here to
+		 * avoid muddying up the expression_tree_walker().
+		 */
+        PGSortBy * s = (PGSortBy *)node;
+        return pg_grouping_rewrite_walker(s->node, context);
+    }
+    return pg_expression_tree_walker(node, (walker_func)pg_grouping_rewrite_walker, context);
+};
 
 PGNode * ClauseParser::buildMergedJoinVar(PGParseState * pstate,
         PGJoinType jointype, PGVar * l_colvar,
@@ -21,7 +165,7 @@ PGNode * ClauseParser::buildMergedJoinVar(PGParseState * pstate,
     outcoltypmod = l_colvar->vartypmod;
     if (outcoltype != r_colvar->vartype)
     {
-        outcoltype = select_common_type(list_make2_oid(l_colvar->vartype, r_colvar->vartype), "JOIN/USING");
+        outcoltype = coerce_parser_ptr->select_common_type(list_make2_oid(l_colvar->vartype, r_colvar->vartype), "JOIN/USING");
         outcoltypmod = -1; /* ie, unknown */
     }
     else if (outcoltypmod != r_colvar->vartypmod)
@@ -37,18 +181,18 @@ PGNode * ClauseParser::buildMergedJoinVar(PGParseState * pstate,
 	 * not same as input.  We never need coerce_type_typmod.
 	 */
     if (l_colvar->vartype != outcoltype)
-        l_node = coerce_type(
-            pstate, (PGNode *)l_colvar, l_colvar->vartype, outcoltype, outcoltypmod, COERCION_IMPLICIT, COERCE_IMPLICIT_CAST, -1);
+        l_node = coerce_parser_ptr->coerce_type(
+            pstate, (PGNode *)l_colvar, l_colvar->vartype, outcoltype, outcoltypmod, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
     else if (l_colvar->vartypmod != outcoltypmod)
-        l_node = (PGNode *)makeRelabelType((Expr *)l_colvar, outcoltype, outcoltypmod, COERCE_IMPLICIT_CAST);
+        l_node = (PGNode *)makeRelabelType((PGExpr *)l_colvar, outcoltype, outcoltypmod, InvalidOid, PG_COERCE_IMPLICIT_CAST);
     else
         l_node = (PGNode *)l_colvar;
 
     if (r_colvar->vartype != outcoltype)
-        r_node = coerce_type(
-            pstate, (PGNode *)r_colvar, r_colvar->vartype, outcoltype, outcoltypmod, COERCION_IMPLICIT, COERCE_IMPLICIT_CAST, -1);
+        r_node = coerce_parser_ptr->coerce_type(
+            pstate, (PGNode *)r_colvar, r_colvar->vartype, outcoltype, outcoltypmod, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
     else if (r_colvar->vartypmod != outcoltypmod)
-        r_node = (PGNode *)makeRelabelType((Expr *)r_colvar, outcoltype, outcoltypmod, COERCE_IMPLICIT_CAST);
+        r_node = (PGNode *)makeRelabelType((PGExpr *)r_colvar, outcoltype, outcoltypmod, InvalidOid, PG_COERCE_IMPLICIT_CAST);
     else
         r_node = (PGNode *)r_colvar;
 
@@ -116,71 +260,57 @@ bool ClauseParser::interpretInhOption(InhOption inhOpt)
 PGRangeTblEntry * ClauseParser::transformRangeSubselect(PGParseState * pstate,
         PGRangeSubselect * r)
 {
-	PGList	   *parsetrees;
-	PGQuery	   *query;
-	PGRangeTblEntry *rte;
+    PGQuery * query;
+    PGRangeTblEntry * rte;
 
-	/*
+    /*
 	 * We require user to supply an alias for a subselect, per SQL92. To relax
 	 * this, we'd have to be prepared to gin up a unique alias for an
-	 * unlabeled subselect.
+	 * unlabeled subselect.  (This is just elog, not ereport, because the
+	 * grammar should have enforced it already.  It'd probably be better to
+	 * report the error here, but we don't have a good error location here.)
 	 */
-	if (r->alias == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("subquery in FROM must have an alias")));
+    if (r->alias == NULL)
+        elog(ERROR, "subquery in FROM must have an alias");
 
-	/*
+    /*
+	 * Set p_expr_kind to show this parse level is recursing to a subselect.
+	 * We can't be nested within any expression, so don't need save-restore
+	 * logic here.
+	 */
+    Assert(pstate->p_expr_kind == EXPR_KIND_NONE)
+    pstate->p_expr_kind = EXPR_KIND_FROM_SUBSELECT;
+
+    /*
+	 * If the subselect is LATERAL, make lateral_only names of this level
+	 * visible to it.  (LATERAL can't nest within a single pstate level, so we
+	 * don't need save/restore logic here.)
+	 */
+    Assert(!pstate->p_lateral_active)
+    pstate->p_lateral_active = r->lateral;
+
+    /*
 	 * Analyze and transform the subquery.
 	 */
-	parsetrees = select_parser.parse_sub_analyze(r->subquery, pstate);
+    query = select_parser_ptr->parse_sub_analyze(r->subquery, pstate, NULL, relation_parser_ptr->getLockedRefname(pstate, r->alias->aliasname));
 
-	/*
-	 * Check that we got something reasonable.	Most of these conditions are
-	 * probably impossible given restrictions of the grammar, but check 'em
-	 * anyway.
+    /* Restore state */
+    pstate->p_lateral_active = false;
+    pstate->p_expr_kind = EXPR_KIND_NONE;
+
+    /*
+	 * Check that we got something reasonable.  Many of these conditions are
+	 * impossible given restrictions of the grammar, but check 'em anyway.
 	 */
-	if (list_length(parsetrees) != 1)
-		elog(ERROR, "unexpected parse analysis result for subquery in FROM");
-	query = (PGQuery *) linitial(parsetrees);
-	if (query == NULL || !IsA(query, PGQuery))
-		elog(ERROR, "unexpected parse analysis result for subquery in FROM");
+    if (!IsA(query, PGQuery) || query->commandType != PG_CMD_SELECT || query->utilityStmt != NULL)
+        elog(ERROR, "unexpected non-SELECT command in subquery in FROM");
 
-	if (query->commandType != PG_CMD_SELECT)
-		elog(ERROR, "expected SELECT query from subquery in FROM");
-	if (query->intoClause != NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("subquery in FROM may not have SELECT INTO")));
-
-	/*
-	 * The subquery cannot make use of any variables from FROM items created
-	 * earlier in the current query.  Per SQL92, the scope of a FROM item does
-	 * not include other FROM items.  Formerly we hacked the namespace so that
-	 * the other variables weren't even visible, but it seems more useful to
-	 * leave them visible and give a specific error message.
-	 *
-	 * XXX this will need further work to support SQL99's LATERAL() feature,
-	 * wherein such references would indeed be legal.
-	 *
-	 * We can skip groveling through the subquery if there's not anything
-	 * visible in the current query.  Also note that outer references are OK.
-	 */
-	if (pstate->p_relnamespace || pstate->p_varnamespace)
-	{
-		if (contain_vars_of_level((PGNode *) query, 1))
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("subquery in FROM may not refer to other relations of same query level"),
-							 errOmitLocation(true)));
-	}
-
-	/*
+    /*
 	 * OK, build an RTE for the subquery.
 	 */
-	rte = relation_parser.addRangeTableEntryForSubquery(pstate, query, r->alias, true);
+    rte = relation_parser_ptr->addRangeTableEntryForSubquery(pstate, query, r->alias, r->lateral, true);
 
-	return rte;
+    return rte;
 };
 
 PGRangeTblEntry * ClauseParser::transformTableEntry(PGParseState * pstate,
@@ -195,7 +325,9 @@ PGRangeTblEntry * ClauseParser::transformTableEntry(PGParseState * pstate,
 	 * automatically generate the range variable if not specified. However
 	 * there are times we need to know whether the entries are legitimate.
 	 */
-    rte = relation_parser.addRangeTableEntry(pstate, r, r->alias, interpretInhOption(r->inhOpt), true);
+    //TODO
+    //rte = relation_parser_ptr->addRangeTableEntry(pstate, r, r->alias, interpretInhOption(r->inhOpt), true);
+    rte = relation_parser_ptr->addRangeTableEntry(pstate, r, r->alias, r->inh, true);
 
     return rte;
 };
@@ -208,9 +340,9 @@ PGNode * ClauseParser::transformWhereClause(PGParseState * pstate,
     if (clause == NULL)
         return NULL;
 
-    qual = expr_parser.transformExpr(pstate, clause);
+    qual = expr_parser_ptr->transformExpr(pstate, clause);
 
-    qual = coerce_parser.coerce_to_boolean(pstate, qual, constructName);
+    qual = coerce_parser_ptr->coerce_to_boolean(pstate, qual, constructName);
 
     return qual;
 };
@@ -227,7 +359,7 @@ PGNode * ClauseParser::transformWhereClause(PGParseState * pstate,
 // 	 * node, the result will be the function name, but it is possible for the
 // 	 * grammar to hand back other node types.
 // 	 */
-//     funcname = target_parser.FigureColname(r->funccallnode);
+//     funcname = target_parser_ptr->FigureColname(r->funccallnode);
 
 //     if (funcname)
 //     {
@@ -272,7 +404,7 @@ PGNode * ClauseParser::transformWhereClause(PGParseState * pstate,
 //                 rel = makeRangeVar(NULL /*catalogname*/, schemaname, tablename, arg_val->location);
 //                 rel->location = arg_val->location;
 
-//                 rte = relation_parser.addRangeTableEntry(pstate, rel, r->alias, false, true);
+//                 rte = relation_parser_ptr->addRangeTableEntry(pstate, rel, r->alias, false, true);
 
 //                 /* Now we set our special attribute in the rte. */
 //                 rte->forceDistRandom = true;
@@ -289,7 +421,7 @@ PGNode * ClauseParser::transformWhereClause(PGParseState * pstate,
 //     /*
 // 	 * Transform the raw expression.
 // 	 */
-//     funcexpr = expr_parser.transformExpr(pstate, r->funccallnode);
+//     funcexpr = expr_parser_ptr->transformExpr(pstate, r->funccallnode);
 
 //     /*
 // 	 * The function parameters cannot make use of any variables from other
@@ -327,7 +459,7 @@ PGNode * ClauseParser::transformWhereClause(PGParseState * pstate,
 //     /*
 // 	 * OK, build an RTE for the function.
 // 	 */
-//     rte = relation_parser.addRangeTableEntryForFunction(pstate, funcname, funcexpr, r, true);
+//     rte = relation_parser_ptr->addRangeTableEntryForFunction(pstate, funcname, funcexpr, r, true);
 
 //     /*
 // 	 * If a coldeflist was supplied, ensure it defines a legal set of names
@@ -363,7 +495,7 @@ PGNode * ClauseParser::transformJoinUsingClause(PGParseState * pstate, PGList * 
         PGNode * rvar = (PGNode *)lfirst(rvars);
         PGAExpr * e;
 
-        e = makeSimpleA_Expr(PG_AEXPR_OP, "=", copyObject(lvar), copyObject(rvar), -1);
+        e = makeSimpleAExpr(PG_AEXPR_OP, "=", (PGNode *)copyObject(lvar), (PGNode *)copyObject(rvar), -1);
 
         if (result == NULL)
             result = (PGNode *)e;
@@ -371,7 +503,7 @@ PGNode * ClauseParser::transformJoinUsingClause(PGParseState * pstate, PGList * 
         {
             PGAExpr * a;
 
-            a = makeA_Expr(AEXPR_AND, NIL, result, (PGNode *)e, -1);
+            a = makeAExpr(AEXPR_AND, NIL, result, (PGNode *)e, -1);
             result = (PGNode *)a;
         }
     }
@@ -382,9 +514,9 @@ PGNode * ClauseParser::transformJoinUsingClause(PGParseState * pstate, PGList * 
 	 * transformJoinOnClause() does.  Just invoke transformExpr() to fix up
 	 * the operators, and we're done.
 	 */
-    result = expr_parser.transformExpr(pstate, result);
+    result = expr_parser_ptr->transformExpr(pstate, result);
 
-    result = coerce_parser.coerce_to_boolean(pstate, result, "JOIN/USING");
+    result = coerce_parser_ptr->coerce_to_boolean(pstate, result, "JOIN/USING");
 
     return result;
 };
@@ -509,10 +641,10 @@ PGNode * ClauseParser::transformFromClauseItem(
 			PGCommonTableExpr *cte;
 			Index levelsup;
 
-			cte = relation_parser.scanNameSpaceForCTE(pstate, rangeVar->relname, &levelsup);
+			cte = relation_parser_ptr->scanNameSpaceForCTE(pstate, rangeVar->relname, &levelsup);
 			if (cte)
 			{
-				rte = relation_parser.addRangeTableEntryForCTE(pstate, cte, levelsup, rangeVar, true);
+				rte = relation_parser_ptr->addRangeTableEntryForCTE(pstate, cte, levelsup, rangeVar, true);
 			}
 		}
 
@@ -612,7 +744,7 @@ PGNode * ClauseParser::transformFromClauseItem(
 		 * this because higher levels will assume I hand back a self-
 		 * consistent namespace subtree.
 		 */
-		relation_parser.checkNameSpaceConflicts(pstate, l_relnamespace, r_relnamespace);
+		relation_parser_ptr->checkNameSpaceConflicts(pstate, l_relnamespace, r_relnamespace);
 
 		/*
 		 * Generate combined relation membership info for possible use by
@@ -628,9 +760,9 @@ PGNode * ClauseParser::transformFromClauseItem(
 		 *
 		 * Note: expandRTE returns new lists, safe for me to modify
 		 */
-		relation_parser.expandRTE(l_rte, l_rtindex, 0, false, -1,
+		relation_parser_ptr->expandRTE(l_rte, l_rtindex, 0, false, -1,
 				  &l_colnames, &l_colvars);
-		relation_parser.expandRTE(r_rte, r_rtindex, 0, false, -1,
+		relation_parser_ptr->expandRTE(r_rte, r_rtindex, 0, false, -1,
 				  &r_colnames, &r_colvars);
 
 		/*
@@ -822,7 +954,7 @@ PGNode * ClauseParser::transformFromClauseItem(
 		/*
 		 * Now build an RTE for the result of the join
 		 */
-		rte = relation_parser.addRangeTableEntryForJoin(pstate,
+		rte = relation_parser_ptr->addRangeTableEntryForJoin(pstate,
 										res_colnames,
 										j->jointype,
 										res_colvars,
@@ -889,7 +1021,7 @@ void ClauseParser::transformFromClause(PGParseState * pstate, PGList * frmList)
         PGRelids containedRels = NULL;
 
         n = transformFromClauseItem(pstate, n, &rte, &rtindex, &relnamespace, &containedRels);
-        relation_parser.checkNameSpaceConflicts(pstate, pstate->p_relnamespace, relnamespace);
+        relation_parser_ptr->checkNameSpaceConflicts(pstate, pstate->p_relnamespace, relnamespace);
         pstate->p_joinlist = lappend(pstate->p_joinlist, n);
         pstate->p_relnamespace = list_concat(pstate->p_relnamespace, relnamespace);
         pstate->p_varnamespace = lappend(pstate->p_varnamespace, rte);
@@ -911,7 +1043,7 @@ PGTargetEntry * ClauseParser::findTargetlistEntrySQL99(PGParseState * pstate,
 	 * resjunk target here, though the SQL92 cases above must ignore resjunk
 	 * targets.
 	 */
-    expr = expr_parser.transformExpr(pstate, node);
+    expr = expr_parser_ptr->transformExpr(pstate, node);
 
     foreach (tl, *tlist)
     {
@@ -926,7 +1058,7 @@ PGTargetEntry * ClauseParser::findTargetlistEntrySQL99(PGParseState * pstate,
 	 * end of the target list.	This target is given resjunk = TRUE so that it
 	 * will not be projected into the final tuple.
 	 */
-    target_result = target_parser.transformTargetEntry(pstate, node, expr, NULL, true);
+    target_result = target_parser_ptr->transformTargetEntry(pstate, node, expr, NULL, true);
 
     *tlist = lappend(*tlist, target_result);
 
@@ -1004,7 +1136,7 @@ PGTargetEntry * ClauseParser::findTargetlistEntrySQL92(PGParseState * pstate,
 			 * breaks no cases that are legal per spec, and it seems a more
 			 * self-consistent behavior.
 			 */
-            if (relation_parser.colNameToVar(pstate, name, true, location) != NULL)
+            if (relation_parser_ptr->colNameToVar(pstate, name, true, location) != NULL)
                 name = NULL;
         }
 
@@ -1139,7 +1271,7 @@ PGList * ClauseParser::addTargetToSortList(
                 tobe_type = TEXTOID;
                 tobe_typmod = -1;
             }
-            tle->expr = (PGExpr *)coerce_parser.coerce_type(
+            tle->expr = (PGExpr *)coerce_parser_ptr->coerce_type(
                 pstate, (PGNode *)tle->expr, restype, tobe_type, tobe_typmod, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
             restype = tobe_type;
         }
@@ -1373,7 +1505,7 @@ PGList * ClauseParser::transformGroupClause(PGParseState * pstate,
 
             if (restype == UNKNOWNOID)
                 tle->expr
-                    = (PGExpr *)coerce_parser.coerce_type(pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
+                    = (PGExpr *)coerce_parser_ptr->coerce_type(pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 
             /*
 			 * The tle_list will be used to match with the ORDER by element below.
@@ -1521,7 +1653,7 @@ PGList * ClauseParser::transformScatterClause(PGParseState * pstate,
         if (exprType((PGNode *)tle->expr) == UNKNOWNOID)
         {
             tle->expr
-                = (PGExpr *)coerce_parser.coerce_type(pstate, (PGNode *)tle->expr, UNKNOWNOID, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
+                = (PGExpr *)coerce_parser_ptr->coerce_type(pstate, (PGNode *)tle->expr, UNKNOWNOID, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
         }
 
         outlist = lappend(outlist, tle->expr);
@@ -1962,9 +2094,9 @@ PGNode * ClauseParser::transformLimitClause(PGParseState * pstate,
     if (clause == NULL)
         return NULL;
 
-    qual = expr_parser.transformExpr(pstate, clause);
+    qual = expr_parser_ptr->transformExpr(pstate, clause);
 
-    qual = coerce_parser.coerce_to_bigint(pstate, qual, constructName);
+    qual = coerce_parser_ptr->coerce_to_bigint(pstate, qual, constructName);
 
     /*
 	 * LIMIT can't refer to any vars or aggregates of the current query; we

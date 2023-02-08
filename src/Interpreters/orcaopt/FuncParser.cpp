@@ -1,8 +1,12 @@
 #include <Interpreters/orcaopt/FuncParser.h>
 
+#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/AggParser.h>
+
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
-using namespace duckdb_libpgquery;
 
 bool FuncParser::typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
 {
@@ -99,7 +103,7 @@ void FuncParser::make_fn_arguments(PGParseState * pstate, duckdb_libpgquery::PGL
         /* types don't match? then force coercion using a function call... */
         if (actual_arg_types[i] != declared_arg_types[i])
         {
-            lfirst(current_fargs) = coerce_parser.coerce_type(
+            lfirst(current_fargs) = coerce_parser_ptr->coerce_type(
                 pstate, lfirst(current_fargs), actual_arg_types[i], declared_arg_types[i], -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
         }
         i++;
@@ -516,7 +520,7 @@ PGNode * FuncParser::ParseFuncOrColumn(
             int winspec = 0;
             PGListCell * over_lc = NULL;
 
-            agg_parser.transformWindowSpec(pstate, over);
+            agg_parser_ptr->transformWindowSpec(pstate, over);
 
             foreach (over_lc, pstate->p_win_clauses)
             {
@@ -664,7 +668,7 @@ int FuncParser::func_match_argtypes(
     for (current_candidate = raw_candidates; current_candidate != NULL; current_candidate = next_candidate)
     {
         next_candidate = current_candidate->next;
-        if (coerce_parser.can_coerce_type(nargs, input_typeids, current_candidate->args, PG_COERCION_IMPLICIT))
+        if (coerce_parser_ptr->can_coerce_type(nargs, input_typeids, current_candidate->args, PG_COERCION_IMPLICIT))
         {
             current_candidate->next = *candidates;
             *candidates = current_candidate;
@@ -755,7 +759,7 @@ FuncCandidateList FuncParser::func_select_candidate(int nargs, Oid * input_typei
 	 * conversions to preferred types.)  Keep all candidates if none match.
 	 */
     for (i = 0; i < nargs; i++) /* avoid multiple lookups */
-        slot_category[i] = coerce_parser.TypeCategory(input_base_typeids[i]);
+        slot_category[i] = coerce_parser_ptr->TypeCategory(input_base_typeids[i]);
     ncandidates = 0;
     nbestMatch = 0;
     last_candidate = NULL;
@@ -767,7 +771,7 @@ FuncCandidateList FuncParser::func_select_candidate(int nargs, Oid * input_typei
         {
             if (input_base_typeids[i] != UNKNOWNOID)
             {
-                if (current_typeids[i] == input_base_typeids[i] || coerce_parser.IsPreferredType(slot_category[i], current_typeids[i]))
+                if (current_typeids[i] == input_base_typeids[i] || coerce_parser_ptr->IsPreferredType(slot_category[i], current_typeids[i]))
                     nmatch++;
             }
         }
@@ -834,17 +838,17 @@ FuncCandidateList FuncParser::func_select_candidate(int nargs, Oid * input_typei
         {
             current_typeids = current_candidate->args;
             current_type = current_typeids[i];
-            current_category = coerce_parser.TypeCategory(current_type);
+            current_category = coerce_parser_ptr->TypeCategory(current_type);
             if (slot_category[i] == INVALID_TYPE)
             {
                 /* first candidate */
                 slot_category[i] = current_category;
-                slot_has_preferred_type[i] = coerce_parser.IsPreferredType(current_category, current_type);
+                slot_has_preferred_type[i] = coerce_parser_ptr->IsPreferredType(current_category, current_type);
             }
             else if (current_category == slot_category[i])
             {
                 /* more candidates in same category */
-                slot_has_preferred_type[i] |= coerce_parser.IsPreferredType(current_category, current_type);
+                slot_has_preferred_type[i] |= coerce_parser_ptr->IsPreferredType(current_category, current_type);
             }
             else
             {
@@ -887,13 +891,13 @@ FuncCandidateList FuncParser::func_select_candidate(int nargs, Oid * input_typei
                 if (input_base_typeids[i] != UNKNOWNOID)
                     continue;
                 current_type = current_typeids[i];
-                current_category = coerce_parser.TypeCategory(current_type);
+                current_category = coerce_parser_ptr->TypeCategory(current_type);
                 if (current_category != slot_category[i])
                 {
                     keepit = false;
                     break;
                 }
-                if (slot_has_preferred_type[i] && !coerce_parser.IsPreferredType(current_category, current_type))
+                if (slot_has_preferred_type[i] && !coerce_parser_ptr->IsPreferredType(current_category, current_type))
                 {
                     keepit = false;
                     break;

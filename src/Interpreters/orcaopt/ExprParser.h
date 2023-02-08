@@ -1,17 +1,27 @@
 #pragma once
 
 #include <Interpreters/orcaopt/parser_common.h>
-#include <Interpreters/orcaopt/RelationParser.h>
-#include <Interpreters/orcaopt/OperParser.h>
-#include <Interpreters/orcaopt/NodeParser.h>
-#include <Interpreters/orcaopt/TypeParser.h>
-#include <Interpreters/orcaopt/CoerceParser.h>
-#include <Interpreters/orcaopt/FuncParser.h>
-#include <Interpreters/orcaopt/SelectParser.h>
-#include <Interpreters/orcaopt/TargetParser.h>
 
 namespace DB
 {
+
+class RelationParser;
+class OperParser;
+class NodeParser;
+class TypeParser;
+class CoerceParser;
+class FuncParser;
+class SelectParser;
+class TargetParser;
+
+using RelationParserPtr = std::unique_ptr<RelationParser>;
+using OperParserPtr = std::unique_ptr<OperParser>;
+using NodeParserPtr = std::unique_ptr<NodeParser>;
+using TypeParserPtr = std::unique_ptr<TypeParser>;
+using CoerceParserPtr = std::unique_ptr<CoerceParser>;
+using FuncParserPtr = std::unique_ptr<FuncParser>;
+using SelectParserPtr = std::unique_ptr<SelectParser>;
+using TargetParserPtr = std::unique_ptr<TargetParser>;
 
 class ExprParser
 {
@@ -95,5 +105,8 @@ public:
 
     duckdb_libpgquery::PGNode * transformWholeRowRef(PGParseState * pstate, char * catalogname,
         char * schemaname, char * relname, int location);
+
+    const char * ParseExprKindName(PGParseExprKind exprKind);
 };
+
 }

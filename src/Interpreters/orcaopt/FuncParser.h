@@ -2,11 +2,13 @@
 
 #include <Interpreters/orcaopt/parser_common.h>
 
-#include <Interpreters/orcaopt/CoerceParser.h>
-#include <Interpreters/orcaopt/AggParser.h>
-
 namespace DB
 {
+
+class CoerceParser;
+class AggParser;
+using CoerceParserPtr = std::unique_ptr<CoerceParser>;
+using AggParserPtr = std::unique_ptr<AggParser>;
 
 class FuncParser
 {
@@ -39,4 +41,5 @@ public:
 
     FuncCandidateList func_select_candidate(int nargs, Oid * input_typeids, FuncCandidateList candidates);
 };
+
 }

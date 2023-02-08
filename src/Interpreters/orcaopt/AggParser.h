@@ -3,8 +3,6 @@
 #include <Interpreters/orcaopt/parser_common.h>
 #include <Interpreters/orcaopt/walkers.h>
 
-#include <Interpreters/orcaopt/ExprParser.h>
-
 namespace DB
 {
 
@@ -323,6 +321,9 @@ int find_minimum_var_level(duckdb_libpgquery::PGNode * node)
     return context.min_varlevel;
 };
 
+class ExprParser;
+using ExprParserPtr = std::unique_ptr<ExprParser>;
+
 class AggParser
 {
 private:
@@ -334,8 +335,9 @@ public:
 
     void transformWindowSpecExprs(PGParseState * pstate);
 
-    void check_call(PGParseState * pstate, duckdb_libpgquery::PGNode * call);
+    //void check_call(PGParseState * pstate, duckdb_libpgquery::PGNode * call);
 
-    void transformWindowFuncCall(PGParseState * pstate, duckdb_libpgquery::PGWindowDef * wind);
+    void transformWindowFuncCall(PGParseState * pstate, duckdb_libpgquery::PGWindowFunc * wfunc, duckdb_libpgquery::PGWindowDef * windef);
 };
+
 }

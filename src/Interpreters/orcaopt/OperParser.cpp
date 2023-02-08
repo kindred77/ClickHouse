@@ -1,9 +1,12 @@
 #include <Interpreters/orcaopt/OperParser.h>
 
-namespace DB
-{
+#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/FuncParser.h>
 
 using namespace duckdb_libpgquery;
+
+namespace DB
+{
 
 FuncDetailCode OperParser::oper_select_candidate(int nargs, Oid * input_typeids, FuncCandidateList candidates,
 		Oid * operOid)
@@ -14,7 +17,7 @@ FuncDetailCode OperParser::oper_select_candidate(int nargs, Oid * input_typeids,
 	 * Delete any candidates that cannot actually accept the given input
 	 * types, whether directly or by coercion.
 	 */
-    ncandidates = func_parser.func_match_argtypes(nargs, input_typeids, candidates, &candidates);
+    ncandidates = func_parser_ptr->func_match_argtypes(nargs, input_typeids, candidates, &candidates);
 
     /* Done if no candidate or only one candidate survives */
     if (ncandidates == 0)
@@ -32,7 +35,7 @@ FuncDetailCode OperParser::oper_select_candidate(int nargs, Oid * input_typeids,
 	 * Use the same heuristics as for ambiguous functions to resolve the
 	 * conflict.
 	 */
-    candidates = func_parser.func_select_candidate(nargs, input_typeids, candidates);
+    candidates = func_parser_ptr->func_select_candidate(nargs, input_typeids, candidates);
 
     if (candidates)
     {
@@ -228,10 +231,10 @@ PGExpr * OperParser::make_op_expr(PGParseState * pstate, Operator op,
 	 * types, possibly adjusting return type or declared_arg_types (which will
 	 * be used as the cast destination by make_fn_arguments)
 	 */
-    rettype = coerce_parser.enforce_generic_type_consistency(actual_arg_types, declared_arg_types, nargs, opform->oprresult);
+    rettype = coerce_parser_ptr->enforce_generic_type_consistency(actual_arg_types, declared_arg_types, nargs, opform->oprresult);
 
     /* perform the necessary typecasting of arguments */
-    func_parser.make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
+    func_parser_ptr->make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
 
     /* and build the expression node */
     result = makeNode(PGOpExpr);
@@ -332,7 +335,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
 	 * types, possibly adjusting return type or declared_arg_types (which will
 	 * be used as the cast destination by make_fn_arguments)
 	 */
-    rettype = coerce_parser.enforce_generic_type_consistency(actual_arg_types, declared_arg_types, 2, opform->oprresult);
+    rettype = coerce_parser_ptr->enforce_generic_type_consistency(actual_arg_types, declared_arg_types, 2, opform->oprresult);
 
     /*
 	 * Check that operator result is boolean
@@ -368,7 +371,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
     declared_arg_types[1] = res_atypeId;
 
     /* perform the necessary typecasting of arguments */
-    func_parser.make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
+    func_parser_ptr->make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
 
     /* and build the expression node */
     result = makeNode(PGScalarArrayOpExpr);

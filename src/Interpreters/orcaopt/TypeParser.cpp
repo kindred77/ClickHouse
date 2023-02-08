@@ -1,8 +1,9 @@
 #include <Interpreters/orcaopt/TypeParser.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
-using namespace duckdb_libpgquery;
 
 Oid TypeParser::typeidTypeRelid(Oid type_id)
 {

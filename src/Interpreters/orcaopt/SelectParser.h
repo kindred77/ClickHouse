@@ -1,15 +1,22 @@
 #pragma once
 
 #include <Interpreters/orcaopt/parser_common.h>
-#include <Interpreters/orcaopt/CTEParser.h>
-#include <Interpreters/orcaopt/ClauseParser.h>
-#include <Interpreters/orcaopt/AggParser.h>
-#include <Interpreters/orcaopt/TargetParser.h>
-#include <Interpreters/orcaopt/NodeParser.h>
-#include <Interpreters/orcaopt/CoerceParser.h>
 
 namespace DB
 {
+
+class CTEParser;
+class ClauseParser;
+class AggParser;
+class TargetParser;
+class NodeParser;
+class CoerceParser;
+using CTEParserPtr = std::unique_ptr<CTEParser>;
+using ClauseParserPtr = std::unique_ptr<ClauseParser>;
+using AggParserPtr = std::unique_ptr<AggParser>;
+using TargetParserPtr = std::unique_ptr<TargetParser>;
+using NodeParserPtr = std::unique_ptr<NodeParser>;
+using CoerceParserPtr = std::unique_ptr<CoerceParser>;
 
 class SelectParser
 {
@@ -30,9 +37,7 @@ public:
 
     duckdb_libpgquery::PGQuery * transformStmt(
         PGParseState * pstate,
-        duckdb_libpgquery::PGNode * parseTree,
-        duckdb_libpgquery::PGList ** extras_before,
-        duckdb_libpgquery::PGList ** extras_after);
+        duckdb_libpgquery::PGNode * parseTree);
 
     duckdb_libpgquery::PGList * do_parse_analyze(duckdb_libpgquery::PGNode * parseTree,
         PGParseState * pstate);
@@ -44,6 +49,9 @@ public:
     parse_analyze(duckdb_libpgquery::PGNode * parseTree,
         const char * sourceText, Oid * paramTypes, int numParams);
 
-    duckdb_libpgquery::PGList * parse_sub_analyze(duckdb_libpgquery::PGNode * parseTree, PGParseState * parentParseState);
+    duckdb_libpgquery::PGQuery *
+    parse_sub_analyze(duckdb_libpgquery::PGNode * parseTree, PGParseState * parentParseState,
+        duckdb_libpgquery::PGCommonTableExpr * parentCTE, duckdb_libpgquery::PGLockingClause * lockclause_from_parent);
 };
+
 }

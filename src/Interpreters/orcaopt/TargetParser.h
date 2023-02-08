@@ -2,12 +2,15 @@
 
 #include <Interpreters/orcaopt/parser_common.h>
 
-#include <Interpreters/orcaopt/RelationParser.h>
-#include <Interpreters/orcaopt/CTEParser.h>
-#include <Interpreters/orcaopt/ExprParser.h>
-
 namespace DB
 {
+
+class RelationParser;
+class CTEParser;
+class ExprParser;
+using RelationParserPtr = std::unique_ptr<RelationParser>;
+using CTEParserPtr = std::unique_ptr<CTEParser>;
+using ExprParserPtr = std::unique_ptr<ExprParser>;
 
 class TargetParser
 {
@@ -44,4 +47,5 @@ public:
 
     duckdb_libpgquery::PGList * transformExpressionList(PGParseState * pstate, duckdb_libpgquery::PGList * exprlist);
 };
+
 }

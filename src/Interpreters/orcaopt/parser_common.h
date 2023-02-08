@@ -27,7 +27,7 @@
 
 #include<string.h>
 
-class RelationParser;
+/* class RelationParser;
 class CTEParser;
 class ExprParser;
 class ClauseParser;
@@ -51,10 +51,11 @@ using CoerceParserPtr = std::unique_ptr<CoerceParser>;
 using FuncParserPtr = std::unique_ptr<FuncParser>;
 using OperParserPtr = std::unique_ptr<OperParser>;
 using TypeParserPtr = std::unique_ptr<TypeParser>;
-using SelectParserPtr = std::unique_ptr<SelectParser>;
+using SelectParserPtr = std::unique_ptr<SelectParser>; */
 
 bool		SQL_inheritance = true;
 
+typedef unsigned char uint8;
 typedef signed short int16;
 typedef long int int64;
 typedef signed int int32;
@@ -233,7 +234,8 @@ typedef enum PGPostgresParserErrors {
 	ERRCODE_STATEMENT_TOO_COMPLEX,
 	ERRCODE_INVALID_RECURSION,
 
-	ERRCODE_COLLATION_MISMATCH
+	ERRCODE_COLLATION_MISMATCH,
+	ERRCODE_DATA_EXCEPTION
 } PGPostgresParserErrors;
 
 typedef struct ErrorContextCallback
@@ -812,21 +814,21 @@ duckdb_libpgquery::PGValue * makeString(char * str)
 // 	error_context_stack = pcbstate->errcallback.previous;
 // };
 
-void
+int
 parser_errposition(PGParseState *pstate, int location)
 {
 	int			pos;
 
 	/* No-op if location was not provided */
 	if (location < 0)
-		return;
+		return 0;
 	/* Can't do anything if source text is not available */
 	if (pstate == NULL || pstate->p_sourcetext == NULL)
-		return;
+		return 0;
 	/* Convert offset to character number */
 	pos = duckdb_libpgquery::pg_mbstrlen_with_len(pstate->p_sourcetext, location) + 1;
 	/* And pass it to the ereport mechanism */
-	duckdb_libpgquery::errposition(pos);
+	return duckdb_libpgquery::errposition(pos);
 };
 
 void

@@ -1,5 +1,9 @@
 #include <Interpreters/orcaopt/TargetParser.h>
 
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/CTEParser.h>
+#include <Interpreters/orcaopt/ExprParser.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -159,7 +163,7 @@ PGTargetEntry * TargetParser::transformTargetEntry(PGParseState * pstate,
 {
     /* Transform the node if caller didn't do it already */
     if (expr == NULL)
-        expr = expr_parser.transformExpr(pstate, node);
+        expr = expr_parser_ptr->transformExpr(pstate, node);
 
     if (colname == NULL && !resjunk)
     {
@@ -244,7 +248,7 @@ void TargetParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle
     if (var == NULL || !IsA(var, PGVar))
         return;
     netlevelsup = var->varlevelsup + levelsup;
-    rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+    rte = relation_parser_ptr->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
     attnum = var->varattno;
 
     switch (rte->rtekind)
@@ -258,7 +262,7 @@ void TargetParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle
             /* Subselect-in-FROM: copy up from the subselect */
             if (attnum != InvalidAttrNumber)
             {
-                PGTargetEntry * ste = relation_parser.get_tle_by_resno(rte->subquery->targetList, attnum);
+                PGTargetEntry * ste = relation_parser_ptr->get_tle_by_resno(rte->subquery->targetList, attnum);
 
                 if (ste == NULL || ste->resjunk)
                     elog(ERROR, "subquery %s does not have attribute %d", rte->eref->aliasname, attnum);
@@ -271,10 +275,10 @@ void TargetParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle
             if (attnum != InvalidAttrNumber)
             {
                 /* Find the CommonTableExpr based on the query name */
-                PGCommonTableExpr * cte = cte_parser.GetCTEForRTE(pstate, rte, netlevelsup);
+                PGCommonTableExpr * cte = cte_parser_ptr->GetCTEForRTE(pstate, rte, netlevelsup);
                 Assert(cte != NULL);
 
-                PGTargetEntry * ste = relation_parser.get_tle_by_resno(GetCTETargetList(cte), attnum);
+                PGTargetEntry * ste = relation_parser_ptr->get_tle_by_resno(GetCTETargetList(cte), attnum);
                 if (ste == NULL || ste->resjunk)
                 {
                     elog(ERROR, "WITH query %s does not have attribute %d", rte->ctename, attnum);
@@ -329,12 +333,12 @@ PGList * TargetParser::ExpandAllTables(PGParseState * pstate)
     foreach (l, pstate->p_varnamespace)
     {
         PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(l);
-        int rtindex = relation_parser.RTERangeTablePosn(pstate, rte, NULL);
+        int rtindex = relation_parser_ptr->RTERangeTablePosn(pstate, rte, NULL);
 
         /* Require read access --- see comments in setTargetTable() */
         rte->requiredPerms |= ACL_SELECT;
 
-        target = list_concat(target, relation_parser.expandRelAttrs(pstate, rte, rtindex, 0, -1));
+        target = list_concat(target, relation_parser_ptr->expandRelAttrs(pstate, rte, rtindex, 0, -1));
     }
 
     return target;
@@ -402,24 +406,24 @@ PGList * TargetParser::ExpandColumnRefStar(PGParseState * pstate, PGColumnRef * 
                 break;
         }
 
-        rte = relation_parser.refnameRangeTblEntry(pstate, catalogname, schemaname, relname, cref->location, &sublevels_up);
+        rte = relation_parser_ptr->refnameRangeTblEntry(pstate, catalogname, schemaname, relname, cref->location, &sublevels_up);
         if (rte == NULL)
         {
-            rte = relation_parser.addImplicitRTE(pstate, makeRangeVar(catalogname, schemaname, relname, cref->location), cref->location);
+            rte = relation_parser_ptr->addImplicitRTE(pstate, makeRangeVar(catalogname, schemaname, relname, cref->location), cref->location);
         }
 
         /* Require read access --- see comments in setTargetTable() */
         rte->requiredPerms |= ACL_SELECT;
 
-        rtindex = relation_parser.RTERangeTablePosn(pstate, rte, &sublevels_up);
+        rtindex = relation_parser_ptr->RTERangeTablePosn(pstate, rte, &sublevels_up);
 
         if (targetlist)
-            return relation_parser.expandRelAttrs(pstate, rte, rtindex, sublevels_up, cref->location);
+            return relation_parser_ptr->expandRelAttrs(pstate, rte, rtindex, sublevels_up, cref->location);
         else
         {
             PGList * vars;
 
-            relation_parser.expandRTE(rte, rtindex, sublevels_up, cref->location, false, NULL, &vars);
+            relation_parser_ptr->expandRTE(rte, rtindex, sublevels_up, cref->location, false, NULL, &vars);
             return vars;
         }
     }
@@ -438,7 +442,7 @@ TupleDesc TargetParser::expandRecordVariable(PGParseState * pstate, PGVar * var,
     Assert(var->vartype == RECORDOID);
 
     netlevelsup = var->varlevelsup + levelsup;
-    rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+    rte = relation_parser_ptr->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
     attnum = var->varattno;
 
     if (attnum == InvalidAttrNumber)
@@ -448,7 +452,7 @@ TupleDesc TargetParser::expandRecordVariable(PGParseState * pstate, PGVar * var,
         PGListCell *lname, *lvar;
         int i;
 
-        relation_parser.expandRTE(rte, var->varno, 0, -1, false, &names, &vars);
+        relation_parser_ptr->expandRTE(rte, var->varno, 0, -1, false, &names, &vars);
 
         tupleDesc = CreateTemplateTupleDesc(list_length(vars), false);
         i = 1;
@@ -481,7 +485,7 @@ TupleDesc TargetParser::expandRecordVariable(PGParseState * pstate, PGVar * var,
             break;
         case PG_RTE_SUBQUERY: {
             /* Subselect-in-FROM: examine sub-select's output expr */
-            PGTargetEntry * ste = relation_parser.get_tle_by_resno(rte->subquery->targetList, attnum);
+            PGTargetEntry * ste = relation_parser_ptr->get_tle_by_resno(rte->subquery->targetList, attnum);
 
             if (ste == NULL || ste->resjunk)
                 elog(ERROR, "subquery %s does not have attribute %d", rte->eref->aliasname, attnum);
@@ -509,10 +513,10 @@ TupleDesc TargetParser::expandRecordVariable(PGParseState * pstate, PGVar * var,
             if (!rte->self_reference)
             {
                 /* Similar to RTE_SUBQUERY */
-                PGCommonTableExpr * cte = cte_parser.GetCTEForRTE(pstate, rte, netlevelsup);
+                PGCommonTableExpr * cte = cte_parser_ptr->GetCTEForRTE(pstate, rte, netlevelsup);
                 Assert(cte != NULL);
 
-                PGTargetEntry * ste = relation_parser.get_tle_by_resno(GetCTETargetList(cte), attnum);
+                PGTargetEntry * ste = relation_parser_ptr->get_tle_by_resno(GetCTETargetList(cte), attnum);
                 if (ste == NULL || ste->resjunk)
                     elog(ERROR, "WITH query %s does not have attribute %d", cte->ctename, attnum);
 
@@ -586,7 +590,7 @@ PGList * TargetParser::ExpandIndirectionStar(PGParseState * pstate, PGAIndirecti
     ind->indirection = list_truncate(ind->indirection, list_length(ind->indirection) - 1);
 
     /* And transform that */
-    expr = expr_parser.transformExpr(pstate, (PGNode *)ind);
+    expr = expr_parser_ptr->transformExpr(pstate, (PGNode *)ind);
 
     /*
 	 * Verify it's a composite type, and get the tupdesc.  We use
@@ -703,7 +707,7 @@ PGList * TargetParser::transformExpressionList(PGParseState * pstate, PGList * e
         /*
 		 * Not "something.*", so transform as a single expression
 		 */
-        result = lappend(result, expr_parser.transformExpr(pstate, e));
+        result = lappend(result, expr_parser_ptr->transformExpr(pstate, e));
     }
 
     /* CDB: Pop error location stack. */

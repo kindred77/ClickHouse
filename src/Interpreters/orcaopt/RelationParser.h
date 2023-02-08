@@ -1,12 +1,14 @@
 #pragma once
 
 #include <Interpreters/orcaopt/parser_common.h>
-#include <Interpreters/orcaopt/CoerceParser.h>
 
 #include <optional>
 
 namespace DB
 {
+
+class CoerceParser;
+using CoerceParserPtr = std::unique_ptr<CoerceParser>;
 
 class RelationParser
 {
@@ -50,8 +52,8 @@ public:
     duckdb_libpgquery::PGRangeTblEntry * addRangeTableEntry(
         PGParseState * pstate, duckdb_libpgquery::PGRangeVar * relation, duckdb_libpgquery::PGAlias * alias, bool inh, bool inFromCl);
 
-    duckdb_libpgquery::PGRangeTblEntry * addRangeTableEntryForSubquery(
-        PGParseState * pstate, duckdb_libpgquery::PGQuery * subquery, duckdb_libpgquery::PGAlias * alias, bool inFromCl);
+    duckdb_libpgquery::PGRangeTblEntry * addRangeTableEntryForSubquery(PGParseState * pstate, duckdb_libpgquery::PGQuery * subquery,
+        duckdb_libpgquery::PGAlias * alias, bool lateral, bool inFromCl);
 
     duckdb_libpgquery::PGRangeTblEntry * scanNameSpaceForRelid(PGParseState * pstate, Oid relid);
 
@@ -108,6 +110,9 @@ public:
         duckdb_libpgquery::PGList ** colnames,
         duckdb_libpgquery::PGList ** colvars);
 
+    duckdb_libpgquery::PGLockingClause * getLockedRefname(PGParseState * pstate, const char * refname);
+
     static char * get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, PGAttrNumber attnum);
 };
+
 }

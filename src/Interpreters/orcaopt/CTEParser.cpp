@@ -1,9 +1,13 @@
 #include <Interpreters/orcaopt/CTEParser.h>
 
-namespace DB
-{
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/NodeParser.h>
+#include <Interpreters/orcaopt/SelectParser.h>
+
 using namespace duckdb_libpgquery;
 
+namespace DB
+{
 void CTEParser::reportDuplicateNames(const char *queryName, PGList *names)
 {
     if (names == NULL)
@@ -105,7 +109,7 @@ void CTEParser::analyzeCTE(PGParseState *pstate, PGCommonTableExpr *cte)
 
     PGList * queryList;
 
-    queryList = select_parser.parse_sub_analyze(cte->ctequery, pstate);
+    queryList = select_parser_ptr->parse_sub_analyze(cte->ctequery, pstate);
     Assert(list_length(queryList) == 1);
 
     PGQuery * query = (PGQuery *)linitial(queryList);
@@ -205,7 +209,7 @@ PGCommonTableExpr * CTEParser::GetCTEForRTE(PGParseState * pstate,
 
     /* Determine RTE's levelsup if caller didn't know it */
     if (rtelevelsup < 0)
-        (void)relation_parser.RTERangeTablePosn(pstate, rte, &rtelevelsup);
+        (void)relation_parser_ptr->RTERangeTablePosn(pstate, rte, &rtelevelsup);
 
     Index levelsup = rte->ctelevelsup + rtelevelsup;
     while (levelsup > 0)

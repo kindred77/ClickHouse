@@ -1,11 +1,6 @@
 #pragma once
 
 #include <Interpreters/orcaopt/parser_common.h>
-#include <Interpreters/orcaopt/RelationParser.h>
-#include <Interpreters/orcaopt/SelectParser.h>
-#include <Interpreters/orcaopt/CoerceParser.h>
-#include <Interpreters/orcaopt/ExprParser.h>
-#include <Interpreters/orcaopt/TargetParser.h>
 
 #define ORDER_CLAUSE 0
 #define GROUP_CLAUSE 1
@@ -20,142 +15,19 @@ typedef struct pg_grouping_rewrite_ctx
     PGParseState * pstate;
 } pg_grouping_rewrite_ctx;
 
-bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context)
-{
-    using duckdb_libpgquery::PGListCell;
-    using duckdb_libpgquery::PGList;
-    using duckdb_libpgquery::PGNode;
-    using duckdb_libpgquery::PGTargetEntry;
-    using duckdb_libpgquery::PGRangeTblEntry;
-    using duckdb_libpgquery::PGVar;
-    using duckdb_libpgquery::PGRowExpr;
+extern bool pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode * node, void * context);
 
-    using duckdb_libpgquery::PGAExpr;
-    using duckdb_libpgquery::PGColumnRef;
-    using duckdb_libpgquery::PGAConst;
-    using duckdb_libpgquery::PGTypeCast;
-    using duckdb_libpgquery::PGGroupingFunc;
-    using duckdb_libpgquery::PGSortBy;
-    using duckdb_libpgquery::T_PGAExpr;
-    using duckdb_libpgquery::T_PGColumnRef;
-    using duckdb_libpgquery::T_PGAConst;
-    using duckdb_libpgquery::T_PGTypeCast;
-    using duckdb_libpgquery::T_PGGroupingFunc;
-    using duckdb_libpgquery::T_PGVar;
-    using duckdb_libpgquery::T_PGRowExpr;
-    using duckdb_libpgquery::T_PGSortBy;
+class RelationParser;
+class SelectParser;
+class CoerceParser;
+class ExprParser;
+class TargetParser;
 
-    using duckdb_libpgquery::ereport;
-    using duckdb_libpgquery::errcode;
-    using duckdb_libpgquery::errmsg;
-    using duckdb_libpgquery::makeInteger;
-
-    pg_grouping_rewrite_ctx * ctx = (pg_grouping_rewrite_ctx *)context;
-
-    if (node == NULL)
-        return false;
-
-    if (IsA(node, PGAConst))
-    {
-        return false;
-    }
-    else if (IsA(node, PGAExpr))
-    {
-        /* could be seen inside an untransformed window clause */
-        return false;
-    }
-    else if (IsA(node, PGColumnRef))
-    {
-        /* could be seen inside an untransformed window clause */
-        return false;
-    }
-    else if (IsA(node, PGTypeCast))
-    {
-        return false;
-    }
-    else if (IsA(node, PGGroupingFunc))
-    {
-        PGGroupingFunc * gf = (PGGroupingFunc *)node;
-        PGListCell * arg_lc;
-        PGList * newargs = NIL;
-
-        //gf->ngrpcols = list_length(ctx->grp_tles);
-
-        /*
-		 * For each argument in gf->args, find its position in grp_tles,
-		 * and increment its counts. Note that this is a O(n^2) algorithm,
-		 * but it should not matter that much.
-		 */
-        foreach (arg_lc, gf->args)
-        {
-            long i = 0;
-            PGNode * node_arg = (PGNode *)lfirst(arg_lc);
-            PGListCell * grp_lc = NULL;
-
-            foreach (grp_lc, ctx->grp_tles)
-            {
-                PGTargetEntry * grp_tle = (PGTargetEntry *)lfirst(grp_lc);
-
-                if (equal(grp_tle->expr, node_arg))
-                    break;
-                i++;
-            }
-
-            /* Find a column not in GROUP BY clause */
-            if (grp_lc == NULL)
-            {
-                PGRangeTblEntry * rte;
-                const char * attname;
-                PGVar * var = (PGVar *)node_arg;
-
-                /* Do not allow expressions inside a grouping function. */
-                if (IsA(node_arg, PGRowExpr))
-                    ereport(
-                        ERROR,
-                        (errcode(ERRCODE_GROUPING_ERROR),
-                         errmsg("row type can not be used inside a grouping function.")/* ,
-                         errOmitLocation(true) */));
-
-                if (!IsA(node_arg, PGVar))
-                    ereport(
-                        ERROR,
-                        (errcode(ERRCODE_GROUPING_ERROR),
-                         errmsg("expression in a grouping fuction does not appear in GROUP BY.")/* ,
-                         errOmitLocation(true) */));
-
-                Assert(IsA(node_arg, PGVar))
-                Assert(var->varno > 0)
-                Assert(var->varno <= list_length(ctx->pstate->p_rtable))
-
-                rte = rt_fetch(var->varno, ctx->pstate->p_rtable);
-                attname = RelationParser::get_rte_attribute_name(rte, var->varattno);
-
-                ereport(
-                    ERROR,
-                    (errcode(ERRCODE_GROUPING_ERROR),
-                     errmsg("column \"%s\".\"%s\" is not in GROUP BY", rte->eref->aliasname, attname)/* ,
-                     errOmitLocation(true) */));
-            }
-
-            newargs = lappend(newargs, makeInteger(i));
-        }
-
-        /* Free gf->args since we do not need it any more. */
-        list_free_deep(gf->args);
-        gf->args = newargs;
-    }
-    else if (IsA(node, PGSortBy))
-    {
-        /*
-		 * When WindowSpec leaves the main parser, partition and order
-		 * clauses will be lists of SortBy structures. Process them here to
-		 * avoid muddying up the expression_tree_walker().
-		 */
-        PGSortBy * s = (PGSortBy *)node;
-        return pg_grouping_rewrite_walker(s->node, context);
-    }
-    return pg_expression_tree_walker(node, (walker_func)pg_grouping_rewrite_walker, context);
-};
+using RelationParserPtr = std::unique_ptr<RelationParser>;
+using SelectParserPtr = std::unique_ptr<SelectParser>;
+using CoerceParserPtr = std::unique_ptr<CoerceParser>;
+using ExprParserPtr = std::unique_ptr<ExprParser>;
+using TargetParserPtr = std::unique_ptr<TargetParser>;
 
 class ClauseParser
 {
@@ -173,6 +45,8 @@ public:
         duckdb_libpgquery::PGVar * r_colvar);
 
     duckdb_libpgquery::PGRangeTblEntry * transformTableEntry(PGParseState * pstate, duckdb_libpgquery::PGRangeVar * r);
+
+    bool interpretInhOption(InhOption inhOpt);
 
     duckdb_libpgquery::PGRangeTblEntry * transformRangeSubselect(PGParseState * pstate,
         duckdb_libpgquery::PGRangeSubselect * r);
@@ -245,4 +119,5 @@ public:
 
     void freeGroupList(duckdb_libpgquery::PGList * grouplist);
 };
+
 }

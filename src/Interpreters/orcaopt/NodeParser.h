@@ -18,4 +18,5 @@ public:
 
     void free_parsestate(PGParseState ** pstate);
 };
+
 }
