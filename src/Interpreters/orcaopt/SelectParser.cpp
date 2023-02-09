@@ -1,511 +1,380 @@
 #include <Interpreters/orcaopt/SelectParser.h>
 
-#include <Interpreters/orcaopt/CTEParser.h>
 #include <Interpreters/orcaopt/ClauseParser.h>
-#include <Interpreters/orcaopt/AggParser.h>
+#include <Interpreters/orcaopt/CoerceParser.h>
 #include <Interpreters/orcaopt/TargetParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
-#include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/RelationParser.h>
+#include <Interpreters/orcaopt/CTEParser.h>
+//#include <Interpreters/orcaopt/CollationParser.h>
+#include <Interpreters/orcaopt/AggParser.h>
+#include <Interpreters/orcaopt/FuncParser.h>
 
 using namespace duckdb_libpgquery;
 
 namespace DB
 {
 
-PGFromExpr * SelectParser::makeFromExpr(PGList *fromlist,
-        PGNode *quals)
+void
+SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
+					 PGVar *var, int levelsup)
 {
-    PGFromExpr * f = makeNode(PGFromExpr);
+    int			netlevelsup;
+	PGRangeTblEntry *rte;
+	PGAttrNumber	attnum;
 
-    f->fromlist = fromlist;
-    f->quals = quals;
-    return f;
+	if (var == NULL || !IsA(var, PGVar))
+		return;
+	netlevelsup = var->varlevelsup + levelsup;
+	rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+	attnum = var->varattno;
+
+	switch (rte->rtekind)
+	{
+		case PG_RTE_RELATION:
+			/* It's a table or view, report it */
+			tle->resorigtbl = rte->relid;
+			tle->resorigcol = attnum;
+			break;
+		case PG_RTE_SUBQUERY:
+			/* Subselect-in-FROM: copy up from the subselect */
+			if (attnum != InvalidAttrNumber)
+			{
+				PGTargetEntry *ste = relation_parser.get_tle_by_resno(rte->subquery->targetList,
+													attnum);
+
+				if (ste == NULL || ste->resjunk)
+					elog(ERROR, "subquery %s does not have attribute %d",
+						 rte->eref->aliasname, attnum);
+				tle->resorigtbl = ste->resorigtbl;
+				tle->resorigcol = ste->resorigcol;
+			}
+			break;
+		case PG_RTE_JOIN:
+			/* Join RTE --- recursively inspect the alias variable */
+			if (attnum != InvalidAttrNumber)
+			{
+				PGVar		   *aliasvar;
+
+				Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
+				aliasvar = (PGVar *) list_nth(rte->joinaliasvars, attnum - 1);
+				/* We intentionally don't strip implicit coercions here */
+				markTargetListOrigin(pstate, tle, aliasvar, netlevelsup);
+			}
+			break;
+		// case PG_RTE_TABLEFUNCTION:
+		case PG_RTE_FUNCTION:
+		case PG_RTE_VALUES:
+		case PG_RTE_TABLEFUNC:
+		// case PG_RTE_NAMEDTUPLESTORE:
+		// case PG_RTE_RESULT:
+		// case PG_RTE_VOID:
+			/* not a simple relation, leave it unmarked */
+			break;
+		case PG_RTE_CTE:
+
+			/*
+			 * CTE reference: copy up from the subquery, if possible. If the
+			 * RTE is a recursive self-reference then we can't do anything
+			 * because we haven't finished analyzing it yet. However, it's no
+			 * big loss because we must be down inside the recursive term of a
+			 * recursive CTE, and so any markings on the current targetlist
+			 * are not going to affect the results anyway.
+			 */
+			if (attnum != InvalidAttrNumber && !rte->self_reference)
+			{
+				PGCommonTableExpr *cte = relation_parser.GetCTEForRTE(pstate, rte, netlevelsup);
+				PGTargetEntry *ste;
+
+				ste = relation_parser.get_tle_by_resno(GetCTETargetList(cte), attnum);
+				if (ste == NULL || ste->resjunk)
+					elog(ERROR, "subquery %s does not have attribute %d",
+						 rte->eref->aliasname, attnum);
+				tle->resorigtbl = ste->resorigtbl;
+				tle->resorigcol = ste->resorigcol;
+			}
+			break;
+	}
 };
 
-void SelectParser::applyColumnNames(PGList * dst, PGList * src)
+void
+SelectParser::markTargetListOrigins(PGParseState *pstate, PGList *targetlist)
 {
-    PGListCell * dst_item;
-    PGListCell * src_item;
+    PGListCell   *l;
 
-    src_item = list_head(src);
+	foreach(l, targetlist)
+	{
+		PGTargetEntry *tle = (PGTargetEntry *) lfirst(l);
 
-    foreach (dst_item, dst)
-    {
-        PGTargetEntry * d = (PGTargetEntry *)lfirst(dst_item);
-        PGColumnDef * s;
-
-        /* junk targets don't count */
-        if (d->resjunk)
-            continue;
-
-        /* fewer ColumnDefs than target entries is OK */
-        if (src_item == NULL)
-            break;
-
-        s = (PGColumnDef *)lfirst(src_item);
-        src_item = lnext(src_item);
-
-        d->resname = pstrdup(s->colname);
-    }
-
-    /* more ColumnDefs than target entries is not OK */
-    if (src_item != NULL)
-        ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), errmsg("CREATE TABLE AS specifies too many column names"), errOmitLocation(true)));
-};
-
-PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
-        PGSelectStmt * stmt)
-{
-    PGQuery * qry = makeNode(PGQuery);
-    PGNode * qual;
-    PGListCell * l;
-
-    qry->commandType = PG_CMD_SELECT;
-
-    /* setup database name for use of magma operations */
-    MemoryContext oldContext = MemoryContextSwitchTo(MessageContext);
-    database = get_database_name(MyDatabaseId);
-    MemoryContextSwitchTo(oldContext);
-
-    /* process the WITH clause */
-    if (stmt->withClause != NULL)
-    {
-        qry->hasRecursive = stmt->withClause->recursive;
-        qry->cteList = cte_parser_ptr->transformWithClause(pstate, stmt->withClause);
-        qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
-    }
-
-    /* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
-    pstate->p_locking_clause = stmt->lockingClause;
-
-    /*
-   * Put WINDOW clause data into pstate so that window references know
-   * about them.
-   */
-    pstate->p_win_clauses = stmt->windowClause;
-
-    /* process the FROM clause */
-    clause_parser_ptr->transformFromClause(pstate, stmt->fromClause);
-
-    /* tidy up expressions in window clauses */
-    agg_parser_ptr->transformWindowSpecExprs(pstate);
-
-    /* transform targetlist */
-    qry->targetList = target_parser_ptr->transformTargetList(pstate, stmt->targetList);
-
-    /* mark column origins */
-    target_parser_ptr->markTargetListOrigins(pstate, qry->targetList);
-
-    /* transform WHERE */
-    qual = clause_parser_ptr->transformWhereClause(pstate, stmt->whereClause, "WHERE");
-
-    /*
-   * Initial processing of HAVING clause is just like WHERE clause.
-   */
-    pstate->having_qual = clause_parser_ptr->transformWhereClause(pstate, stmt->havingClause, "HAVING");
-
-    /*
-   * CDB: Untyped Const or Param nodes in a subquery in the FROM clause
-   * might have been assigned proper types when we transformed the WHERE
-   * clause, targetlist, etc.  Bring targetlist Var types up to date.
-   */
-    coerce_parser_ptr->fixup_unknown_vars_in_targetlist(pstate, qry->targetList);
-
-    /*
-   * Transform sorting/grouping stuff.  Do ORDER BY first because both
-   * transformGroupClause and transformDistinctClause need the results.
-   */
-    qry->sortClause = clause_parser_ptr->transformSortClause(
-        pstate,
-        stmt->sortClause,
-        &qry->targetList,
-        true, /* fix unknowns */
-        false /* use SQL92 rules */);
-
-    qry->groupClause = clause_parser_ptr->transformGroupClause(pstate, stmt->groupClause, &qry->targetList, qry->sortClause, false /* useSQL92 rules */);
-
-    /*
-   * SCATTER BY clause on a table function TableValueExpr subquery.
-   *
-   * Note: a given subquery cannot have both a SCATTER clause and an INTO
-   * clause, because both of those control distribution.  This should not
-   * possible due to grammar restrictions on where a SCATTER clause is
-   * allowed.
-   */
-    Insist(!(stmt->scatterClause && stmt->intoClause));
-    qry->scatterClause = clause_parser_ptr->transformScatterClause(pstate, stmt->scatterClause, &qry->targetList);
-
-    /* Having clause */
-    qry->havingQual = pstate->having_qual;
-    pstate->having_qual = NULL;
-
-    /*
-   * Process WINDOW clause.
-   */
-    clause_parser_ptr->transformWindowClause(pstate, qry);
-
-    qry->distinctClause = clause_parser_ptr->transformDistinctClause(pstate, stmt->distinctClause, &qry->targetList, &qry->sortClause, &qry->groupClause);
-
-    qry->limitOffset = clause_parser_ptr->transformLimitClause(pstate, stmt->limitOffset, "OFFSET");
-    qry->limitCount = clause_parser_ptr->transformLimitClause(pstate, stmt->limitCount, "LIMIT");
-
-    /* CDB: Cursor position not available for errors below this point. */
-    pstate->p_breadcrumb.node = NULL;
-
-    /* handle any SELECT INTO/CREATE TABLE AS spec */
-    qry->intoClause = NULL;
-    if (stmt->intoClause)
-    {
-        qry->intoClause = stmt->intoClause;
-        if (stmt->intoClause->colNames)
-            applyColumnNames(qry->targetList, stmt->intoClause->colNames);
-        /* XXX XXX:		qry->partitionBy = stmt->partitionBy; */
-    }
-
-    /*
-   * Generally, we'll only have a distributedBy clause if stmt->into is set,
-   * with the exception of set op queries, since transformSetOperationStmt()
-   * sets stmt->into to NULL to avoid complications elsewhere.
-   */
-    if (Gp_role == GP_ROLE_DISPATCH)
-        setQryDistributionPolicy(stmt, qry);
-
-    qry->rtable = pstate->p_rtable;
-    qry->jointree = makeFromExpr(pstate->p_joinlist, qual);
-
-    qry->hasSubLinks = pstate->p_hasSubLinks;
-    qry->hasAggs = pstate->p_hasAggs;
-    if (pstate->p_hasAggs || qry->groupClause || qry->havingQual)
-        parseCheckAggregates(pstate, qry);
-
-    if (pstate->p_hasTblValueExpr)
-        parseCheckTableFunctions(pstate, qry);
-
-    qry->hasWindFuncs = pstate->p_hasWindFuncs;
-    if (pstate->p_hasWindFuncs)
-        parseProcessWindFuncs(pstate, qry);
-
-    foreach (l, stmt->lockingClause)
-    {
-        /* disable select for update/share for gpsql */
-        ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support select for update/share statement yet")));
-        /*transformLockingClause(qry, (LockingClause *) lfirst(l));*/
-    }
-
-    /*
-   * If the query mixes window functions and aggregates, we need to
-   * transform it such that the grouped query appears as a subquery
-   */
-    if (qry->hasWindFuncs && (qry->groupClause || qry->hasAggs))
-        transformGroupedWindows(qry);
-
-    return qry;
-};
-
-PGQuery * SelectParser::transformStmt(
-        PGParseState * pstate,
-        PGNode * parseTree)
-{
-    PGQuery * result = NULL;
-
-    switch (nodeTag(parseTree))
-    {
-        /*
-     * Non-optimizable statements
-     */
-        // case T_CreateStmt:
-        //     result = transformCreateStmt(pstate, (CreateStmt *)parseTree, extras_before, extras_after);
-        //     break;
-
-        // case T_CreateExternalStmt:
-        //     result = transformCreateExternalStmt(pstate, (CreateExternalStmt *)parseTree, extras_before, extras_after);
-        //     break;
-
-        // case T_CreateForeignStmt:
-        //     result = transformCreateForeignStmt(pstate, (CreateForeignStmt *)parseTree, extras_before, extras_after);
-        //     break;
-
-        // case T_IndexStmt:
-        //     result = transformIndexStmt(pstate, (IndexStmt *)parseTree, extras_before, extras_after);
-        //     break;
-
-        // case T_RuleStmt:
-        //     result = transformRuleStmt(pstate, (RuleStmt *)parseTree, extras_before, extras_after);
-        //     break;
-
-        // case T_ViewStmt:
-        //     result = transformViewStmt(pstate, (ViewStmt *)parseTree, extras_before, extras_after);
-        //     break;
-
-        // case T_ExplainStmt: {
-        //     ExplainStmt * n = (ExplainStmt *)parseTree;
-
-        //     result = makeNode(Query);
-        //     result->commandType = CMD_UTILITY;
-        //     n->query = transformStmt(pstate, (Node *)n->query, extras_before, extras_after);
-        //     result->utilityStmt = (Node *)parseTree;
-        // }
-        // break;
-
-    //     case T_CopyStmt: {
-    //         CopyStmt * n = (CopyStmt *)parseTree;
-
-    //         /*
-    //    * Check if we need to create an error table. If so, add it to the
-    //    * before list.
-    //    */
-    //         if (n->sreh && ((SingleRowErrorDesc *)n->sreh)->errtable)
-    //         {
-    //             CreateStmtContext cxt;
-    //             cxt.blist = NIL;
-    //             cxt.alist = NIL;
-
-    //             transformSingleRowErrorHandling(pstate, &cxt, (SingleRowErrorDesc *)n->sreh);
-    //             *extras_before = list_concat(*extras_before, cxt.blist);
-    //         }
-
-    //         result = makeNode(Query);
-    //         result->commandType = CMD_UTILITY;
-    //         if (n->query)
-    //             n->query = transformStmt(pstate, (Node *)n->query, extras_before, extras_after);
-    //         result->utilityStmt = (Node *)parseTree;
-    //     }
-    //     break;
-
-    //     case T_AlterTableStmt:
-    //         result = transformAlterTableStmt(pstate, (AlterTableStmt *)parseTree, extras_before, extras_after);
-    //         break;
-
-    //     case T_PrepareStmt:
-    //         result = transformPrepareStmt(pstate, (PrepareStmt *)parseTree);
-    //         break;
-
-    //     case T_ExecuteStmt:
-    //         result = transformExecuteStmt(pstate, (ExecuteStmt *)parseTree);
-    //         break;
-
-        /*
-     * Optimizable statements
-     */
-        // case T_InsertStmt:
-        //     result = transformInsertStmt(pstate, (InsertStmt *)parseTree, extras_before, extras_after);
-        //     break;
-
-        // case T_DeleteStmt:
-        //     result = transformDeleteStmt(pstate, (DeleteStmt *)parseTree);
-        //     break;
-
-        // case T_UpdateStmt:
-        //     result = transformUpdateStmt(pstate, (UpdateStmt *)parseTree);
-        //     break;
-
-        case T_PGSelectStmt: {
-            PGSelectStmt * n = (PGSelectStmt *)parseTree;
-
-            // if (n->valuesLists)
-            //     result = transformValuesClause(pstate, n);
-            // else if (n->op == PG_SETOP_NONE)
-            //     result = transformSelectStmt(pstate, n);
-            // else
-            //     result = transformSetOperationStmt(pstate, n);
-            if (n->op == PG_SETOP_NONE)
-                 result = transformSelectStmt(pstate, n);
-        }
-        break;
-
-        // case T_DeclareCursorStmt:
-        //     result = transformDeclareCursorStmt(pstate, (DeclareCursorStmt *)parseTree);
-        //     break;
-
-        default:
-
-            /*
-       * other statements don't require any transformation; just return
-       * the original parsetree with a Query node plastered on top.
-       */
-            result = makeNode(PGQuery);
-            result->commandType = PG_CMD_UTILITY;
-            result->utilityStmt = (PGNode *)parseTree;
-            break;
-    }
-
-    /* Mark as original query until we learn differently */
-    result->querySource = PG_QSRC_ORIGINAL;
-    result->canSetTag = true;
-
-    /*
-   * Check that we did not produce too many resnos; at the very least we
-   * cannot allow more than 2^16, since that would exceed the range of a
-   * AttrNumber. It seems safest to use MaxTupleAttributeNumber.
-   */
-    if (pstate->p_next_resno - 1 > MaxTupleAttributeNumber)
-        ereport(
-            ERROR, (errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED), errmsg("target lists can have at most %d entries", MaxTupleAttributeNumber)));
-
-    return result;
-};
-
-PGList *
-SelectParser::do_parse_analyze(PGNode *parseTree, PGParseState *pstate)
-{
-    PGList * result = NIL;
-
-    /* Lists to return extra commands from transformation */
-    //PGList * extras_before = NIL;
-    //PGList * extras_after = NIL;
-    PGList * tmp = NIL;
-    PGQuery * query;
-    PGListCell * l;
-
-    ErrorContextCallback errcontext;
-
-    /* CDB: Request a callback in case ereport or elog is called. */
-    errcontext.callback = parse_analyze_error_callback;
-    errcontext.arg = pstate;
-    errcontext.previous = error_context_stack;
-    error_context_stack = &errcontext;
-
-    query = transformStmt(pstate, parseTree);
-
-    /* CDB: Pop error context callback stack. */
-    error_context_stack = errcontext.previous;
-
-    /* CDB: All breadcrumbs should have been popped. */
-    Assert(!pstate->p_breadcrumb.pop);
-
-    /* don't need to access result relation any more */
-    release_pstate_resources(pstate);
-
-    //foreach (l, extras_before)
-        //result = list_concat(result, parse_sub_analyze(lfirst(l), pstate));
-
-    result = lappend(result, query);
-
-    //foreach (l, extras_after)
-        //tmp = list_concat(tmp, parse_sub_analyze(lfirst(l), pstate));
-
-    /*
-   * If this is the top level query and it is a CreateStmt/CreateExternalStmt
-   * and it has a partition by clause, reorder the expanded extras_after so
-   * that AlterTable is able to build the partitioning hierarchy
-   * better. The problem with the existing list is that for
-   * subpartitioned tables, the subpartitions will be added to the
-   * hierarchy before the root, which means we cannot get the parent
-   * oid of rules.
-   *
-   * nefarious: special KeepMe case in cdbpartition.c:atpxPart_validate_spec
-   */
-    if (pstate->parentParseState == NULL && query->utilityStmt
-        && (IsA(query->utilityStmt, PGCreateStmt) && ((PGCreateStmt *)query->utilityStmt)->base.partitionBy
-            || IsA(query->utilityStmt, CreateExternalStmt) && ((CreateExternalStmt *)query->utilityStmt)->base.partitionBy))
-    {
-        /*
-     * We just break the statements into two lists: alter statements and
-     * other statements.
-     */
-        PGList * alters = NIL;
-        PGList * others = NIL;
-        PGQuery ** stmts;
-        int i = 0;
-        int j;
-
-        foreach (l, tmp)
-        {
-            PGQuery * q = lfirst(l);
-
-            Assert(IsA(q, PGQuery));
-
-            if (IsA(q->utilityStmt, PGAlterTableStmt))
-                alters = lappend(alters, q);
-            else
-                others = lappend(others, q);
-        }
-
-        Assert(list_length(alters));
-
-        /*
-     * Now, sort the ALTER statements so that the deeper partition members
-     * are processed last.
-     */
-        stmts = palloc(list_length(alters) * sizeof(PGQuery *));
-        foreach (l, alters)
-            stmts[i++] = (PGQuery *)lfirst(l);
-
-        qsort(stmts, i, sizeof(void *), alter_cmp);
-
-        list_free(alters);
-        alters = NIL;
-        for (j = 0; j < i; j++)
-        {
-            PGAlterTableStmt * n;
-            alters = lappend(alters, stmts[j]);
-
-            n = (PGAlterTableStmt *)((PGQuery *)stmts[j])->utilityStmt;
-        }
-        result = list_concat(result, others);
-        result = list_concat(result, alters);
-    }
-    else
-        result = list_concat(result, tmp);
-
-    /*
-   * Make sure that only the original query is marked original. We have to
-   * do this explicitly since recursive calls of do_parse_analyze will have
-   * marked some of the added-on queries as "original".  Also mark only the
-   * original query as allowed to set the command-result tag.
-   */
-    foreach (l, result)
-    {
-        PGQuery * q = lfirst(l);
-
-        if (q == query)
-        {
-            q->querySource = PG_QSRC_ORIGINAL;
-            q->canSetTag = true;
-        }
-        else
-        {
-            q->querySource = PG_QSRC_PARSER;
-            q->canSetTag = false;
-        }
-    }
-
-    return result;
-};
-
-PGList *
-SelectParser::parse_analyze(PGNode *parseTree, const char *sourceText, Oid *paramTypes,
-                    int numParams)
-{
-    PGParseState * pstate = node_parser_ptr->make_parsestate(NULL);
-    PGList * result;
-
-    pstate->p_sourcetext = sourceText;
-    pstate->p_paramtypes = paramTypes;
-    pstate->p_numparams = numParams;
-    pstate->p_variableparams = false;
-
-    result = do_parse_analyze(parseTree, pstate);
-
-    node_parser_ptr->free_parsestate(&pstate);
-
-    return result;
+		markTargetListOrigin(pstate, tle, (PGVar *) tle->expr, 0);
+	}
 };
 
 PGQuery *
-SelectParser::parse_sub_analyze(duckdb_libpgquery::PGNode * parseTree, PGParseState * parentParseState,
-    PGCommonTableExpr * parentCTE, PGLockingClause * lockclause_from_parent)
+SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 {
-    PGParseState *pstate = node_parser_ptr->make_parsestate(parentParseState);
+    PGQuery	   *qry = makeNode(PGQuery);
+	PGNode	   *qual;
+	PGListCell   *l;
+
+	qry->commandType = PG_CMD_SELECT;
+
+	/* process the WITH clause independently of all else */
+	if (stmt->withClause)
+	{
+		qry->hasRecursive = stmt->withClause->recursive;
+		qry->cteList = cte_parser.transformWithClause(pstate, stmt->withClause);
+		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
+	}
+
+	/* Complain if we get called from someplace where INTO is not allowed */
+	node_parser.parser_errposition(pstate, exprLocation((PGNode *) stmt->intoClause));
+	if (stmt->intoClause)
+		ereport(ERROR,
+				(errcode(ERRCODE_SYNTAX_ERROR),
+				 errmsg("SELECT ... INTO is not allowed here")));
+
+	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
+	pstate->p_locking_clause = stmt->lockingClause;
+
+	/* make WINDOW info available for window functions, too */
+	pstate->p_windowdefs = stmt->windowClause;
+
+	/* process the FROM clause */
+	clause_parser.transformFromClause(pstate, stmt->fromClause);
+
+	/* transform targetlist */
+	qry->targetList = target_parser.transformTargetList(pstate, stmt->targetList,
+										  PGParseExprKind::EXPR_KIND_SELECT_TARGET);
+
+	/* mark column origins */
+	markTargetListOrigins(pstate, qry->targetList);
+
+	/* transform WHERE */
+	qual = clause_parser.transformWhereClause(pstate, stmt->whereClause,
+								PGParseExprKind::EXPR_KIND_WHERE, "WHERE");
+
+	/* initial processing of HAVING clause is much like WHERE clause */
+	qry->havingQual = clause_parser.transformWhereClause(pstate, stmt->havingClause,
+										   PGParseExprKind::EXPR_KIND_HAVING, "HAVING");
+
+	/*
+	 * Transform sorting/grouping stuff.  Do ORDER BY first because both
+	 * transformGroupClause and transformDistinctClause need the results. Note
+	 * that these functions can also change the targetList, so it's passed to
+	 * them by reference.
+	 */
+	qry->sortClause = clause_parser.transformSortClause(pstate,
+										  stmt->sortClause,
+										  &qry->targetList,
+										  PGParseExprKind::EXPR_KIND_ORDER_BY,
+										  false /* allow SQL92 rules */ );
+
+	qry->groupClause = clause_parser.transformGroupClause(pstate,
+											stmt->groupClause,
+											&qry->groupingSets,
+											&qry->targetList,
+											qry->sortClause,
+											PGParseExprKind::EXPR_KIND_GROUP_BY,
+											false /* allow SQL92 rules */ );
+
+	/*
+	 * SCATTER BY clause on a table function TableValueExpr subquery.
+	 *
+	 * Note: a given subquery cannot have both a SCATTER clause and an INTO
+	 * clause, because both of those control distribution.  This should not
+	 * possible due to grammar restrictions on where a SCATTER clause is
+	 * allowed.
+	 */
+	Assert(!(stmt->scatterClause && stmt->intoClause));
+	// qry->scatterClause = transformScatterClause(pstate,
+	// 											stmt->scatterClause,
+	// 											&qry->targetList);
+
+	if (stmt->distinctClause == NIL)
+	{
+		qry->distinctClause = NIL;
+		qry->hasDistinctOn = false;
+	}
+	else if (linitial(stmt->distinctClause) == NULL)
+	{
+		/* We had SELECT DISTINCT */
+		qry->distinctClause = clause_parser.transformDistinctClause(pstate,
+													  &qry->targetList,
+													  qry->sortClause,
+													  false);
+		qry->hasDistinctOn = false;
+	}
+	else
+	{
+		/* We had SELECT DISTINCT ON */
+		qry->distinctClause = clause_parser.transformDistinctOnClause(pstate,
+														stmt->distinctClause,
+														&qry->targetList,
+														qry->sortClause);
+		qry->hasDistinctOn = true;
+	}
+
+	/* transform LIMIT */
+	qry->limitOffset = clause_parser.transformLimitClause(pstate, stmt->limitOffset,
+											PGParseExprKind::EXPR_KIND_OFFSET, "OFFSET");
+	qry->limitCount = clause_parser.transformLimitClause(pstate, stmt->limitCount,
+										   PGParseExprKind::EXPR_KIND_LIMIT, "LIMIT");
+
+	/* transform window clauses after we have seen all window functions */
+	qry->windowClause = clause_parser.transformWindowDefinitions(pstate,
+												   pstate->p_windowdefs,
+												   &qry->targetList);
+
+	/* resolve any still-unresolved output columns as being type text */
+	if (pstate->p_resolve_unknowns)
+		target_parser.resolveTargetListUnknowns(pstate, qry->targetList);
+
+	qry->rtable = pstate->p_rtable;
+	qry->jointree = makeFromExpr(pstate->p_joinlist, qual);
+
+	qry->hasSubLinks = pstate->p_hasSubLinks;
+	qry->hasWindowFuncs = pstate->p_hasWindowFuncs;
+	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
+	qry->hasAggs = pstate->p_hasAggs;
+	// qry->hasFuncsWithExecRestrictions = pstate->p_hasFuncsWithExecRestrictions;
+
+	if (pstate->p_hasTblValueExpr)
+		func_parser.parseCheckTableFunctions(pstate, qry);
+
+	// foreach(l, stmt->lockingClause)
+	// {
+	// 	transformLockingClause(pstate, qry,
+	// 						   (PGLockingClause *) lfirst(l), false);
+	// }
+
+	collation_parser.assign_query_collations(pstate, qry);
+
+	/* this must be done after collations, for reliable comparison of exprs */
+	if (pstate->p_hasAggs || qry->groupClause || qry->groupingSets || qry->havingQual)
+		agg_parser.parseCheckAggregates(pstate, qry);
+
+	return qry;
+};
+
+PGQuery *
+SelectParser::transformStmt(PGParseState *pstate, PGNode *parseTree)
+{
+    PGQuery	   *result;
+
+	/*
+	 * We apply RAW_EXPRESSION_COVERAGE_TEST testing to basic DML statements;
+	 * we can't just run it on everything because raw_expression_tree_walker()
+	 * doesn't claim to handle utility statements.
+	 */
+#ifdef RAW_EXPRESSION_COVERAGE_TEST
+	switch (nodeTag(parseTree))
+	{
+		case T_PGSelectStmt:
+		case T_PGInsertStmt:
+		case T_PGUpdateStmt:
+		case T_PGDeleteStmt:
+			(void) test_raw_expression_coverage(parseTree, NULL);
+			break;
+		default:
+			break;
+	}
+#endif							/* RAW_EXPRESSION_COVERAGE_TEST */
+
+	switch (nodeTag(parseTree))
+	{
+			/*
+			 * Optimizable statements
+			 */
+		// case T_PGInsertStmt:
+		// 	result = transformInsertStmt(pstate, (PGInsertStmt *) parseTree);
+		// 	break;
+
+		// case T_PGDeleteStmt:
+		// 	result = transformDeleteStmt(pstate, (PGDeleteStmt *) parseTree);
+		// 	break;
+
+		// case T_PGUpdateStmt:
+		// 	result = transformUpdateStmt(pstate, (PGUpdateStmt *) parseTree);
+		// 	break;
+
+		case T_PGSelectStmt:
+			{
+				PGSelectStmt *n = (PGSelectStmt *) parseTree;
+
+                if (n->op == PG_SETOP_NONE)
+					result = transformSelectStmt(pstate, n);
+
+				// if (n->valuesLists)
+				// 	result = transformValuesClause(pstate, n);
+				// else if (n->op == PG_SETOP_NONE)
+				// 	result = transformSelectStmt(pstate, n);
+				// else
+				// 	result = transformSetOperationStmt(pstate, n);
+			}
+			break;
+
+			/*
+			 * Special cases
+			 */
+		// case T_PGDeclareCursorStmt:
+		// 	result = transformDeclareCursorStmt(pstate,
+		// 										(PGDeclareCursorStmt *) parseTree);
+		// 	break;
+
+		// case T_PGExplainStmt:
+		// 	result = transformExplainStmt(pstate,
+		// 								  (PGExplainStmt *) parseTree);
+		// 	break;
+
+		// case T_PGCreateTableAsStmt:
+		// 	result = transformCreateTableAsStmt(pstate,
+		// 										(PGCreateTableAsStmt *) parseTree);
+		// 	break;
+
+		// case T_PGCallStmt:
+		// 	result = transformCallStmt(pstate,
+		// 							   (PGCallStmt *) parseTree);
+		// 	break;
+
+		default:
+
+			/*
+			 * other statements don't require any transformation; just return
+			 * the original parsetree with a Query node plastered on top.
+			 */
+			result = makeNode(PGQuery);
+			result->commandType = PG_CMD_UTILITY;
+			result->utilityStmt = (PGNode *) parseTree;
+			break;
+	}
+
+	/* Mark as original query until we learn differently */
+	result->querySource = PG_QSRC_ORIGINAL;
+	result->canSetTag = true;
+
+	// if (pstate->p_hasDynamicFunction)
+	// 	result->hasDynamicFunctions = true;
+
+	return result;
+};
+
+PGQuery *
+SelectParser::parse_sub_analyze(PGNode *parseTree, PGParseState *parentParseState,
+				  PGCommonTableExpr *parentCTE,
+				  PGLockingClause *lockclause_from_parent,
+				  bool resolve_unknowns)
+{
+	PGParseState *pstate = make_parsestate(parentParseState);
 	PGQuery	   *query;
 
 	pstate->p_parent_cte = parentCTE;
 	pstate->p_lockclause_from_parent = lockclause_from_parent;
+	//pstate->p_resolve_unknowns = resolve_unknowns;
 
-	//query = do_parse_analyze(parseTree, pstate);
-    query = transformStmt(pstate, parseTree);
+	query = transformStmt(pstate, parseTree);
 
-	node_parser_ptr->free_parsestate(pstate);
+	free_parsestate(pstate);
 
 	return query;
 };

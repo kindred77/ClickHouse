@@ -2011,3 +2011,117 @@ pg_flatten_join_alias_vars(PGQuery *query, PGNode *node)
 
 	return pg_flatten_join_alias_vars_mutator(node, &context);
 };
+
+bool cdb_walk_vars_walker(PGNode * node, void * wvwcontext)
+{
+    // using duckdb_libpgquery::PGNode;
+    // using duckdb_libpgquery::PGVar;
+    // using duckdb_libpgquery::PGAggref;
+    // using duckdb_libpgquery::PGCurrentOfExpr;
+    // using duckdb_libpgquery::PGQuery;
+
+    // using duckdb_libpgquery::T_PGVar;
+    // using duckdb_libpgquery::T_PGAggref;
+    // using duckdb_libpgquery::T_PGCurrentOfExpr;
+    // using duckdb_libpgquery::T_PGQuery;
+
+    Cdb_walk_vars_context * ctx = (Cdb_walk_vars_context *)wvwcontext;
+
+    if (node == NULL)
+        return false;
+
+    if (IsA(node, PGVar) && ctx->callback_var != NULL)
+        return ctx->callback_var((PGVar *)node, ctx->context, ctx->sublevelsup);
+
+    if (IsA(node, PGAggref) && ctx->callback_aggref != NULL)
+        return ctx->callback_aggref((PGAggref *)node, ctx->context, ctx->sublevelsup);
+
+    if (IsA(node, PGCurrentOfExpr) && ctx->callback_currentof != NULL)
+        return ctx->callback_currentof((PGCurrentOfExpr *)node, ctx->context, ctx->sublevelsup);
+
+    if (IsA(node, PGQuery))
+    {
+        bool b;
+
+        /* Recurse into subselects */
+        ctx->sublevelsup++;
+        b = pg_query_tree_walker((PGQuery *)node, (walker_func)cdb_walk_vars_walker, ctx, 0);
+        ctx->sublevelsup--;
+        return b;
+    }
+    return pg_expression_tree_walker(node, (walker_func)cdb_walk_vars_walker, ctx);
+}; /* cdb_walk_vars_walker */
+
+bool cdb_walk_vars(
+    PGNode * node,
+    Cdb_walk_vars_callback_Var callback_var,
+    Cdb_walk_vars_callback_Aggref callback_aggref,
+    Cdb_walk_vars_callback_CurrentOf callback_currentof,
+    void * context,
+    int levelsup)
+{
+    Cdb_walk_vars_context ctx;
+
+    ctx.callback_var = callback_var;
+    ctx.callback_aggref = callback_aggref;
+    ctx.callback_currentof = callback_currentof;
+    ctx.context = context;
+    ctx.sublevelsup = levelsup;
+
+    /*
+	 * Must be prepared to start with a Query or a bare expression tree; if
+	 * it's a Query, we don't want to increment levelsdown.
+	 */
+    return pg_query_or_expression_tree_walker(node, (walker_func)cdb_walk_vars_walker, &ctx, 0);
+}; /* cdb_walk_vars */
+
+/*
+ * contain_vars_of_level
+ *	  Recursively scan a clause to discover whether it contains any Var nodes
+ *	  of the specified query level.
+ *
+ *	  Returns true if any such Var found.
+ *
+ * Will recurse into sublinks.  Also, may be invoked directly on a Query.
+ */
+bool contain_vars_of_level(PGNode * node, int levelsup)
+{
+    int sublevels_up = levelsup;
+
+    return pg_query_or_expression_tree_walker(node, (walker_func)contain_vars_of_level_walker, (void *)&sublevels_up, 0);
+};
+
+static bool contain_vars_of_level_walker(PGNode * node, int * sublevels_up)
+{
+    if (node == NULL)
+        return false;
+    if (IsA(node, PGVar))
+    {
+        if (((PGVar *)node)->varlevelsup == *sublevels_up)
+            return true; /* abort tree traversal and return true */
+        return false;
+    }
+    if (IsA(node, PGCurrentOfExpr))
+    {
+        if (*sublevels_up == 0)
+            return true;
+        return false;
+    }
+    // if (IsA(node, PGPlaceHolderVar))
+    // {
+    //     if (((PGPlaceHolderVar *)node)->phlevelsup == *sublevels_up)
+    //         return true; /* abort the tree traversal and return true */
+    //     /* else fall through to check the contained expr */
+    // }
+    if (IsA(node, PGQuery))
+    {
+        /* Recurse into subselects */
+        bool result;
+
+        (*sublevels_up)++;
+        result = pg_query_tree_walker((PGQuery *)node, (walker_func)contain_vars_of_level_walker, (void *)sublevels_up, 0);
+        (*sublevels_up)--;
+        return result;
+    }
+    return pg_expression_tree_walker(node, (walker_func)contain_vars_of_level_walker, (void *)sublevels_up);
+};

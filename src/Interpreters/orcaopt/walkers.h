@@ -168,3 +168,33 @@ pg_flatten_join_alias_vars_mutator(duckdb_libpgquery::PGNode *node,
 
 extern duckdb_libpgquery::PGNode *
 pg_flatten_join_alias_vars(duckdb_libpgquery::PGQuery *query, duckdb_libpgquery::PGNode *node);
+
+
+typedef bool (*Cdb_walk_vars_callback_Aggref)(duckdb_libpgquery::PGAggref * aggref, void * context, int sublevelsup);
+typedef bool (*Cdb_walk_vars_callback_Var)(duckdb_libpgquery::PGVar * var, void * context, int sublevelsup);
+typedef bool (*Cdb_walk_vars_callback_CurrentOf)(duckdb_libpgquery::PGCurrentOfExpr * expr, void * context, int sublevelsup);
+
+typedef struct Cdb_walk_vars_context
+{
+    Cdb_walk_vars_callback_Var callback_var;
+    Cdb_walk_vars_callback_Aggref callback_aggref;
+    Cdb_walk_vars_callback_CurrentOf callback_currentof;
+    void * context;
+    int sublevelsup;
+} Cdb_walk_vars_context;
+
+extern bool cdb_walk_vars_walker(duckdb_libpgquery::PGNode * node, void * wvwcontext);
+
+extern bool cdb_walk_vars(
+    duckdb_libpgquery::PGNode * node,
+    Cdb_walk_vars_callback_Var callback_var,
+    Cdb_walk_vars_callback_Aggref callback_aggref,
+    Cdb_walk_vars_callback_CurrentOf callback_currentof,
+    void * context,
+    int levelsup);
+
+extern bool
+contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up);
+
+extern bool
+contain_vars_of_level(duckdb_libpgquery::PGNode *node, int levelsup);

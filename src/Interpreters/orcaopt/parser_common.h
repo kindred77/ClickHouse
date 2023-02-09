@@ -115,14 +115,27 @@ typedef enum
 	EXPR_KIND_SCATTER_BY		/* SCATTER BY expression */
 } PGParseExprKind;
 
+typedef struct ParseStateBreadCrumb
+{
+    duckdb_libpgquery::PGNode * node;
+    struct ParseStateBreadCrumb * pop;
+} ParseStateBreadCrumb;
+
 struct PGParseState
 {
 	struct PGParseState *parentParseState;	/* stack link */
+	//for oldversion
+	ParseStateBreadCrumb    p_breadcrumb;       /* top of err location stack */
+
 	const char *p_sourcetext;	/* source text, or NULL if not available */
 	duckdb_libpgquery::PGList	   *p_rtable;		/* range table so far */
 	duckdb_libpgquery::PGList	   *p_joinexprs;	/* JoinExprs for RTE_JOIN p_rtable entries */
 	duckdb_libpgquery::PGList	   *p_joinlist;		/* join items so far (will become FromExpr
 								 * node's fromlist) */
+	//for oldversion
+	duckdb_libpgquery::PGList	   *p_relnamespace; /* current namespace for relations */
+	duckdb_libpgquery::PGList	   *p_varnamespace; /* current namespace for columns */
+
 	duckdb_libpgquery::PGList	   *p_namespace;	/* currently-referenceable RTEs (List of
 								 * ParseNamespaceItem) */
 	bool		p_lateral_active;	/* p_lateral_only items visible? */
@@ -172,12 +185,6 @@ struct PGParseState
 	// CoerceParamHook p_coerce_param_hook;
 	void	   *p_ref_hook_state;	/* common passthrough link for above */
 };
-
-typedef struct ParseStateBreadCrumb
-{
-    duckdb_libpgquery::PGNode * node;
-    struct ParseStateBreadCrumb * pop;
-} ParseStateBreadCrumb;
 
 struct PGParseNamespaceItem
 {
@@ -235,7 +242,8 @@ typedef enum PGPostgresParserErrors {
 	ERRCODE_INVALID_RECURSION,
 
 	ERRCODE_COLLATION_MISMATCH,
-	ERRCODE_DATA_EXCEPTION
+	ERRCODE_DATA_EXCEPTION,
+	ERRCODE_QUERY_CANCELED
 } PGPostgresParserErrors;
 
 typedef struct ErrorContextCallback
@@ -794,26 +802,6 @@ duckdb_libpgquery::PGValue * makeString(char * str)
     return v;
 };
 
-// void
-// setup_parser_errposition_callback(PGParseCallbackState *pcbstate,
-// 								  PGParseState *pstate, int location)
-// {
-// 	/* Setup error traceback support for ereport() */
-// 	pcbstate->pstate = pstate;
-// 	pcbstate->location = location;
-// 	pcbstate->errcallback.callback = pcb_error_callback;
-// 	pcbstate->errcallback.arg = (void *) pcbstate;
-// 	pcbstate->errcallback.previous = error_context_stack;
-// 	error_context_stack = &pcbstate->errcallback;
-// };
-
-// void
-// cancel_parser_errposition_callback(PGParseCallbackState *pcbstate)
-// {
-// 	/* Pop the error context stack */
-// 	error_context_stack = pcbstate->errcallback.previous;
-// };
-
 int
 parser_errposition(PGParseState *pstate, int location)
 {
@@ -836,6 +824,77 @@ free_parsestate(PGParseState *pstate)
 {
 	delete pstate;
 	pstate = NULL;
+};
+
+/* Global variables */
+ErrorContextCallback *error_context_stack = NULL;
+
+static void pcb_error_callback(void * arg)
+{
+    PGParseCallbackState * pcbstate = (PGParseCallbackState *)arg;
+
+	//TODO
+    //if (geterrcode() != ERRCODE_QUERY_CANCELED)
+        (void)parser_errposition(pcbstate->pstate, pcbstate->location);
+};
+
+void
+setup_parser_errposition_callback(PGParseCallbackState *pcbstate,
+								  PGParseState *pstate, int location)
+{
+	/* Setup error traceback support for ereport() */
+	pcbstate->pstate = pstate;
+	pcbstate->location = location;
+	pcbstate->errcallback.callback = pcb_error_callback;
+	pcbstate->errcallback.arg = (void *) pcbstate;
+	pcbstate->errcallback.previous = error_context_stack;
+	error_context_stack = &pcbstate->errcallback;
+};
+
+void
+cancel_parser_errposition_callback(PGParseCallbackState *pcbstate)
+{
+	/* Pop the error context stack */
+	error_context_stack = pcbstate->errcallback.previous;
+};
+
+duckdb_libpgquery::PGTargetEntry * get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList * targetList)
+{
+	using duckdb_libpgquery::errcode;
+	using duckdb_libpgquery::ereport;
+	using duckdb_libpgquery::errmsg;
+
+    duckdb_libpgquery::PGListCell * l;
+
+    foreach (l, targetList)
+    {
+        duckdb_libpgquery::PGTargetEntry * tle = (duckdb_libpgquery::PGTargetEntry *)lfirst(l);
+
+        if (tle->ressortgroupref == sortref)
+            return tle;
+    }
+
+    /*
+	 * XXX: we probably should catch this earlier, but we have a
+	 * few queries in the regression suite that hit this.
+	 */
+    ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), errmsg("ORDER/GROUP BY expression not found in targetlist")));
+    return NULL; /* keep compiler quiet */
+};
+
+duckdb_libpgquery::PGTargetEntry * get_sortgroupclause_tle(
+	duckdb_libpgquery::PGSortGroupClause * sgClause, 
+	duckdb_libpgquery::PGList * targetList)
+{
+    return get_sortgroupref_tle(sgClause->tleSortGroupRef, targetList);
+};
+
+duckdb_libpgquery::PGNode *
+get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause * sgClause, duckdb_libpgquery::PGList * targetList)
+{
+    duckdb_libpgquery::PGTargetEntry * tle = get_sortgroupclause_tle(sgClause, targetList);
+
+    return (duckdb_libpgquery::PGNode *)tle->expr;
 };
 
 // duckdb_libpgquery::PGTargetEntry *

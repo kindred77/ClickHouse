@@ -6,6 +6,11 @@
 #include <Parsers/queryToString.h>
 #include <IO/Operators.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#else
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
 
 namespace DB
 {
