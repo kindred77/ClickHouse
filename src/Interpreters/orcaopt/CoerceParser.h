@@ -152,6 +152,8 @@ public:
 	coerce_to_specific_type(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
 						Oid targetTypeId,
 						const char *constructName);
+
+    bool IsBinaryCoercible(Oid srctype, Oid targettype);
 };
 
 }

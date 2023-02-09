@@ -1901,4 +1901,69 @@ CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
 										  constructName);
 };
 
+bool CoerceParser::IsBinaryCoercible(Oid srctype, Oid targettype)
+{
+    HeapTuple tuple;
+    Form_pg_cast castForm;
+    bool result;
+
+    /* Fast path if same type */
+    if (srctype == targettype)
+        return true;
+
+    /* Anything is coercible to ANY or ANYELEMENT */
+    if (targettype == ANYOID || targettype == ANYELEMENTOID)
+        return true;
+
+    /* If srctype is a domain, reduce to its base type */
+    if (OidIsValid(srctype))
+        srctype = getBaseType(srctype);
+
+    /* Somewhat-fast path for domain -> base type case */
+    if (srctype == targettype)
+        return true;
+
+    /* Also accept any array type as coercible to ANYARRAY */
+    if (targettype == ANYARRAYOID)
+        if (type_is_array(srctype))
+            return true;
+
+    /* Also accept any non-array type as coercible to ANYNONARRAY */
+    if (targettype == ANYNONARRAYOID)
+        if (!type_is_array(srctype))
+            return true;
+
+    /* Also accept any enum type as coercible to ANYENUM */
+    if (targettype == ANYENUMOID)
+        if (type_is_enum(srctype))
+            return true;
+
+    /* Also accept any range type as coercible to ANYRANGE */
+    if (targettype == ANYRANGEOID)
+        if (type_is_range(srctype))
+            return true;
+
+    /* Also accept any composite type as coercible to RECORD */
+    if (targettype == RECORDOID)
+        if (ISCOMPLEX(srctype))
+            return true;
+
+    /* Also accept any composite array type as coercible to RECORD[] */
+    if (targettype == RECORDARRAYOID)
+        if (is_complex_array(srctype))
+            return true;
+
+    /* Else look in pg_cast */
+    tuple = SearchSysCache2(CASTSOURCETARGET, ObjectIdGetDatum(srctype), ObjectIdGetDatum(targettype));
+    if (!HeapTupleIsValid(tuple))
+        return false; /* no cast */
+    castForm = (Form_pg_cast)GETSTRUCT(tuple);
+
+    result = (castForm->castmethod == COERCION_METHOD_BINARY && castForm->castcontext == COERCION_CODE_IMPLICIT);
+
+    ReleaseSysCache(tuple);
+
+    return result;
+};
+
 }

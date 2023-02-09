@@ -2197,7 +2197,8 @@ PGNode * ClauseParser::transformFrameOffset(
 				 * will have parsed the type into its internal format, we can
 				 * just poke directly into the Const structure.
 				 */
-                result = OidFunctionCall2(funcoid, con->constvalue, zero);
+				//TODO
+                //result = OidFunctionCall2(funcoid, con->constvalue, zero);
 
                 if (result)
                     ereport(

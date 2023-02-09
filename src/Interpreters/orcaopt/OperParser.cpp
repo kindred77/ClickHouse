@@ -39,8 +39,8 @@ OperParser::compatible_oper(PGParseState *pstate, PGList *op, Oid arg1, Oid arg2
 
 	/* but is it good enough? */
 	opform = (Form_pg_operator) GETSTRUCT(optup);
-	if (IsBinaryCoercible(arg1, opform->oprleft) &&
-		IsBinaryCoercible(arg2, opform->oprright))
+	if (coerce_parser->IsBinaryCoercible(arg1, opform->oprleft) &&
+		coerce_parser->IsBinaryCoercible(arg2, opform->oprright))
 		return optup;
 
 	/* nope... */
@@ -48,7 +48,7 @@ OperParser::compatible_oper(PGParseState *pstate, PGList *op, Oid arg1, Oid arg2
 
 	if (!noError)
 	{
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
 				 errmsg("operator requires run-time type coercion: %s",
@@ -94,14 +94,14 @@ OperParser::get_sort_group_operators(Oid argtype,
 		(needGT && !OidIsValid(gt_opr)))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("could not identify an ordering operator for type %s",
-						format_type_be(argtype)),
+				 errmsg("could not identify an ordering operator for type %s"/* ,
+						format_type_be(argtype) */),
 				 errhint("Use an explicit ordering operator or modify the query.")));
 	if (needEQ && !OidIsValid(eq_opr))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("could not identify an equality operator for type %s",
-						format_type_be(argtype))));
+				 errmsg("could not identify an equality operator for type %s"/* ,
+						format_type_be(argtype) */)));
 
 	/* Return results as needed */
 	if (ltOpr)
@@ -279,9 +279,9 @@ OperParser::make_oper_cache_key(PGParseState *pstate, OprCacheKey *key, PGList *
 		PGParseCallbackState pcbstate;
 
 		/* search only in exact schema given */
-		node_parser.setup_parser_errposition_callback(&pcbstate, pstate, location);
+		setup_parser_errposition_callback(&pcbstate, pstate, location);
 		key->search_path[0] = LookupExplicitNamespace(schemaname, false);
-		node_parser.cancel_parser_errposition_callback(&pcbstate);
+		cancel_parser_errposition_callback(&pcbstate);
 	}
 	else
 	{
@@ -400,7 +400,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 	 * possibly adjusting return type or declared_arg_types (which will be
 	 * used as the cast destination by make_fn_arguments)
 	 */
-	rettype = coerce_parser.enforce_generic_type_consistency(actual_arg_types,
+	rettype = coerce_parser->enforce_generic_type_consistency(actual_arg_types,
 											   declared_arg_types,
 											   2,
 											   opform->oprresult,
@@ -411,14 +411,14 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 	 */
 	if (rettype != BOOLOID)
 	{
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("op ANY/ALL (array) requires operator to yield boolean")));
 	}
 	if (get_func_retset(opform->oprcode))
 	{
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("op ANY/ALL (array) requires operator not to return a set")));
@@ -440,7 +440,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 		res_atypeId = get_array_type(declared_arg_types[1]);
 		if (!OidIsValid(res_atypeId))
 		{
-			node_parser.parser_errposition(pstate, location);
+			parser_errposition(pstate, location);
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("could not find array type for data type %s",
@@ -451,7 +451,7 @@ OperParser::make_scalar_array_op(PGParseState *pstate, PGList *opname,
 	declared_arg_types[1] = res_atypeId;
 
 	/* perform the necessary typecasting of arguments */
-	func_parser.make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
+	func_parser->make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
 
 	/* and build the expression node */
 	result = makeNode(PGScalarArrayOpExpr);
@@ -479,7 +479,7 @@ OperParser::oper_select_candidate(int nargs,
 	 * Delete any candidates that cannot actually accept the given input
 	 * types, whether directly or by coercion.
 	 */
-	ncandidates = func_parser.func_match_argtypes(nargs, input_typeids,
+	ncandidates = func_parser->func_match_argtypes(nargs, input_typeids,
 									  candidates, &candidates);
 
 	/* Done if no candidate or only one candidate survives */
@@ -498,7 +498,7 @@ OperParser::oper_select_candidate(int nargs,
 	 * Use the same heuristics as for ambiguous functions to resolve the
 	 * conflict.
 	 */
-	candidates = func_parser.func_select_candidate(nargs, input_typeids, candidates);
+	candidates = func_parser->func_select_candidate(nargs, input_typeids, candidates);
 
 	if (candidates)
 	{
@@ -638,7 +638,7 @@ OperParser::op_error(PGParseState *pstate, PGList *op, char oprkind,
 {
 	if (fdresult == FUNCDETAIL_MULTIPLE)
 	{
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_AMBIGUOUS_FUNCTION),
 				 errmsg("operator is not unique: %s",
@@ -648,7 +648,7 @@ OperParser::op_error(PGParseState *pstate, PGList *op, char oprkind,
 	}
 	else
 	{
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
 				 errmsg("operator does not exist: %s",
@@ -729,7 +729,7 @@ OperParser::make_op(PGParseState *pstate, PGList *opname,
 	/* Check it's not a shell */
 	if (!OidIsValid(opform->oprcode))
 	{
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
 				 errmsg("operator is only a shell: %s",
@@ -772,14 +772,14 @@ OperParser::make_op(PGParseState *pstate, PGList *opname,
 	 * possibly adjusting return type or declared_arg_types (which will be
 	 * used as the cast destination by make_fn_arguments)
 	 */
-	rettype = coerce_parser.enforce_generic_type_consistency(actual_arg_types,
+	rettype = coerce_parser->enforce_generic_type_consistency(actual_arg_types,
 											   declared_arg_types,
 											   nargs,
 											   opform->oprresult,
 											   false);
 
 	/* perform the necessary typecasting of arguments */
-	func_parser.make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
+	func_parser->make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
 
 	/* and build the expression node */
 	result = makeNode(PGOpExpr);
@@ -794,7 +794,7 @@ OperParser::make_op(PGParseState *pstate, PGList *opname,
 	/* if it returns a set, check that's OK */
 	if (result->opretset)
 	{
-		func_parser.check_srf_call_placement(pstate, last_srf, location);
+		func_parser->check_srf_call_placement(pstate, last_srf, location);
 		/* ... and remember it for error checks at higher levels */
 		pstate->p_last_srf = (PGNode *) result;
 	}

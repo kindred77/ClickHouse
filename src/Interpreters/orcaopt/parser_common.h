@@ -423,6 +423,7 @@ typedef struct _TupleDesc
 
 typedef struct _Form_pg_operator
 {
+	Oid oid;
     NameData oprname; /* name of operator */
     Oid oprnamespace; /* OID of namespace containing this oper */
     Oid oprowner; /* operator owner */
@@ -895,6 +896,58 @@ get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause * sgClause, duckdb
     duckdb_libpgquery::PGTargetEntry * tle = get_sortgroupclause_tle(sgClause, targetList);
 
     return (duckdb_libpgquery::PGNode *)tle->expr;
+};
+
+/*
+ * DeconstructQualifiedName
+ *		Given a possibly-qualified name expressed as a list of String nodes,
+ *		extract the schema name and object name.
+ *
+ * *nspname_p is set to NULL if there is no explicit schema name.
+ */
+void DeconstructQualifiedName(duckdb_libpgquery::PGList * names, char ** nspname_p, char ** objname_p)
+{
+	using duckdb_libpgquery::ereport;
+	using duckdb_libpgquery::errcode;
+	using duckdb_libpgquery::ereport;
+	using duckdb_libpgquery::errmsg;
+
+    char * catalogname;
+    char * schemaname = NULL;
+    char * objname = NULL;
+
+    switch (list_length(names))
+    {
+        case 1:
+            objname = strVal(linitial(names));
+            break;
+        case 2:
+            schemaname = strVal(linitial(names));
+            objname = strVal(lsecond(names));
+            break;
+        case 3:
+            catalogname = strVal(linitial(names));
+            schemaname = strVal(lsecond(names));
+            objname = strVal(lthird(names));
+
+            /*
+			 * We check the catalog name and then ignore it.
+			 */
+            if (strcmp(catalogname, get_database_name(MyDatabaseId)) != 0)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                     errmsg("cross-database references are not implemented: %s", NameListToString(names))));
+            break;
+        default:
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_SYNTAX_ERROR), errmsg("improper qualified name (too many dotted names): %s", NameListToString(names))));
+            break;
+    }
+
+    *nspname_p = schemaname;
+    *objname_p = objname;
 };
 
 // duckdb_libpgquery::PGTargetEntry *
