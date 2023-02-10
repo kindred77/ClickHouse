@@ -8,6 +8,7 @@
 #include <Interpreters/orcaopt/OperParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/TargetParser.h>
+#include <Interpreters/orcaopt/OperProvider.h>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
@@ -20,6 +21,8 @@
 #endif
 
 using namespace duckdb_libpgquery;
+
+using PGOperatorPtr = std::shared_ptr<Form_pg_operator>;
 
 namespace DB
 {
@@ -2057,7 +2060,7 @@ PGNode * ClauseParser::transformFrameOffset(
         PGSortGroupClause * sort;
         Oid oprresult;
         PGList * oprname;
-        Operator tup;
+        PGOperatorPtr tup;
         int32 typmod;
 
         /* Transform the raw expression tree */
@@ -2110,15 +2113,15 @@ PGNode * ClauseParser::transformFrameOffset(
 
         tup = oper_parser->oper(pstate, oprname, otype, rtype, true, 0);
 
-        if (!HeapTupleIsValid(tup))
+        if (tup == NULL)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_SYNTAX_ERROR),
                  errmsg("window specification RANGE parameter type must be coercible to ORDER BY column type")));
 
-        oprresult = ((Form_pg_operator)GETSTRUCT(tup))->oprresult;
-        newrtype = ((Form_pg_operator)GETSTRUCT(tup))->oprright;
-        ReleaseSysCache(tup);
+        oprresult = tup->oprresult;
+        newrtype = tup->oprright;
+        //ReleaseSysCache(tup);
         list_free_deep(oprname);
 
         if (rtype != newrtype)
@@ -2186,7 +2189,7 @@ PGNode * ClauseParser::transformFrameOffset(
             if (OidIsValid(sortop))
             {
                 Type typ = typeidType(newrtype);
-                Oid funcoid = get_opcode(sortop);
+                Oid funcoid = oper_provider->get_opcode(sortop);
                 Datum zero;
                 Datum result;
 
@@ -2213,7 +2216,7 @@ PGNode * ClauseParser::transformFrameOffset(
     }
     else
     {
-        Assert(false);
+        Assert(false)
         node = NULL;
     }
 

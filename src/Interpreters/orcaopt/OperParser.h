@@ -7,10 +7,12 @@ namespace DB
 class FuncParser;
 class NodeParser;
 class CoerceParser;
+class OperProvider;
 
 using FuncParserPtr = std::unique_ptr<FuncParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
+using OperProviderPtr = std::unique_ptr<OperProvider>;
 
 class OperParser
 {
@@ -18,13 +20,15 @@ private:
     FuncParserPtr func_parser;
 	NodeParserPtr node_parser;
 	CoerceParserPtr coerce_parser;
+
+	OperProviderPtr oper_provider;
 public:
 	explicit OperParser();
 
 	Oid
 	compatible_oper_opid(duckdb_libpgquery::PGList *op, Oid arg1, Oid arg2, bool noError);
 
-	Operator
+	PGOperatorPtr
 	compatible_oper(PGParseState *pstate, duckdb_libpgquery::PGList *op, Oid arg1, Oid arg2,
 				bool noError, int location);
 
@@ -34,15 +38,15 @@ public:
 						 Oid *ltOpr, Oid *eqOpr, Oid *gtOpr,
 						 bool *isHashable);
 
-	bool
-	make_oper_cache_key(PGParseState *pstate, OprCacheKey *key, duckdb_libpgquery::PGList *opname,
-					Oid ltypeId, Oid rtypeId, int location);
+	//bool
+	//make_oper_cache_key(PGParseState *pstate, OprCacheKey *key, duckdb_libpgquery::PGList *opname,
+	//				Oid ltypeId, Oid rtypeId, int location);
 
-	void
-	make_oper_cache_entry(OprCacheKey *key, Oid opr_oid);
+	//void
+	//make_oper_cache_entry(OprCacheKey *key, Oid opr_oid);
 
-	Oid
-	find_oper_cache_entry(OprCacheKey *key);
+	// Oid
+	// find_oper_cache_entry(OprCacheKey *key);
 
 	Oid
 	binary_oper_exact(duckdb_libpgquery::PGList *opname, Oid arg1, Oid arg2);
@@ -56,15 +60,15 @@ public:
 	const char *
 	op_signature_string(duckdb_libpgquery::PGList *op, char oprkind, Oid arg1, Oid arg2);
 	
-	Operator
+	PGOperatorPtr
 	right_oper(PGParseState *pstate, duckdb_libpgquery::PGList *op,
 			Oid arg, bool noError, int location);
 
-	Operator
+	PGOperatorPtr
 	left_oper(PGParseState *pstate, duckdb_libpgquery::PGList *op,
 			Oid arg, bool noError, int location);
 
-	Operator
+	PGOperatorPtr
 	oper(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
 		Oid ltypeId, Oid rtypeId,bool noError, int location);
 
@@ -72,9 +76,6 @@ public:
 	make_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname, 
 		duckdb_libpgquery::PGNode *ltree, duckdb_libpgquery::PGNode *rtree,
 		duckdb_libpgquery::PGNode *last_srf, int location);
-
-	Oid
-	oprid(Operator op);
 
 	void
 	op_error(PGParseState *pstate, duckdb_libpgquery::PGList *op, char oprkind,

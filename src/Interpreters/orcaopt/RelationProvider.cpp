@@ -1,4 +1,6 @@
-#include <Interpreters/orcaopt/pgoptnew/RelationProvider.h>
+#include <Interpreters/orcaopt/RelationProvider.h>
+
+#include <Storages/IStorage.h>
 
 namespace DB
 {
