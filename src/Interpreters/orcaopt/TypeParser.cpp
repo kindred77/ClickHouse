@@ -11,11 +11,10 @@ void
 TypeParser::typenameTypeIdAndMod(PGParseState *pstate, const PGTypeName *typeName,
 					 Oid *typeid_p, int32 *typmod_p)
 {
-    Type		tup;
+    PGTypePtr		tup;
 
 	tup = typenameType(pstate, typeName, typmod_p);
-	*typeid_p = ((Form_pg_type) GETSTRUCT(tup))->oid;
-	ReleaseSysCache(tup);
+	*typeid_p = tup->oid;
 };
 
 char *
@@ -28,7 +27,7 @@ TypeParser::TypeNameToString(const PGTypeName *typeName)
 	return string.data;
 };
 
-Type
+PGTypePtr
 TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 			   int32 *typmod_p, bool missing_ok)
 {
@@ -53,7 +52,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 		switch (list_length(typeName->names))
 		{
 			case 1:
-				node_parser.parser_errposition(pstate, typeName->location);
+				parser_errposition(pstate, typeName->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too few dotted names): %s",
@@ -75,7 +74,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 				field = strVal(lfourth(typeName->names));
 				break;
 			default:
-				node_parser.parser_errposition(pstate, typeName->location);
+				parser_errposition(pstate, typeName->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too many dotted names): %s",
@@ -98,7 +97,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 				typoid = InvalidOid;
 			else
 			{
-				node_parser.parser_errposition(pstate, typeName->location);
+				parser_errposition(pstate, typeName->location);
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_COLUMN),
 						 errmsg("column \"%s\" of relation \"%s\" does not exist",
@@ -110,7 +109,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 			typoid = get_atttype(relid, attnum);
 
 			/* this construct should never have an array indicator */
-			Assert(typeName->arrayBounds == NIL);
+			Assert(typeName->arrayBounds == NIL)
 
 			/* emit nuisance notice (intentionally not errposition'd) */
 			ereport(NOTICE,
@@ -134,7 +133,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 			Oid			namespaceId;
 			PGParseCallbackState pcbstate;
 
-			node_parser.setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
+			setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
 
 			namespaceId = LookupExplicitNamespace(schemaname, missing_ok);
 			if (OidIsValid(namespaceId))
@@ -144,7 +143,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 			else
 				typoid = InvalidOid;
 
-			node_parser.cancel_parser_errposition_callback(&pcbstate);
+			cancel_parser_errposition_callback(&pcbstate);
 		}
 		else
 		{
@@ -198,7 +197,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 	 */
 	if (!((Form_pg_type) GETSTRUCT(typ))->typisdefined)
 	{
-		node_parser.parser_errposition(pstate, typeName->location);
+		parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier cannot be specified for shell type \"%s\"",
@@ -209,7 +208,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 
 	if (typmodin == InvalidOid)
 	{
-		node_parser.parser_errposition(pstate, typeName->location);
+		parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("type modifier is not allowed for type \"%s\"",
@@ -253,7 +252,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 		}
 		if (!cstr)
 		{
-			node_parser.parser_errposition(pstate, typeName->location);
+			parser_errposition(pstate, typeName->location);
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("type modifiers must be simple constants or identifiers")));
@@ -266,12 +265,12 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 								-2, false, 'c');
 
 	/* arrange to report location if type's typmodin function fails */
-	node_parser.setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
+	setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
 
 	result = DatumGetInt32(OidFunctionCall1(typmodin,
 											PointerGetDatum(arrtypmod)));
 
-	node_parser.cancel_parser_errposition_callback(&pcbstate);
+	cancel_parser_errposition_callback(&pcbstate);
 
 	pfree(datums);
 	pfree(arrtypmod);
@@ -279,7 +278,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, Ty
 	return result;
 };
 
-Type
+PGTypePtr
 TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32 *typmod_p)
 {
     Type		tup;
@@ -287,7 +286,7 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 	tup = LookupTypeName(pstate, typeName, typmod_p, false);
 	if (tup == NULL)
 	{
-		node_parser.parser_errposition(pstate, typeName->location);
+		parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" does not exist",
@@ -295,7 +294,7 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 	}
 	if (!((Form_pg_type) GETSTRUCT(tup))->typisdefined)
 	{
-		node_parser.parser_errposition(pstate, typeName->location);
+		parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" is only a shell",
@@ -304,7 +303,7 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 	return tup;
 };
 
-Type
+PGTypePtr
 TypeParser::typeidType(Oid id)
 {
 	HeapTuple	tup;
@@ -343,7 +342,7 @@ TypeParser::typeByVal(Type t)
 };
 
 Datum
-TypeParser::stringTypeDatum(Type tp, char *string, int32 atttypmod)
+TypeParser::stringTypeDatum(Type tp, const char *string, int32 atttypmod)
 {
 	Form_pg_type typform = (Form_pg_type) GETSTRUCT(tp);
 	Oid			typinput = typform->typinput;
@@ -403,14 +402,227 @@ TypeParser::LookupCollation(PGParseState *pstate, duckdb_libpgquery::PGList *col
 	PGParseCallbackState pcbstate;
 
 	if (pstate)
-		node_parser.setup_parser_errposition_callback(&pcbstate, pstate, location);
+		setup_parser_errposition_callback(&pcbstate, pstate, location);
 
 	colloid = get_collation_oid(collnames, false);
 
 	if (pstate)
-		node_parser.cancel_parser_errposition_callback(&pcbstate);
+		cancel_parser_errposition_callback(&pcbstate);
 
 	return colloid;
+};
+
+char * TypeParser::format_type_with_typemod(Oid type_oid, int32 typemod)
+{
+	return format_type_internal(type_oid, typemod, true, false, false);
+};
+
+char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify)
+{
+    bool with_typemod = typemod_given && (typemod >= 0);
+    HeapTuple tuple;
+    Form_pg_type typeform;
+    Oid array_base_type;
+    bool is_array;
+    char * buf;
+
+    if (type_oid == InvalidOid && allow_invalid)
+        return pstrdup("-");
+
+    tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(type_oid));
+    if (!HeapTupleIsValid(tuple))
+    {
+        if (allow_invalid)
+            return pstrdup("???");
+        else
+            elog(ERROR, "cache lookup failed for type %u", type_oid);
+    }
+    typeform = (Form_pg_type)GETSTRUCT(tuple);
+
+    /*
+	 * Check if it's a regular (variable length) array type.  Fixed-length
+	 * array types such as "name" shouldn't get deconstructed.  As of Postgres
+	 * 8.1, rather than checking typlen we check the toast property, and don't
+	 * deconstruct "plain storage" array types --- this is because we don't
+	 * want to show oidvector as oid[].
+	 */
+    array_base_type = typeform->typelem;
+
+    if (array_base_type != InvalidOid && typeform->typstorage != 'p')
+    {
+        /* Switch our attention to the array element type */
+        ReleaseSysCache(tuple);
+        tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(array_base_type));
+        if (!HeapTupleIsValid(tuple))
+        {
+            if (allow_invalid)
+                return pstrdup("???[]");
+            else
+                elog(ERROR, "cache lookup failed for type %u", type_oid);
+        }
+        typeform = (Form_pg_type)GETSTRUCT(tuple);
+        type_oid = array_base_type;
+        is_array = true;
+    }
+    else
+        is_array = false;
+
+    /*
+	 * See if we want to special-case the output for certain built-in types.
+	 * Note that these special cases should all correspond to special
+	 * productions in gram.y, to ensure that the type name will be taken as a
+	 * system type, not a user type of the same name.
+	 *
+	 * If we do not provide a special-case output here, the type name will be
+	 * handled the same way as a user type name --- in particular, it will be
+	 * double-quoted if it matches any lexer keyword.  This behavior is
+	 * essential for some cases, such as types "bit" and "char".
+	 */
+    buf = NULL; /* flag for no special case */
+
+    switch (type_oid)
+    {
+        case BITOID:
+            if (with_typemod)
+                buf = printTypmod("bit", typemod, typeform->typmodout);
+            else if (typemod_given)
+            {
+                /*
+				 * bit with typmod -1 is not the same as BIT, which means
+				 * BIT(1) per SQL spec.  Report it as the quoted typename so
+				 * that parser will not assign a bogus typmod.
+				 */
+            }
+            else
+                buf = pstrdup("bit");
+            break;
+
+        case BOOLOID:
+            buf = pstrdup("boolean");
+            break;
+
+        case BPCHAROID:
+            if (with_typemod)
+                buf = printTypmod("character", typemod, typeform->typmodout);
+            else if (typemod_given)
+            {
+                /*
+				 * bpchar with typmod -1 is not the same as CHARACTER, which
+				 * means CHARACTER(1) per SQL spec.  Report it as bpchar so
+				 * that parser will not assign a bogus typmod.
+				 */
+            }
+            else
+                buf = pstrdup("character");
+            break;
+
+        case FLOAT4OID:
+            buf = pstrdup("real");
+            break;
+
+        case FLOAT8OID:
+            buf = pstrdup("double precision");
+            break;
+
+        case INT2OID:
+            buf = pstrdup("smallint");
+            break;
+
+        case INT4OID:
+            buf = pstrdup("integer");
+            break;
+
+        case INT8OID:
+            buf = pstrdup("bigint");
+            break;
+
+        case NUMERICOID:
+            if (with_typemod)
+                buf = printTypmod("numeric", typemod, typeform->typmodout);
+            else
+                buf = pstrdup("numeric");
+            break;
+
+        case INTERVALOID:
+            if (with_typemod)
+                buf = printTypmod("interval", typemod, typeform->typmodout);
+            else
+                buf = pstrdup("interval");
+            break;
+
+        case TIMEOID:
+            if (with_typemod)
+                buf = printTypmod("time", typemod, typeform->typmodout);
+            else
+                buf = pstrdup("time without time zone");
+            break;
+
+        case TIMETZOID:
+            if (with_typemod)
+                buf = printTypmod("time", typemod, typeform->typmodout);
+            else
+                buf = pstrdup("time with time zone");
+            break;
+
+        case TIMESTAMPOID:
+            if (with_typemod)
+                buf = printTypmod("timestamp", typemod, typeform->typmodout);
+            else
+                buf = pstrdup("timestamp without time zone");
+            break;
+
+        case TIMESTAMPTZOID:
+            if (with_typemod)
+                buf = printTypmod("timestamp", typemod, typeform->typmodout);
+            else
+                buf = pstrdup("timestamp with time zone");
+            break;
+
+        case VARBITOID:
+            if (with_typemod)
+                buf = printTypmod("bit varying", typemod, typeform->typmodout);
+            else
+                buf = pstrdup("bit varying");
+            break;
+
+        case VARCHAROID:
+            if (with_typemod)
+                buf = printTypmod("character varying", typemod, typeform->typmodout);
+            else
+                buf = pstrdup("character varying");
+            break;
+    }
+
+    if (buf == NULL)
+    {
+        /*
+		 * Default handling: report the name as it appears in the catalog.
+		 * Here, we must qualify the name if it is not visible in the search
+		 * path, and we must double-quote it if it's not a standard identifier
+		 * or if it matches any keyword.
+		 */
+        char * nspname;
+        char * typname;
+
+        if (!force_qualify && TypeIsVisible(type_oid))
+            nspname = NULL;
+        else
+            nspname = get_namespace_name(typeform->typnamespace);
+
+        typname = NameStr(typeform->typname);
+
+        buf = quote_qualified_identifier(nspname, typname);
+
+        if (with_typemod)
+            buf = printTypmod(buf, typemod, typeform->typmodout);
+    }
+
+    if (is_array)
+        buf = psprintf("%s[]", buf);
+
+    ReleaseSysCache(tuple);
+
+    return buf;
 };
 
 }

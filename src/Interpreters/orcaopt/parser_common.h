@@ -195,6 +195,45 @@ struct PGParseNamespaceItem
     bool p_lateral_ok; /* If so, does join type allow use? */
 };
 
+/* Enumeration of contexts in which a self-reference is disallowed */
+typedef enum
+{
+    RECURSION_OK,
+    RECURSION_NONRECURSIVETERM, /* inside the left-hand term */
+    RECURSION_SUBLINK, /* inside a sublink */
+    RECURSION_OUTERJOIN, /* inside nullable side of an outer join */
+    RECURSION_INTERSECT, /* underneath INTERSECT (ALL) */
+    RECURSION_EXCEPT /* underneath EXCEPT (ALL) */
+} RecursionContext;
+
+/*
+ * For WITH RECURSIVE, we have to find an ordering of the clause members
+ * with no forward references, and determine which members are recursive
+ * (i.e., self-referential).  It is convenient to do this with an array
+ * of CteItems instead of a list of CommonTableExprs.
+ */
+struct PGCteItem
+{
+    duckdb_libpgquery::PGCommonTableExpr * cte; /* One CTE to examine */
+    int id; /* Its ID number for dependencies */
+    duckdb_libpgquery::PGBitmapset * depends_on; /* CTEs depended on (not including self) */
+};
+
+/* CteState is what we need to pass around in the tree walkers */
+struct PGCteState
+{
+    /* global state: */
+    PGParseState * pstate; /* global parse state */
+    PGCteItem * items; /* array of CTEs and extra data */
+    int numitems; /* number of CTEs */
+    /* working state during a tree walk: */
+    int curitem; /* index of item currently being examined */
+    duckdb_libpgquery::PGList * innerwiths; /* list of lists of CommonTableExpr */
+    /* working state for checkWellFormedRecursion walk only: */
+    int selfrefcount; /* number of self-references detected */
+    RecursionContext context; /* context to allow or disallow self-ref */
+};
+
 /*
  * This enum represents the different strengths of FOR UPDATE/SHARE clauses.
  * The ordering here is important, because the highest numerical value takes
@@ -447,6 +486,7 @@ using PGOperatorPtr = std::shared_ptr<Form_pg_operator>;
 
 struct Form_pg_type
 {
+	Oid oid;
     NameData typname; /* type name */
     Oid typnamespace; /* OID of namespace containing this type */
     Oid typowner; /* type owner */

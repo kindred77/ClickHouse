@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/pgoptnew/ENRParser.h>
+#include <Interpreters/orcaopt/ENRParser.h>
 
 using namespace duckdb_libpgquery;
 

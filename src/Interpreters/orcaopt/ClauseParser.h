@@ -12,6 +12,7 @@ class ExprParser;
 class TargetParser;
 class OperParser;
 class NodeParser;
+class TypeParser;
 class OperProvider;
 
 using RelationParserPtr = std::unique_ptr<RelationParser>;
@@ -21,6 +22,7 @@ using ExprParserPtr = std::unique_ptr<ExprParser>;
 using TargetParserPtr = std::unique_ptr<TargetParser>;
 using OperParserPtr = std::unique_ptr<OperParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
+using TypeParsertr = std::unique_ptr<TypeParser>;
 using OperProviderPtr = std::unique_ptr<OperProvider>;
 
 class ClauseParser
@@ -34,6 +36,7 @@ private:
     //CollationParserPtr collation_parser;
     OperParserPtr oper_parser;
     NodeParserPtr node_parser;
+    TypeParserPtr type_parser;
     OperProviderPtr oper_provider;
     //std::shared_ptr<ScalarOperatorProvider> scalar_operator_provider = nullptr;
 public:

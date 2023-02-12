@@ -5,8 +5,6 @@
 namespace DB
 {
 
-typedef HeapTuple Type;
-
 class RelationParser;
 class NodeParser;
 
@@ -25,10 +23,10 @@ public:
     typenameTypeIdAndMod(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName,
 					 Oid *typeid_p, int32 *typmod_p);
     
-    Type
+    PGTypePtr
     typenameType(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, int32 *typmod_p);
 
-    Type
+    PGTypePtr
     LookupTypeName(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName,
 			   int32 *typmod_p, bool missing_ok);
 
@@ -36,34 +34,38 @@ public:
     TypeNameToString(const duckdb_libpgquery::PGTypeName *typeName);
 
     int32
-    typenameTypeMod(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, Type typ);
+    typenameTypeMod(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, PGTypePtr typ);
 
-    Type
+    PGTypePtr
     typeidType(Oid id);
 
     Oid
-    typeTypeCollation(Type typ);
+    typeTypeCollation(PGTypePtr typ);
 
     int16
-    typeLen(Type t);
+    typeLen(PGTypePtr t);
 
     bool
-    typeByVal(Type t);
+    typeByVal(PGTypePtr t);
 
     Datum
-    stringTypeDatum(Type tp, char *string, int32 atttypmod);
+    stringTypeDatum(PGTypePtr tp, const char *string, int32 atttypmod);
 
     Oid
     typeOrDomainTypeRelid(Oid type_id);
 
     Oid
-    typeTypeRelid(Type typ);
+    typeTypeRelid(PGTypePtr typ);
 
     Oid
-    typeTypeId(Type tp);
+    typeTypeId(PGTypePtr tp);
 
     Oid
     LookupCollation(PGParseState *pstate, duckdb_libpgquery::PGList *collnames, int location);
+
+    char * format_type_with_typemod(Oid type_oid, int32 typemod);
+
+    char * format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify);
 };
 
 }

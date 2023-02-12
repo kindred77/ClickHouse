@@ -362,21 +362,19 @@ SelectParser::transformStmt(PGParseState *pstate, PGNode *parseTree)
 PGQuery *
 SelectParser::parse_sub_analyze(PGNode *parseTree, PGParseState *parentParseState,
 				  PGCommonTableExpr *parentCTE,
-				  PGLockingClause *lockclause_from_parent,
-				  bool resolve_unknowns)
+				  PGLockingClause *lockclause_from_parent)
 {
-	PGParseState *pstate = make_parsestate(parentParseState);
-	PGQuery	   *query;
+    PGParseState * pstate = make_parsestate(parentParseState);
+    PGQuery * query;
 
-	pstate->p_parent_cte = parentCTE;
-	pstate->p_lockclause_from_parent = lockclause_from_parent;
-	//pstate->p_resolve_unknowns = resolve_unknowns;
+    pstate->p_parent_cte = parentCTE;
+    pstate->p_lockclause_from_parent = lockclause_from_parent;
 
-	query = transformStmt(pstate, parseTree);
+    query = transformStmt(pstate, parseTree);
 
-	free_parsestate(pstate);
+    free_parsestate(pstate);
 
-	return query;
+    return query;
 };
 
 }

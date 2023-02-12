@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/pgoptnew/parser_common.h>
+#include <Interpreters/orcaopt/parser_common.h>
 
 namespace DB
 {

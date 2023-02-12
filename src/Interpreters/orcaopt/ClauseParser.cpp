@@ -8,6 +8,7 @@
 #include <Interpreters/orcaopt/OperParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/TargetParser.h>
+#include <Interpreters/orcaopt/TypeParser.h>
 #include <Interpreters/orcaopt/OperProvider.h>
 
 #ifdef __clang__
@@ -113,8 +114,7 @@ ClauseParser::transformRangeSubselect(PGParseState *pstate, PGRangeSubselect *r)
 	 * Analyze and transform the subquery.
 	 */
 	query = select_parser->parse_sub_analyze(r->subquery, pstate, NULL,
-							  relation_parser->getLockedRefname(pstate, r->alias->aliasname),
-							  true);
+							  relation_parser->getLockedRefname(pstate, r->alias->aliasname));
 
 	/* Restore state */
 	pstate->p_lateral_active = false;
@@ -2188,12 +2188,12 @@ PGNode * ClauseParser::transformFrameOffset(
 
             if (OidIsValid(sortop))
             {
-                Type typ = typeidType(newrtype);
+                PGTypePtr typ = type_parser->typeidType(newrtype);
                 Oid funcoid = oper_provider->get_opcode(sortop);
                 Datum zero;
                 Datum result;
 
-                zero = stringTypeDatum(typ, "0", exprTypmod(node));
+                zero = type_parser->stringTypeDatum(typ, "0", exprTypmod(node));
 
                 /*
 				 * As we know the value is a const and since transformExpr()
@@ -2201,7 +2201,7 @@ PGNode * ClauseParser::transformFrameOffset(
 				 * just poke directly into the Const structure.
 				 */
 				//TODO
-                //result = OidFunctionCall2(funcoid, con->constvalue, zero);
+                result = OidFunctionCall2(funcoid, con->constvalue, zero);
 
                 if (result)
                     ereport(
@@ -2210,7 +2210,7 @@ PGNode * ClauseParser::transformFrameOffset(
                          errmsg("RANGE parameter cannot be negative"),
                          parser_errposition(pstate, con->location)));
 
-                ReleaseSysCache(typ);
+                //ReleaseSysCache(typ);
             }
         }
     }
