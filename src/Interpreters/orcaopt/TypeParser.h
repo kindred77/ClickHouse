@@ -57,6 +57,8 @@ public:
     Oid
     typeTypeRelid(PGTypePtr typ);
 
+    Oid typeidTypeRelid(Oid type_id);
+
     Oid
     typeTypeId(PGTypePtr tp);
 

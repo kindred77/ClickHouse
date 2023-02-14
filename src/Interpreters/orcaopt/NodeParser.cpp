@@ -4,17 +4,18 @@
 #include <Interpreters/orcaopt/ExprParser.h>
 #include <Interpreters/orcaopt/RelationParser.h>
 
-namespace DB
-{
+#include <Interpreters/orcaopt/TypeProvider.h>
+
 using namespace duckdb_libpgquery;
 
-Oid transformArrayType(Oid *arrayType, int32 *arrayTypmod)
+namespace DB
+{
+
+Oid NodeParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
 {
     Oid origArrayType = *arrayType;
     Oid elementType;
-    HeapTuple type_tuple_array;
-    Form_pg_type type_struct_array;
-
+    
     /*
 	 * If the input is a domain, smash to base type, and extract the actual
 	 * typmod to be applied to the base type.  Subscripting a domain is an
@@ -22,7 +23,7 @@ Oid transformArrayType(Oid *arrayType, int32 *arrayTypmod)
 	 * itself.  (Note that we provide no method whereby the creator of a
 	 * domain over an array type could hide its ability to be subscripted.)
 	 */
-    *arrayType = getBaseTypeAndTypmod(*arrayType, arrayTypmod);
+    *arrayType = type_provider->getBaseTypeAndTypmod(*arrayType, arrayTypmod);
 
     /*
 	 * We treat int2vector and oidvector as though they were domains over
@@ -37,21 +38,19 @@ Oid transformArrayType(Oid *arrayType, int32 *arrayTypmod)
         *arrayType = OIDARRAYOID;
 
     /* Get the type tuple for the array */
-    type_tuple_array = SearchSysCache1(TYPEOID, ObjectIdGetDatum(*arrayType));
-    if (!HeapTupleIsValid(type_tuple_array))
+    PGTypePtr type_tuple_array = type_provider->getTypeByOid(*arrayType);
+    if (type_tuple_array == NULL)
         elog(ERROR, "cache lookup failed for type %u", *arrayType);
-    type_struct_array = (Form_pg_type)GETSTRUCT(type_tuple_array);
 
     /* needn't check typisdefined since this will fail anyway */
 
-    elementType = type_struct_array->typelem;
+    elementType = type_tuple_array->typelem;
     if (elementType == InvalidOid)
         ereport(
             ERROR,
             (errcode(ERRCODE_DATATYPE_MISMATCH),
-             errmsg("cannot subscript type %s because it is not an array", format_type_be(origArrayType))));
+             errmsg("cannot subscript type %s because it is not an array", type_provider->format_type_be(origArrayType))));
 
-    ReleaseSysCache(type_tuple_array);
 
     return elementType;
 };
@@ -122,7 +121,7 @@ PGArrayRef * NodeParser::transformArraySubscripts(
         PGAIndices * ai = (PGAIndices *)lfirst(idx);
         PGNode * subexpr;
 
-        Assert(IsA(ai, PGAIndices));
+        Assert(IsA(ai, PGAIndices))
         if (isSlice)
         {
             if (ai->lidx)
@@ -165,10 +164,10 @@ PGArrayRef * NodeParser::transformArraySubscripts(
     {
         Oid typesource = exprType(assignFrom);
         Oid typeneeded = isSlice ? arrayType : elementType;
-        Node * newFrom;
+        PGNode * newFrom;
 
-        newFrom
-            = coerce_parser->coerce_to_target_type(pstate, assignFrom, typesource, typeneeded, arrayTypMod, PG_COERCION_ASSIGNMENT, PG_COERCE_IMPLICIT_CAST, -1);
+        newFrom = coerce_parser->coerce_to_target_type(pstate, assignFrom, typesource, typeneeded, arrayTypMod,
+			PG_COERCION_ASSIGNMENT, PG_COERCE_IMPLICIT_CAST, -1);
         if (newFrom == NULL)
             ereport(
                 ERROR,
@@ -176,8 +175,8 @@ PGArrayRef * NodeParser::transformArraySubscripts(
                  errmsg(
                      "array assignment requires type %s"
                      " but expression is of type %s",
-                     format_type_be(typeneeded),
-                     format_type_be(typesource)),
+                     type_provider->format_type_be(typeneeded),
+                     type_provider->format_type_be(typesource)),
                  errhint("You will need to rewrite or cast the expression."),
                  parser_errposition(pstate, exprLocation(assignFrom))));
         assignFrom = newFrom;
@@ -209,8 +208,8 @@ NodeParser::make_var(PGParseState *pstate, PGRangeTblEntry *rte, int attrno, int
 	int32		type_mod;
 	Oid			varcollid;
 
-	vnum = relation_parser.RTERangeTablePosn(pstate, rte, &sublevels_up);
-	relation_parser.get_rte_attribute_type(rte, attrno, &vartypeid, &type_mod, &varcollid);
+	vnum = relation_parser->RTERangeTablePosn(pstate, rte, &sublevels_up);
+	relation_parser->get_rte_attribute_type(rte, attrno, &vartypeid, &type_mod, &varcollid);
 	result = makeVar(vnum, attrno, vartypeid, type_mod, varcollid, sublevels_up);
 	result->location = location;
 	return result;

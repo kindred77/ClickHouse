@@ -10,6 +10,7 @@
 #include <Interpreters/orcaopt/TargetParser.h>
 #include <Interpreters/orcaopt/TypeParser.h>
 #include <Interpreters/orcaopt/OperProvider.h>
+#include <Interpreters/orcaopt/FunctionProvider.h>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
@@ -1173,7 +1174,7 @@ ClauseParser::targetIsInSortList(PGTargetEntry *tle, Oid sortop, PGList *sortLis
 		if (scl->tleSortGroupRef == ref &&
 			(sortop == InvalidOid ||
 			 sortop == scl->sortop ||
-			 sortop == get_commutator(scl->sortop)))
+			 sortop == oper_provider->get_commutator(scl->sortop)))
 			return true;
 	}
 	return false;
@@ -1256,7 +1257,7 @@ ClauseParser::addTargetToSortList(PGParseState * pstate, PGTargetEntry * tle,
 			 * equality operator, and determine whether to consider it like
 			 * ASC or DESC.
 			 */
-            eqop = get_equality_op_for_ordering_op(sortop, &reverse);
+            eqop = oper_provider->get_equality_op_for_ordering_op(sortop, &reverse);
             if (!OidIsValid(eqop))
                 ereport(
                     ERROR,
@@ -1267,7 +1268,7 @@ ClauseParser::addTargetToSortList(PGParseState * pstate, PGTargetEntry * tle,
             /*
 			 * Also see if the equality operator is hashable.
 			 */
-            hashable = op_hashjoinable(eqop, restype);
+            hashable = oper_provider->op_hashjoinable(eqop, restype);
             break;
         default:
             elog(ERROR, "unrecognized sortby_dir: %d", sortby->sortby_dir);
@@ -2200,8 +2201,7 @@ PGNode * ClauseParser::transformFrameOffset(
 				 * will have parsed the type into its internal format, we can
 				 * just poke directly into the Const structure.
 				 */
-				//TODO
-                result = OidFunctionCall2(funcoid, con->constvalue, zero);
+                result = function_provider->OidFunctionCall2(funcoid, con->constvalue, zero);
 
                 if (result)
                     ereport(

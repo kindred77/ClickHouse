@@ -37,10 +37,18 @@ typedef enum
 class RelationParser;
 class TypeParser;
 class NodeParser;
+class TypeProvider;
+class ClassProvider;
+class ProcProvider;
+class CastProvider;
 
 using RelationParserPtr = std::unique_ptr<RelationParser>;
 using TypeParserPtr = std::unique_ptr<TypeParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
+using TypeProviderPtr = std::unique_ptr<TypeProvider>;
+using ClassProviderPtr = std::unique_ptr<ClassProvider>;
+using ProcProviderPtr = std::unique_ptr<ProcProvider>;
+using CastProviderPtr = std::unique_ptr<CastProvider>;
 
 class CoerceParser
 {
@@ -48,6 +56,10 @@ private:
 	RelationParserPtr relation_parser;
 	NodeParserPtr node_parser;
 	TypeParserPtr type_parser;
+	TypeProviderPtr type_provider;
+	ClassProviderPtr class_provider;
+	ProcProviderPtr proc_provider;
+	CastProviderPtr cast_provider;
 public:
 	explicit CoerceParser();
 
@@ -60,7 +72,7 @@ public:
 			Oid inputTypeId, Oid targetTypeId, int32 targetTypeMod,
 			duckdb_libpgquery::PGCoercionContext ccontext, duckdb_libpgquery::PGCoercionForm cformat, int location);
 
-	duckdb_libpgquery::PGNode *
+    duckdb_libpgquery::PGNode *
 	coerce_to_target_type(PGParseState *pstate, duckdb_libpgquery::PGNode *expr, Oid exprtype,
 					  Oid targettype, int32 targettypmod,
 					  duckdb_libpgquery::PGCoercionContext ccontext,
@@ -88,13 +100,12 @@ public:
 	find_typmod_coercion_function(Oid typeId,
 							  Oid *funcid);
 
-	duckdb_libpgquery::PGNode *
-	coerce_type_typmod(duckdb_libpgquery::PGNode *node, Oid targetTypeId, int32 targetTypMod,
-				   duckdb_libpgquery::PGCoercionContext ccontext, duckdb_libpgquery::PGCoercionForm cformat,
-				   int location,
-				   bool hideInputCoercion);
+    duckdb_libpgquery::PGNode * coerce_type_typmod(
+        duckdb_libpgquery::PGNode * node, Oid targetTypeId, int32 targetTypMod,
+		duckdb_libpgquery::PGCoercionForm cformat, int location, bool isExplicit,
+		bool hideInputCoercion);
 
-	void
+    void
 	hide_coercion_node(duckdb_libpgquery::PGNode *node);
 
 	duckdb_libpgquery::PGNode *
@@ -104,25 +115,32 @@ public:
 						 duckdb_libpgquery::PGCoercionForm cformat,
 						 int location);
 
-	duckdb_libpgquery::PGNode *
-	build_coercion_expression(duckdb_libpgquery::PGNode *node,
-						  CoercionPathType pathtype,
-						  Oid funcId,
-						  Oid targetTypeId, int32 targetTypMod,
-						  duckdb_libpgquery::PGCoercionContext ccontext, duckdb_libpgquery::PGCoercionForm cformat,
-						  int location);
+    duckdb_libpgquery::PGNode * build_coercion_expression(
+        duckdb_libpgquery::PGNode * node,
+        CoercionPathType pathtype,
+        Oid funcId,
+        Oid targetTypeId,
+        int32 targetTypMod,
+        duckdb_libpgquery::PGCoercionForm cformat,
+        int location,
+        bool isExplicit);
 
-	void
+    int
 	parser_coercion_errposition(PGParseState *pstate,
 							int coerce_location,
 							duckdb_libpgquery::PGNode *input_expr);
 
-	duckdb_libpgquery::PGNode *
-	coerce_to_domain(duckdb_libpgquery::PGNode *arg, Oid baseTypeId, int32 baseTypeMod, Oid typeId,
-				 duckdb_libpgquery::PGCoercionContext ccontext, duckdb_libpgquery::PGCoercionForm cformat, int location,
-				 bool hideInputCoercion);
+    duckdb_libpgquery::PGNode * coerce_to_domain(
+        duckdb_libpgquery::PGNode * arg,
+        Oid baseTypeId,
+        int32 baseTypeMod,
+        Oid typeId,
+        duckdb_libpgquery::PGCoercionForm cformat,
+        int location,
+        bool hideInputCoercion,
+        bool lengthCoercionDone);
 
-	TYPCATEGORY
+    TYPCATEGORY
 	TypeCategory(Oid type);
 
 	bool
@@ -154,6 +172,17 @@ public:
 						const char *constructName);
 
     bool IsBinaryCoercible(Oid srctype, Oid targettype);
+
+    bool typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId);
+
+    duckdb_libpgquery::PGVar * coerce_unknown_var(
+        PGParseState * pstate,
+        duckdb_libpgquery::PGVar * var,
+        Oid targetTypeId,
+        int32 targetTypeMod,
+        duckdb_libpgquery::PGCoercionContext ccontext,
+        duckdb_libpgquery::PGCoercionForm cformat,
+        int levelsup);
 };
 
 }

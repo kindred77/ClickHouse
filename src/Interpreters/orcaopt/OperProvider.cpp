@@ -199,4 +199,121 @@ Oid OperProvider::get_opcode(Oid opno)
         return InvalidOid;
 };
 
+Oid OperProvider::get_commutator(Oid opno)
+{
+    PGOperatorPtr op = getOperByOID(opno);
+    if (op != NULL)
+    {
+        return op->oprcom;
+    }
+    else
+        return InvalidOid;
+};
+
+bool OperProvider::get_ordering_op_properties(Oid opno, Oid * opfamily, Oid * opcintype, int16 * strategy)
+{
+    bool result = false;
+    CatCList * catlist;
+    int i;
+
+    /* ensure outputs are initialized on failure */
+    *opfamily = InvalidOid;
+    *opcintype = InvalidOid;
+    *strategy = 0;
+
+    /*
+	 * Search pg_amop to see if the target operator is registered as the "<"
+	 * or ">" operator of any btree opfamily.
+	 */
+    catlist = SearchSysCacheList1(AMOPOPID, ObjectIdGetDatum(opno));
+
+    for (i = 0; i < catlist->n_members; i++)
+    {
+        HeapTuple tuple = &catlist->members[i]->tuple;
+        Form_pg_amop aform = (Form_pg_amop)GETSTRUCT(tuple);
+
+        /* must be btree */
+        if (aform->amopmethod != BTREE_AM_OID)
+            continue;
+
+        if (aform->amopstrategy == BTLessStrategyNumber || aform->amopstrategy == BTGreaterStrategyNumber)
+        {
+            /* Found it ... should have consistent input types */
+            if (aform->amoplefttype == aform->amoprighttype)
+            {
+                /* Found a suitable opfamily, return info */
+                *opfamily = aform->amopfamily;
+                *opcintype = aform->amoplefttype;
+                *strategy = aform->amopstrategy;
+                result = true;
+                break;
+            }
+        }
+    }
+
+    ReleaseSysCacheList(catlist);
+
+    return result;
+};
+
+Oid OperProvider::get_opfamily_member(Oid opfamily, Oid lefttype, Oid righttype, int16 strategy)
+{
+    HeapTuple tp;
+    Form_pg_amop amop_tup;
+    Oid result;
+
+    tp = SearchSysCache4(
+        AMOPSTRATEGY, ObjectIdGetDatum(opfamily), ObjectIdGetDatum(lefttype), ObjectIdGetDatum(righttype), Int16GetDatum(strategy));
+    if (!HeapTupleIsValid(tp))
+        return InvalidOid;
+    amop_tup = (Form_pg_amop)GETSTRUCT(tp);
+    result = amop_tup->amopopr;
+    ReleaseSysCache(tp);
+    return result;
+};
+
+Oid OperProvider::get_equality_op_for_ordering_op(Oid opno, bool * reverse)
+{
+    Oid result = InvalidOid;
+    Oid opfamily;
+    Oid opcintype;
+    int16 strategy;
+
+    /* Find the operator in pg_amop */
+    if (get_ordering_op_properties(opno, &opfamily, &opcintype, &strategy))
+    {
+        /* Found a suitable opfamily, get matching equality operator */
+        result = get_opfamily_member(opfamily, opcintype, opcintype, BTEqualStrategyNumber);
+        if (reverse)
+            *reverse = (strategy == BTGreaterStrategyNumber);
+    }
+
+    return result;
+};
+
+bool OperProvider::op_hashjoinable(Oid opno, Oid inputtype)
+{
+    bool result = false;
+    // HeapTuple tp;
+    // TypeCacheEntry * typentry;
+
+    /* As in op_mergejoinable, let the typcache handle the hard cases */
+    /* Eventually we'll need a similar case for record_eq ... */
+    // if (opno == ARRAY_EQ_OP)
+    // {
+    //     typentry = lookup_type_cache(inputtype, TYPECACHE_HASH_PROC);
+    //     if (typentry->hash_proc == F_HASH_ARRAY)
+    //         result = true;
+    // }
+    // else
+    // {
+        PGOperatorPtr op = getOperByOID(opno);
+        if (op != NULL)
+        {
+            result = op->oprcanhash;
+        }
+    // }
+    return result;
+};
+
 }

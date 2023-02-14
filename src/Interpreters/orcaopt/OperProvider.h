@@ -26,6 +26,16 @@ public:
     FuncCandidateList OpernameGetCandidates(duckdb_libpgquery::PGList * names, char oprkind, bool missing_schema_ok);
 
 	Oid get_opcode(Oid opno);
+
+	Oid get_commutator(Oid opno);
+
+    Oid get_opfamily_member(Oid opfamily, Oid lefttype, Oid righttype, int16 strategy);
+
+    bool get_ordering_op_properties(Oid opno, Oid * opfamily, Oid * opcintype, int16 * strategy);
+
+    Oid get_equality_op_for_ordering_op(Oid opno, bool * reverse);
+
+    bool op_hashjoinable(Oid opno, Oid inputtype);
 };
 
 }

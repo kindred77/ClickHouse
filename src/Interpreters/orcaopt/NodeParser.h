@@ -7,10 +7,12 @@ namespace DB
 class CoerceParser;
 class ExprParser;
 class RelationParser;
+class TypeProvider;
 
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
 using ExprParserPtr = std::unique_ptr<ExprParser>;
 using RelationParserPtr = std::unique_ptr<RelationParser>;
+using TypeProviderPtr = std::unique_ptr<TypeProvider>;
 
 class NodeParser
 {
@@ -18,6 +20,7 @@ private:
 	CoerceParserPtr coerce_parser;
 	ExprParserPtr expr_parser;
 	RelationParserPtr relation_parser;
+	TypeProviderPtr type_provider;
 public:
 	explicit NodeParser();
 

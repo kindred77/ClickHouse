@@ -198,3 +198,28 @@ contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up)
 
 extern bool
 contain_vars_of_level(duckdb_libpgquery::PGNode *node, int levelsup);
+
+struct winref_check_ctx
+{
+    PGParseState * pstate;
+    Index winref;
+    bool has_order;
+    bool has_frame;
+};
+
+/*
+ * winref_checkspec_walker
+ */
+extern bool winref_checkspec_walker(duckdb_libpgquery::PGNode * node, void * ctx);
+
+/*
+ * winref_checkspec
+ *
+ * See if any WindowFuncss using this spec are DISTINCT qualified.
+ *
+ * In addition, we're going to check winrequireorder / winallowframe.
+ * You might want to do it in ParseFuncOrColumn,
+ * but we need to do this here after all the transformations
+ * (especially parent inheritance) was done.
+ */
+extern bool winref_checkspec(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist, Index winref, bool has_order, bool has_frame);

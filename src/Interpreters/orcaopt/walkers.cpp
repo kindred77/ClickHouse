@@ -2125,3 +2125,91 @@ static bool contain_vars_of_level_walker(PGNode * node, int * sublevels_up)
     }
     return pg_expression_tree_walker(node, (walker_func)contain_vars_of_level_walker, (void *)sublevels_up);
 };
+
+bool winref_checkspec_walker(duckdb_libpgquery::PGNode * node, void * ctx)
+{
+	using duckdb_libpgquery::PGWindowFunc;
+
+    winref_check_ctx * ref = (winref_check_ctx *)ctx;
+
+    if (!node)
+        return false;
+    else if (IsA(node, PGWindowFunc))
+    {
+        PGWindowFunc * winref = (PGWindowFunc *)node;
+
+        /*
+		 * Look at functions pointing to the interesting spec only.
+		 */
+        if (winref->winref != ref->winref)
+            return false;
+
+        if (winref->windistinct)
+        {
+            if (ref->has_order)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_SYNTAX_ERROR),
+                     errmsg("DISTINCT cannot be used with window specification containing an ORDER BY clause"),
+                     parser_errposition(ref->pstate, winref->location)));
+
+            if (ref->has_frame)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_SYNTAX_ERROR),
+                     errmsg("DISTINCT cannot be used with window specification containing a framing clause"),
+                     parser_errposition(ref->pstate, winref->location)));
+        }
+#if 0 // FIXME
+		/*
+		 * Check compatibilities between function's requirement and
+		 * window specification by looking up pg_window catalog.
+		 */
+		if (!ref->has_order || ref->has_frame)
+		{
+			HeapTuple		tuple;
+			Form_pg_window	wf;
+
+			tuple = SearchSysCache1(WINFNOID,
+									ObjectIdGetDatum(winref->winfnoid));
+
+			/*
+			 * Check only "true" window function.
+			 * Otherwise, it must be an aggregate.
+			 */
+			if (HeapTupleIsValid(tuple))
+			{
+				wf = (Form_pg_window) GETSTRUCT(tuple);
+				if (wf->winrequireorder && !ref->has_order)
+					ereport(ERROR,
+							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+							 errmsg("window function \"%s\" requires a window specification with an ordering clause",
+									get_func_name(wf->winfnoid)),
+								parser_errposition(ref->pstate, winref->location)));
+
+				if (!wf->winallowframe && ref->has_frame)
+					ereport(ERROR,
+							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+							 errmsg("window function \"%s\" cannot be used with a framed window specification",
+									get_func_name(wf->winfnoid)),
+								parser_errposition(ref->pstate, winref->location)));
+				ReleaseSysCache(tuple);
+			}
+		}
+#endif
+    }
+
+    return pg_expression_tree_walker(node, (walker_func)winref_checkspec_walker, ctx);
+};
+
+bool winref_checkspec(PGParseState * pstate, PGList * targetlist, Index winref, bool has_order, bool has_frame)
+{
+    winref_check_ctx ctx;
+
+    ctx.pstate = pstate;
+    ctx.winref = winref;
+    ctx.has_order = has_order;
+    ctx.has_frame = has_frame;
+
+    return pg_expression_tree_walker((PGNode *)targetlist, (walker_func)winref_checkspec_walker, (void *)&ctx);
+};

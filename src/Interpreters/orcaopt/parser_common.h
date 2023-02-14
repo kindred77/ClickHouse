@@ -62,6 +62,7 @@ typedef signed int int32;
 typedef unsigned int uint32;	/* == 32 bits */
 typedef int32 int4;
 typedef int16 int2;
+typedef float float4;
 
 typedef int64 Datum;
 typedef char TYPCATEGORY;
@@ -282,7 +283,9 @@ typedef enum {
 
 	ERRCODE_COLLATION_MISMATCH,
 	ERRCODE_DATA_EXCEPTION,
-	ERRCODE_QUERY_CANCELED
+	ERRCODE_QUERY_CANCELED,
+    ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE,
+	ERRCODE_INVALID_TEXT_REPRESENTATION
 } PGPostgresParserErrors;
 
 typedef struct ErrorContextCallback
@@ -652,6 +655,104 @@ struct Form_pg_type
 };
 
 using PGTypePtr = std::shared_ptr<Form_pg_type>;
+
+struct Form_pg_class
+{
+    NameData relname; /* class name */
+    Oid relnamespace; /* OID of namespace containing this class */
+    Oid reltype; /* OID of entry in pg_type for table's
+								 * implicit row type */
+    Oid reloftype; /* OID of entry in pg_type for underlying
+								 * composite type */
+    Oid relowner; /* class owner */
+    Oid relam; /* index access method; 0 if not an index */
+    Oid relfilenode; /* identifier of physical storage file */
+
+    /* relfilenode == 0 means it is a "mapped" relation, see relmapper.c */
+    Oid reltablespace; /* identifier of table space for relation */
+    int32 relpages; /* # of blocks (not always up-to-date) */
+    float4 reltuples; /* # of tuples (not always up-to-date) */
+    int32 relallvisible; /* # of all-visible blocks (not always
+								 * up-to-date) */
+    Oid reltoastrelid; /* OID of toast table; 0 if none */
+    bool relhasindex; /* T if has (or has had) any indexes */
+    bool relisshared; /* T if shared across databases */
+    char relpersistence; /* see RELPERSISTENCE_xxx constants below */
+    char relkind; /* see RELKIND_xxx constants below */
+    char relstorage; /* see RELSTORAGE_xxx constants below */
+    int16 relnatts; /* number of user attributes */
+
+    /*
+	 * Class pg_attribute must contain exactly "relnatts" user attributes
+	 * (with attnums ranging from 1 to relnatts) for this class.  It may also
+	 * contain entries with negative attnums for system attributes.
+	 */
+    int16 relchecks; /* # of CHECK constraints for class */
+    bool relhasoids; /* T if we generate OIDs for rows of rel */
+    bool relhaspkey; /* has (or has had) PRIMARY KEY index */
+    bool relhasrules; /* has (or has had) any rules */
+    bool relhastriggers; /* has (or has had) any TRIGGERs */
+    bool relhassubclass; /* has (or has had) derived classes */
+    bool relispopulated; /* matview currently holds query results */
+    char relreplident; /* see REPLICA_IDENTITY_xxx constants  */
+    uint32 relfrozenxid; /* all Xids < this are frozen in this rel */
+    uint32 relminmxid; /* all multixacts in this rel are >= this.
+								 * this is really a MultiXactId */
+};
+
+using PGClassPtr = std::shared_ptr<Form_pg_class>;
+
+struct oidvector
+{
+    int32 vl_len_; /* these fields must match ArrayType! */
+    int ndim; /* always 1 for oidvector */
+    int32 dataoffset; /* always 0 for oidvector */
+    Oid elemtype;
+    int dim1;
+    int lbound1;
+    Oid values[1]; /* VARIABLE LENGTH ARRAY */
+};
+
+struct Form_pg_proc
+{
+    NameData proname; /* procedure name */
+    Oid pronamespace; /* OID of namespace containing this proc */
+    Oid proowner; /* procedure owner */
+    Oid prolang; /* OID of pg_language entry */
+    float4 procost; /* estimated execution cost */
+    float4 prorows; /* estimated # of rows out (if proretset) */
+    Oid provariadic; /* element type of variadic array, or 0 */
+    Oid protransform; /* transforms calls to it during planning */
+    bool proisagg; /* is it an aggregate? */
+    bool proiswindow; /* is it a window function? */
+    bool prosecdef; /* security definer */
+    bool proleakproof; /* is it a leak-proof function? */
+    bool proisstrict; /* strict with respect to NULLs? */
+    bool proretset; /* returns a set? */
+    char provolatile; /* see PROVOLATILE_ categories below */
+    int16 pronargs; /* number of arguments */
+    int16 pronargdefaults; /* number of arguments with defaults */
+    Oid prorettype; /* OID of result type */
+
+    /*
+	 * variable-length fields start here, but we allow direct access to
+	 * proargtypes
+	 */
+    oidvector proargtypes; /* parameter types (excludes OUT params) */
+};
+
+using PGProcPtr = std::shared_ptr<Form_pg_proc>;
+
+struct Form_pg_cast
+{
+    Oid castsource; /* source datatype for cast */
+    Oid casttarget; /* destination datatype for cast */
+    Oid castfunc; /* cast function; 0 = binary coercible */
+    char castcontext; /* contexts in which cast can be used */
+    char castmethod; /* cast method */
+};
+
+using PGCastPtr = std::shared_ptr<Form_pg_cast>;
 
 typedef enum
 {
@@ -1119,7 +1220,6 @@ void DeconstructQualifiedName(duckdb_libpgquery::PGList * names, char ** nspname
 {
 	using duckdb_libpgquery::ereport;
 	using duckdb_libpgquery::errcode;
-	using duckdb_libpgquery::ereport;
 	using duckdb_libpgquery::errmsg;
 	using duckdb_libpgquery::PGValue;
 
@@ -1159,6 +1259,90 @@ void DeconstructQualifiedName(duckdb_libpgquery::PGList * names, char ** nspname
 
     *nspname_p = schemaname;
     *objname_p = objname;
+};
+
+#define INT64CONST(x)  (x##L)
+
+bool scanint8(const char * str, bool errorOK, int64 * result)
+{
+	using duckdb_libpgquery::ereport;
+	using duckdb_libpgquery::errcode;
+	using duckdb_libpgquery::errmsg;
+
+    const char * ptr = str;
+    int64 tmp = 0;
+    int sign = 1;
+
+    /*
+	 * Do our own scan, rather than relying on sscanf which might be broken
+	 * for long long.
+	 */
+
+    /* skip leading spaces */
+    while (*ptr && isspace((unsigned char)*ptr))
+        ptr++;
+
+    /* handle sign */
+    if (*ptr == '-')
+    {
+        ptr++;
+
+        /*
+		 * Do an explicit check for INT64_MIN.  Ugly though this is, it's
+		 * cleaner than trying to get the loop below to handle it portably.
+		 */
+        if (strncmp(ptr, "9223372036854775808", 19) == 0)
+        {
+            tmp = -INT64CONST(0x7fffffffffffffff) - 1;
+            ptr += 19;
+            goto gotdigits;
+        }
+        sign = -1;
+    }
+    else if (*ptr == '+')
+        ptr++;
+
+    /* require at least one digit */
+    if (!isdigit((unsigned char)*ptr))
+    {
+        if (errorOK)
+            return false;
+        else
+            ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("invalid input syntax for integer: \"%s\"", str)));
+    }
+
+    /* process digits */
+    while (*ptr && isdigit((unsigned char)*ptr))
+    {
+        int64 newtmp = tmp * 10 + (*ptr++ - '0');
+
+        if ((newtmp / 10) != tmp) /* overflow? */
+        {
+            if (errorOK)
+                return false;
+            else
+                ereport(ERROR, (errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE), errmsg("value \"%s\" is out of range for type bigint", str)));
+        }
+        tmp = newtmp;
+    }
+
+gotdigits:
+
+    /* allow trailing whitespace, but not other trailing chars */
+    while (*ptr != '\0' && isspace((unsigned char)*ptr))
+        ptr++;
+
+    if (*ptr != '\0')
+    {
+        if (errorOK)
+            return false;
+        else
+            ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("invalid input syntax for integer: \"%s\"", str)));
+    }
+
+    *result = (sign < 0) ? -tmp : tmp;
+
+    return true;
 };
 
 // duckdb_libpgquery::PGTargetEntry *

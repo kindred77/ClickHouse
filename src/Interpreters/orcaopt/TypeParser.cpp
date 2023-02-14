@@ -314,6 +314,22 @@ TypeParser::typeidType(Oid id)
 	return (Type) tup;
 };
 
+Oid TypeParser::typeidTypeRelid(Oid type_id)
+{
+    HeapTuple typeTuple;
+    Form_pg_type type;
+    Oid result;
+
+    typeTuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(type_id));
+    if (!HeapTupleIsValid(typeTuple))
+        elog(ERROR, "cache lookup failed for type %u", type_id);
+
+    type = (Form_pg_type)GETSTRUCT(typeTuple);
+    result = type->typrelid;
+    ReleaseSysCache(typeTuple);
+    return result;
+};
+
 Oid
 TypeParser::typeTypeCollation(Type typ)
 {
