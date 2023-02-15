@@ -29,6 +29,10 @@ public:
 
 	std::optional<std::tuple<Oid, StoragePtr, char> >
 	getPairByDBAndTableName(const String & database_name, const String & table_name) const;
+
+    char * get_database_name(Oid dbid);
+
+    char get_rel_relkind(Oid relid);
 };
 
 }

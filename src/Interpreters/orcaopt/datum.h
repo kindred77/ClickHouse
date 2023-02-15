@@ -111,6 +111,11 @@ typedef union
 	 (VARATT_IS_1B(PTR) ? VARSIZE_1B(PTR) : \
 	  VARSIZE_4B(PTR)))
 
+#define SET_VARSIZE_4B(PTR,len) \
+	(((varattrib_4b *) (PTR))->va_4byte.va_header = htonl( (len) & 0x3FFFFFFF ))
+
+#define SET_VARSIZE(PTR, len)				SET_VARSIZE_4B(PTR, len)
+
 typedef size_t Size;
 
 struct varlena

@@ -10,11 +10,6 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-RelationParser::RelationParser()
-{
-	relation_provider = std::make_shared<RelationProvider>();
-};
-
 PGCommonTableExpr *
 RelationParser::scanNameSpaceForCTE(PGParseState *pstate, const char *refname,
 					Index *ctelevelsup)
@@ -1790,17 +1785,25 @@ RelationParser::updateFuzzyAttrMatchState(int fuzzy_rte_penalty,
 	}
 };
 
-PGNode *
-RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, const char *colname,
-				 int location, int fuzzy_rte_penalty,
-				 FuzzyAttrMatchState *fuzzystate)
+int RelationParser::specialAttNum(const char * attname)
 {
-	PGNode	   *result = NULL;
-	int			attnum = 0;
-	PGVar		   *var;
-	PGListCell   *c;
+    Form_pg_attribute sysatt;
 
-	/*
+    sysatt = SystemAttributeByName(attname, true /* "oid" will be accepted */);
+    if (sysatt != NULL)
+        return sysatt->attnum;
+    return InvalidAttrNumber;
+};
+
+PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate, PGRangeTblEntry * rte,
+		char * colname, int location)
+{
+    PGNode * result = NULL;
+    int attnum = 0;
+    PGVar * var;
+    PGListCell * c;
+
+    /*
 	 * Scan the user column names (or aliases) for a match. Complain if
 	 * multiple matches.
 	 *
@@ -1811,113 +1814,86 @@ RelationParser::scanRTEForColumn(PGParseState *pstate, PGRangeTblEntry *rte, con
 	 * Should this somehow go wrong and we try to access a dropped column,
 	 * we'll still catch it by virtue of the checks in
 	 * get_rte_attribute_type(), which is called by make_var().  That routine
-	 * has to do a cache lookup anyway, so the check there is cheap.  Callers
-	 * interested in finding match with shortest distance need to defend
-	 * against this directly, though.
+	 * has to do a cache lookup anyway, so the check there is cheap.
 	 */
-	foreach(c, rte->eref->colnames)
-	{
-		const char *attcolname = strVal(lfirst(c));
+    foreach (c, rte->eref->colnames)
+    {
+        attnum++;
+        if (strcmp(strVal(lfirst(c)), colname) == 0)
+        {
+            if (result)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_AMBIGUOUS_COLUMN),
+                     errmsg("column reference \"%s\" is ambiguous", colname),
+                     parser_errposition(pstate, location)));
+            var = node_parser->make_var(pstate, rte, attnum, location);
+            /* Require read access to the column */
+            markVarForSelectPriv(pstate, var, rte);
+            result = (PGNode *)var;
+        }
+    }
 
-		attnum++;
-		if (strcmp(attcolname, colname) == 0)
-		{
-			if (result)
-			{
-				node_parser.parser_errposition(pstate, location);
-				ereport(ERROR,
-						(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-						 errmsg("column reference \"%s\" is ambiguous",
-								colname)));
-			}
-			var = node_parser.make_var(pstate, rte, attnum, location);
-			/* Require read access to the column */
-			markVarForSelectPriv(pstate, var, rte);
-			result = (PGNode *) var;
-		}
-
-		/* Updating fuzzy match state, if provided. */
-		if (fuzzystate != NULL)
-			updateFuzzyAttrMatchState(fuzzy_rte_penalty, fuzzystate,
-									  rte, attcolname, colname, attnum);
-	}
-
-	/*
+    /*
 	 * If we have a unique match, return it.  Note that this allows a user
 	 * alias to override a system column name (such as OID) without error.
 	 */
-	if (result)
-		return result;
+    if (result)
+        return result;
 
-	/*
-	 * If the RTE represents a real relation, consider system column names.
-	 * Composites are only used for pseudo-relations like ON CONFLICT's
-	 * excluded.
+    /*
+	 * If the RTE represents a real table, consider system column names.
 	 */
-	if (rte->rtekind == PG_RTE_RELATION &&
-		rte->relkind != RELKIND_COMPOSITE_TYPE)
-	{
-		/* In GPDB, system columns like gp_segment_id, ctid, xmin/xmax seem to be
+    if (rte->rtekind == PG_RTE_RELATION)
+    {
+        /* In GPDB, system columns like gp_segment_id, ctid, xmin/xmax seem to be
 		 * ambiguous for replicated table, replica in each segment has different
-		 * value of those columns, between sessions, different replicas are chosen
+		 * value of those columns, between sessions, different replicas are choosen
 		 * to provide data, so it's weird for users to see different system columns
 		 * between sessions. So for replicated table, we don't expose system columns
 		 * unless it's GP_ROLE_UTILITY for debug purpose.
 		 */
-		if (GpPolicyIsReplicated(GpPolicyFetch(rte->relid)) &&
-			Gp_role != GP_ROLE_UTILITY)
-			return result;
+        if (GpPolicyIsReplicated(GpPolicyFetch(rte->relid)) && Gp_role != GP_ROLE_UTILITY)
+            return result;
 
-		/* quick check to see if name could be a system column */
-		attnum = specialAttNum(colname);
+        /* quick check to see if name could be a system column */
+        attnum = specialAttNum(colname);
 
-		/* In constraint check, no system column is allowed except tableOid */
-		if (pstate->p_expr_kind == EXPR_KIND_CHECK_CONSTRAINT &&
-			attnum < InvalidAttrNumber && attnum != TableOidAttributeNumber)
-		{
-			node_parser.parser_errposition(pstate, location);
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("system column \"%s\" reference in check constraint is invalid",
-							colname)));
-		}
-
-		/*
-		 * In generated column, no system column is allowed except tableOid.
+        /* In constraint check, no system column is allowed except tableOid */
+        /*
+		 * In GPDB, tableoid is not allowed either, because we've removed
+		 * HeapTupleData.t_tableOid field.
+		 * GPDB_94_MERGE_FIXME: Could we make that work somehow? Resurrect
+		 * t_tableOid, maybe? I think we'd need it for logical decoding as well.
 		 */
-		if (pstate->p_expr_kind == EXPR_KIND_GENERATED_COLUMN &&
-			attnum < InvalidAttrNumber && attnum != TableOidAttributeNumber)
-		{
-			node_parser.parser_errposition(pstate, location);
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("cannot use system column \"%s\" in column generation expression",
-							colname)));
-		}
+        if (pstate->p_expr_kind == EXPR_KIND_CHECK_CONSTRAINT && attnum < InvalidAttrNumber /* && attnum != TableOidAttributeNumber */)
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+                 errmsg("system column \"%s\" reference in check constraint is invalid", colname),
+                 parser_errposition(pstate, location)));
 
-		if (attnum != InvalidAttrNumber)
-		{
-			/*
+        if (attnum != InvalidAttrNumber)
+        {
+            /*
 			 * Now check to see if column actually is defined.  Because of
 			 * an ancient oversight in DefineQueryRewrite, it's possible that
 			 * pg_attribute contains entries for system columns for a view,
 			 * even though views should not have such --- so we also check
 			 * the relkind.  This kluge will not be needed in 9.3 and later.
 			 */
-			if (SearchSysCacheExists2(ATTNUM,
-									  ObjectIdGetDatum(rte->relid),
-									  Int16GetDatum(attnum)) &&
-				get_rel_relkind(rte->relid) != RELKIND_VIEW)
-			{
-				var = node_parser.make_var(pstate, rte, attnum, location);
-				/* Require read access to the column */
-				markVarForSelectPriv(pstate, var, rte);
-				result = (PGNode *) var;
-			}
-		}
-	}
+            if (SearchSysCacheExists2(ATTNUM, ObjectIdGetDatum(rte->relid), Int16GetDatum(attnum))
+                && relation_provider->get_rel_relkind(rte->relid) != RELKIND_VIEW)
+            {
+                var = node_parser->make_var(pstate, rte, attnum, location);
+                /* Require read access to the column */
+                markVarForSelectPriv(pstate, var, rte);
+                result = (PGNode *)var;
+            }
+        }
+    }
 
-	return result;
+    return result;
 };
 
 PGNode *

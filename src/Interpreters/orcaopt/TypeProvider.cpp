@@ -1076,4 +1076,122 @@ bool TypeProvider::typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
     return result;
 };
 
+Oid TypeProvider::get_range_subtype(Oid rangeOid)
+{
+    HeapTuple tp;
+
+    tp = SearchSysCache1(RANGETYPE, ObjectIdGetDatum(rangeOid));
+    if (HeapTupleIsValid(tp))
+    {
+        Form_pg_range rngtup = (Form_pg_range)GETSTRUCT(tp);
+        Oid result;
+
+        result = rngtup->rngsubtype;
+        ReleaseSysCache(tp);
+        return result;
+    }
+    else
+        return InvalidOid;
+};
+
+Oid TypeProvider::get_base_element_type(Oid typid)
+{
+    /*
+	 * We loop to find the bottom base type in a stack of domains.
+	 */
+    for (;;)
+    {
+        HeapTuple tup;
+        Form_pg_type typTup;
+
+        tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
+        if (!HeapTupleIsValid(tup))
+            break;
+        typTup = (Form_pg_type)GETSTRUCT(tup);
+        if (typTup->typtype != TYPTYPE_DOMAIN)
+        {
+            /* Not a domain, so stop descending */
+            Oid result;
+
+            /* This test must match get_element_type */
+            if (typTup->typlen == -1)
+                result = typTup->typelem;
+            else
+                result = InvalidOid;
+            ReleaseSysCache(tup);
+            return result;
+        }
+
+        typid = typTup->typbasetype;
+        ReleaseSysCache(tup);
+    }
+
+    /* Like get_element_type, silently return InvalidOid for bogus input */
+    return InvalidOid;
+};
+
+char TypeProvider::get_typtype(Oid typid)
+{
+    HeapTuple tp;
+
+    tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
+    if (HeapTupleIsValid(tp))
+    {
+        Form_pg_type typtup = (Form_pg_type)GETSTRUCT(tp);
+        char result;
+
+        result = typtup->typtype;
+        ReleaseSysCache(tp);
+        return result;
+    }
+    else
+        return '\0';
+};
+
+bool TypeProvider::type_is_enum(Oid typid)
+{
+    return (get_typtype(typid) == TYPTYPE_ENUM);
+};
+
+Oid TypeProvider::get_array_type(Oid typid)
+{
+	Oid			result = InvalidOid;
+
+	PGTypePtr tp = getTypeByOid(typid);
+	if (tp != NULL)
+	{
+		result = tp->typarray;
+	}
+	return result;
+};
+
+bool TypeProvider::type_is_range(Oid typid)
+{
+	return (get_typtype(typid) == TYPTYPE_RANGE);
+};
+
+bool TypeProvider::type_is_rowtype(Oid typid)
+{
+	return (typid == RECORDOID || get_typtype(typid) == TYPTYPE_COMPOSITE);
+};
+
+Oid TypeProvider::get_typcollation(Oid typid)
+{
+	PGTypePtr tp = getTypeByOid(typid);
+    if (tp != NULL)
+    {
+        Oid result;
+
+        result = tp->typcollation;
+        return result;
+    }
+    else
+        return InvalidOid;
+};
+
+bool
+TypeProvider::type_is_collatable(Oid typid)
+{
+    return OidIsValid(get_typcollation(typid));
+};
 }

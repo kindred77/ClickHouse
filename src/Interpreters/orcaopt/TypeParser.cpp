@@ -641,4 +641,14 @@ char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemo
     return buf;
 };
 
+Oid TypeParser::typenameTypeId(PGParseState *pstate, const PGTypeName *typeName)
+{
+    Oid typoid;
+
+    PGTypePtr tup = typenameType(pstate, typeName, NULL);
+    typoid = tup->oid;
+
+    return typoid;
+};
+
 }

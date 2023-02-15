@@ -133,17 +133,6 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 	return ptype;
 };
 
-int
-CoerceParser::parser_coercion_errposition(PGParseState *pstate,
-							int coerce_location,
-							PGNode *input_expr)
-{
-	if (coerce_location >= 0)
-		return parser_errposition(pstate, coerce_location);
-	else
-		return parser_errposition(pstate, exprLocation(input_expr));
-};
-
 PGNode *
 CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 						 Oid targetTypeId,
@@ -883,7 +872,7 @@ CoerceParser::find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
 			default:
 				elog(ERROR, "unrecognized castcontext: %d",
 					 (int) tuple->castcontext);
-				//castcontext = 0;	/* keep compiler quiet */
+				castcontext = PG_COERCION_IMPLICIT;	/* keep compiler quiet */
 				break;
 		}
 
@@ -1061,7 +1050,7 @@ CoerceParser::check_generic_type_consistency(const Oid *actual_arg_types,
 	/* Get the element type based on the range type, if we have one */
 	if (OidIsValid(range_typeid))
 	{
-		range_typelem = get_range_subtype(range_typeid);
+		range_typelem = type_provider->get_range_subtype(range_typeid);
 		if (!OidIsValid(range_typelem))
 			return false;		/* should be a range, but isn't */
 
@@ -1082,14 +1071,14 @@ CoerceParser::check_generic_type_consistency(const Oid *actual_arg_types,
 	if (have_anynonarray)
 	{
 		/* require the element type to not be an array or domain over array */
-		if (type_is_array_domain(elem_typeid))
+		if (type_provider->get_base_element_type(elem_typeid) != InvalidOid)
 			return false;
 	}
 
 	if (have_anyenum)
 	{
 		/* require the element type to be an enum */
-		if (!type_is_enum(elem_typeid))
+		if (!type_provider->type_is_enum(elem_typeid))
 			return false;
 	}
 
@@ -1163,14 +1152,14 @@ CoerceParser::can_coerce_type(int nargs, const Oid *input_typeids, const Oid *ta
 		 * coerce (may need tighter checking here)
 		 */
 		if (inputTypeId == RECORDOID &&
-			type_parser.typeOrDomainTypeRelid(targetTypeId) != InvalidOid)
+			type_parser->typeOrDomainTypeRelid(targetTypeId) != InvalidOid)
 			continue;
 
 		/*
 		 * If input is a composite type and target is RECORD, accept
 		 */
 		if (targetTypeId == RECORDOID &&
-			type_parser.typeOrDomainTypeRelid(inputTypeId) != InvalidOid)
+			type_parser->typeOrDomainTypeRelid(inputTypeId) != InvalidOid)
 			continue;
 
 #ifdef NOT_USED					/* not implemented yet */
@@ -1194,7 +1183,7 @@ CoerceParser::can_coerce_type(int nargs, const Oid *input_typeids, const Oid *ta
 		/*
 		 * If input is a class type that inherits from target, accept
 		 */
-		if (typeInheritsFrom(inputTypeId, targetTypeId)
+		if (type_provider->typeInheritsFrom(inputTypeId, targetTypeId)
 			|| typeIsOfTypedTable(inputTypeId, targetTypeId))
 			continue;
 
@@ -1220,36 +1209,31 @@ CoerceParser::find_typmod_coercion_function(Oid typeId,
 							  Oid *funcid)
 {
 	CoercionPathType result;
-	Type		targetType;
-	Form_pg_type typeForm;
-	HeapTuple	tuple;
+	//Type		targetType;
+	//Form_pg_type typeForm;
+	//HeapTuple	tuple;
 
 	*funcid = InvalidOid;
 	result = COERCION_PATH_FUNC;
 
-	targetType = type_parser.typeidType(typeId);
-	typeForm = (Form_pg_type) GETSTRUCT(targetType);
+	PGTypePtr targetType = type_parser->typeidType(typeId);
+	//typeForm = (Form_pg_type) GETSTRUCT(targetType);
 
 	/* Check for a varlena array type */
-	if (typeForm->typelem != InvalidOid && typeForm->typlen == -1)
+	if (targetType->typelem != InvalidOid && targetType->typlen == -1)
 	{
 		/* Yes, switch our attention to the element type */
-		typeId = typeForm->typelem;
+		typeId = targetType->typelem;
 		result = COERCION_PATH_ARRAYCOERCE;
 	}
-	ReleaseSysCache(targetType);
+	//ReleaseSysCache(targetType);
 
 	/* Look in pg_cast */
-	tuple = SearchSysCache2(CASTSOURCETARGET,
-							ObjectIdGetDatum(typeId),
-							ObjectIdGetDatum(typeId));
+	PGCastPtr tuple = cast_provider->getCastBySourceTypeAndTargetTypeOid(typeId, typeId);
 
-	if (HeapTupleIsValid(tuple))
+	if (tuple != NULL)
 	{
-		Form_pg_cast castForm = (Form_pg_cast) GETSTRUCT(tuple);
-
-		*funcid = castForm->castfunc;
-		ReleaseSysCache(tuple);
+		*funcid = tuple->castfunc;
 	}
 
 	if (!OidIsValid(*funcid))
@@ -1279,34 +1263,35 @@ CoerceParser::hide_coercion_node(PGNode *node)
 		elog(ERROR, "unsupported node type: %d", (int) nodeTag(node));
 };
 
-PGNode *
-coerce_type_typmod(
+PGNode * CoerceParser::coerce_type_typmod(
         PGNode * node, Oid targetTypeId, int32 targetTypMod,
-		PGCoercionForm cformat, int location, bool isExplicit,
-		bool hideInputCoercion)
+		PGCoercionForm cformat, int location, bool isExplicit, bool hideInputCoercion)
 {
-    CoercionPathType pathtype;
-    Oid funcId;
+	CoercionPathType pathtype;
+	Oid			funcId;
 
-    /*
+	/*
 	 * A negative typmod is assumed to mean that no coercion is wanted. Also,
 	 * skip coercion if already done.
 	 */
-    if (targetTypMod < 0 || targetTypMod == exprTypmod(node))
-        return node;
+	if (targetTypMod < 0 || targetTypMod == exprTypmod(node))
+		return node;
 
-    pathtype = find_typmod_coercion_function(targetTypeId, &funcId);
+	pathtype = find_typmod_coercion_function(targetTypeId, &funcId);
 
-    if (pathtype != COERCION_PATH_NONE)
-    {
-        /* Suppress display of nested coercion steps */
-        if (hideInputCoercion)
-            hide_coercion_node(node);
+	if (pathtype != COERCION_PATH_NONE)
+	{
+		/* Suppress display of nested coercion steps */
+		if (hideInputCoercion)
+			hide_coercion_node(node);
 
-        node = build_coercion_expression(node, pathtype, funcId, targetTypeId, targetTypMod, cformat, location, isExplicit);
-    }
+		node = build_coercion_expression(node, pathtype, funcId,
+										 targetTypeId, targetTypMod,
+										 cformat, location,
+										 isExplicit);
+	}
 
-    return node;
+	return node;
 };
 
 PGNode *
@@ -1316,13 +1301,13 @@ CoerceParser::coerce_to_target_type(PGParseState *pstate, PGNode *expr, Oid expr
 					  PGCoercionForm cformat,
 					  int location)
 {
-	PGNode	   *result;
-	PGNode	   *origexpr;
+    PGNode * result;
+    PGNode * origexpr;
 
-	if (!can_coerce_type(1, &exprtype, &targettype, ccontext))
-		return NULL;
+    if (!can_coerce_type(1, &exprtype, &targettype, ccontext))
+        return NULL;
 
-	/*
+    /*
 	 * If the input has a CollateExpr at the top, strip it off, perform the
 	 * coercion, and put a new one back on.  This is annoying since it
 	 * duplicates logic in coerce_type, but if we don't do this then it's too
@@ -1331,37 +1316,39 @@ CoerceParser::coerce_to_target_type(PGParseState *pstate, PGNode *expr, Oid expr
 	 * something that wasn't generated by coerce_type.  Note that if there are
 	 * multiple stacked CollateExprs, we just discard all but the topmost.
 	 */
-	origexpr = expr;
-	while (expr && IsA(expr, PGCollateExpr))
-		expr = (PGNode *) ((PGCollateExpr *) expr)->arg;
+    origexpr = expr;
+    while (expr && IsA(expr, PGCollateExpr))
+        expr = (PGNode *)((PGCollateExpr *)expr)->arg;
 
-	result = coerce_type(pstate, expr, exprtype,
-						 targettype, targettypmod,
-						 ccontext, cformat, location);
+    result = coerce_type(pstate, expr, exprtype, targettype, targettypmod, ccontext, cformat, location);
 
-	/*
+    /*
 	 * If the target is a fixed-length type, it may need a length coercion as
 	 * well as a type coercion.  If we find ourselves adding both, force the
 	 * inner coercion node to implicit display form.
 	 */
-	result = coerce_type_typmod(result,
-								targettype, targettypmod,
-								ccontext, cformat, location,
-								(result != expr && !IsA(result, PGConst) && !IsA(result, PGVar)));
+    result = coerce_type_typmod(
+        result,
+        targettype,
+        targettypmod,
+        cformat,
+        location,
+        (cformat != PG_COERCE_IMPLICIT_CAST),
+        (result != expr && !IsA(result, PGConst) && !IsA(result, PGVar)));
 
-	if (expr != origexpr)
-	{
-		/* Reinstall top CollateExpr */
-		PGCollateExpr *coll = (PGCollateExpr *) origexpr;
-		PGCollateExpr *newcoll = makeNode(PGCollateExpr);
+    if (expr != origexpr)
+    {
+        /* Reinstall top CollateExpr */
+        PGCollateExpr * coll = (PGCollateExpr *)origexpr;
+        PGCollateExpr * newcoll = makeNode(PGCollateExpr);
 
-		newcoll->arg = (PGExpr *) result;
-		newcoll->collOid = coll->collOid;
-		newcoll->location = coll->location;
-		result = (PGNode *) newcoll;
-	}
+        newcoll->arg = (PGExpr *)result;
+        newcoll->collOid = coll->collOid;
+        newcoll->location = coll->location;
+        result = (PGNode *)newcoll;
+    }
 
-	return result;
+    return result;
 };
 
 PGNode *
@@ -1381,7 +1368,7 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 										-1);
 		if (newnode == NULL)
 		{
-			node_parser.parser_errposition(pstate, exprLocation(node));
+			parser_errposition(pstate, exprLocation(node));
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 			/* translator: first %s is name of a SQL construct, eg WHERE */
@@ -1394,7 +1381,7 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 
 	if (expression_returns_set(node))
 	{
-		node_parser.parser_errposition(pstate, exprLocation(node));
+		parser_errposition(pstate, exprLocation(node));
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 		/* translator: %s is name of a SQL construct, eg WHERE */
@@ -1415,164 +1402,6 @@ PGNode * CoerceParser::build_coercion_expression(
         int location,
         bool isExplicit)
 {
-	int			nargs = 0;
-
-	if (OidIsValid(funcId))
-	{
-		HeapTuple	tp;
-		Form_pg_proc procstruct;
-
-		tp = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcId));
-		if (!HeapTupleIsValid(tp))
-			elog(ERROR, "cache lookup failed for function %u", funcId);
-		procstruct = (Form_pg_proc) GETSTRUCT(tp);
-
-		/*
-		 * These Asserts essentially check that function is a legal coercion
-		 * function.  We can't make the seemingly obvious tests on prorettype
-		 * and proargtypes[0], even in the COERCION_PATH_FUNC case, because of
-		 * various binary-compatibility cases.
-		 */
-		/* Assert(targetTypeId == procstruct->prorettype); */
-		Assert(!procstruct->proretset);
-		Assert(procstruct->prokind == PROKIND_FUNCTION);
-		nargs = procstruct->pronargs;
-		Assert(nargs >= 1 && nargs <= 3);
-		/* Assert(procstruct->proargtypes.values[0] == exprType(node)); */
-		Assert(nargs < 2 || procstruct->proargtypes.values[1] == INT4OID);
-		Assert(nargs < 3 || procstruct->proargtypes.values[2] == BOOLOID);
-
-		ReleaseSysCache(tp);
-	}
-
-	if (pathtype == COERCION_PATH_FUNC)
-	{
-		/* We build an ordinary FuncExpr with special arguments */
-		PGFuncExpr   *fexpr;
-		PGList	   *args;
-		PGConst	   *cons;
-
-		Assert(OidIsValid(funcId));
-
-		args = list_make1(node);
-
-		if (nargs >= 2)
-		{
-			/* Pass target typmod as an int4 constant */
-			cons = makeConst(INT4OID,
-							 -1,
-							 InvalidOid,
-							 sizeof(int32),
-							 Int32GetDatum(targetTypMod),
-							 false,
-							 true);
-
-			args = lappend(args, cons);
-		}
-
-		if (nargs == 3)
-		{
-			/* Pass it a boolean isExplicit parameter, too */
-			cons = makeConst(BOOLOID,
-							 -1,
-							 InvalidOid,
-							 sizeof(bool),
-							 BoolGetDatum(ccontext == PG_COERCION_EXPLICIT),
-							 false,
-							 true);
-
-			args = lappend(args, cons);
-		}
-
-		fexpr = makeFuncExpr(funcId, targetTypeId, args,
-							 InvalidOid, InvalidOid, cformat);
-		fexpr->location = location;
-		return (PGNode *) fexpr;
-	}
-	else if (pathtype == COERCION_PATH_ARRAYCOERCE)
-	{
-		/* We need to build an ArrayCoerceExpr */
-		PGArrayCoerceExpr *acoerce = makeNode(PGArrayCoerceExpr);
-		PGCaseTestExpr *ctest = makeNode(PGCaseTestExpr);
-		Oid			sourceBaseTypeId;
-		int32		sourceBaseTypeMod;
-		Oid			targetElementType;
-		PGNode	   *elemexpr;
-
-		/*
-		 * Look through any domain over the source array type.  Note we don't
-		 * expect that the target type is a domain; it must be a plain array.
-		 * (To get to a domain target type, we'll do coerce_to_domain later.)
-		 */
-		sourceBaseTypeMod = exprTypmod(node);
-		sourceBaseTypeId = type_provider->getBaseTypeAndTypmod(exprType(node),
-												&sourceBaseTypeMod);
-
-		/*
-		 * Set up a CaseTestExpr representing one element of the source array.
-		 * This is an abuse of CaseTestExpr, but it's OK as long as there
-		 * can't be any CaseExpr or ArrayCoerceExpr within the completed
-		 * elemexpr.
-		 */
-		ctest->typeId = type_provider->get_element_type(sourceBaseTypeId);
-		Assert(OidIsValid(ctest->typeId))
-		ctest->typeMod = sourceBaseTypeMod;
-		ctest->collation = InvalidOid;	/* Assume coercions don't care */
-
-		/* And coerce it to the target element type */
-		targetElementType = type_provider->get_element_type(targetTypeId);
-		Assert(OidIsValid(targetElementType))
-
-		elemexpr = coerce_to_target_type(NULL,
-										 (PGNode *) ctest,
-										 ctest->typeId,
-										 targetElementType,
-										 targetTypMod,
-										 ccontext,
-										 cformat,
-										 location);
-		if (elemexpr == NULL)	/* shouldn't happen */
-			elog(ERROR, "failed to coerce array element type as expected");
-
-		acoerce->arg = (PGExpr *) node;
-		//acoerce->elemexpr = (PGExpr *) elemexpr;
-		acoerce->resulttype = targetTypeId;
-
-		/*
-		 * Label the output as having a particular element typmod only if we
-		 * ended up with a per-element expression that is labeled that way.
-		 */
-		acoerce->resulttypmod = exprTypmod(elemexpr);
-		/* resultcollid will be set by parse_collate.c */
-		acoerce->coerceformat = cformat;
-		acoerce->location = location;
-
-		return (PGNode *) acoerce;
-	}
-	else if (pathtype == COERCION_PATH_COERCEVIAIO)
-	{
-		/* We need to build a CoerceViaIO node */
-		PGCoerceViaIO *iocoerce = makeNode(PGCoerceViaIO);
-
-		Assert(!OidIsValid(funcId))
-
-		iocoerce->arg = (PGExpr *) node;
-		iocoerce->resulttype = targetTypeId;
-		/* resultcollid will be set by parse_collate.c */
-		iocoerce->coerceformat = cformat;
-		iocoerce->location = location;
-
-		return (PGNode *) iocoerce;
-	}
-	else
-	{
-		elog(ERROR, "unsupported pathtype %d in build_coercion_expression",
-			 (int) pathtype);
-		return NULL;			/* keep compiler quiet */
-	}
-
-	--------------------------------------;
-
     int nargs = 0;
 
     if (OidIsValid(funcId))
@@ -1698,15 +1527,15 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 	return node;
 };
 
-void
+int
 CoerceParser::parser_coercion_errposition(PGParseState *pstate,
 							int coerce_location,
 							PGNode *input_expr)
 {
 	if (coerce_location >= 0)
-		parser_errposition(pstate, coerce_location);
+		return parser_errposition(pstate, coerce_location);
 	else
-		parser_errposition(pstate, exprLocation(input_expr));
+		return parser_errposition(pstate, exprLocation(input_expr));
 };
 
 Oid
@@ -1861,7 +1690,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 		}
 		else
 		{
-			range_typelem = get_range_subtype(range_typeid);
+			range_typelem = type_provider->get_range_subtype(range_typeid);
 			if (!OidIsValid(range_typelem))
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
@@ -1911,7 +1740,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 	if (have_anynonarray && elem_typeid != ANYELEMENTOID)
 	{
 		/* require the element type to not be an array or domain over array */
-		if (type_is_array_domain(elem_typeid))
+		if (type_provider->get_base_element_type(elem_typeid) != InvalidOid)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("type matched to anynonarray is an array type: %s",
@@ -1921,7 +1750,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 	if (have_anyenum && elem_typeid != ANYELEMENTOID)
 	{
 		/* require the element type to be an enum */
-		if (!type_is_enum(elem_typeid))
+		if (!type_provider->type_is_enum(elem_typeid))
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("type matched to anyenum is not an enum type: %s",
@@ -1949,7 +1778,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			{
 				if (!OidIsValid(array_typeid))
 				{
-					array_typeid = get_array_type(elem_typeid);
+					array_typeid = type_provider->get_array_type(elem_typeid);
 					if (!OidIsValid(array_typeid))
 						ereport(ERROR,
 								(errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -1977,7 +1806,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 	{
 		if (!OidIsValid(array_typeid))
 		{
-			array_typeid = get_array_type(elem_typeid);
+			array_typeid = type_provider->get_array_type(elem_typeid);
 			if (!OidIsValid(array_typeid))
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -2028,7 +1857,7 @@ CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
 										-1);
 		if (newnode == NULL)
 		{
-			node_parser.parser_errposition(pstate, exprLocation(node));
+			parser_errposition(pstate, exprLocation(node));
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 			/* translator: first %s is name of a SQL construct, eg LIMIT */
@@ -2042,7 +1871,7 @@ CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
 
 	if (expression_returns_set(node))
 	{
-		node_parser.parser_errposition(pstate, exprLocation(node));
+		parser_errposition(pstate, exprLocation(node));
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 		/* translator: %s is name of a SQL construct, eg LIMIT */
@@ -2065,8 +1894,6 @@ CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
 
 bool CoerceParser::IsBinaryCoercible(Oid srctype, Oid targettype)
 {
-    HeapTuple tuple;
-    Form_pg_cast castForm;
     bool result;
 
     /* Fast path if same type */
@@ -2087,43 +1914,42 @@ bool CoerceParser::IsBinaryCoercible(Oid srctype, Oid targettype)
 
     /* Also accept any array type as coercible to ANYARRAY */
     if (targettype == ANYARRAYOID)
-        if (type_is_array(srctype))
+        if (type_provider->get_element_type(srctype) != InvalidOid)
             return true;
 
     /* Also accept any non-array type as coercible to ANYNONARRAY */
     if (targettype == ANYNONARRAYOID)
-        if (!type_is_array(srctype))
+        if (type_provider->get_element_type(srctype) == InvalidOid)
             return true;
 
     /* Also accept any enum type as coercible to ANYENUM */
     if (targettype == ANYENUMOID)
-        if (type_is_enum(srctype))
+        if (type_provider->type_is_enum(srctype))
             return true;
 
     /* Also accept any range type as coercible to ANYRANGE */
     if (targettype == ANYRANGEOID)
-        if (type_is_range(srctype))
+        if (type_provider->type_is_range(srctype))
             return true;
 
     /* Also accept any composite type as coercible to RECORD */
     if (targettype == RECORDOID)
-        if (ISCOMPLEX(srctype))
+        if (type_parser->typeidTypeRelid(srctype) != InvalidOid)
             return true;
 
     /* Also accept any composite array type as coercible to RECORD[] */
     if (targettype == RECORDARRAYOID)
-        if (is_complex_array(srctype))
+	{
+		if (is_complex_array(srctype))
             return true;
-
+	}
+        
     /* Else look in pg_cast */
-    tuple = SearchSysCache2(CASTSOURCETARGET, ObjectIdGetDatum(srctype), ObjectIdGetDatum(targettype));
-    if (!HeapTupleIsValid(tuple))
+	PGCastPtr tuple = cast_provider->getCastBySourceTypeAndTargetTypeOid(srctype, targettype);
+    if (tuple == NULL)
         return false; /* no cast */
-    castForm = (Form_pg_cast)GETSTRUCT(tuple);
 
-    result = (castForm->castmethod == COERCION_METHOD_BINARY && castForm->castcontext == COERCION_CODE_IMPLICIT);
-
-    ReleaseSysCache(tuple);
+    result = (tuple->castmethod == COERCION_METHOD_BINARY && tuple->castcontext == COERCION_CODE_IMPLICIT);
 
     return result;
 };

@@ -10,8 +10,11 @@ namespace DB
 {
 class CoerceParser;
 class NodeParser;
+class RelationProvider;
+
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
+using RelationProviderPtr = std::unique_ptr<RelationProvider>;
 
 class RelationParser
 {
@@ -19,7 +22,12 @@ private:
     CoerceParserPtr coerce_parser;
 	//std::shared_ptr<RelationProvider> relation_provider;
 	NodeParserPtr node_parser;
+
+	RelationProviderPtr relation_provider;
 	//ENRParser enr_parser;
+
+    int specialAttNum(const char * attname);
+
 public:
 	explicit RelationParser();
 
@@ -95,13 +103,11 @@ public:
 	GetRTEByRangeTablePosn(PGParseState *pstate,
 					   int varno,
 					   int sublevels_up);
-	
-	duckdb_libpgquery::PGNode *
-	scanRTEForColumn(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, const char *colname,
-				 int location, int fuzzy_rte_penalty,
-				 FuzzyAttrMatchState *fuzzystate);
 
-	duckdb_libpgquery::PGNode *
+    duckdb_libpgquery::PGNode * scanRTEForColumn(PGParseState * pstate, duckdb_libpgquery::PGRangeTblEntry * rte,
+		char * colname, int location);
+
+    duckdb_libpgquery::PGNode *
 	colNameToVar(PGParseState *pstate, const char *colname, bool localonly,
 			 int location);
 

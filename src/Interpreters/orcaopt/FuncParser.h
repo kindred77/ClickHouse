@@ -37,10 +37,9 @@ private:
 public:
 	explicit FuncParser();
 
-    duckdb_libpgquery::PGNode *
-    ParseFuncOrColumn(PGParseState *pstate, duckdb_libpgquery::PGList *funcname, duckdb_libpgquery::PGList *fargs,
-				  duckdb_libpgquery::PGNode *last_srf, duckdb_libpgquery::PGFuncCall *fn, bool proc_call, int location);
-    
+    duckdb_libpgquery::PGNode * ParseFuncOrColumn(PGParseState * pstate, duckdb_libpgquery::PGList * funcname, 
+		duckdb_libpgquery::PGList * fargs, duckdb_libpgquery::PGFuncCall * fn, int location);
+
     duckdb_libpgquery::PGNode *
     ParseComplexProjection(PGParseState *pstate, const char *funcname, duckdb_libpgquery::PGNode *first_arg,
 					   int location);

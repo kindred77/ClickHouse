@@ -15,6 +15,8 @@ class NodeParser;
 class TypeParser;
 class FuncParser;
 class AggParser;
+class TypeProvider;
+class RelationProvider;
 
 using RelationParserPtr = std::unique_ptr<RelationParser>;
 using SelectParserPtr = std::unique_ptr<SelectParser>;
@@ -26,6 +28,8 @@ using NodeParserPtr = std::unique_ptr<NodeParser>;
 using TypeParserPtr = std::unique_ptr<TypeParser>;
 using FuncParserPtr = std::unique_ptr<FuncParser>;
 using AggParserPtr = std::unique_ptr<AggParser>;
+using TypeProviderPtr = std::unique_ptr<TypeProvider>;
+using RelationProviderPtr = std::unique_ptr<RelationProvider>;
 
 class ExprParser
 {
@@ -40,6 +44,8 @@ private:
     //CollationParserPtr collation_parser;
     NodeParserPtr node_parser;
     AggParserPtr agg_parser;
+    TypeProviderPtr type_provider;
+    RelationProviderPtr relation_provider;
 
     bool		operator_precedence_warning = false;
     bool		Transform_null_equals = false;
@@ -65,7 +71,7 @@ public:
     transformParamRef(PGParseState *pstate, duckdb_libpgquery::PGParamRef *pref);
 
     duckdb_libpgquery::PGNode *
-    transformIndirection(PGParseState *pstate, duckdb_libpgquery::PGAIndirection *ind);
+    transformIndirection(PGParseState *pstate, duckdb_libpgquery::PGNode *basenode, duckdb_libpgquery::PGList *indirection);
 
     duckdb_libpgquery::PGNode *
     transformArrayExpr(PGParseState *pstate, duckdb_libpgquery::PGAArrayExpr *a,
@@ -155,11 +161,6 @@ public:
     void
     unknown_attribute(PGParseState *pstate, duckdb_libpgquery::PGNode *relref, const char *attname,
 				  int location);
-
-    duckdb_libpgquery::PGNode *
-    make_row_comparison_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
-					   duckdb_libpgquery::PGList *largs, duckdb_libpgquery::PGList *rargs,
-                       int location);
 
     duckdb_libpgquery::PGExpr *
     make_distinct_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,

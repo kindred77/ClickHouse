@@ -266,16 +266,23 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			else
 			{
 				/* arrange to report location if numeric_in() fails */
-				setup_parser_errposition_callback(&pcbstate, pstate, location);
-				val = DirectFunctionCall3(numeric_in,
-										  CStringGetDatum(strVal(value)),
-										  ObjectIdGetDatum(InvalidOid),
-										  Int32GetDatum(-1));
-				cancel_parser_errposition_callback(&pcbstate);
+				//TODO
+				ereport(
+                ERROR,
+                (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                 errmsg("Do not supported!")));
 
-				typeoid = NUMERICOID;
-				typelen = -1;	/* variable len */
-				typebyval = false;
+
+				// setup_parser_errposition_callback(&pcbstate, pstate, location);
+				// val = DirectFunctionCall3(numeric_in,
+				// 						  CStringGetDatum(strVal(value)),
+				// 						  ObjectIdGetDatum(InvalidOid),
+				// 						  Int32GetDatum(-1));
+				// cancel_parser_errposition_callback(&pcbstate);
+
+				// typeoid = NUMERICOID;
+				// typelen = -1;	/* variable len */
+				// typebyval = false;
 			}
 			break;
 
@@ -293,16 +300,20 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			break;
 
 		case T_PGBitString:
-			/* arrange to report location if bit_in() fails */
-			setup_parser_errposition_callback(&pcbstate, pstate, location);
-			val = DirectFunctionCall3(bit_in,
-									  CStringGetDatum(strVal(value)),
-									  ObjectIdGetDatum(InvalidOid),
-									  Int32GetDatum(-1));
-			cancel_parser_errposition_callback(&pcbstate);
-			typeoid = BITOID;
-			typelen = -1;
-			typebyval = false;
+
+            //TODO
+            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("Do not supported!")));
+
+            /* arrange to report location if bit_in() fails */
+			// setup_parser_errposition_callback(&pcbstate, pstate, location);
+			// val = DirectFunctionCall3(bit_in,
+			// 						  CStringGetDatum(strVal(value)),
+			// 						  ObjectIdGetDatum(InvalidOid),
+			// 						  Int32GetDatum(-1));
+			// cancel_parser_errposition_callback(&pcbstate);
+			// typeoid = BITOID;
+			// typelen = -1;
+			// typebyval = false;
 			break;
 
 		case T_PGNull:

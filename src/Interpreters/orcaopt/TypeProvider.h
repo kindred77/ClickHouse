@@ -51,6 +51,24 @@ public:
 
     bool typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId);
 
+    Oid get_range_subtype(Oid rangeOid);
+
+    char get_typtype(Oid typid);
+
+	bool type_is_enum(Oid typid);
+
+    Oid get_base_element_type(Oid typid);
+
+    Oid get_array_type(Oid typid);
+
+    bool type_is_range(Oid typid);
+
+    bool type_is_rowtype(Oid typid);
+
+    Oid get_typcollation(Oid typid);
+
+    bool type_is_collatable(Oid typid);
+
 private:
 	FunctionProviderPtr function_provider;
 	TypeParserPtr type_parser;

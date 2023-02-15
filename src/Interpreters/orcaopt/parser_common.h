@@ -53,10 +53,19 @@ using OperParserPtr = std::unique_ptr<OperParser>;
 using TypeParserPtr = std::unique_ptr<TypeParser>;
 using SelectParserPtr = std::unique_ptr<SelectParser>; */
 
+/*
+ * Symbolic values for prokind column
+ */
+#define PG_PROKIND_FUNCTION 'f'
+#define PG_PROKIND_AGGREGATE 'a'
+#define PG_PROKIND_WINDOW 'w'
+#define PG_PROKIND_PROCEDURE 'p'
+
 bool		SQL_inheritance = true;
 
 typedef unsigned char uint8;
 typedef signed short int16;
+typedef unsigned short uint16;	/* == 16 bits */
 typedef long int int64;
 typedef signed int int32;
 typedef unsigned int uint32;	/* == 32 bits */
@@ -150,6 +159,7 @@ struct PGParseState
 	PGParseExprKind p_expr_kind;	/* what kind of expression we're parsing */
 	int			p_next_resno;	/* next targetlist resno to assign */
 	duckdb_libpgquery::PGList	   *p_multiassign_exprs;	/* junk tlist entries for multiassign */
+	duckdb_libpgquery::PGNode	   *p_value_substitute;		/* what to replace VALUE with, if any */
 	duckdb_libpgquery::PGList	   *p_locking_clause;	/* raw FOR UPDATE/FOR SHARE info */
 	bool		p_locked_from_parent;	/* parent has marked this subquery
 										 * with FOR UPDATE/FOR SHARE */
@@ -1029,6 +1039,8 @@ static const int oldprecedence_r[] = {
 #define Max(x, y)		((x) > (y) ? (x) : (y))
 
 #define NameStr(name)	((name).data)
+
+Oid			MyDatabaseId = InvalidOid;
 
 size_t
 strlcpy(char *dst, const char *src, size_t siz)

@@ -102,8 +102,7 @@ public:
 
     duckdb_libpgquery::PGNode * coerce_type_typmod(
         duckdb_libpgquery::PGNode * node, Oid targetTypeId, int32 targetTypMod,
-		duckdb_libpgquery::PGCoercionForm cformat, int location, bool isExplicit,
-		bool hideInputCoercion);
+		duckdb_libpgquery::PGCoercionForm cformat, int location, bool isExplicit, bool hideInputCoercion);
 
     void
 	hide_coercion_node(duckdb_libpgquery::PGNode *node);

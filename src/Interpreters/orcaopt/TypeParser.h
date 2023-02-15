@@ -19,6 +19,8 @@ private:
 public:
 	explicit TypeParser();
 
+    Oid typenameTypeId(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName);
+
     void
     typenameTypeIdAndMod(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName,
 					 Oid *typeid_p, int32 *typmod_p);
