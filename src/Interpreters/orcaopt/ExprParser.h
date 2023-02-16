@@ -114,10 +114,7 @@ public:
     transformFuncCall(PGParseState *pstate, duckdb_libpgquery::PGFuncCall *fn);
 
     duckdb_libpgquery::PGNode *
-    transformMultiAssignRef(PGParseState *pstate, duckdb_libpgquery::PGMultiAssignRef *maref);
-
-    duckdb_libpgquery::PGNode *
-    transformRowExpr(PGParseState *pstate, duckdb_libpgquery::PGRowExpr *r, bool allowDefault);
+    transformRowExpr(PGParseState *pstate, duckdb_libpgquery::PGRowExpr *r);
 
     duckdb_libpgquery::PGNode *
     transformSubLink(PGParseState *pstate, duckdb_libpgquery::PGSubLink *sublink);
@@ -132,13 +129,12 @@ public:
     transformMinMaxExpr(PGParseState *pstate, duckdb_libpgquery::PGMinMaxExpr *m);
 
     duckdb_libpgquery::PGNode *
-    transformSQLValueFunction(PGParseState *pstate, duckdb_libpgquery::PGSQLValueFunction *svf);
-
-    duckdb_libpgquery::PGNode *
     transformBooleanTest(PGParseState *pstate, duckdb_libpgquery::PGBooleanTest *b);
 
     duckdb_libpgquery::PGNode *
     transformCurrentOfExpr(PGParseState *pstate, duckdb_libpgquery::PGCurrentOfExpr *cexpr);
+
+    duckdb_libpgquery::PGNode * transformGroupingFunc(PGParseState * pstate, duckdb_libpgquery::PGGroupingFunc * gf);
 
     int
     operator_precedence_group(duckdb_libpgquery::PGNode *node, const char **nodename);
@@ -152,7 +148,7 @@ public:
     duckdb_libpgquery::PGNode *
     make_nulltest_from_distinct(PGParseState *pstate, duckdb_libpgquery::PGAExpr *distincta, duckdb_libpgquery::PGNode *arg);
 
-    char *
+    const char *
     ParseExprKindName(PGParseExprKind exprKind);
 
     bool

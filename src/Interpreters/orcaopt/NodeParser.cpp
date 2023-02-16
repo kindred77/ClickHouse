@@ -266,7 +266,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			else
 			{
 				/* arrange to report location if numeric_in() fails */
-				//TODO
+				//TODO kindred
 				ereport(
                 ERROR,
                 (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -301,7 +301,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 
 		case T_PGBitString:
 
-            //TODO
+            //TODO kindred
             ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("Do not supported!")));
 
             /* arrange to report location if bit_in() fails */

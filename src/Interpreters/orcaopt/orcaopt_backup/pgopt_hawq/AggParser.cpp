@@ -50,7 +50,7 @@ void AggParser::transformWindowSpec(PGParseState * pstate, PGWindowDef * spec)
     }
     spec->orderClause = nl;
 
-	//TODO
+	//TODO kindred
     // if (spec->frame)
     // {
     //     PGWindowFrame * frame = spec->frame;

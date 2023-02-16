@@ -916,65 +916,50 @@ TargetParser::transformTargetList(PGParseState *pstate, PGList *targetlist,
 
 PGList *
 TargetParser::transformExpressionList(PGParseState *pstate, PGList *exprlist,
-						PGParseExprKind exprKind, bool allowDefault)
+						PGParseExprKind exprKind)
 {
-	PGList	   *result = NIL;
-	PGListCell   *lc;
+    PGList * result = NIL;
+    PGListCell * lc;
 
-	foreach(lc, exprlist)
-	{
-		PGNode	   *e = (PGNode *) lfirst(lc);
+    foreach (lc, exprlist)
+    {
+        PGNode * e = (PGNode *)lfirst(lc);
 
-		/*
+        /*
 		 * Check for "something.*".  Depending on the complexity of the
 		 * "something", the star could appear as the last field in ColumnRef,
 		 * or as the last indirection item in A_Indirection.
 		 */
-		if (IsA(e, PGColumnRef))
-		{
-			PGColumnRef  *cref = (PGColumnRef *) e;
+        if (IsA(e, PGColumnRef))
+        {
+            PGColumnRef * cref = (PGColumnRef *)e;
 
-			if (IsA(llast(cref->fields), PGAStar))
-			{
-				/* It is something.*, expand into multiple items */
-				result = list_concat(result,
-									 ExpandColumnRefStar(pstate, cref,
-														 false));
-				continue;
-			}
-		}
-		else if (IsA(e, PGAIndirection))
-		{
-			PGAIndirection *ind = (PGAIndirection *) e;
+            if (IsA(llast(cref->fields), PGAStar))
+            {
+                /* It is something.*, expand into multiple items */
+                result = list_concat(result, ExpandColumnRefStar(pstate, cref, false));
+                continue;
+            }
+        }
+        else if (IsA(e, PGAIndirection))
+        {
+            PGAIndirection * ind = (PGAIndirection *)e;
 
-			if (IsA(llast(ind->indirection), PGAStar))
-			{
-				/* It is something.*, expand into multiple items */
-				result = list_concat(result,
-									 ExpandIndirectionStar(pstate, ind,
-														   false, exprKind));
-				continue;
-			}
-		}
+            if (IsA(llast(ind->indirection), PGAStar))
+            {
+                /* It is something.*, expand into multiple items */
+                result = list_concat(result, ExpandIndirectionStar(pstate, ind, false, exprKind));
+                continue;
+            }
+        }
 
-		/*
-		 * Not "something.*", so transform as a single expression.  If it's a
-		 * SetToDefault node and we should allow that, pass it through
-		 * unmodified.  (transformExpr will throw the appropriate error if
-		 * we're disallowing it.)
+        /*
+		 * Not "something.*", so transform as a single expression
 		 */
-		if (allowDefault && IsA(e, PGSetToDefault))
-			 /* do nothing */ ;
-		else
-			e = expr_parser.transformExpr(pstate, e, exprKind);
+        result = lappend(result, expr_parser->transformExpr(pstate, e, exprKind));
+    }
 
-		result = lappend(result, e);
-	}
-
-	/* Shouldn't have any multiassign items here */
-	Assert(pstate->p_multiassign_exprs == NIL);
-
-	return result;
+    return result;
 };
 
 void

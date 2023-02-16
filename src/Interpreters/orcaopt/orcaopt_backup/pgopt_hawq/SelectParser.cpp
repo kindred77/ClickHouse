@@ -187,11 +187,11 @@ PGQuery * SelectParser::transformSelectStmt(PGParseState * pstate,
         transformLockingClause(pstate, qry, (LockingClause *)lfirst(l), false);
     }
 
-    //TODO
+    //TODO kindred
     //assign_query_collations(pstate, qry);
 
     /* this must be done after collations, for reliable comparison of exprs */
-    //TODO
+    //TODO kindred
     //if (pstate->p_hasAggs || qry->groupClause || qry->havingQual)
     //    parseCheckAggregates(pstate, qry);
 

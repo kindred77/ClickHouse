@@ -1,5 +1,6 @@
 #include <Interpreters/orcaopt/SelectParser.h>
 
+#include <Interpreters/orcaopt/walkers.h>
 #include <Interpreters/orcaopt/ClauseParser.h>
 #include <Interpreters/orcaopt/CoerceParser.h>
 #include <Interpreters/orcaopt/TargetParser.h>
@@ -240,7 +241,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	// qry->hasFuncsWithExecRestrictions = pstate->p_hasFuncsWithExecRestrictions;
 
 	if (pstate->p_hasTblValueExpr)
-		func_parser.parseCheckTableFunctions(pstate, qry);
+		parseCheckTableFunctions(pstate, qry);
 
 	// foreach(l, stmt->lockingClause)
 	// {

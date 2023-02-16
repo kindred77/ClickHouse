@@ -764,6 +764,30 @@ struct Form_pg_cast
 
 using PGCastPtr = std::shared_ptr<Form_pg_cast>;
 
+struct Form_pg_agg
+{
+    Oid aggfnoid;
+    char aggkind;
+    int16 aggnumdirectargs;
+    Oid aggtransfn;
+    Oid aggfinalfn;
+    Oid aggcombinefn;
+    Oid aggserialfn;
+    Oid aggdeserialfn;
+    Oid aggmtransfn;
+    Oid aggminvtransfn;
+    Oid aggmfinalfn;
+    bool aggfinalextra;
+    bool aggmfinalextra;
+    Oid aggsortop;
+    Oid aggtranstype;
+    int32 aggtransspace;
+    Oid aggmtranstype;
+    int32 aggmtransspace;
+};
+
+using PGAggPtr = std::shared_ptr<Form_pg_agg>;
+
 typedef enum
 {
 	INH_NO,						/* Do NOT scan child tables */
@@ -1157,7 +1181,7 @@ static void pcb_error_callback(void * arg)
 {
     PGParseCallbackState * pcbstate = (PGParseCallbackState *)arg;
 
-	//TODO
+	//TODO kindred
     //if (geterrcode() != ERRCODE_QUERY_CANCELED)
         (void)parser_errposition(pcbstate->pstate, pcbstate->location);
 };
@@ -1355,6 +1379,46 @@ gotdigits:
     *result = (sign < 0) ? -tmp : tmp;
 
     return true;
+};
+
+const char * NameListToString(duckdb_libpgquery::PGList * names)
+{
+	using duckdb_libpgquery::elog;
+	using duckdb_libpgquery::PGListCell;
+	using duckdb_libpgquery::PGNode;
+	using duckdb_libpgquery::T_PGString;
+	using duckdb_libpgquery::PGAStar;
+	using duckdb_libpgquery::PGValue;
+	using duckdb_libpgquery::T_PGAStar;
+
+    std::string result = "";
+    PGListCell * l;
+
+    foreach (l, names)
+    {
+        PGNode * name = (PGNode *)lfirst(l);
+
+        if (l != list_head(names))
+		{
+            //appendStringInfoChar(&string, '.');
+			result += ".";
+		}
+
+        if (IsA(name, PGString))
+		{
+            //appendStringInfoString(&string, strVal(name));
+			result += std::string(strVal(name));
+		}
+        else if (IsA(name, PGAStar))
+		{
+            //appendStringInfoString(&string, "*");
+			result += "*";
+		}
+        else
+            elog(ERROR, "unexpected node type in name list: %d", (int)nodeTag(name));
+    }
+
+    return result.c_str();
 };
 
 // duckdb_libpgquery::PGTargetEntry *

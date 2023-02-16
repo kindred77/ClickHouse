@@ -2919,7 +2919,7 @@ bool pg_equal(const void * a, const void * b)
         return false;
 
     /* Guard against stack overflow due to overly complex expressions */
-    //TODO
+    //TODO kindred
     //check_stack_depth();
 
     switch (nodeTag(a))

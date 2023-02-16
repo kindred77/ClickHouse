@@ -11,7 +11,7 @@ namespace DB
 
 PGCastPtr CastProvider::getCastBySourceTypeAndTargetTypeOid(Oid sourceTypeId, Oid targetTypeId) const
 {
-	//TODO
+	//TODO kindred
 	auto it = oid_cast_map.find(sourceTypeId);
 	auto it2 = oid_cast_map.find(targetTypeId);
 	if (it == oid_cast_map.end())

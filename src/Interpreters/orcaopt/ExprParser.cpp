@@ -16,8 +16,10 @@
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
 #else
 #pragma GCC diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
 #endif
 
 using namespace duckdb_libpgquery;
@@ -388,7 +390,7 @@ ExprParser::transformParamRef(PGParseState *pstate, PGParamRef *pref)
 	 * The core parser knows nothing about Params.  If a hook is supplied,
 	 * call it.  If not, or if the hook returns NULL, throw a generic error.
 	 */
-	//TODO
+	//TODO kindred
 	// if (pstate->p_paramref_hook != NULL)
 	// 	result = pstate->p_paramref_hook(pstate, pref);
 	// else
@@ -1605,7 +1607,7 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
 			IsA(rexpr, PGRowExpr))
 		{
 			/* ROW() op ROW() is handled specially */
-			//TODO
+			//TODO kindred
 
 			parser_errposition(pstate, a->location);
 			ereport(ERROR,
@@ -1809,7 +1811,7 @@ ExprParser::transformFuncCall(PGParseState *pstate, PGFuncCall *fn)
 	 */
     if (fn->agg_within_group)
     {
-        Assert(fn->agg_order != NIL);
+        Assert(fn->agg_order != NIL)
         foreach (args, fn->agg_order)
         {
             PGSortBy * arg = (PGSortBy *)lfirst(args);
@@ -1823,198 +1825,38 @@ ExprParser::transformFuncCall(PGParseState *pstate, PGFuncCall *fn)
 };
 
 PGNode *
-ExprParser::transformRowExpr(PGParseState *pstate, PGRowExpr *r, bool allowDefault)
+ExprParser::transformRowExpr(PGParseState *pstate, PGRowExpr *r)
 {
-	PGRowExpr    *newr;
-	char		fname[16];
-	int			fnum;
-	PGListCell   *lc;
+    PGRowExpr * newr;
+    char fname[16];
+    int fnum;
+    PGListCell * lc;
 
-	newr = makeNode(PGRowExpr);
+    /* If we already transformed this node, do nothing */
+    if (OidIsValid(r->row_typeid))
+        return (PGNode *)r;
 
-	/* Transform the field expressions */
-	newr->args = target_parser->transformExpressionList(pstate, r->args,
-										 pstate->p_expr_kind, allowDefault);
+    newr = makeNode(PGRowExpr);
 
-	/* Disallow more columns than will fit in a tuple */
-	if (list_length(newr->args) > MaxTupleAttributeNumber)
-	{
-		parser_errposition(pstate, r->location);
-		ereport(ERROR,
-				(errcode(ERRCODE_TOO_MANY_COLUMNS),
-				 errmsg("ROW expressions can have at most %d entries",
-						MaxTupleAttributeNumber)));
-	}
+    /* Transform the field expressions */
+    newr->args = target_parser->transformExpressionList(pstate, r->args, pstate->p_expr_kind);
 
-	/* Barring later casting, we consider the type RECORD */
-	newr->row_typeid = RECORDOID;
-	newr->row_format = PG_COERCE_IMPLICIT_CAST;
+    /* Barring later casting, we consider the type RECORD */
+    newr->row_typeid = RECORDOID;
+    newr->row_format = PG_COERCE_IMPLICIT_CAST;
 
-	/* ROW() has anonymous columns, so invent some field names */
-	newr->colnames = NIL;
-	fnum = 1;
-	foreach(lc, newr->args)
-	{
-		snprintf(fname, sizeof(fname), "f%d", fnum++);
-		newr->colnames = lappend(newr->colnames, makeString(pstrdup(fname)));
-	}
+    /* ROW() has anonymous columns, so invent some field names */
+    newr->colnames = NIL;
+    fnum = 1;
+    foreach (lc, newr->args)
+    {
+        snprintf(fname, sizeof(fname), "f%d", fnum++);
+        newr->colnames = lappend(newr->colnames, makeString(pstrdup(fname)));
+    }
 
-	newr->location = r->location;
+    newr->location = r->location;
 
-	return (PGNode *) newr;
-};
-
-PGNode *
-ExprParser::transformMultiAssignRef(PGParseState *pstate, PGMultiAssignRef *maref)
-{
-	PGSubLink    *sublink;
-	PGRowExpr    *rexpr;
-	PGQuery	   *qtree;
-	PGTargetEntry *tle;
-
-	/* We should only see this in first-stage processing of UPDATE tlists */
-	Assert(pstate->p_expr_kind == EXPR_KIND_UPDATE_SOURCE)
-
-	/* We only need to transform the source if this is the first column */
-	if (maref->colno == 1)
-	{
-		/*
-		 * For now, we only allow EXPR SubLinks and RowExprs as the source of
-		 * an UPDATE multiassignment.  This is sufficient to cover interesting
-		 * cases; at worst, someone would have to write (SELECT * FROM expr)
-		 * to expand a composite-returning expression of another form.
-		 */
-		if (IsA(maref->source, PGSubLink) &&
-			((PGSubLink *) maref->source)->subLinkType == PG_EXPR_SUBLINK)
-		{
-			/* Relabel it as a MULTIEXPR_SUBLINK */
-			sublink = (PGSubLink *) maref->source;
-			sublink->subLinkType = PG_MULTIEXPR_SUBLINK;
-			/* And transform it */
-			sublink = (PGSubLink *) transformExprRecurse(pstate,
-													   (PGNode *) sublink);
-
-			qtree = castNode(PGQuery, sublink->subselect);
-
-			/* Check subquery returns required number of columns */
-			if (count_nonjunk_tlist_entries(qtree->targetList) != maref->ncolumns)
-			{
-				parser_errposition(pstate, sublink->location);
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("number of columns does not match number of values")));
-			}
-
-			/*
-			 * Build a resjunk tlist item containing the MULTIEXPR SubLink,
-			 * and add it to pstate->p_multiassign_exprs, whence it will later
-			 * get appended to the completed targetlist.  We needn't worry
-			 * about selecting a resno for it; transformUpdateStmt will do
-			 * that.
-			 */
-			tle = makeTargetEntry((PGExpr *) sublink, 0, NULL, true);
-			pstate->p_multiassign_exprs = lappend(pstate->p_multiassign_exprs,
-												  tle);
-
-			/*
-			 * Assign a unique-within-this-targetlist ID to the MULTIEXPR
-			 * SubLink.  We can just use its position in the
-			 * p_multiassign_exprs list.
-			 */
-			sublink->subLinkId = list_length(pstate->p_multiassign_exprs);
-		}
-		else if (IsA(maref->source, PGRowExpr))
-		{
-			/* Transform the RowExpr, allowing SetToDefault items */
-			rexpr = (PGRowExpr *) transformRowExpr(pstate,
-												 (PGRowExpr *) maref->source,
-												 true);
-
-			/* Check it returns required number of columns */
-			if (list_length(rexpr->args) != maref->ncolumns)
-			{
-				parser_errposition(pstate, rexpr->location);
-				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("number of columns does not match number of values")));
-			}
-
-			/*
-			 * Temporarily append it to p_multiassign_exprs, so we can get it
-			 * back when we come back here for additional columns.
-			 */
-			tle = makeTargetEntry((PGExpr *) rexpr, 0, NULL, true);
-			pstate->p_multiassign_exprs = lappend(pstate->p_multiassign_exprs,
-												  tle);
-		}
-		else
-		{
-			parser_errposition(pstate, exprLocation(maref->source));
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("source for a multiple-column UPDATE item must be a sub-SELECT or ROW() expression")));
-		}
-	}
-	else
-	{
-		/*
-		 * Second or later column in a multiassignment.  Re-fetch the
-		 * transformed SubLink or RowExpr, which we assume is still the last
-		 * entry in p_multiassign_exprs.
-		 */
-		Assert(pstate->p_multiassign_exprs != NIL)
-		tle = (PGTargetEntry *) llast(pstate->p_multiassign_exprs);
-	}
-
-	/*
-	 * Emit the appropriate output expression for the current column
-	 */
-	if (IsA(tle->expr, PGSubLink))
-	{
-		PGParam	   *param;
-
-		sublink = (PGSubLink *) tle->expr;
-		Assert(sublink->subLinkType == PG_MULTIEXPR_SUBLINK)
-		qtree = castNode(PGQuery, sublink->subselect);
-
-		/* Build a Param representing the current subquery output column */
-		tle = (PGTargetEntry *) list_nth(qtree->targetList, maref->colno - 1);
-		Assert(!tle->resjunk)
-
-		param = makeNode(PGParam);
-		param->paramkind = PG_PARAM_MULTIEXPR;
-		param->paramid = (sublink->subLinkId << 16) | maref->colno;
-		param->paramtype = exprType((PGNode *) tle->expr);
-		param->paramtypmod = exprTypmod((PGNode *) tle->expr);
-		param->paramcollid = exprCollation((PGNode *) tle->expr);
-		param->location = exprLocation((PGNode *) tle->expr);
-
-		return (PGNode *) param;
-	}
-
-	if (IsA(tle->expr, PGRowExpr))
-	{
-		PGNode	   *result;
-
-		rexpr = (PGRowExpr *) tle->expr;
-
-		/* Just extract and return the next element of the RowExpr */
-		result = (PGNode *) list_nth(rexpr->args, maref->colno - 1);
-
-		/*
-		 * If we're at the last column, delete the RowExpr from
-		 * p_multiassign_exprs; we don't need it anymore, and don't want it in
-		 * the finished UPDATE tlist.
-		 */
-		if (maref->colno == maref->ncolumns)
-			pstate->p_multiassign_exprs =
-				list_delete_ptr(pstate->p_multiassign_exprs, tle);
-
-		return result;
-	}
-
-	elog(ERROR, "unexpected expr type in multiassign list");
-	return NULL;				/* keep compiler quiet */
+    return (PGNode *)newr;
 };
 
 PGNode *
@@ -2037,7 +1879,7 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 	switch (pstate->p_expr_kind)
 	{
 		case EXPR_KIND_NONE:
-			Assert(false);		/* can't happen */
+			Assert(false)		/* can't happen */
 			break;
 		case EXPR_KIND_OTHER:
 			/* Accept sublink here; caller must throw error if wanted */
@@ -2230,7 +2072,7 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 		 * Identify the combining operator(s) and generate a suitable
 		 * row-comparison expression.
 		 */
-		//TODO
+		//TODO kindred
 		// sublink->testexpr = make_row_comparison_op(pstate,
 		// 										   sublink->operName,
 		// 										   left_list,
@@ -2297,7 +2139,8 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 		 * leave it to parse_collate.c to do that later, but propagating the
 		 * result to the CaseTestExpr would be unnecessarily complicated.
 		 */
-		collation_parser->assign_expr_collations(pstate, arg);
+		//TODO kindred
+		//collation_parser->assign_expr_collations(pstate, arg);
 
 		placeholder = makeNode(PGCaseTestExpr);
 		placeholder->typeId = exprType(arg);
@@ -2521,59 +2364,6 @@ ExprParser::transformMinMaxExpr(PGParseState *pstate, PGMinMaxExpr *m)
 };
 
 PGNode *
-ExprParser::transformSQLValueFunction(PGParseState *pstate, PGSQLValueFunction *svf)
-{
-	/*
-	 * All we need to do is insert the correct result type and (where needed)
-	 * validate the typmod, so we just modify the node in-place.
-	 */
-	switch (svf->op)
-	{
-		case PG_SVFOP_CURRENT_DATE:
-			svf->type = DATEOID;
-			break;
-		case PG_SVFOP_CURRENT_TIME:
-			svf->type = TIMETZOID;
-			break;
-		case PG_SVFOP_CURRENT_TIME_N:
-			svf->type = TIMETZOID;
-			svf->typmod = anytime_typmod_check(true, svf->typmod);
-			break;
-		case PG_SVFOP_CURRENT_TIMESTAMP:
-			svf->type = TIMESTAMPTZOID;
-			break;
-		case PG_SVFOP_CURRENT_TIMESTAMP_N:
-			svf->type = TIMESTAMPTZOID;
-			svf->typmod = anytimestamp_typmod_check(true, svf->typmod);
-			break;
-		case PG_SVFOP_LOCALTIME:
-			svf->type = TIMEOID;
-			break;
-		case PG_SVFOP_LOCALTIME_N:
-			svf->type = TIMEOID;
-			svf->typmod = anytime_typmod_check(false, svf->typmod);
-			break;
-		case PG_SVFOP_LOCALTIMESTAMP:
-			svf->type = TIMESTAMPOID;
-			break;
-		case PG_SVFOP_LOCALTIMESTAMP_N:
-			svf->type = TIMESTAMPOID;
-			svf->typmod = anytimestamp_typmod_check(false, svf->typmod);
-			break;
-		case PG_SVFOP_CURRENT_ROLE:
-		case PG_SVFOP_CURRENT_USER:
-		case PG_SVFOP_USER:
-		case PG_SVFOP_SESSION_USER:
-		case PG_SVFOP_CURRENT_CATALOG:
-		case PG_SVFOP_CURRENT_SCHEMA:
-			svf->type = NAMEOID;
-			break;
-	}
-
-	return (PGNode *) svf;
-};
-
-PGNode *
 ExprParser::transformBooleanTest(PGParseState *pstate, PGBooleanTest *b)
 {
 	const char *clausename;
@@ -2667,260 +2457,352 @@ ExprParser::transformCurrentOfExpr(PGParseState *pstate, PGCurrentOfExpr *cexpr)
 		 */
 		if (node != NULL && IsA(node, PGParam))
 		{
-			PGParam	   *p = (PGParam *) node;
+			//TODO kindred
+			// PGParam	   *p = (PGParam *) node;
 
-			if (p->paramkind == PG_PARAM_EXTERN &&
-				p->paramtype == REFCURSOROID)
-			{
-				/* Matches, so convert CURRENT OF to a param reference */
-				cexpr->cursor_name = NULL;
-				cexpr->cursor_param = p->paramid;
-			}
+			// if (p->paramkind == PG_PARAM_EXTERN &&
+			// 	p->paramtype == REFCURSOROID)
+			// {
+			// 	/* Matches, so convert CURRENT OF to a param reference */
+			// 	cexpr->cursor_name = NULL;
+			// 	cexpr->cursor_param = p->paramid;
+			// }
+			ereport(
+                ERROR,
+                (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                 errmsg("Do not supported yet!")));
 		}
 	}
 
 	return (PGNode *) cexpr;
 };
 
+PGNode * ExprParser::transformGroupingFunc(PGParseState * pstate, PGGroupingFunc * gf)
+{
+    PGList * targs = NIL;
+    PGListCell * lc;
+    PGGroupingFunc * new_gf;
+
+    new_gf = makeNode(PGGroupingFunc);
+
+    /*
+	 * Transform the list of arguments.
+	 */
+    foreach (lc, gf->args)
+        targs = lappend(targs, transformExpr(pstate, (PGNode *)lfirst(lc), EXPR_KIND_GROUP_BY));
+
+    new_gf->args = targs;
+
+    //new_gf->ngrpcols = gf->ngrpcols;
+
+    return (PGNode *)new_gf;
+};
+
 PGNode *
 ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 {
-    PGNode	   *result;
+    PGNode * result;
 
-	if (expr == NULL)
-		return NULL;
+    if (expr == NULL)
+        return NULL;
 
-	/* Guard against stack overflow due to overly complex expressions */
-	check_stack_depth();
+    /* Guard against stack overflow due to overly complex expressions */
+	//TODO kindred
+    //check_stack_depth();
 
-	switch (nodeTag(expr))
-	{
-		case T_PGColumnRef:
-			result = transformColumnRef(pstate, (PGColumnRef *) expr);
-			break;
+    switch (nodeTag(expr))
+    {
+        case T_PGColumnRef:
+            result = transformColumnRef(pstate, (PGColumnRef *)expr);
+            break;
 
-		case T_PGParamRef:
-			result = transformParamRef(pstate, (PGParamRef *) expr);
-			break;
+        case T_PGParamRef:
+            result = transformParamRef(pstate, (PGParamRef *)expr);
+            break;
 
-		case T_PGAConst:
-			{
-				PGAConst    *con = (PGAConst *) expr;
-				PGValue	   *val = &con->val;
+        case T_PGAConst: {
+            PGAConst * con = (PGAConst *)expr;
+            PGValue * val = &con->val;
 
-				result = (PGNode *) node_parser->make_const(pstate, val, con->location);
-				break;
-			}
+            result = (PGNode *) node_parser->make_const(pstate, val, con->location);
+            break;
+        }
 
-		case T_PGAIndirection:
-			result = transformIndirection(pstate, (PGAIndirection *) expr);
-			break;
+        case T_PGAIndirection: {
+            PGAIndirection * ind = (PGAIndirection *)expr;
 
-		case T_PGAArrayExpr:
-			result = transformArrayExpr(pstate, (PGAArrayExpr *) expr,
-										InvalidOid, InvalidOid, -1);
-			break;
+            result = transformExprRecurse(pstate, ind->arg);
+            result = transformIndirection(pstate, result, ind->indirection);
+            break;
+        }
 
-		case T_PGTypeCast:
-			result = transformTypeCast(pstate, (PGTypeCast *) expr);
-			break;
+        case T_PGAArrayExpr:
+            result = transformArrayExpr(pstate, (PGAArrayExpr *)expr, InvalidOid, InvalidOid, -1);
+            break;
 
-		case T_PGCollateClause:
-			result = transformCollateClause(pstate, (PGCollateClause *) expr);
-			break;
+        case T_PGTypeCast: {
+            PGTypeCast * tc = (PGTypeCast *)expr;
 
-		case T_PGAExpr:
-			{
-				PGAExpr	   *a = (PGAExpr *) expr;
+            /*
+				 * If the subject of the typecast is an ARRAY[] construct and
+				 * the target type is an array type, we invoke
+				 * transformArrayExpr() directly so that we can pass down the
+				 * type information.  This avoids some cases where
+				 * transformArrayExpr() might not infer the correct type.
+				 */
+            if (IsA(tc->arg, PGAArrayExpr))
+            {
+                    Oid targetType;
+                    Oid elementType;
+                    int32 targetTypmod;
 
-				switch (a->kind)
-				{
-					case PG_AEXPR_OP:
-						result = transformAExprOp(pstate, a);
-						break;
-					case PG_AEXPR_OP_ANY:
-						result = transformAExprOpAny(pstate, a);
-						break;
-					case PG_AEXPR_OP_ALL:
-						result = transformAExprOpAll(pstate, a);
-						break;
-					case PG_AEXPR_DISTINCT:
-					case PG_AEXPR_NOT_DISTINCT:
-						result = transformAExprDistinct(pstate, a);
-						break;
-					case PG_AEXPR_NULLIF:
-						result = transformAExprNullIf(pstate, a);
-						break;
-					case PG_AEXPR_OF:
-						result = transformAExprOf(pstate, a);
-						break;
-					case PG_AEXPR_IN:
-						result = transformAExprIn(pstate, a);
-						break;
-					case PG_AEXPR_LIKE:
-					case PG_AEXPR_ILIKE:
-					case PG_AEXPR_SIMILAR:
-						/* we can transform these just like AEXPR_OP */
-						result = transformAExprOp(pstate, a);
-						break;
-					case PG_AEXPR_BETWEEN:
-					case PG_AEXPR_NOT_BETWEEN:
-					case PG_AEXPR_BETWEEN_SYM:
-					case PG_AEXPR_NOT_BETWEEN_SYM:
-						result = transformAExprBetween(pstate, a);
-						break;
-					case AEXPR_PAREN:
-						result = transformExprRecurse(pstate, a->lexpr);
-						break;
-					default:
-						elog(ERROR, "unrecognized A_Expr kind: %d", a->kind);
-						result = NULL;	/* keep compiler quiet */
-						break;
-				}
-				break;
-			}
+                    type_parser->typenameTypeIdAndMod(pstate, tc->typeName, &targetType, &targetTypmod);
 
-		case T_PGBoolExpr:
-			result = transformBoolExpr(pstate, (PGBoolExpr *) expr);
-			break;
+                    /*
+					 * If target is a domain over array, work with the base
+					 * array type here.  transformTypeCast below will cast the
+					 * array type to the domain.  In the usual case that the
+					 * target is not a domain, transformTypeCast is a no-op.
+					 */
+                    targetType = type_provider->getBaseTypeAndTypmod(targetType, &targetTypmod);
+                    elementType = type_provider->get_element_type(targetType);
+                    if (OidIsValid(elementType))
+                    {
+                        tc = (PGTypeCast *)copyObject(tc);
+                        tc->arg = transformArrayExpr(pstate, (PGAArrayExpr *)tc->arg, targetType, elementType, targetTypmod);
+                    }
+            }
 
-		case T_PGFuncCall:
-			result = transformFuncCall(pstate, (PGFuncCall *) expr);
-			break;
+            result = transformTypeCast(pstate, tc);
+            break;
+        }
 
-		case T_PGMultiAssignRef:
-			result = transformMultiAssignRef(pstate, (PGMultiAssignRef *) expr);
-			break;
+        case T_PGCollateClause:
+            result = transformCollateClause(pstate, (PGCollateClause *)expr);
+            break;
 
-		case T_PGGroupingFunc:
-			result = agg_parser->transformGroupingFunc(pstate, (PGGroupingFunc *) expr);
-			break;
+        case T_PGAExpr: {
+            PGAExpr * a = (PGAExpr *)expr;
 
-		// case T_PGGroupId:
-		// 	result = transformGroupId(pstate, (PGGroupId *) expr);
-		// 	break;
+            switch (a->kind)
+            {
+                    case PG_AEXPR_OP:
+                        result = transformAExprOp(pstate, a);
+                        break;
+					//TODO kindred
+                    // case AEXPR_AND:
+                    //     result = transformAExprAnd(pstate, a);
+                    //     break;
+                    // case AEXPR_OR:
+                    //     result = transformAExprOr(pstate, a);
+                    //     break;
+                    // case PG_AEXPR_NOT:
+                    //     result = transformAExprNot(pstate, a);
+                    //     break;
+                    case PG_AEXPR_OP_ANY:
+                        result = transformAExprOpAny(pstate, a);
+                        break;
+                    case PG_AEXPR_OP_ALL:
+                        result = transformAExprOpAll(pstate, a);
+                        break;
+                    case PG_AEXPR_DISTINCT:
+                        result = transformAExprDistinct(pstate, a);
+                        break;
+                    case PG_AEXPR_NULLIF:
+                        result = transformAExprNullIf(pstate, a);
+                        break;
+                    case PG_AEXPR_OF:
+                        result = transformAExprOf(pstate, a);
+                        break;
+                    case PG_AEXPR_IN:
+                        result = transformAExprIn(pstate, a);
+                        break;
+                    default:
+                        elog(ERROR, "unrecognized A_Expr kind: %d", a->kind);
+                        result = NULL; /* keep compiler quiet */
+                        break;
+            }
+            break;
+        }
 
-		case T_PGNamedArgExpr:
-			{
-				PGNamedArgExpr *na = (PGNamedArgExpr *) expr;
+        case T_PGFuncCall:
+            result = transformFuncCall(pstate, (PGFuncCall *)expr);
+            break;
 
-				na->arg = (PGExpr *) transformExprRecurse(pstate, (PGNode *) na->arg);
-				result = expr;
-				break;
-			}
+        case T_PGNamedArgExpr: {
+            PGNamedArgExpr * na = (PGNamedArgExpr *)expr;
 
-		case T_PGSubLink:
-			result = transformSubLink(pstate, (PGSubLink *) expr);
-			break;
+            na->arg = (PGExpr *)transformExprRecurse(pstate, (PGNode *)na->arg);
+            result = expr;
+            break;
+        }
 
-		case T_PGCaseExpr:
-			result = transformCaseExpr(pstate, (PGCaseExpr *) expr);
-			break;
+        case T_PGSubLink:
+            result = transformSubLink(pstate, (PGSubLink *)expr);
+            break;
 
-		case T_PGRowExpr:
-			result = transformRowExpr(pstate, (PGRowExpr *) expr, false);
-			break;
+        case T_PGCaseExpr:
+            result = transformCaseExpr(pstate, (PGCaseExpr *)expr);
+            break;
 
-		// case T_PGTableValueExpr:
-		// 	result = transformTableValueExpr(pstate, (PGTableValueExpr *) expr);
-		// 	break;
+        case T_PGRowExpr:
+            result = transformRowExpr(pstate, (PGRowExpr *)expr);
+            break;
+		//TODO kindred
+        // case T_TableValueExpr:
+        //     result = transformTableValueExpr(pstate, (TableValueExpr *)expr);
+        //     break;
 
-		case T_PGCoalesceExpr:
-			result = transformCoalesceExpr(pstate, (PGCoalesceExpr *) expr);
-			break;
+        case T_PGCoalesceExpr:
+            result = transformCoalesceExpr(pstate, (PGCoalesceExpr *)expr);
+            break;
 
-		case T_PGMinMaxExpr:
-			result = transformMinMaxExpr(pstate, (PGMinMaxExpr *) expr);
-			break;
+        case T_PGMinMaxExpr:
+            result = transformMinMaxExpr(pstate, (PGMinMaxExpr *)expr);
+            break;
+		//TODO kindred
+        // case T_XmlExpr:
+        //     result = transformXmlExpr(pstate, (XmlExpr *)expr);
+        //     break;
 
-		case T_PGSQLValueFunction:
-			result = transformSQLValueFunction(pstate,
-											   (PGSQLValueFunction *) expr);
-			break;
+        // case T_XmlSerialize:
+        //     result = transformXmlSerialize(pstate, (XmlSerialize *)expr);
+        //     break;
 
-		// case T_PGXmlExpr:
-		// 	result = transformXmlExpr(pstate, (XmlExpr *) expr);
-		// 	break;
+        case T_PGNullTest: {
+            PGNullTest * n = (PGNullTest *)expr;
 
-		// case T_PGXmlSerialize:
-		// 	result = transformXmlSerialize(pstate, (XmlSerialize *) expr);
-		// 	break;
+            n->arg = (PGExpr *)transformExprRecurse(pstate, (PGNode *)n->arg);
+            /* the argument can be any type, so don't coerce it */
+            n->argisrow = type_provider->type_is_rowtype(exprType((PGNode *)n->arg));
+            result = expr;
+            break;
+        }
 
-		case T_PGNullTest:
-			{
-				PGNullTest   *n = (PGNullTest *) expr;
+        case T_PGBooleanTest:
+            result = transformBooleanTest(pstate, (PGBooleanTest *)expr);
+            break;
 
-				if (operator_precedence_warning)
-					emit_precedence_warnings(pstate, PREC_GROUP_POSTFIX_IS, "IS",
-											 (PGNode *) n->arg, NULL,
-											 n->location);
+        case T_PGCurrentOfExpr:
+            result = transformCurrentOfExpr(pstate, (PGCurrentOfExpr *)expr);
+            break;
 
-				n->arg = (PGExpr *) transformExprRecurse(pstate, (PGNode *) n->arg);
-				/* the argument can be any type, so don't coerce it */
-				n->argisrow = type_provider->type_is_rowtype(exprType((PGNode *) n->arg));
-				result = expr;
-				break;
-			}
+        case T_PGGroupingFunc: {
+            PGGroupingFunc * gf = (PGGroupingFunc *)expr;
+            result = transformGroupingFunc(pstate, gf);
+            break;
+        }
 
-		case T_PGBooleanTest:
-			result = transformBooleanTest(pstate, (PGBooleanTest *) expr);
-			break;
+		//TODO kindred
+        // case T_PartitionBoundSpec: {
+        //     PartitionBoundSpec * in = (PartitionBoundSpec *)expr;
+        //     PartitionRangeItem * ri;
+        //     List * out = NIL;
+        //     ListCell * lc;
 
-		case T_PGCurrentOfExpr:
-			result = transformCurrentOfExpr(pstate, (PGCurrentOfExpr *) expr);
-			break;
+        //     if (in->partStart)
+        //     {
+        //             ri = (PartitionRangeItem *)in->partStart;
 
-			/*
-			 * In all places where DEFAULT is legal, the caller should have
-			 * processed it rather than passing it to transformExpr().
-			 */
-		case T_PGSetToDefault:
-			parser_errposition(pstate,
-										((PGSetToDefault *) expr)->location);
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("DEFAULT is not allowed in this context")));
-			break;
+        //             /* ALTER TABLE ... ADD PARTITION might feed
+		// 			 * "pre-cooked" expressions into the boundspec for
+		// 			 * range items (which are Lists) 
+		// 			 */
+        //             {
+        //                 Assert(IsA(in->partStart, PartitionRangeItem));
 
-			/*
-			 * CaseTestExpr doesn't require any processing; it is only
-			 * injected into parse trees in a fully-formed state.
+        //                 foreach (lc, ri->partRangeVal)
+        //                 {
+        //                     Node * n = lfirst(lc);
+        //                     out = lappend(out, transformExpr(pstate, n, EXPR_KIND_PARTITION_EXPRESSION));
+        //                 }
+        //                 ri->partRangeVal = out;
+        //                 out = NIL;
+        //             }
+        //     }
+        //     if (in->partEnd)
+        //     {
+        //             ri = (PartitionRangeItem *)in->partEnd;
+
+        //             /* ALTER TABLE ... ADD PARTITION might feed
+		// 			 * "pre-cooked" expressions into the boundspec for
+		// 			 * range items (which are Lists) 
+		// 			 */
+        //             {
+        //                 Assert(IsA(in->partEnd, PartitionRangeItem));
+        //                 foreach (lc, ri->partRangeVal)
+        //                 {
+        //                     Node * n = lfirst(lc);
+        //                     out = lappend(out, transformExpr(pstate, n, EXPR_KIND_PARTITION_EXPRESSION));
+        //                 }
+        //                 ri->partRangeVal = out;
+        //                 out = NIL;
+        //             }
+        //     }
+        //     if (in->partEvery)
+        //     {
+        //             ri = (PartitionRangeItem *)in->partEvery;
+        //             Assert(IsA(in->partEvery, PartitionRangeItem));
+        //             foreach (lc, ri->partRangeVal)
+        //             {
+        //                 Node * n = lfirst(lc);
+        //                 out = lappend(out, transformExpr(pstate, n, EXPR_KIND_PARTITION_EXPRESSION));
+        //             }
+        //             ri->partRangeVal = out;
+        //     }
+
+        //     result = (Node *)in;
+        // }
+        // break;
+
+            /*********************************************
+			 * Quietly accept node types that may be presented when we are
+			 * called on an already-transformed tree.
 			 *
-			 * Ordinarily we should not see a Var here, but it is convenient
-			 * for transformJoinUsingClause() to create untransformed operator
-			 * trees containing already-transformed Vars.  The best
-			 * alternative would be to deconstruct and reconstruct column
-			 * references, which seems expensively pointless.  So allow it.
-			 */
-		case T_PGCaseTestExpr:
-		/*
-		 * AlterPartitionCmd still transform a already-transformed expression
-		 * and re-transform expressions in many places, better to keep T_Const here. 
-		 */
-		case T_PGConst:
-		/*
-		 * DefineDomain() dispatch a already-transformed statement to the QEs and
-		 * QEs will re-transform the T_CoerceToDomain/T_CoerceToDomainValue again.
-		 */
-		case T_PGCoerceToDomain:
-		case T_PGCoerceToDomainValue:
-		case T_PGVar:
-			{
-				result = (PGNode *) expr;
-				break;
-			}
+			 * Do any other node types need to be accepted?  For now we are
+			 * taking a conservative approach, and only accepting node
+			 * types that are demonstrably necessary to accept.
+			 *********************************************/
+        case T_PGVar:
+        case T_PGConst:
+        case T_PGParam:
+        case T_PGAggref:
+        case T_PGArrayRef:
+        case T_PGFuncExpr:
+        case T_PGOpExpr:
+        case T_PGDistinctExpr:
+        case T_PGNullIfExpr:
+        case T_PGScalarArrayOpExpr:
+        case T_PGBoolExpr:
+        case T_PGFieldSelect:
+        case T_PGFieldStore:
+        case T_PGRelabelType:
+        case T_PGCoerceViaIO:
+        case T_PGArrayCoerceExpr:
+        case T_PGConvertRowtypeExpr:
+        case T_PGCollateExpr:
+        case T_PGCaseTestExpr:
+        case T_PGArrayExpr:
+        case T_PGCoerceToDomain:
+        case T_PGCoerceToDomainValue:
+        case T_PGSetToDefault:
+        // case T_PGGroupId:
+        case T_PGInteger: {
+            result = (PGNode *)expr;
+            break;
+        }
 
-		default:
-			/* should not reach here */
-			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(expr));
-			result = NULL;		/* keep compiler quiet */
-			break;
-	}
+        default:
+            /* should not reach here */
+            elog(ERROR, "unrecognized node type: %d", (int)nodeTag(expr));
+            result = NULL; /* keep compiler quiet */
+            break;
+    }
 
-	return result;
+    return result;
 };
 
-char *
+const char *
 ExprParser::ParseExprKindName(PGParseExprKind exprKind)
 {
 	switch (exprKind)

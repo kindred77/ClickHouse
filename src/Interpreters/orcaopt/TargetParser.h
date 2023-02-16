@@ -66,7 +66,7 @@ public:
 
     duckdb_libpgquery::PGList *
     transformExpressionList(PGParseState *pstate, duckdb_libpgquery::PGList *exprlist,
-						PGParseExprKind exprKind, bool allowDefault);
+						PGParseExprKind exprKind);
 
     void
     resolveTargetListUnknowns(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist);

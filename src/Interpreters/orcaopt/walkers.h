@@ -223,3 +223,14 @@ extern bool winref_checkspec_walker(duckdb_libpgquery::PGNode * node, void * ctx
  * (especially parent inheritance) was done.
  */
 extern bool winref_checkspec(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist, Index winref, bool has_order, bool has_frame);
+
+typedef struct
+{
+	duckdb_libpgquery::PGNode *parent;
+} check_table_func_context;
+
+extern void 
+parseCheckTableFunctions(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry);
+
+extern bool 
+checkTableFunctions_walker(duckdb_libpgquery::PGNode *node, check_table_func_context *context);

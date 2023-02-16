@@ -556,7 +556,7 @@ TypeProvider::getType(Field::Types::Which which)
 
 PGTypePtr TypeProvider::getTypeByOid(Oid oid)
 {
-	//TODO
+	//TODO kindred
 	return std::make_shared<Form_pg_type>();
 };
 

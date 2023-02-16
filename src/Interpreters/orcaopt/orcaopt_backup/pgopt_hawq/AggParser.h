@@ -32,7 +32,7 @@ static bool checkExprHasAggs_walker(duckdb_libpgquery::PGNode * node, checkExprH
         /* else fall through to examine argument */
     }
 
-	//TODO
+	//TODO kindred
     // if (IsA(node, PercentileExpr))
     // {
     //     /* PercentileExpr is always levelsup == 0 */

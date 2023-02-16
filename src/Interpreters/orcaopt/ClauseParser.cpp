@@ -266,7 +266,7 @@ ClauseParser::buildMergedJoinVar(PGParseState *pstate, PGJoinType jointype,
 	 * coercion and CoalesceExpr nodes, if we made any.  This must be done now
 	 * so that the join node's alias vars show correct collation info.
 	 */
-	//TODO
+	//TODO kindred
 	//collation_parser->assign_expr_collations(pstate, res_node);
 
 	return res_node;
@@ -1469,7 +1469,7 @@ PGNode *
 ClauseParser::flatten_grouping_sets(PGNode *expr, bool toplevel, bool *hasGroupingSets)
 {
 	/* just in case of pathological input */
-	//TODO
+	//TODO kindred
 	//check_stack_depth();
 
 	if (expr == (PGNode *) NIL)

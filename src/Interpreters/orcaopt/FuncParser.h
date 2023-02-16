@@ -13,6 +13,9 @@ class NodeParser;
 class TypeParser;
 class AggParser;
 class ClauseParser;
+class TypeProvider;
+class ProcProvider;
+class AggProvider;
 
 using RelationParserPtr = std::unique_ptr<RelationParser>;
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
@@ -22,6 +25,9 @@ using NodeParserPtr = std::unique_ptr<NodeParser>;
 using TypeParserPtr = std::unique_ptr<TypeParser>;
 using AggParserPtr = std::unique_ptr<AggParser>;
 using ClauseParserPtr = std::unique_ptr<ClauseParser>;
+using TypeProviderPtr = std::unique_ptr<TypeProvider>;
+using ProcProviderPtr = std::unique_ptr<ProcProvider>;
+using AggProviderPtr = std::unique_ptr<AggProvider>;
 
 class FuncParser
 {
@@ -34,6 +40,9 @@ private:
     RelationParserPtr relation_parser;
 	TargetParserPtr target_parser;
     ExprParserPtr expr_parser;
+	TypeProviderPtr type_provider;
+	ProcProviderPtr proc_provider;
+	AggProviderPtr agg_provider;
 public:
 	explicit FuncParser();
 
@@ -58,11 +67,11 @@ public:
     Oid
     FuncNameAsType(duckdb_libpgquery::PGList *funcname);
 
-    char *
+    const char *
     funcname_signature_string(const char *funcname, int nargs,
 						  duckdb_libpgquery::PGList *argnames, const Oid *argtypes);
 
-    char *
+    const char *
     func_signature_string(duckdb_libpgquery::PGList *funcname, int nargs,
 					  duckdb_libpgquery::PGList *argnames, const Oid *argtypes);
 
@@ -95,11 +104,7 @@ public:
 				  Oid *actual_arg_types,
 				  Oid *declared_arg_types);
 
-    void
-    check_srf_call_placement(PGParseState *pstate, duckdb_libpgquery::PGNode *last_srf, int location);
-
-	void 
-	parseCheckTableFunctions(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry);
+    void check_srf_call_placement(PGParseState * pstate, int location);
 };
 
 }

@@ -254,7 +254,7 @@ CTEParser::transformWithClause(PGParseState *pstate, PGWithClause *withClause)
 		}
 	}
 
-	//TODO
+	//TODO kindred
 	//not support cte recursive yet
 	// if (withClause->recursive)
 	// {

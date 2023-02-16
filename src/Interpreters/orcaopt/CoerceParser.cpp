@@ -683,7 +683,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
             type_provider->getTypeOutputInfo(UNKNOWNOID, &outfunc, &outtypisvarlena);
             type_provider->getTypeInputInfo(targetTypeId, &infunc, &intypioparam);
 
-			//TODO
+			//TODO kindred
             //Insist(OidIsValid(outfunc));
             //Insist(OidIsValid(infunc));
 			Assert(OidIsValid(outfunc))

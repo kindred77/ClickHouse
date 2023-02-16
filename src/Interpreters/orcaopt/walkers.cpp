@@ -2213,3 +2213,52 @@ bool winref_checkspec(PGParseState * pstate, PGList * targetlist, Index winref, 
 
     return pg_expression_tree_walker((PGNode *)targetlist, (walker_func)winref_checkspec_walker, (void *)&ctx);
 };
+
+void parseCheckTableFunctions(PGParseState * pstate, PGQuery * qry)
+{
+    check_table_func_context context;
+    context.parent = NULL;
+    pg_query_tree_walker(qry, (walker_func)checkTableFunctions_walker, (void *)&context, 0);
+};
+
+static bool checkTableFunctions_walker(PGNode * node, check_table_func_context * context)
+{
+    if (node == NULL)
+        return false;
+
+    /* 
+	 * TABLE() value expressions are currently only permited as parameters
+	 * to table functions called in the FROM clause.
+	 */
+	//TODO kindred
+    // if (IsA(node, PGTableValueExpr))
+    // {
+    //     if (context->parent && IsA(context->parent, FuncExpr))
+    //     {
+    //         FuncExpr * parent = (FuncExpr *)context->parent;
+
+    //         /*
+	// 		 * This flag is set in addRangeTableEntryForFunction for functions
+	// 		 * called as range table entries having TABLE value expressions
+	// 		 * as arguments.
+	// 		 */
+    //         if (parent->is_tablefunc)
+    //             return false;
+
+    //         /* Error message could be improved */
+    //         ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), errmsg("table functions must be invoked in FROM clause")));
+    //     }
+    //     ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), errmsg("invalid use of TABLE value expression")));
+    //     return true; /* not possible, but keeps compiler happy */
+    // }
+
+    context->parent = node;
+    if (IsA(node, PGQuery))
+    {
+        return pg_query_tree_walker((PGQuery *)node, (walker_func)checkTableFunctions_walker, (void *)context, 0);
+    }
+    else
+    {
+        return pg_expression_tree_walker(node, (walker_func)checkTableFunctions_walker, (void *)context);
+    }
+};

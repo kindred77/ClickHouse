@@ -1257,7 +1257,7 @@ bool ClauseParser::targetIsInSortGroupList(PGTargetEntry * tle, Oid sortop,
         if (node == NULL)
             continue;
 
-        //TODO
+        //TODO kindred
         // if (IsA(node, GroupClause) || IsA(node, SortClause))
         // {
         //     GroupClause * gc = (GroupClause *)node;
