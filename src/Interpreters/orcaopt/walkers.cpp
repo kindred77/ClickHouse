@@ -1862,156 +1862,199 @@ pg_query_tree_mutator(PGQuery *query,
 	return query;
 };
 
-PGNode *
-pg_flatten_join_alias_vars_mutator(PGNode *node,
-			flatten_join_alias_vars_context *context)
+bool checkExprHasSubLink(PGNode * node)
 {
-	if (node == NULL)
-		return NULL;
-	if (IsA(node, PGVar))
-	{
-		PGVar		   *var = (PGVar *) node;
-		PGRangeTblEntry *rte;
-		PGNode	   *newvar;
+    /*
+	 * If a Query is passed, examine it --- but we should not recurse into
+	 * sub-Queries that are in its rangetable or CTE list.
+	 */
+    return pg_query_or_expression_tree_walker(node, (walker_func)checkExprHasSubLink_walker, NULL, QTW_IGNORE_RC_SUBQUERIES);
+};
 
-		/* No change unless Var belongs to a JOIN of the target level */
-		if (var->varlevelsup != context->sublevels_up)
-			return node;		/* no need to copy, really */
-		rte = rt_fetch(var->varno, context->query->rtable);
-		if (rte->rtekind != PG_RTE_JOIN)
-			return node;
-		if (var->varattno == InvalidAttrNumber)
-		{
-			/* Must expand whole-row reference */
-			PGRowExpr    *rowexpr;
-			PGList	   *fields = NIL;
-			PGList	   *colnames = NIL;
-			PGAttrNumber	attnum;
-			PGListCell   *lv;
-			PGListCell   *ln;
-
-			attnum = 0;
-			Assert(list_length(rte->joinaliasvars) == list_length(rte->eref->colnames));
-			forboth(lv, rte->joinaliasvars, ln, rte->eref->colnames)
-			{
-				newvar = (PGNode *) lfirst(lv);
-				attnum++;
-				/* Ignore dropped columns */
-				if (newvar == NULL)
-					continue;
-				newvar = (PGNode *)copyObject(newvar);
-
-				/*
-				 * If we are expanding an alias carried down from an upper
-				 * query, must adjust its varlevelsup fields.
-				 */
-				if (context->sublevels_up != 0)
-					PGIncrementVarSublevelsUp(newvar, context->sublevels_up, 0);
-				/* Preserve original Var's location, if possible */
-				if (IsA(newvar, PGVar))
-					((PGVar *) newvar)->location = var->location;
-				/* Recurse in case join input is itself a join */
-				/* (also takes care of setting inserted_sublink if needed) */
-				newvar = pg_flatten_join_alias_vars_mutator(newvar, context);
-				fields = lappend(fields, newvar);
-				/* We need the names of non-dropped columns, too */
-				colnames = lappend(colnames, copyObject((PGNode *) lfirst(ln)));
-			}
-			rowexpr = makeNode(PGRowExpr);
-			rowexpr->args = fields;
-			rowexpr->row_typeid = var->vartype;
-			rowexpr->row_format = PG_COERCE_IMPLICIT_CAST;
-			rowexpr->colnames = colnames;
-			rowexpr->location = var->location;
-
-			return (PGNode *) rowexpr;
-		}
-
-		/* Expand join alias reference */
-		Assert(var->varattno > 0);
-		newvar = (PGNode *) list_nth(rte->joinaliasvars, var->varattno - 1);
-		Assert(newvar != NULL);
-		newvar = (PGNode *)copyObject(newvar);
-
-		/*
-		 * If we are expanding an alias carried down from an upper query, must
-		 * adjust its varlevelsup fields.
-		 */
-		if (context->sublevels_up != 0)
-			PGIncrementVarSublevelsUp(newvar, context->sublevels_up, 0);
-
-		/* Preserve original Var's location, if possible */
-		if (IsA(newvar, PGVar))
-			((PGVar *) newvar)->location = var->location;
-
-		/* Recurse in case join input is itself a join */
-		newvar = pg_flatten_join_alias_vars_mutator(newvar, context);
-
-		/* Detect if we are adding a sublink to query */
-		if (context->possible_sublink && !context->inserted_sublink)
-			context->inserted_sublink = checkExprHasSubLink(newvar);
-
-		return newvar;
-	}
-	// if (IsA(node, PlaceHolderVar))
-	// {
-	// 	/* Copy the PlaceHolderVar node with correct mutation of subnodes */
-	// 	PlaceHolderVar *phv;
-
-	// 	phv = (PlaceHolderVar *) pg_expression_tree_mutator(node,
-	// 													 flatten_join_alias_vars_mutator,
-	// 													 (void *) context);
-	// 	/* now fix PlaceHolderVar's relid sets */
-	// 	if (phv->phlevelsup == context->sublevels_up)
-	// 	{
-	// 		phv->phrels = alias_relid_set(context->query,
-	// 									  phv->phrels);
-	// 	}
-	// 	return (PGNode *) phv;
-	// }
-
-	if (IsA(node, PGQuery))
-	{
-		/* Recurse into RTE subquery or not-yet-planned sublink subquery */
-		PGQuery	   *newnode;
-		bool		save_inserted_sublink;
-
-		context->sublevels_up++;
-		save_inserted_sublink = context->inserted_sublink;
-		context->inserted_sublink = ((PGQuery *) node)->hasSubLinks;
-		newnode = pg_query_tree_mutator((PGQuery *) node,
-									 pg_flatten_join_alias_vars_mutator,
-									 (void *) context,
-									 QTW_IGNORE_JOINALIASES);
-		newnode->hasSubLinks |= context->inserted_sublink;
-		context->inserted_sublink = save_inserted_sublink;
-		context->sublevels_up--;
-		return (PGNode *) newnode;
-	}
-	/* Already-planned tree not supported */
-	Assert(!IsA(node, PGSubPlan));
-	/* Shouldn't need to handle these planner auxiliary nodes here */
-	// Assert(!IsA(node, SpecialJoinInfo));
-	// Assert(!IsA(node, PlaceHolderInfo));
-	// Assert(!IsA(node, MinMaxAggInfo));
-
-	return pg_expression_tree_mutator(node, pg_flatten_join_alias_vars_mutator,
-								   (void *) context);
+static bool checkExprHasSubLink_walker(PGNode * node, void * context)
+{
+    if (node == NULL)
+        return false;
+    if (IsA(node, PGSubLink))
+        return true; /* abort the tree traversal and return true */
+    return pg_expression_tree_walker(node, (walker_func)checkExprHasSubLink_walker, context);
 };
 
 PGNode *
-pg_flatten_join_alias_vars(PGQuery *query, PGNode *node)
+pg_flatten_join_alias_vars_mutator(PGNode *node,
+			void *context_arg)
 {
-	flatten_join_alias_vars_context context;
+    if (node == NULL)
+        return NULL;
+	
+	flatten_join_alias_vars_context * context = (flatten_join_alias_vars_context *)context_arg;
 
-	context.query = query;
-	context.sublevels_up = 0;
-	/* flag whether join aliases could possibly contain SubLinks */
-	context.possible_sublink = query->hasSubLinks;
-	/* if hasSubLinks is already true, no need to work hard */
-	context.inserted_sublink = query->hasSubLinks;
+    if (IsA(node, PGVar))
+    {
+        PGVar * var = (PGVar *)node;
+        PGRangeTblEntry * rte;
+        PGNode * newvar;
 
-	return pg_flatten_join_alias_vars_mutator(node, &context);
+        /* No change unless Var belongs to a JOIN of the target level */
+        if (var->varlevelsup != context->sublevels_up)
+            return node; /* no need to copy, really */
+        rte = (PGRangeTblEntry *)(context->root_parse_rtable_arrray[var->varno - 1]);
+        if (rte->rtekind != PG_RTE_JOIN)
+            return node;
+        if (var->varattno == InvalidAttrNumber)
+        {
+            /* Must expand whole-row reference */
+            PGRowExpr * rowexpr;
+            PGList * fields = NIL;
+            PGList * colnames = NIL;
+            PGAttrNumber attnum;
+            PGListCell * lv;
+            PGListCell * ln;
+
+            attnum = 0;
+            Assert(list_length(rte->joinaliasvars) == list_length(rte->eref->colnames));
+            forboth(lv, rte->joinaliasvars, ln, rte->eref->colnames)
+            {
+                newvar = (PGNode *)lfirst(lv);
+                attnum++;
+                /* Ignore dropped columns */
+                if (newvar == NULL)
+                    continue;
+                newvar = (PGNode *)copyObject(newvar);
+
+                /*
+				 * If we are expanding an alias carried down from an upper
+				 * query, must adjust its varlevelsup fields.
+				 */
+                if (context->sublevels_up != 0)
+                    PGIncrementVarSublevelsUp(newvar, context->sublevels_up, 0);
+                /* Preserve original Var's location, if possible */
+                if (IsA(newvar, PGVar))
+                    ((PGVar *)newvar)->location = var->location;
+                /* Recurse in case join input is itself a join */
+                /* (also takes care of setting inserted_sublink if needed) */
+                newvar = pg_flatten_join_alias_vars_mutator(newvar, context);
+                fields = lappend(fields, newvar);
+                /* We need the names of non-dropped columns, too */
+                colnames = lappend(colnames, copyObject((PGNode *)lfirst(ln)));
+            }
+            rowexpr = makeNode(PGRowExpr);
+            rowexpr->args = fields;
+            rowexpr->row_typeid = var->vartype;
+            rowexpr->row_format = PG_COERCE_IMPLICIT_CAST;
+            rowexpr->colnames = colnames;
+            rowexpr->location = var->location;
+
+            return (PGNode *)rowexpr;
+        }
+
+        /* Expand join alias reference */
+        Assert(var->varattno > 0);
+        newvar = (PGNode *)list_nth(rte->joinaliasvars, var->varattno - 1);
+        Assert(newvar != NULL);
+        newvar = (PGNode *)copyObject(newvar);
+
+        /*
+		 * If we are expanding an alias carried down from an upper query, must
+		 * adjust its varlevelsup fields.
+		 */
+        if (context->sublevels_up != 0)
+            PGIncrementVarSublevelsUp(newvar, context->sublevels_up, 0);
+
+        /* Preserve original Var's location, if possible */
+        if (IsA(newvar, PGVar))
+            ((PGVar *)newvar)->location = var->location;
+
+        /* Recurse in case join input is itself a join */
+        newvar = pg_flatten_join_alias_vars_mutator(newvar, context);
+
+        /* Detect if we are adding a sublink to query */
+        if (context->possible_sublink && !context->inserted_sublink)
+            context->inserted_sublink = checkExprHasSubLink(newvar);
+
+        return newvar;
+    }
+	//TODO kindred
+    // if (IsA(node, PlaceHolderVar))
+    // {
+    //     /* Copy the PlaceHolderVar node with correct mutation of subnodes */
+    //     PlaceHolderVar * phv;
+
+    //     phv = (PlaceHolderVar *)expression_tree_mutator(node, flatten_join_alias_vars_mutator, (void *)context);
+    //     /* now fix PlaceHolderVar's relid sets */
+    //     if (phv->phlevelsup == context->sublevels_up)
+    //     {
+    //         phv->phrels = alias_relid_set(context->root, phv->phrels);
+    //     }
+    //     return (Node *)phv;
+    // }
+
+    if (IsA(node, PGQuery))
+    {
+        /* Recurse into RTE subquery or not-yet-planned sublink subquery */
+        PGQuery * newnode;
+        bool save_inserted_sublink;
+
+        context->sublevels_up++;
+        save_inserted_sublink = context->inserted_sublink;
+        context->inserted_sublink = ((PGQuery *)node)->hasSubLinks;
+        newnode = pg_query_tree_mutator((PGQuery *)node, pg_flatten_join_alias_vars_mutator, (void *)context, QTW_IGNORE_JOINALIASES);
+        newnode->hasSubLinks |= context->inserted_sublink;
+        context->inserted_sublink = save_inserted_sublink;
+        context->sublevels_up--;
+        return (PGNode *)newnode;
+    }
+    /* Already-planned tree not supported */
+    Assert(!IsA(node, PGSubPlan))
+    /* Shouldn't need to handle these planner auxiliary nodes here */
+    Assert(!IsA(node, PGSpecialJoinInfo))
+	//TODO kindred
+    //Assert(!IsA(node, LateralJoinInfo))
+    Assert(!IsA(node, PGPlaceHolderInfo))
+    Assert(!IsA(node, PGMinMaxAggInfo))
+
+    return pg_expression_tree_mutator(node, pg_flatten_join_alias_vars_mutator, (void *)context);
+};
+
+PGNode **
+rtable_to_array(PGList *rtable)
+{
+    PGListCell * lc;
+    int i;
+    PGNode ** arr = (PGNode **)palloc(sizeof(PGNode *) * list_length(rtable));
+
+    foreach_with_count(lc, rtable, i)
+    {
+        arr[i] = (PGNode *)lfirst(lc);
+    }
+
+    return arr;
+};
+
+PGNode *
+pg_flatten_join_alias_vars(PGPlannerInfo *root, PGNode *node)
+{
+    flatten_join_alias_vars_context context;
+
+    context.root = root;
+    context.sublevels_up = 0;
+    /* flag whether join aliases could possibly contain SubLinks */
+    context.possible_sublink = root->parse->hasSubLinks;
+    /* if hasSubLinks is already true, no need to work hard */
+    context.inserted_sublink = root->parse->hasSubLinks;
+
+    /*
+	 * The following funcation call flatten_join_alias_vars_mutator()
+	 * will walk the expr and it will frequently access root
+	 * parse tree's rtable using list_nth. When the rtable is huge,
+	 * performance is poor. Here we cache the rtable list into array
+	 * to achieve random access to speed up a lot when rtable is huge.
+	 * See Github issue https://github.com/greenplum-db/gpdb/issues/11379
+	 * for details.
+	 */
+    context.root_parse_rtable_arrray = rtable_to_array(root->parse->rtable);
+
+    return pg_flatten_join_alias_vars_mutator(node, &context);
 };
 
 bool cdb_walk_vars_walker(PGNode * node, void * wvwcontext)
@@ -2373,4 +2416,178 @@ bool pg_grouping_rewrite_walker(PGNode * node, void * context)
         return pg_grouping_rewrite_walker(s->node, context);
     }
     return pg_expression_tree_walker(node, (walker_func)pg_grouping_rewrite_walker, context);
+};
+
+bool pg_check_ungrouped_columns_walker(PGNode * node, check_ungrouped_columns_context * context)
+{
+    ListCell * gl;
+
+    if (node == NULL)
+        return false;
+    if (IsA(node, PGConst) || IsA(node, PGParam))
+        return false; /* constants are always acceptable */
+
+    if (IsA(node, PGAggref))
+    {
+        PGAggref * agg = (PGAggref *)node;
+
+        if ((int)agg->agglevelsup == context->sublevels_up)
+        {
+            /*
+			 * If we find an aggregate call of the original level, do not
+			 * recurse into its normal arguments, ORDER BY arguments, or
+			 * filter; ungrouped vars there are not an error.  But we should
+			 * check direct arguments as though they weren't in an aggregate.
+			 * We set a special flag in the context to help produce a useful
+			 * error message for ungrouped vars in direct arguments.
+			 */
+            bool result;
+
+            Assert(!context->in_agg_direct_args);
+            context->in_agg_direct_args = true;
+            result = pg_check_ungrouped_columns_walker((PGNode *)agg->aggdirectargs, context);
+            context->in_agg_direct_args = false;
+            return result;
+        }
+
+        /*
+		 * We can skip recursing into aggregates of higher levels altogether,
+		 * since they could not possibly contain Vars of concern to us (see
+		 * transformAggregateCall).  We do need to look at aggregates of lower
+		 * levels, however.
+		 */
+        if ((int)agg->agglevelsup > context->sublevels_up)
+            return false;
+    }
+
+    /*
+	 * If we have any GROUP BY items that are not simple Vars, check to see if
+	 * subexpression as a whole matches any GROUP BY item. We need to do this
+	 * at every recursion level so that we recognize GROUPed-BY expressions
+	 * before reaching variables within them. But this only works at the outer
+	 * query level, as noted above.
+	 */
+    if (context->have_non_var_grouping && context->sublevels_up == 0)
+    {
+        foreach (gl, context->groupClauses)
+        {
+            if (equal(node, lfirst(gl)))
+                return false; /* acceptable, do not descend more */
+        }
+    }
+
+    /*
+	 * If we have an ungrouped Var of the original query level, we have a
+	 * failure.  Vars below the original query level are not a problem, and
+	 * neither are Vars from above it.  (If such Vars are ungrouped as far as
+	 * their own query level is concerned, that's someone else's problem...)
+	 */
+    if (IsA(node, PGVar))
+    {
+        PGVar * var = (PGVar *)node;
+        PGRangeTblEntry * rte;
+        const char * attname;
+
+        if (var->varlevelsup != context->sublevels_up)
+            return false; /* it's not local to my query, ignore */
+
+        /*
+		 * Check for a match, if we didn't do it above.
+		 */
+        if (!context->have_non_var_grouping || context->sublevels_up != 0)
+        {
+            foreach (gl, context->groupClauses)
+            {
+                PGVar * gvar = (PGVar *)lfirst(gl);
+
+                if (IsA(gvar, PGVar) && gvar->varno == var->varno && gvar->varattno == var->varattno && gvar->varlevelsup == 0)
+                    return false; /* acceptable, we're okay */
+            }
+        }
+
+        /*
+		 * Check whether the Var is known functionally dependent on the GROUP
+		 * BY columns.  If so, we can allow the Var to be used, because the
+		 * grouping is really a no-op for this table.  However, this deduction
+		 * depends on one or more constraints of the table, so we have to add
+		 * those constraints to the query's constraintDeps list, because it's
+		 * not semantically valid anymore if the constraint(s) get dropped.
+		 * (Therefore, this check must be the last-ditch effort before raising
+		 * error: we don't want to add dependencies unnecessarily.)
+		 *
+		 * Because this is a pretty expensive check, and will have the same
+		 * outcome for all columns of a table, we remember which RTEs we've
+		 * already proven functional dependency for in the func_grouped_rels
+		 * list.  This test also prevents us from adding duplicate entries to
+		 * the constraintDeps list.
+		 */
+        if (list_member_int(*context->func_grouped_rels, var->varno))
+            return false; /* previously proven acceptable */
+
+        Assert(var->varno > 0 && (int)var->varno <= list_length(context->pstate->p_rtable));
+        rte = rt_fetch(var->varno, context->pstate->p_rtable);
+        if (rte->rtekind == PG_RTE_RELATION)
+        {
+            if (check_functional_grouping(rte->relid, var->varno, 0, context->groupClauses, &context->qry->constraintDeps))
+            {
+                *context->func_grouped_rels = lappend_int(*context->func_grouped_rels, var->varno);
+                return false; /* acceptable */
+            }
+        }
+
+        /* Found an ungrouped local variable; generate error message */
+        attname = get_rte_attribute_name(rte, var->varattno);
+        if (context->sublevels_up == 0)
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_GROUPING_ERROR),
+                 errmsg(
+                     "column \"%s.%s\" must appear in the GROUP BY clause or be used in an aggregate function",
+                     rte->eref->aliasname,
+                     attname),
+                 context->in_agg_direct_args ? errdetail("Direct arguments of an ordered-set aggregate must use only grouped columns.") : 0,
+                 parser_errposition(context->pstate, var->location)));
+        else
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_GROUPING_ERROR),
+                 errmsg("subquery uses ungrouped column \"%s.%s\" from outer query", rte->eref->aliasname, attname),
+                 parser_errposition(context->pstate, var->location)));
+    }
+
+    if (IsA(node, PGQuery))
+    {
+        /* Recurse into subselects */
+        bool result;
+
+        context->sublevels_up++;
+        result = pg_query_tree_walker((PGQuery *)node, (walker_func)pg_check_ungrouped_columns_walker, (void *)context, 0);
+        context->sublevels_up--;
+        return result;
+    }
+    return pg_expression_tree_walker(node, (walker_func)pg_check_ungrouped_columns_walker, (void *)context);
+};
+
+bool
+pg_checkExprHasGroupExtFuncs_walker(PGNode *node, checkHasGroupExtFuncs_context *context)
+{
+    if (node == NULL)
+        return false;
+	//TODO kindred
+    if (IsA(node, PGGroupingFunc)/*  || IsA(node, PGGroupId) */)
+    {
+        /* XXX do GroupingFunc or GroupId need 'levelsup'? */
+        return true; /* abort the tree traversal and return true */
+    }
+    if (IsA(node, PGQuery))
+    {
+        /* Recurse into subselects */
+        bool result;
+
+        context->sublevels_up++;
+        result = pg_query_tree_walker((PGQuery *)node, (walker_func)pg_checkExprHasGroupExtFuncs_walker, (void *)context, 0);
+        context->sublevels_up--;
+        return result;
+    }
+    return pg_expression_tree_walker(node, (walker_func)pg_checkExprHasGroupExtFuncs_walker, (void *)context);
 };

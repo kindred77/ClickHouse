@@ -2,12 +2,12 @@
 
 #include <Interpreters/orcaopt/parser_common.h>
 
-typedef struct
+struct contain_aggs_of_level_context
 {
 	int			sublevels_up;
-} contain_aggs_of_level_context;
+};
 
-typedef struct
+struct assign_collations_context
 {
 	PGParseState *pstate;			/* parse state (for error reporting) */
 	Oid			collation;		/* OID of current collation, if any */
@@ -16,34 +16,35 @@ typedef struct
 	/* Remaining fields are only valid when strength == COLLATE_CONFLICT */
 	Oid			collation2;		/* OID of conflicting collation */
 	int			location2;		/* location of expr that set collation2 */
-} assign_collations_context;
+};
 
-typedef struct
+struct locate_agg_of_level_context
 {
 	int			agg_location;
 	int			sublevels_up;
-} locate_agg_of_level_context;
+};
 
-typedef struct
+struct locate_var_of_level_context
 {
 	int			var_location;
 	int			sublevels_up;
-} locate_var_of_level_context;
+};
 
 typedef struct
 {
 	int			win_location;
 } locate_windowfunc_context;
 
-typedef struct
+struct flatten_join_alias_vars_context
 {
-	duckdb_libpgquery::PGQuery	   *query;			/* outer Query */
-	int			sublevels_up;
-	bool		possible_sublink;	/* could aliases include a SubLink? */
-	bool		inserted_sublink;	/* have we inserted a SubLink? */
-} flatten_join_alias_vars_context;
+    PGPlannerInfo * root;
+    int sublevels_up;
+    bool possible_sublink; /* could aliases include a SubLink? */
+    bool inserted_sublink; /* have we inserted a SubLink? */
+    duckdb_libpgquery::PGNode ** root_parse_rtable_arrray; /* array form of root->parse->rtable */
+};
 
-typedef struct
+struct IncrementVarSublevelsUp_context
 {
 	int			delta_sublevels_up;
 	int			min_sublevels_up;
@@ -62,7 +63,7 @@ typedef struct
 	 *
 	 */
 	bool		        ignore_min_sublevels_up;
-} IncrementVarSublevelsUp_context;
+};
 
 typedef bool (*walker_func) (duckdb_libpgquery::PGNode *node, void *context);
 
@@ -162,26 +163,35 @@ pg_expression_tree_mutator(duckdb_libpgquery::PGNode *node,
 						duckdb_libpgquery::PGNode *(*mutator) (duckdb_libpgquery::PGNode *node, void *context),
 						void *context);
 
-extern duckdb_libpgquery::PGNode *
-pg_flatten_join_alias_vars_mutator(duckdb_libpgquery::PGNode *node,
-			flatten_join_alias_vars_context *context);
+extern bool
+checkExprHasSubLink(duckdb_libpgquery::PGNode *node);
+
+extern bool
+checkExprHasSubLink_walker(duckdb_libpgquery::PGNode *node, void *context);
 
 extern duckdb_libpgquery::PGNode *
-pg_flatten_join_alias_vars(duckdb_libpgquery::PGQuery *query, duckdb_libpgquery::PGNode *node);
+pg_flatten_join_alias_vars_mutator(duckdb_libpgquery::PGNode *node,
+			void *context);
+
+extern duckdb_libpgquery::PGNode **
+rtable_to_array(duckdb_libpgquery::PGList *rtable);
+
+extern duckdb_libpgquery::PGNode *
+pg_flatten_join_alias_vars(PGPlannerInfo *root, duckdb_libpgquery::PGNode *node);
 
 
 typedef bool (*Cdb_walk_vars_callback_Aggref)(duckdb_libpgquery::PGAggref * aggref, void * context, int sublevelsup);
 typedef bool (*Cdb_walk_vars_callback_Var)(duckdb_libpgquery::PGVar * var, void * context, int sublevelsup);
 typedef bool (*Cdb_walk_vars_callback_CurrentOf)(duckdb_libpgquery::PGCurrentOfExpr * expr, void * context, int sublevelsup);
 
-typedef struct Cdb_walk_vars_context
+struct Cdb_walk_vars_context
 {
     Cdb_walk_vars_callback_Var callback_var;
     Cdb_walk_vars_callback_Aggref callback_aggref;
     Cdb_walk_vars_callback_CurrentOf callback_currentof;
     void * context;
     int sublevelsup;
-} Cdb_walk_vars_context;
+};
 
 extern bool cdb_walk_vars_walker(duckdb_libpgquery::PGNode * node, void * wvwcontext);
 
@@ -224,10 +234,10 @@ extern bool winref_checkspec_walker(duckdb_libpgquery::PGNode * node, void * ctx
  */
 extern bool winref_checkspec(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist, Index winref, bool has_order, bool has_frame);
 
-typedef struct
+struct check_table_func_context
 {
 	duckdb_libpgquery::PGNode *parent;
-} check_table_func_context;
+};
 
 extern void 
 parseCheckTableFunctions(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry);
@@ -235,7 +245,7 @@ parseCheckTableFunctions(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry);
 extern bool 
 checkTableFunctions_walker(duckdb_libpgquery::PGNode *node, check_table_func_context *context);
 
-typedef struct grouping_rewrite_ctx
+struct grouping_rewrite_ctx
 {
 	duckdb_libpgquery::PGList *grp_tles;
 	PGParseState *pstate;
@@ -243,3 +253,26 @@ typedef struct grouping_rewrite_ctx
 
 extern bool
 pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode *node, void *context);
+
+struct check_ungrouped_columns_context
+{
+	PGParseState *pstate;
+	duckdb_libpgquery::PGQuery	   *qry;
+	duckdb_libpgquery::PGList	   *groupClauses;
+	bool		have_non_var_grouping;
+	duckdb_libpgquery::PGList	  **func_grouped_rels;
+	int			sublevels_up;
+	bool		in_agg_direct_args;
+};
+
+extern bool
+pg_check_ungrouped_columns_walker(duckdb_libpgquery::PGNode *node,
+							   check_ungrouped_columns_context *context);
+
+struct checkHasGroupExtFuncs_context
+{
+	int sublevels_up;
+};
+
+extern bool
+pg_checkExprHasGroupExtFuncs_walker(duckdb_libpgquery::PGNode *node, checkHasGroupExtFuncs_context *context);

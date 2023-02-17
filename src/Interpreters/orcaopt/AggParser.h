@@ -67,6 +67,16 @@ public:
 
 	duckdb_libpgquery::PGList *
 	expand_grouping_sets(duckdb_libpgquery::PGList *groupingSets, int limit);
+
+    duckdb_libpgquery::PGList * get_groupclause_exprs(duckdb_libpgquery::PGNode * grpcl,
+		duckdb_libpgquery::PGList * targetList);
+
+    void check_ungrouped_columns(
+        duckdb_libpgquery::PGNode * node, PGParseState * pstate, duckdb_libpgquery::PGQuery * qry,
+		duckdb_libpgquery::PGList * groupClauses, bool have_non_var_grouping, 
+		duckdb_libpgquery::PGList ** func_grouped_rels);
+
+    bool checkExprHasGroupExtFuncs(duckdb_libpgquery::PGNode * node);
 };
 
 }

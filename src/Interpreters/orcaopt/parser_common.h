@@ -72,6 +72,7 @@ typedef unsigned int uint32;	/* == 32 bits */
 typedef int32 int4;
 typedef int16 int2;
 typedef float float4;
+typedef unsigned long int uint64;
 
 typedef int64 Datum;
 typedef char TYPCATEGORY;
@@ -879,6 +880,390 @@ struct OprCacheKey
 	Oid			search_path[MAX_CACHED_PATH_LEN];
 };
 
+/**
+ * Planning configuration information
+ */
+struct PGPlannerConfig
+{
+    bool enable_sort;
+    bool enable_hashagg;
+    bool enable_groupagg;
+    bool enable_nestloop;
+    bool enable_mergejoin;
+    bool enable_hashjoin;
+    bool gp_enable_hashjoin_size_heuristic;
+    bool gp_enable_predicate_propagation;
+    int constraint_exclusion;
+
+    bool gp_enable_minmax_optimization;
+    bool gp_enable_multiphase_agg;
+    bool gp_enable_preunique;
+    bool gp_eager_preunique;
+    bool gp_hashagg_streambottom;
+    bool gp_enable_agg_distinct;
+    bool gp_enable_dqa_pruning;
+    bool gp_eager_dqa_pruning;
+    bool gp_eager_one_phase_agg;
+    bool gp_eager_two_phase_agg;
+    bool gp_enable_groupext_distinct_pruning;
+    bool gp_enable_groupext_distinct_gather;
+    bool gp_enable_sort_distinct;
+
+    bool gp_enable_direct_dispatch;
+    bool gp_dynamic_partition_pruning;
+
+    bool gp_cte_sharing; /* Indicate whether sharing is to be disabled on any CTEs */
+
+    bool honor_order_by;
+
+    bool is_under_subplan; /* True for plan rooted at a subquery which is planned as a subplan */
+
+    /* These ones are tricky */
+    //GpRoleValue	Gp_role; // TODO: this one is tricky
+    bool force_singleQE; /* True means force gather base rel to singleQE  */
+};
+
+/* ----------------
+ *		Plan node
+ *
+ * All plan nodes "derive" from the Plan structure by having the
+ * Plan structure as the first field.  This ensures that everything works
+ * when nodes are cast to Plan's.  (node pointers are frequently cast to Plan*
+ * when passed around generically in the executor)
+ *
+ * We never actually instantiate any Plan nodes; this is just the common
+ * abstract superclass for all Plan-type nodes.
+ * ----------------
+ */
+struct PGPlan
+{
+    duckdb_libpgquery::PGNodeTag type;
+
+    /* Plan node id */
+    int plan_node_id; /* unique across entire final plan tree */
+
+    /*
+	 * estimated execution costs for plan (see costsize.c for more info)
+	 */
+	//TODO kindred
+    //Cost startup_cost; /* cost expended before fetching any tuples */
+    //Cost total_cost; /* total cost (assuming all tuples fetched) */
+
+    /*
+	 * planner's estimate of result size of this plan step
+	 */
+    double plan_rows; /* number of rows plan is expected to emit */
+    int plan_width; /* average row width in bytes */
+
+    /*
+	 * Common structural data for all Plan types.
+	 */
+    duckdb_libpgquery::PGList * targetlist; /* target list to be computed at this node */
+    duckdb_libpgquery::PGList * qual; /* implicitly-ANDed qual conditions */
+    struct PGPlan * lefttree; /* input plan tree(s) */
+    struct PGPlan * righttree;
+    duckdb_libpgquery::PGList * initPlan; /* Init Plan nodes (un-correlated expr
+								 * subselects) */
+
+    /*
+	 * Information for management of parameter-change-driven rescanning
+	 *
+	 * extParam includes the paramIDs of all external PARAM_EXEC params
+	 * affecting this plan node or its children.  setParam params from the
+	 * node's initPlans are not included, but their extParams are.
+	 *
+	 * allParam includes all the extParam paramIDs, plus the IDs of local
+	 * params that affect the node (i.e., the setParams of its initplans).
+	 * These are _all_ the PARAM_EXEC params that affect this node.
+	 */
+    duckdb_libpgquery::PGBitmapset * extParam;
+    duckdb_libpgquery::PGBitmapset * allParam;
+
+    /*
+	 * MPP needs to keep track of the characteristics of flow of output
+	 * tuple of Plan nodes.
+	 */
+	//TODO kindred
+    //Flow * flow;
+	/* Flow description.  Initially NULL.
+	 * Set during parallelization.
+	 */
+
+    /*
+	 * CDB:  How should this plan tree be dispatched?  Initially this is set
+	 * to DISPATCH_UNDETERMINED and, in non-root nodes, may remain so.
+	 * However, in Plan nodes at the root of any separately dispatchable plan
+	 * fragment, it must be set to a specific dispatch type.
+	 */
+	//TODO kindred
+    //DispatchMethod dispatch;
+
+    /*
+	 * CDB: if we're going to direct dispatch, point it at a particular id.
+	 *
+	 * For motion nodes, this direct dispatch data is for the slice rooted at the
+	 *   motion node (the sending side!)
+	 * For other nodes, it is for the slice rooted at this plan so it must be a root
+	 *   plan for a query
+	 * Note that for nodes that are internal to a slice then this data is not
+	 *   set.
+	 */
+	//TODO kindred
+    //DirectDispatchInfo directDispatch;
+
+    /*
+	 * CDB: Now many motion nodes are there in the Plan.  How many init plans?
+	 * Additional plan tree global significant only in the root node.
+	 */
+    int nMotionNodes;
+    int nInitPlans;
+
+    /*
+	 * CDB: This allows the slice table to accompany the plan as it
+	 * moves around the executor. This is anoter plan tree global that
+	 * should be non-NULL only in the top node of a dispatchable tree.
+	 * It could (and should) move to a TopPlan node if we ever do that.
+	 *
+	 * Currently, the slice table should not be installed on the QD.
+	 * Rather is it shipped to QEs as a separate parameter to MPPEXEC.
+	 * The implementation of MPPEXEC, which runs on the QEs, installs
+	 * the slice table in the plan as required there.
+	 */
+    duckdb_libpgquery::PGNode * sliceTable;
+
+    /**
+	 * How much memory (in KB) should be used to execute this plan node?
+	 */
+    uint64 operatorMemKB;
+
+    /*
+	 * The parent motion node of a plan node.
+	 */
+    struct PGPlan * motionNode;
+};
+
+/*----------
+ * PlannerGlobal
+ *		Global information for planning/optimization
+ *
+ * PlannerGlobal holds state for an entire planner invocation; this state
+ * is shared across all levels of sub-Queries that exist in the command being
+ * planned.
+ *----------
+ */
+struct PGPlannerGlobal
+{
+    duckdb_libpgquery::PGNodeTag type;
+
+	//TODO kindred
+    //ParamListInfo boundParams; /* Param values provided to planner() */
+
+    duckdb_libpgquery::PGList * subplans; /* Plans for SubPlan nodes */
+
+    duckdb_libpgquery::PGList * subroots; /* PlannerInfos for SubPlan nodes */
+
+    duckdb_libpgquery::PGBitmapset * rewindPlanIDs; /* indices of subplans that require REWIND */
+
+    duckdb_libpgquery::PGList * finalrtable; /* "flat" rangetable for executor */
+
+    duckdb_libpgquery::PGList * finalrowmarks; /* "flat" list of PlanRowMarks */
+
+    duckdb_libpgquery::PGList * resultRelations; /* "flat" list of integer RT indexes */
+
+    duckdb_libpgquery::PGList * relationOids; /* OIDs of relations the plan depends on */
+
+    duckdb_libpgquery::PGList * invalItems; /* other dependencies, as PlanInvalItems */
+
+    int nParamExec; /* number of PARAM_EXEC Params used */
+
+    Index lastPHId; /* highest PlaceHolderVar ID assigned */
+
+    Index lastRowMarkId; /* highest PlanRowMark ID assigned */
+
+    bool transientPlan; /* redo plan when TransactionXmin changes? */
+    bool oneoffPlan; /* redo plan on every execution? */
+    bool simplyUpdatable; /* can be used with CURRENT OF? */
+
+    bool is_parallel_cursor; /* is the query a parallel retrieve cursor? */
+
+	//TODO kindred
+    //ApplyShareInputContext share; /* workspace for GPDB plan sharing */
+
+};
+
+/*----------
+ * PlannerInfo
+ *		Per-query information for planning/optimization
+ *
+ * This struct is conventionally called "root" in all the planner routines.
+ * It holds links to all of the planner's working state, in addition to the
+ * original Query.  Note that at present the planner extensively modifies
+ * the passed-in Query data structure; someday that should stop.
+ *----------
+ */
+struct PGPlannerInfo
+{
+    duckdb_libpgquery::PGNodeTag type;
+
+    duckdb_libpgquery::PGQuery * parse; /* the Query being planned */
+
+    PGPlannerGlobal * glob; /* global info for current planner run */
+
+    Index query_level; /* 1 at the outermost Query */
+
+    struct PGPlannerInfo * parent_root; /* NULL at outermost Query */
+
+    duckdb_libpgquery::PGList * plan_params; /* list of PlannerParamItems, see below */
+
+    /*
+	 * simple_rel_array holds pointers to "base rels" and "other rels" (see
+	 * comments for RelOptInfo for more info).  It is indexed by rangetable
+	 * index (so entry 0 is always wasted).  Entries can be NULL when an RTE
+	 * does not correspond to a base relation, such as a join RTE or an
+	 * unreferenced view RTE; or if the RelOptInfo hasn't been made yet.
+	 */
+	//TODO kindred
+    //struct RelOptInfo ** simple_rel_array; /* All 1-rel RelOptInfos */
+    int simple_rel_array_size; /* allocated size of array */
+
+    /*
+	 * simple_rte_array is the same length as simple_rel_array and holds
+	 * pointers to the associated rangetable entries.  This lets us avoid
+	 * rt_fetch(), which can be a bit slow once large inheritance sets have
+	 * been expanded.
+	 */
+    duckdb_libpgquery::PGRangeTblEntry ** simple_rte_array; /* rangetable as an array */
+
+    /*
+	 * all_baserels is a Relids set of all base relids (but not "other"
+	 * relids) in the query; that is, the Relids identifier of the final join
+	 * we need to form.  This is computed in make_one_rel, just before we
+	 * start making Paths.
+	 */
+    PGRelids all_baserels;
+
+    /*
+	 * nullable_baserels is a Relids set of base relids that are nullable by
+	 * some outer join in the jointree; these are rels that are potentially
+	 * nullable below the WHERE clause, SELECT targetlist, etc.  This is
+	 * computed in deconstruct_jointree.
+	 */
+    PGRelids nullable_baserels;
+
+    /*
+	 * join_rel_list is a list of all join-relation RelOptInfos we have
+	 * considered in this planning run.  For small problems we just scan the
+	 * list to do lookups, but when there are many join relations we build a
+	 * hash table for faster lookups.  The hash table is present and valid
+	 * when join_rel_hash is not NULL.  Note that we still maintain the list
+	 * even when using the hash table for lookups; this simplifies life for
+	 * GEQO.
+	 */
+    duckdb_libpgquery::PGList * join_rel_list; /* list of join-relation RelOptInfos */
+	//TODO kindred
+    //struct HTAB * join_rel_hash; /* optional hashtable for join relations */
+
+    /*
+	 * When doing a dynamic-programming-style join search, join_rel_level[k]
+	 * is a list of all join-relation RelOptInfos of level k, and
+	 * join_cur_level is the current level.  New join-relation RelOptInfos are
+	 * automatically added to the join_rel_level[join_cur_level] list.
+	 * join_rel_level is NULL if not in use.
+	 */
+    duckdb_libpgquery::PGList ** join_rel_level; /* lists of join-relation RelOptInfos */
+    int join_cur_level; /* index of list being extended */
+
+    duckdb_libpgquery::PGList * init_plans; /* init SubPlans for query */
+
+    duckdb_libpgquery::PGList * cte_plan_ids; /* per-CTE-item list of subplan IDs */
+
+    duckdb_libpgquery::PGList * eq_classes; /* list of active EquivalenceClasses */
+
+    duckdb_libpgquery::PGList * non_eq_clauses; /* list of non-equivalence clauses */
+
+    duckdb_libpgquery::PGList * canon_pathkeys; /* list of "canonical" PathKeys */
+
+    //TODO kindred
+    //PartitionNode * result_partitions;
+    duckdb_libpgquery::PGList * result_aosegnos;
+
+    duckdb_libpgquery::PGList * list_cteplaninfo; /* list of CtePlannerInfo, one for each CTE */
+
+    /*
+	 * Outer join info
+	 */
+    duckdb_libpgquery::PGList * left_join_clauses; /* list of RestrictInfos for
+										 * mergejoinable outer join clauses
+										 * w/nonnullable var on left */
+
+    duckdb_libpgquery::PGList * right_join_clauses; /* list of RestrictInfos for
+										 * mergejoinable outer join clauses
+										 * w/nonnullable var on right */
+
+    duckdb_libpgquery::PGList * full_join_clauses; /* list of RestrictInfos for
+										 * mergejoinable full join clauses */
+
+    duckdb_libpgquery::PGList * join_info_list; /* list of SpecialJoinInfos */
+
+    duckdb_libpgquery::PGList * lateral_info_list; /* list of LateralJoinInfos */
+
+    duckdb_libpgquery::PGList * append_rel_list; /* list of AppendRelInfos */
+
+    duckdb_libpgquery::PGList * rowMarks; /* list of PlanRowMarks */
+
+    duckdb_libpgquery::PGList * placeholder_list; /* list of PlaceHolderInfos */
+
+    duckdb_libpgquery::PGList * query_pathkeys; /* desired pathkeys for query_planner(), and
+								 * actual pathkeys after planning */
+
+    duckdb_libpgquery::PGList * group_pathkeys; /* groupClause pathkeys, if any */
+    duckdb_libpgquery::PGList * window_pathkeys; /* pathkeys of bottom window, if any */
+    duckdb_libpgquery::PGList * distinct_pathkeys; /* distinctClause pathkeys, if any */
+    duckdb_libpgquery::PGList * sort_pathkeys; /* sortClause pathkeys, if any */
+
+    duckdb_libpgquery::PGList * minmax_aggs; /* List of MinMaxAggInfos */
+
+    duckdb_libpgquery::PGList * initial_rels; /* RelOptInfos we are now trying to join */
+
+    //TODO kindred
+    //MemoryContext planner_cxt; /* context holding PlannerInfo */
+
+    double total_table_pages; /* # of pages in all tables of query */
+
+    double tuple_fraction; /* tuple_fraction passed to query_planner */
+    double limit_tuples; /* limit_tuples passed to query_planner */
+
+    bool hasInheritedTarget; /* true if parse->resultRelation is an
+										 * inheritance child rel */
+    bool hasJoinRTEs; /* true if any RTEs are RTE_JOIN kind */
+    bool hasLateralRTEs; /* true if any RTEs are marked LATERAL */
+    bool hasHavingQual; /* true if havingQual was non-null */
+    bool hasPseudoConstantQuals; /* true if any RestrictInfo has
+										 * pseudoconstant = true */
+    bool hasRecursion; /* true if planning a recursive WITH item */
+
+    /* These fields are used only when hasRecursion is true: */
+    int wt_param_id; /* PARAM_EXEC ID for the work table */
+    struct PGPlan * non_recursive_plan; /* plan for non-recursive term */
+
+    /* These fields are workspace for createplan.c */
+    PGRelids curOuterRels; /* outer rels above current node */
+    duckdb_libpgquery::PGList * curOuterParams; /* not-yet-assigned NestLoopParams */
+
+    PGPlannerConfig * config; /* Planner configuration */
+
+    duckdb_libpgquery::PGList * dynamicScans; /* DynamicScanInfos */
+
+    /* optional private data for join_search_hook, e.g., GEQO */
+    void * join_search_private;
+
+    int upd_del_replicated_table;
+    bool is_split_update; /* true if UPDATE that modifies
+									 * distribution key columns */
+    bool is_correlated_subplan; /* true for correlated subqueries nested within subplans */
+    bool disallow_unique_rowid_path; /* true if we decide not to generate unique rowid path */
+};
+
 static inline Datum BoolGetDatum(bool b) { return (b ? 1 : 0); } 
 
 static inline int32 DatumGetInt32(Datum d) { return (int32) d; };
@@ -1064,6 +1449,11 @@ static const int oldprecedence_r[] = {
 #define Max(x, y)		((x) > (y) ? (x) : (y))
 
 #define NameStr(name)	((name).data)
+
+#define foreach_with_count(cell, list, counter) \
+	for ((cell) = list_head(list), (counter)=0; \
+	     (cell) != NULL; \
+	     (cell) = lnext(cell), ++(counter))
 
 Oid			MyDatabaseId = InvalidOid;
 
@@ -1427,6 +1817,7 @@ std::string get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, PGA
 	using duckdb_libpgquery::ereport;
 	using duckdb_libpgquery::errcode;
 	using duckdb_libpgquery::errmsg_internal;
+	using duckdb_libpgquery::PGValue;
 
     const char * name;
 

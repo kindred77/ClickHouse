@@ -1286,6 +1286,77 @@ AggParser::expand_grouping_sets(PGList *groupingSets, int limit)
 	return result;
 };
 
+PGList * AggParser::get_groupclause_exprs(PGNode * grpcl,
+		PGList * targetList)
+{
+    PGList * result = NIL;
+
+    if (!grpcl)
+        return result;
+
+    Assert(IsA(grpcl, PGSortGroupClause) /* || IsA(grpcl, GroupingClause) */ || IsA(grpcl, PGList));
+
+	//TODO kindred
+    if (IsA(grpcl, PGSortGroupClause))
+    {
+        PGNode * node = get_sortgroupclause_expr((PGSortGroupClause *)grpcl, targetList);
+        result = lappend(result, node);
+    }
+
+    /* else if (IsA(grpcl, PGGroupingClause))
+    {
+        PGListCell * l;
+        PGGroupingClause * gc = (PGGroupingClause *)grpcl;
+
+        foreach (l, gc->groupsets)
+        {
+            result = list_concat(result, get_groupclause_exprs((PGNode *)lfirst(l), targetList));
+        }
+    } */
+
+    else
+    {
+        PGList * exprs = (PGList *)grpcl;
+        PGListCell * lc;
+
+        foreach (lc, exprs)
+        {
+            result = list_concat(result, get_groupclause_exprs((PGNode *)lfirst(lc), targetList));
+        }
+    }
+
+    return result;
+};
+
+void AggParser::check_ungrouped_columns(
+        PGNode * node, PGParseState * pstate, PGQuery * qry,
+		PGList * groupClauses, bool have_non_var_grouping, 
+		PGList ** func_grouped_rels)
+{
+	check_ungrouped_columns_context context;
+
+	context.pstate = pstate;
+	context.qry = qry;
+	context.groupClauses = groupClauses;
+	context.have_non_var_grouping = have_non_var_grouping;
+	context.func_grouped_rels = func_grouped_rels;
+	context.sublevels_up = 0;
+	context.in_agg_direct_args = false;
+	pg_check_ungrouped_columns_walker(node, &context);
+};
+
+bool AggParser::checkExprHasGroupExtFuncs(PGNode * node)
+{
+    checkHasGroupExtFuncs_context context;
+    context.sublevels_up = 0;
+
+    /*
+	 * Must be prepared to start with a Query or a bare expression tree; if
+	 * it's a Query, we don't want to increment sublevels_up.
+	 */
+    return pg_query_or_expression_tree_walker(node, (walker_func)pg_checkExprHasGroupExtFuncs_walker, (void *)&context, 0);
+};
+
 void
 AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 {
@@ -1295,8 +1366,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
     PGListCell * l;
     bool hasJoinRTEs;
     bool hasSelfRefRTEs;
-	//TODO kindred
-    //PGPlannerInfo * root;
+    PGPlannerInfo * root;
     PGNode * clause;
 
     /* This should only be called if we found aggregates or grouping */
@@ -1330,7 +1400,9 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
         if (grpcl == NULL)
             continue;
 
-        Assert(IsA(grpcl, PGSortGroupClause) || IsA(grpcl, PGGroupingClause))
+		//TODO kindred
+        //Assert(IsA(grpcl, PGSortGroupClause) || IsA(grpcl, PGGroupingClause))
+		Assert(IsA(grpcl, PGSortGroupClause))
 
         exprs = get_groupclause_exprs(grpcl, qry->targetList);
 
@@ -1357,7 +1429,8 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
     {
         root = makeNode(PGPlannerInfo);
         root->parse = qry;
-        root->planner_cxt = PGCurrentMemoryContext;
+		//TODO kindred
+        //root->planner_cxt = PGCurrentMemoryContext;
         root->hasJoinRTEs = true;
 
         groupClauses = (PGList *)pg_flatten_join_alias_vars(root, (PGNode *)groupClauses);
