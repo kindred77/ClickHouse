@@ -195,6 +195,20 @@ public:
 
     void
     checkExprIsVarFree(PGParseState *pstate, duckdb_libpgquery::PGNode *n, const char *constructName);
+
+    duckdb_libpgquery::PGSortGroupClause * make_group_clause(duckdb_libpgquery::PGTargetEntry * tle,
+        duckdb_libpgquery::PGList * targetlist, Oid eqop, Oid sortop, bool nulls_first, bool hashable);
+
+    duckdb_libpgquery::PGList * create_group_clause(duckdb_libpgquery::PGList * tlist_group,
+        duckdb_libpgquery::PGList * targetlist, duckdb_libpgquery::PGList * sortClause,
+        duckdb_libpgquery::PGList ** tlist_remainder);
+
+    duckdb_libpgquery::PGList * transformDistinctToGroupBy(PGParseState * pstate,
+        duckdb_libpgquery::PGList ** targetlist, duckdb_libpgquery::PGList ** sortClause,
+        duckdb_libpgquery::PGList ** groupClause);
+
+    void processExtendedGrouping(PGParseState * pstate, duckdb_libpgquery::PGNode * havingQual,
+        duckdb_libpgquery::PGList * windowClause, duckdb_libpgquery::PGList * targetlist);
 };
 
 }

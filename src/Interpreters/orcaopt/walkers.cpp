@@ -1817,7 +1817,8 @@ pg_range_table_mutator(PGList *rtable,
 			// 	/* nothing to do */
 				break;
 		}
-		MUTATE(newrte->securityQuals, rte->securityQuals, PGList *);
+		//TODO kindred
+		//MUTATE(newrte->securityQuals, rte->securityQuals, PGList *);
 		newrt = lappend(newrt, newrte);
 	}
 	return newrt;
@@ -1846,7 +1847,8 @@ pg_query_tree_mutator(PGQuery *query,
 	MUTATE(query->jointree, query->jointree, PGFromExpr *);
 	MUTATE(query->setOperations, query->setOperations, PGNode *);
 	MUTATE(query->groupClause, query->groupClause, PGList *);
-	MUTATE(query->scatterClause, query->scatterClause, PGList *);
+	//TODO kindred
+	//MUTATE(query->scatterClause, query->scatterClause, PGList *);
 	MUTATE(query->havingQual, query->havingQual, PGNode *);
 	MUTATE(query->windowClause, query->windowClause, PGList *);
 	MUTATE(query->limitOffset, query->limitOffset, PGNode *);
@@ -2144,22 +2146,23 @@ bool winref_checkspec_walker(duckdb_libpgquery::PGNode * node, void * ctx)
         if (winref->winref != ref->winref)
             return false;
 
-        if (winref->windistinct)
-        {
-            if (ref->has_order)
-                ereport(
-                    ERROR,
-                    (errcode(ERRCODE_SYNTAX_ERROR),
-                     errmsg("DISTINCT cannot be used with window specification containing an ORDER BY clause"),
-                     parser_errposition(ref->pstate, winref->location)));
+		//TODO kindred
+        // if (winref->windistinct)
+        // {
+        //     if (ref->has_order)
+        //         ereport(
+        //             ERROR,
+        //             (errcode(ERRCODE_SYNTAX_ERROR),
+        //              errmsg("DISTINCT cannot be used with window specification containing an ORDER BY clause"),
+        //              parser_errposition(ref->pstate, winref->location)));
 
-            if (ref->has_frame)
-                ereport(
-                    ERROR,
-                    (errcode(ERRCODE_SYNTAX_ERROR),
-                     errmsg("DISTINCT cannot be used with window specification containing a framing clause"),
-                     parser_errposition(ref->pstate, winref->location)));
-        }
+        //     if (ref->has_frame)
+        //         ereport(
+        //             ERROR,
+        //             (errcode(ERRCODE_SYNTAX_ERROR),
+        //              errmsg("DISTINCT cannot be used with window specification containing a framing clause"),
+        //              parser_errposition(ref->pstate, winref->location)));
+        // }
 #if 0 // FIXME
 		/*
 		 * Check compatibilities between function's requirement and
@@ -2261,4 +2264,113 @@ static bool checkTableFunctions_walker(PGNode * node, check_table_func_context *
     {
         return pg_expression_tree_walker(node, (walker_func)checkTableFunctions_walker, (void *)context);
     }
+};
+
+bool pg_grouping_rewrite_walker(PGNode * node, void * context)
+{
+    grouping_rewrite_ctx * ctx = (grouping_rewrite_ctx *)context;
+
+    if (node == NULL)
+        return false;
+
+    if (IsA(node, PGAConst))
+    {
+        return false;
+    }
+    else if (IsA(node, PGAExpr))
+    {
+        /* could be seen inside an untransformed window clause */
+        return false;
+    }
+    else if (IsA(node, PGColumnRef))
+    {
+        /* could be seen inside an untransformed window clause */
+        return false;
+    }
+    else if (IsA(node, PGTypeCast))
+    {
+        return false;
+    }
+    else if (IsA(node, PGGroupingFunc))
+    {
+        PGGroupingFunc * gf = (PGGroupingFunc *)node;
+        PGListCell * arg_lc;
+        PGList * newargs = NIL;
+
+		//TODO kindred
+        //gf->ngrpcols = list_length(ctx->grp_tles);
+
+        /*
+		 * For each argument in gf->args, find its position in grp_tles,
+		 * and increment its counts. Note that this is a O(n^2) algorithm,
+		 * but it should not matter that much.
+		 */
+        foreach (arg_lc, gf->args)
+        {
+            long i = 0;
+            PGNode * node = (PGNode *)lfirst(arg_lc);
+            PGListCell * grp_lc = NULL;
+
+            foreach (grp_lc, ctx->grp_tles)
+            {
+                PGTargetEntry * grp_tle = (PGTargetEntry *)lfirst(grp_lc);
+
+                if (equal(grp_tle->expr, node))
+                    break;
+                i++;
+            }
+
+            /* Find a column not in GROUP BY clause */
+            if (grp_lc == NULL)
+            {
+                PGRangeTblEntry * rte;
+				//TODO kindred
+                //const char * attname;
+                PGVar * var = (PGVar *)node;
+
+                PGParseState * pstate = ctx->pstate;
+                Index levelsup;
+
+                /* Do not allow expressions inside a grouping function. */
+                if (IsA(node, PGRowExpr))
+                    ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("row type can not be used inside a grouping function")));
+
+                if (!IsA(node, PGVar))
+                    ereport(
+                        ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("expression in a grouping function does not appear in GROUP BY")));
+
+                Assert(IsA(node, PGVar))
+                Assert(var->varno > 0)
+
+                for (levelsup = var->varlevelsup; levelsup > 0; levelsup--)
+                    pstate = pstate->parentParseState;
+
+                Assert(var->varno <= list_length(pstate->p_rtable))
+
+                rte = rt_fetch(var->varno, pstate->p_rtable);
+                //attname = get_rte_attribute_name(rte, var->varattno);
+
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_GROUPING_ERROR), errmsg("column number is \"%d\" in \"%s\" is not in GROUP BY", rte->eref->aliasname, var->varattno)));
+            }
+
+            newargs = lappend(newargs, makeInteger(i));
+        }
+
+        /* Free gf->args since we do not need it any more. */
+        list_free_deep(gf->args);
+        gf->args = newargs;
+    }
+    else if (IsA(node, PGSortBy))
+    {
+        /*
+		 * When WindowClause leaves the main parser, partition and order
+		 * clauses will be lists of SortBy structures. Process them here to
+		 * avoid muddying up the expression_tree_walker().
+		 */
+        PGSortBy * s = (PGSortBy *)node;
+        return pg_grouping_rewrite_walker(s->node, context);
+    }
+    return pg_expression_tree_walker(node, (walker_func)pg_grouping_rewrite_walker, context);
 };

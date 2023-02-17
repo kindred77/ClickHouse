@@ -182,6 +182,8 @@ public:
         duckdb_libpgquery::PGCoercionContext ccontext,
         duckdb_libpgquery::PGCoercionForm cformat,
         int levelsup);
+
+    void fixup_unknown_vars_in_targetlist(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist);
 };
 
 }

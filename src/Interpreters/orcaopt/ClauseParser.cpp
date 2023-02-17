@@ -2428,4 +2428,155 @@ ClauseParser::transformWindowDefinitions(PGParseState *pstate,
     return result;
 };
 
+PGSortGroupClause * ClauseParser::make_group_clause(PGTargetEntry * tle,
+        PGList * targetlist, Oid eqop, Oid sortop, bool nulls_first, bool hashable)
+{
+    PGSortGroupClause * result;
+
+    result = makeNode(PGSortGroupClause);
+    result->tleSortGroupRef = assignSortGroupRef(tle, targetlist);
+    result->eqop = eqop;
+    result->sortop = sortop;
+    result->nulls_first = nulls_first;
+    result->hashable = hashable;
+
+    return result;
+};
+
+PGList * ClauseParser::create_group_clause(PGList * tlist_group,
+        PGList * targetlist, PGList * sortClause,
+        PGList ** tlist_remainder)
+{
+    PGList * result = NIL;
+    PGListCell * l;
+    PGList * tlist = list_copy(tlist_group);
+
+    /*
+	 * Iterate through the ORDER BY clause. If we find a grouping element
+	 * that matches the ORDER BY element, append the grouping element to the
+	 * result set immediately. Otherwise, stop iterating. The effect of this
+	 * is to look for a prefix of the ORDER BY list in the grouping clauses,
+	 * and to move that prefix to the front of the GROUP BY.
+	 */
+    foreach (l, sortClause)
+    {
+        PGSortGroupClause * sc = (PGSortGroupClause *)lfirst(l);
+        PGListCell * prev = NULL;
+        PGListCell * tl = NULL;
+        bool found = false;
+
+        foreach (tl, tlist)
+        {
+            PGNode * node = (PGNode *)lfirst(tl);
+
+            if (IsA(node, PGTargetEntry))
+            {
+                PGTargetEntry * tle = (PGTargetEntry *)lfirst(tl);
+
+                if (!tle->resjunk && sc->tleSortGroupRef == tle->ressortgroupref)
+                {
+                    PGSortGroupClause * gc;
+
+                    tlist = list_delete_cell(tlist, tl, prev);
+
+                    /* Use the sort clause's sorting information */
+                    gc = make_group_clause(tle, targetlist, sc->eqop, sc->sortop, sc->nulls_first, sc->hashable);
+                    result = lappend(result, gc);
+                    found = true;
+                    break;
+                }
+
+                prev = tl;
+            }
+        }
+
+        /* As soon as we've failed to match an ORDER BY element, stop */
+        if (!found)
+            break;
+    }
+
+    /* Save remaining GROUP-BY tle's */
+    *tlist_remainder = tlist;
+
+    return result;
+};
+
+PGList * ClauseParser::transformDistinctToGroupBy(PGParseState * pstate,
+        PGList ** targetlist, PGList ** sortClause,
+        PGList ** groupClause)
+{
+    PGList * group_tlist = list_copy(*targetlist);
+
+    /*
+	 * create first group clauses based on matching sort clauses, if any
+	 */
+    PGList * group_tlist_remainder = NIL;
+    PGList * group_clause_list = create_group_clause(group_tlist, *targetlist, *sortClause, &group_tlist_remainder);
+
+    if (list_length(group_tlist_remainder) > 0)
+    {
+        /*
+		 * append remaining group clauses to the end of group clause list
+		 */
+        ListCell * lc = NULL;
+
+        foreach (lc, group_tlist_remainder)
+        {
+            PGTargetEntry * tle = (PGTargetEntry *)lfirst(lc);
+            if (!tle->resjunk)
+            {
+                PGSortBy sortby;
+
+                sortby.type = T_PGSortBy;
+                sortby.sortby_dir = PG_SORTBY_DEFAULT;
+                sortby.sortby_nulls = PG_SORTBY_NULLS_DEFAULT;
+                sortby.useOp = NIL;
+                sortby.location = -1;
+                sortby.node = (PGNode *)tle->expr;
+                group_clause_list = addTargetToSortList(pstate, tle, group_clause_list, *targetlist, &sortby, true);
+            }
+        }
+    }
+
+    *groupClause = group_clause_list;
+
+    list_free(group_tlist);
+    list_free(group_tlist_remainder);
+
+    /*
+	 * return empty distinct list, since we have created a grouping clause to do the job
+	 */
+    return NIL;
+};
+
+void ClauseParser::processExtendedGrouping(PGParseState * pstate, PGNode * havingQual,
+        PGList * windowClause, PGList * targetlist)
+{
+    grouping_rewrite_ctx ctx;
+
+    /*
+	 * For each GROUPING function, check if its argument(s) appear in the
+	 * GROUP BY clause. We also set ngrpcols, nargs and grpargs values for
+	 * each GROUPING function here. These values are used together with
+	 * GROUPING_ID to calculate the final value for each GROUPING function
+	 * in the executor.
+	 */
+    ctx.pstate = pstate;
+    ctx.grp_tles = pstate->p_grp_tles;
+    pstate->p_grp_tles = NIL;
+
+    pg_expression_tree_walker((PGNode *)targetlist, (walker_func)pg_grouping_rewrite_walker, (void *)&ctx);
+
+    /*
+	 * The expression might be present in a window clause as well
+	 * so process those.
+	 */
+    pg_expression_tree_walker((PGNode *)windowClause, (walker_func)pg_grouping_rewrite_walker, (void *)&ctx);
+
+    /*
+	 * The expression might be present in the having clause as well.
+	 */
+    pg_expression_tree_walker(havingQual, (walker_func)pg_grouping_rewrite_walker, (void *)&ctx);
+};
+
 }

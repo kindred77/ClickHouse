@@ -1096,7 +1096,7 @@ FuncParser::func_get_detail(PGList *funcname,
 };
 
 
-const char *
+std::string
 FuncParser::funcname_signature_string(const char *funcname, int nargs,
 						  PGList *argnames, const Oid *argtypes)
 {
@@ -1134,14 +1134,14 @@ FuncParser::funcname_signature_string(const char *funcname, int nargs,
 	//appendStringInfoChar(&argbuf, ')');
 	result += ")";
 
-	return result.c_str();			/* return palloc'd string buffer */
+	return result;			/* return palloc'd string buffer */
 };
 
 const char *
 FuncParser::func_signature_string(PGList *funcname, int nargs,
 					  PGList *argnames, const Oid *argtypes)
 {
-	return funcname_signature_string(NameListToString(funcname),
+	return funcname_signature_string(NameListToString(funcname).c_str(),
 									 nargs, argnames, argtypes);
 };
 

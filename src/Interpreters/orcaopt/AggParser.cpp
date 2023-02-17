@@ -1286,126 +1286,127 @@ AggParser::expand_grouping_sets(PGList *groupingSets, int limit)
 	return result;
 };
 
-// void
-// AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
-// {
-//     PGList * groupClauses = NIL;
-//     bool have_non_var_grouping;
-//     PGList * func_grouped_rels = NIL;
-//     PGListCell * l;
-//     bool hasJoinRTEs;
-//     bool hasSelfRefRTEs;
-//     PlannerInfo * root;
-//     PGNode * clause;
+void
+AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
+{
+    PGList * groupClauses = NIL;
+    bool have_non_var_grouping;
+    PGList * func_grouped_rels = NIL;
+    PGListCell * l;
+    bool hasJoinRTEs;
+    bool hasSelfRefRTEs;
+	//TODO kindred
+    //PGPlannerInfo * root;
+    PGNode * clause;
 
-//     /* This should only be called if we found aggregates or grouping */
-//     Assert(pstate->p_hasAggs || qry->groupClause || qry->havingQual);
+    /* This should only be called if we found aggregates or grouping */
+    Assert(pstate->p_hasAggs || qry->groupClause || qry->havingQual);
 
-//     /*
-// 	 * Scan the range table to see if there are JOIN or self-reference CTE
-// 	 * entries.  We'll need this info below.
-// 	 */
-//     hasJoinRTEs = hasSelfRefRTEs = false;
-//     foreach (l, pstate->p_rtable)
-//     {
-//         PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(l);
+    /*
+	 * Scan the range table to see if there are JOIN or self-reference CTE
+	 * entries.  We'll need this info below.
+	 */
+    hasJoinRTEs = hasSelfRefRTEs = false;
+    foreach (l, pstate->p_rtable)
+    {
+        PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(l);
 
-//         if (rte->rtekind == PG_RTE_JOIN)
-//             hasJoinRTEs = true;
-//         else if (rte->rtekind == PG_RTE_CTE && rte->self_reference)
-//             hasSelfRefRTEs = true;
-//     }
+        if (rte->rtekind == PG_RTE_JOIN)
+            hasJoinRTEs = true;
+        else if (rte->rtekind == PG_RTE_CTE && rte->self_reference)
+            hasSelfRefRTEs = true;
+    }
 
-//     /*
-// 	 * Build a list of the acceptable GROUP BY expressions for use by
-// 	 * check_ungrouped_columns().
-// 	 */
-//     foreach (l, qry->groupClause)
-//     {
-//         PGNode * grpcl = lfirst(l);
-//         PGList * exprs;
-//         PGListCell * l2;
+    /*
+	 * Build a list of the acceptable GROUP BY expressions for use by
+	 * check_ungrouped_columns().
+	 */
+    foreach (l, qry->groupClause)
+    {
+        PGNode * grpcl = (PGNode *)lfirst(l);
+        PGList * exprs;
+        PGListCell * l2;
 
-//         if (grpcl == NULL)
-//             continue;
+        if (grpcl == NULL)
+            continue;
 
-//         Assert(IsA(grpcl, PGSortGroupClause) || IsA(grpcl, GroupingClause));
+        Assert(IsA(grpcl, PGSortGroupClause) || IsA(grpcl, PGGroupingClause))
 
-//         exprs = get_groupclause_exprs(grpcl, qry->targetList);
+        exprs = get_groupclause_exprs(grpcl, qry->targetList);
 
-//         foreach (l2, exprs)
-//         {
-//             PGNode * expr = (PGNode *)lfirst(l2);
+        foreach (l2, exprs)
+        {
+            PGNode * expr = (PGNode *)lfirst(l2);
 
-//             // FIXME: Should this go into check_agg_arguments now?
-//             if (checkExprHasGroupExtFuncs(expr))
-//                 ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("grouping() or group_id() not allowed in GROUP BY clause")));
-//             groupClauses = lcons(expr, groupClauses);
-//         }
-//     }
+            // FIXME: Should this go into check_agg_arguments now?
+            if (checkExprHasGroupExtFuncs(expr))
+                ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("grouping() or group_id() not allowed in GROUP BY clause")));
+            groupClauses = lcons(expr, groupClauses);
+        }
+    }
 
-//     /*
-// 	 * If there are join alias vars involved, we have to flatten them to the
-// 	 * underlying vars, so that aliased and unaliased vars will be correctly
-// 	 * taken as equal.  We can skip the expense of doing this if no rangetable
-// 	 * entries are RTE_JOIN kind. We use the planner's flatten_join_alias_vars
-// 	 * routine to do the flattening; it wants a PlannerInfo root node, which
-// 	 * fortunately can be mostly dummy.
-// 	 */
-//     if (hasJoinRTEs)
-//     {
-//         root = makeNode(PlannerInfo);
-//         root->parse = qry;
-//         root->planner_cxt = CurrentMemoryContext;
-//         root->hasJoinRTEs = true;
+    /*
+	 * If there are join alias vars involved, we have to flatten them to the
+	 * underlying vars, so that aliased and unaliased vars will be correctly
+	 * taken as equal.  We can skip the expense of doing this if no rangetable
+	 * entries are RTE_JOIN kind. We use the planner's flatten_join_alias_vars
+	 * routine to do the flattening; it wants a PlannerInfo root node, which
+	 * fortunately can be mostly dummy.
+	 */
+    if (hasJoinRTEs)
+    {
+        root = makeNode(PGPlannerInfo);
+        root->parse = qry;
+        root->planner_cxt = PGCurrentMemoryContext;
+        root->hasJoinRTEs = true;
 
-//         groupClauses = (PGList *)flatten_join_alias_vars(root, (PGNode *)groupClauses);
-//     }
-//     else
-//         root = NULL; /* keep compiler quiet */
+        groupClauses = (PGList *)pg_flatten_join_alias_vars(root, (PGNode *)groupClauses);
+    }
+    else
+        root = NULL; /* keep compiler quiet */
 
-//     /*
-// 	 * Detect whether any of the grouping expressions aren't simple Vars; if
-// 	 * they're all Vars then we don't have to work so hard in the recursive
-// 	 * scans.  (Note we have to flatten aliases before this.)
-// 	 */
-//     have_non_var_grouping = false;
-//     foreach (l, groupClauses)
-//     {
-//         if (!IsA((PGNode *)lfirst(l), PGVar))
-//         {
-//             have_non_var_grouping = true;
-//             break;
-//         }
-//     }
+    /*
+	 * Detect whether any of the grouping expressions aren't simple Vars; if
+	 * they're all Vars then we don't have to work so hard in the recursive
+	 * scans.  (Note we have to flatten aliases before this.)
+	 */
+    have_non_var_grouping = false;
+    foreach (l, groupClauses)
+    {
+        if (!IsA((PGNode *)lfirst(l), PGVar))
+        {
+            have_non_var_grouping = true;
+            break;
+        }
+    }
 
-//     /*
-// 	 * Check the targetlist and HAVING clause for ungrouped variables.
-// 	 *
-// 	 * Note: because we check resjunk tlist elements as well as regular ones,
-// 	 * this will also find ungrouped variables that came from ORDER BY and
-// 	 * WINDOW clauses.  For that matter, it's also going to examine the
-// 	 * grouping expressions themselves --- but they'll all pass the test ...
-// 	 */
-//     clause = (PGNode *)qry->targetList;
-//     if (hasJoinRTEs)
-//         clause = flatten_join_alias_vars(root, clause);
-//     check_ungrouped_columns(clause, pstate, qry, groupClauses, have_non_var_grouping, &func_grouped_rels);
+    /*
+	 * Check the targetlist and HAVING clause for ungrouped variables.
+	 *
+	 * Note: because we check resjunk tlist elements as well as regular ones,
+	 * this will also find ungrouped variables that came from ORDER BY and
+	 * WINDOW clauses.  For that matter, it's also going to examine the
+	 * grouping expressions themselves --- but they'll all pass the test ...
+	 */
+    clause = (PGNode *)qry->targetList;
+    if (hasJoinRTEs)
+        clause = pg_flatten_join_alias_vars(root, clause);
+    check_ungrouped_columns(clause, pstate, qry, groupClauses, have_non_var_grouping, &func_grouped_rels);
 
-//     clause = (PGNode *)qry->havingQual;
-//     if (hasJoinRTEs)
-//         clause = flatten_join_alias_vars(root, clause);
-//     check_ungrouped_columns(clause, pstate, qry, groupClauses, have_non_var_grouping, &func_grouped_rels);
+    clause = (PGNode *)qry->havingQual;
+    if (hasJoinRTEs)
+        clause = pg_flatten_join_alias_vars(root, clause);
+    check_ungrouped_columns(clause, pstate, qry, groupClauses, have_non_var_grouping, &func_grouped_rels);
 
-//     /*
-// 	 * Per spec, aggregates can't appear in a recursive term.
-// 	 */
-//     if (pstate->p_hasAggs && hasSelfRefRTEs)
-//         ereport(
-//             ERROR,
-//             (errcode(ERRCODE_INVALID_RECURSION),
-//              errmsg("aggregate functions are not allowed in a recursive query's recursive term"),
-//              parser_errposition(pstate, locate_agg_of_level((Node *)qry, 0))));
-// };
+    /*
+	 * Per spec, aggregates can't appear in a recursive term.
+	 */
+    if (pstate->p_hasAggs && hasSelfRefRTEs)
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_INVALID_RECURSION),
+             errmsg("aggregate functions are not allowed in a recursive query's recursive term"),
+             parser_errposition(pstate, pg_locate_agg_of_level((PGNode *)qry, 0))));
+};
 
 }

@@ -2,6 +2,8 @@
 
 
 #include <Interpreters/orcaopt/parser_common.h>
+#include <Interpreters/Context.h>
+#include <gpos/memory/CMemoryPool.h>
 
 #include <map>
 #include <optional>
@@ -30,9 +32,13 @@ public:
 	std::optional<std::tuple<Oid, StoragePtr, char> >
 	getPairByDBAndTableName(const String & database_name, const String & table_name) const;
 
-    char * get_database_name(Oid dbid);
+    std::string get_database_name(Oid dbid) const;
 
-    char get_rel_relkind(Oid relid);
+    char get_rel_relkind(Oid relid) const;
+
+	std::string get_attname(Oid relid, PGAttrNumber attnum) const;
+
+	std::string get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, PGAttrNumber attnum);
 };
 
 }

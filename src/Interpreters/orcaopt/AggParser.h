@@ -60,8 +60,7 @@ public:
 	transformWindowFuncCall(PGParseState *pstate, duckdb_libpgquery::PGWindowFunc *wfunc,
 						duckdb_libpgquery::PGWindowDef *windef);
 
-	// void
-	// parseCheckAggregates(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry);
+	void parseCheckAggregates(PGParseState *pstate, duckdb_libpgquery::PGQuery *qry);
 
 	duckdb_libpgquery::PGList *
 	expand_groupingset_node(duckdb_libpgquery::PGGroupingSet *gs);

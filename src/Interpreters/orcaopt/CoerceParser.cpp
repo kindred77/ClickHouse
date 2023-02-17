@@ -1954,4 +1954,21 @@ bool CoerceParser::IsBinaryCoercible(Oid srctype, Oid targettype)
     return result;
 };
 
+void CoerceParser::fixup_unknown_vars_in_targetlist(PGParseState * pstate, PGList * targetlist)
+{
+    PGListCell * cell;
+
+    foreach (cell, targetlist)
+    {
+        PGTargetEntry * tle = (PGTargetEntry *)lfirst(cell);
+
+        Assert(IsA(tle, PGTargetEntry))
+
+        if (IsA(tle->expr, PGVar) && ((PGVar *)tle->expr)->vartype == UNKNOWNOID)
+        {
+            tle->expr = (PGExpr *)coerce_unknown_var(pstate, (PGVar *)tle->expr, UNKNOWNOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_EXPLICIT_CALL, 0);
+        }
+    }
+};
+
 }

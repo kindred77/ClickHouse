@@ -295,7 +295,8 @@ typedef enum {
 	ERRCODE_DATA_EXCEPTION,
 	ERRCODE_QUERY_CANCELED,
     ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE,
-	ERRCODE_INVALID_TEXT_REPRESENTATION
+	ERRCODE_INVALID_TEXT_REPRESENTATION,
+	ERRCODE_INTERNAL_ERROR
 } PGPostgresParserErrors;
 
 typedef struct ErrorContextCallback
@@ -1381,7 +1382,7 @@ gotdigits:
     return true;
 };
 
-const char * NameListToString(duckdb_libpgquery::PGList * names)
+std::string NameListToString(duckdb_libpgquery::PGList * names)
 {
 	using duckdb_libpgquery::elog;
 	using duckdb_libpgquery::PGListCell;
@@ -1418,8 +1419,70 @@ const char * NameListToString(duckdb_libpgquery::PGList * names)
             elog(ERROR, "unexpected node type in name list: %d", (int)nodeTag(name));
     }
 
-    return result.c_str();
+    return result;
 };
+
+std::string get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, PGAttrNumber attnum)
+{
+	using duckdb_libpgquery::ereport;
+	using duckdb_libpgquery::errcode;
+	using duckdb_libpgquery::errmsg_internal;
+
+    const char * name;
+
+    if (attnum == InvalidAttrNumber)
+        return "*";
+
+    /*
+	 * If there is a user-written column alias, use it.
+	 */
+    if (rte->alias && attnum > 0 && attnum <= list_length(rte->alias->colnames))
+        return strVal(list_nth(rte->alias->colnames, attnum - 1));
+
+    /*
+	 * CDB: Pseudo columns have negative attribute numbers below the
+	 * lowest system attribute number.
+	 */
+	//TODO kindred
+    // if (attnum <= FirstLowInvalidHeapAttributeNumber)
+    // {
+    //     CdbRelColumnInfo * rci = cdb_rte_find_pseudo_column(rte, attnum);
+
+    //     if (!rci)
+    //         goto bogus;
+    //     return rci->colname;
+    // }
+
+    /*
+	 * If the RTE is a relation, go to the system catalogs not the
+	 * eref->colnames list.  This is a little slower but it will give the
+	 * right answer if the column has been renamed since the eref list was
+	 * built (which can easily happen for rules).
+	 */
+    if (rte->rtekind == duckdb_libpgquery::PG_RTE_RELATION)
+        return get_relid_attribute_name(rte->relid, attnum);
+
+    /*
+	 * Otherwise use the column name from eref.  There should always be one.
+	 */
+    if (rte->eref != NULL && attnum > 0 && attnum <= list_length(rte->eref->colnames))
+        return strVal(list_nth(rte->eref->colnames, attnum - 1));
+
+    /* CDB: Get name of sysattr even if relid is no good (e.g. SubqueryScan) */
+	//TODO kindred
+    // if (attnum < 0 && attnum > FirstLowInvalidHeapAttributeNumber)
+    // {
+    //     Form_pg_attribute att_tup = SystemAttributeDefinition(attnum, true);
+
+    //     return NameStr(att_tup->attname);
+    // }
+
+bogus:
+    /* else caller gave us a bogus attnum */
+    name = (rte->eref && rte->eref->aliasname) ? rte->eref->aliasname : "*BOGUS*";
+    ereport(WARNING, (errcode(ERRCODE_INTERNAL_ERROR), errmsg_internal("invalid attnum %d for rangetable entry %s", attnum, name)));
+    return "*BOGUS*";
+}
 
 // duckdb_libpgquery::PGTargetEntry *
 // get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)
