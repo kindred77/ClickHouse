@@ -2,6 +2,9 @@
 
 #include <Interpreters/orcaopt/parser_common.h>
 
+extern duckdb_libpgquery::PGTargetEntry *
+tlist_member(duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList *targetlist);
+
 struct contain_aggs_of_level_context
 {
 	int			sublevels_up;
@@ -276,3 +279,35 @@ struct checkHasGroupExtFuncs_context
 
 extern bool
 pg_checkExprHasGroupExtFuncs_walker(duckdb_libpgquery::PGNode *node, checkHasGroupExtFuncs_context *context);
+
+
+extern void pg_get_sortgroupclauses_tles_recurse(duckdb_libpgquery::PGList * clauses, duckdb_libpgquery::PGList * targetList,
+	duckdb_libpgquery::PGList ** tles, duckdb_libpgquery::PGList ** sortops,
+	duckdb_libpgquery::PGList ** eqops);
+
+extern void
+pg_get_sortgroupclauses_tles(duckdb_libpgquery::PGList *clauses, duckdb_libpgquery::PGList *targetList,
+						  duckdb_libpgquery::PGList **tles, duckdb_libpgquery::PGList **sortops, duckdb_libpgquery::PGList **eqops);
+
+struct maxSortGroupRef_context
+{
+	Index maxsgr;
+	bool include_orderedagg;
+};
+
+extern bool maxSortGroupRef_walker(duckdb_libpgquery::PGNode *node, maxSortGroupRef_context *cxt);
+
+extern Index maxSortGroupRef(duckdb_libpgquery::PGList *targetlist, bool include_orderedagg);
+
+extern char * generate_positional_name(PGAttrNumber attrno);
+
+extern duckdb_libpgquery::PGList*
+generate_alternate_vars(duckdb_libpgquery::PGVar *invar, grouped_window_ctx *ctx);
+
+extern duckdb_libpgquery::PGVar * var_for_gw_expr(grouped_window_ctx * ctx, duckdb_libpgquery::PGNode * expr, bool force);
+
+extern duckdb_libpgquery::PGNode* grouped_window_mutator(duckdb_libpgquery::PGNode *node, void *context);
+
+extern duckdb_libpgquery::PGAlias * make_replacement_alias(duckdb_libpgquery::PGQuery *qry, const char *aname);
+
+extern void IncrementVarSublevelsUpInTransformGroupedWindows(duckdb_libpgquery::PGNode * node, int delta_sublevels_up, int min_sublevels_up);

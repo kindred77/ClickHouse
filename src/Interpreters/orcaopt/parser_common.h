@@ -1812,6 +1812,23 @@ void DeconstructQualifiedName(duckdb_libpgquery::PGList * names, char ** nspname
     *objname_p = objname;
 };
 
+struct grouped_window_ctx
+{
+    duckdb_libpgquery::PGList * subtlist; /* target list for subquery */
+    duckdb_libpgquery::PGList * subgroupClause; /* group clause for subquery */
+    duckdb_libpgquery::PGList * windowClause; /* window clause for outer query*/
+
+    /* Scratch area for init_grouped_window context and map_sgr_mutator.
+	 */
+    Index * sgr_map;
+
+    /* Scratch area for grouped_window_mutator and var_for_gw_expr.
+	 */
+    duckdb_libpgquery::PGList * subrtable;
+    int call_depth;
+    duckdb_libpgquery::PGTargetEntry * tle;
+};
+
 // duckdb_libpgquery::PGTargetEntry *
 // get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)
 // {

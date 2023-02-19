@@ -13,8 +13,10 @@
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wunused-parameter"
 #else
 #pragma GCC diagnostic ignored "-Wswitch"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
 using namespace duckdb_libpgquery;
@@ -117,6 +119,105 @@ SelectParser::markTargetListOrigins(PGParseState *pstate, PGList *targetlist)
 	}
 };
 
+PGNode * SelectParser::map_sgr_mutator(PGNode * node, void * context)
+{
+    grouped_window_ctx * ctx = (grouped_window_ctx *)context;
+
+    if (!node)
+        return NULL;
+
+    if (IsA(node, PGList))
+    {
+        PGListCell * lc;
+        PGList * new_lst = NIL;
+
+        foreach (lc, (PGList *)node)
+        {
+            PGNode * newnode = (PGNode *)lfirst(lc);
+            newnode = map_sgr_mutator(newnode, ctx);
+            new_lst = lappend(new_lst, newnode);
+        }
+        return (PGNode *)new_lst;
+    }
+    else if (IsA(node, PGSortGroupClause))
+    {
+        PGSortGroupClause * g = (PGSortGroupClause *)node;
+        PGSortGroupClause * new_g = makeNode(PGSortGroupClause);
+        memcpy(new_g, g, sizeof(PGSortGroupClause));
+        new_g->tleSortGroupRef = ctx->sgr_map[g->tleSortGroupRef];
+        return (PGNode *)new_g;
+    }
+	//TODO kindred
+    // else if (IsA(node, GroupingClause))
+    // {
+    //     GroupingClause * gc = (GroupingClause *)node;
+    //     GroupingClause * new_gc = makeNode(GroupingClause);
+    //     memcpy(new_gc, gc, sizeof(GroupingClause));
+    //     new_gc->groupsets = (List *)map_sgr_mutator((Node *)gc->groupsets, ctx);
+    //     return (Node *)new_gc;
+    // }
+
+    return NULL; /* Never happens */
+};
+
+void SelectParser::init_grouped_window_context(grouped_window_ctx * ctx, PGQuery * qry)
+{
+    PGList * grp_tles;
+    PGList * grp_sortops;
+    PGList * grp_eqops;
+    PGListCell * lc = NULL;
+    Index maxsgr = 0;
+
+    pg_get_sortgroupclauses_tles(qry->groupClause, qry->targetList, &grp_tles, &grp_sortops, &grp_eqops);
+    list_free(grp_sortops);
+    maxsgr = maxSortGroupRef(grp_tles, true);
+
+    ctx->subtlist = NIL;
+    ctx->subgroupClause = NIL;
+
+    /* Set up scratch space.
+	 */
+
+    ctx->subrtable = qry->rtable;
+
+    /* Map input = outer query sortgroupref values to subquery values while building the
+	 * subquery target list prefix. */
+    ctx->sgr_map = (Index *)palloc((maxsgr + 1) * sizeof(ctx->sgr_map[0]));
+    foreach (lc, grp_tles)
+    {
+        PGTargetEntry * tle;
+        Index old_sgr;
+
+        tle = (PGTargetEntry *)copyObject(lfirst(lc));
+        old_sgr = tle->ressortgroupref;
+
+        ctx->subtlist = lappend(ctx->subtlist, tle);
+        tle->resno = list_length(ctx->subtlist);
+        tle->ressortgroupref = tle->resno;
+        tle->resjunk = false;
+
+        ctx->sgr_map[old_sgr] = tle->ressortgroupref;
+    }
+
+    /* Miscellaneous scratch area. */
+    ctx->call_depth = 0;
+    ctx->tle = NULL;
+
+    /* Revise grouping into ctx->subgroupClause */
+    ctx->subgroupClause = (PGList *)map_sgr_mutator((PGNode *)qry->groupClause, ctx);
+};
+
+void SelectParser::discard_grouped_window_context(grouped_window_ctx * ctx)
+{
+    ctx->subtlist = NIL;
+    ctx->subgroupClause = NIL;
+    ctx->tle = NULL;
+    if (ctx->sgr_map)
+        pfree(ctx->sgr_map);
+    ctx->sgr_map = NULL;
+    ctx->subrtable = NULL;
+};
+
 PGQuery * SelectParser::transformGroupedWindows(PGParseState * pstate,
         PGQuery * qry)
 {
@@ -168,7 +269,7 @@ PGQuery * SelectParser::transformGroupedWindows(PGParseState * pstate,
     /* Check if there is a window function in the join tree. If so
 	 * we must mark hasWindowFuncs in the sub query as well.
 	 */
-    if (contain_window_function((PGNode *)subq->jointree))
+    if (pg_contain_windowfuncs((PGNode *)subq->jointree))
         subq->hasWindowFuncs = true;
 
     /* Make the single range table entry for the outer query Q' as
@@ -249,7 +350,8 @@ PGQuery * SelectParser::transformGroupedWindows(PGParseState * pstate,
 
     discard_grouped_window_context(&ctx);
 
-    assign_query_collations(pstate, subq);
+	//TODO kindred
+    //assign_query_collations(pstate, subq);
 
     return qry;
 };
@@ -259,7 +361,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 {
     PGQuery * qry = makeNode(PGQuery);
     PGNode * qual;
-    PGListCell * l;
+    //PGListCell * l;
 
     qry->commandType = PG_CMD_SELECT;
 

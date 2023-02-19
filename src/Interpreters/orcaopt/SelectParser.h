@@ -46,6 +46,12 @@ public:
     duckdb_libpgquery::PGQuery *
     transformStmt(PGParseState *pstate, duckdb_libpgquery::PGNode *parseTree);
 
+    duckdb_libpgquery::PGNode * map_sgr_mutator(duckdb_libpgquery::PGNode * node, void * context);
+
+    void init_grouped_window_context(grouped_window_ctx * ctx, duckdb_libpgquery::PGQuery * qry);
+
+    void discard_grouped_window_context(grouped_window_ctx * ctx);
+
     duckdb_libpgquery::PGQuery * transformGroupedWindows(PGParseState * pstate,
         duckdb_libpgquery::PGQuery * qry);
 

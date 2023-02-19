@@ -3,6 +3,23 @@
 
 using namespace duckdb_libpgquery;
 
+PGTargetEntry *
+tlist_member(PGNode *node, PGList *targetlist)
+{
+    PGListCell * temp;
+
+    foreach (temp, targetlist)
+    {
+        PGTargetEntry * tlentry = (PGTargetEntry *)lfirst(temp);
+
+        Assert(IsA(tlentry, PGTargetEntry))
+
+        if (pg_equal(node, tlentry->expr))
+            return tlentry;
+    }
+    return NULL;
+};
+
 bool
 pg_expression_tree_walker(PGNode *node,
 					   walker_func walker,
@@ -2526,7 +2543,7 @@ bool pg_check_ungrouped_columns_walker(PGNode * node, check_ungrouped_columns_co
         if (list_member_int(*context->func_grouped_rels, var->varno))
             return false; /* previously proven acceptable */
 
-        Assert(var->varno > 0 && (int)var->varno <= list_length(context->pstate->p_rtable));
+        Assert(var->varno > 0 && (int)var->varno <= list_length(context->pstate->p_rtable))
         rte = rt_fetch(var->varno, context->pstate->p_rtable);
         if (rte->rtekind == PG_RTE_RELATION)
         {
@@ -2592,4 +2609,419 @@ pg_checkExprHasGroupExtFuncs_walker(PGNode *node, checkHasGroupExtFuncs_context 
         return result;
     }
     return pg_expression_tree_walker(node, (walker_func)pg_checkExprHasGroupExtFuncs_walker, (void *)context);
+};
+
+void pg_get_sortgroupclauses_tles_recurse(PGList * clauses, PGList * targetList,
+	PGList ** tles, PGList ** sortops,
+	PGList ** eqops)
+{
+    PGListCell * lc;
+    PGListCell * lc_sortop;
+    PGListCell * lc_eqop;
+    PGList * sub_grouping_tles = NIL;
+    PGList * sub_grouping_sortops = NIL;
+    PGList * sub_grouping_eqops = NIL;
+
+    foreach (lc, clauses)
+    {
+        PGNode * node = (PGNode *)lfirst(lc);
+
+        if (node == NULL)
+            continue;
+
+        if (IsA(node, PGSortGroupClause))
+        {
+            PGSortGroupClause * sgc = (PGSortGroupClause *)node;
+            PGTargetEntry * tle = get_sortgroupclause_tle(sgc, targetList);
+
+            if (!list_member(*tles, tle))
+            {
+                *tles = lappend(*tles, tle);
+                *sortops = lappend_oid(*sortops, sgc->sortop);
+                *eqops = lappend_oid(*eqops, sgc->eqop);
+            }
+        }
+        else if (IsA(node, PGList))
+        {
+            pg_get_sortgroupclauses_tles_recurse((PGList *)node, targetList, tles, sortops, eqops);
+        }
+		//TODO kindred
+        // else if (IsA(node, GroupingClause))
+        // {
+        //     /* GroupingClauses are collected into separate list */
+        //     get_sortgroupclauses_tles_recurse(
+        //         ((GroupingClause *)node)->groupsets, targetList, &sub_grouping_tles, &sub_grouping_sortops, &sub_grouping_eqops);
+        // }
+        else
+            elog(ERROR, "unrecognized node type in list of sort/group clauses: %d", (int)nodeTag(node));
+    }
+
+    /*
+	 * Put SortGroupClauses before GroupingClauses.
+	 */
+    forthree(lc, sub_grouping_tles, lc_sortop, sub_grouping_sortops, lc_eqop, sub_grouping_eqops)
+    {
+        if (!list_member(*tles, lfirst(lc)))
+        {
+            *tles = lappend(*tles, lfirst(lc));
+            *sortops = lappend_oid(*sortops, lfirst_oid(lc_sortop));
+            *eqops = lappend_oid(*eqops, lfirst_oid(lc_eqop));
+        }
+    }
+};
+
+void
+pg_get_sortgroupclauses_tles(PGList *clauses, PGList *targetList,
+						  PGList **tles, PGList **sortops, PGList **eqops)
+{
+    *tles = NIL;
+    *sortops = NIL;
+    *eqops = NIL;
+
+    pg_get_sortgroupclauses_tles_recurse(clauses, targetList, tles, sortops, eqops);
+};
+
+bool maxSortGroupRef_walker(PGNode *node, maxSortGroupRef_context *cxt)
+{
+    if (node == NULL)
+        return false;
+
+    if (IsA(node, PGTargetEntry))
+    {
+        PGTargetEntry * tle = (PGTargetEntry *)node;
+        if (tle->ressortgroupref > cxt->maxsgr)
+            cxt->maxsgr = tle->ressortgroupref;
+
+        return maxSortGroupRef_walker((PGNode *)tle->expr, cxt);
+    }
+
+    /* Aggref nodes don't nest, so we can treat them here without recurring
+	 * further.
+	 */
+
+    if (IsA(node, PGAggref))
+    {
+        PGAggref * ref = (PGAggref *)node;
+
+        if (cxt->include_orderedagg)
+        {
+            ListCell * lc;
+
+            foreach (lc, ref->aggorder)
+            {
+                PGSortGroupClause * sort = (PGSortGroupClause *)lfirst(lc);
+                Assert(IsA(sort, PGSortGroupClause))
+                Assert(sort->tleSortGroupRef != 0);
+                if (sort->tleSortGroupRef > cxt->maxsgr)
+                    cxt->maxsgr = sort->tleSortGroupRef;
+            }
+        }
+        return false;
+    }
+
+    return pg_expression_tree_walker(node, (walker_func)maxSortGroupRef_walker, cxt);
+};
+
+Index maxSortGroupRef(PGList *targetlist, bool include_orderedagg)
+{
+    maxSortGroupRef_context context;
+    context.maxsgr = 0;
+    context.include_orderedagg = include_orderedagg;
+
+    if (targetlist != NIL)
+    {
+        if (!IsA(targetlist, PGList) || !IsA(linitial(targetlist), PGTargetEntry))
+            elog(ERROR, "non-targetlist argument supplied");
+
+        maxSortGroupRef_walker((PGNode *)targetlist, &context);
+    }
+
+    return context.maxsgr;
+};
+
+char * generate_positional_name(PGAttrNumber attrno)
+{
+	int rc = 0;
+	char buf[NAMEDATALEN];
+
+	rc = snprintf(buf, sizeof(buf),
+				  "att_%d", attrno );
+	if ( rc == EOF || rc < 0 || rc >=sizeof(buf) )
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("can't generate internal attribute name")));
+	}
+	return pstrdup(buf);
+};
+
+PGVar * var_for_gw_expr(grouped_window_ctx * ctx, PGNode * expr, bool force)
+{
+    PGVar * var = NULL;
+    PGTargetEntry * tle = tlist_member(expr, ctx->subtlist);
+
+    if (tle == NULL && force)
+    {
+        tle = makeNode(PGTargetEntry);
+        ctx->subtlist = lappend(ctx->subtlist, tle);
+        tle->expr = (PGExpr *)expr;
+        tle->resno = list_length(ctx->subtlist);
+        /* See comment in grouped_window_mutator for why level 3 is appropriate. */
+        if (ctx->call_depth == 3 && ctx->tle != NULL && ctx->tle->resname != NULL)
+        {
+            tle->resname = pstrdup(ctx->tle->resname);
+        }
+        else
+        {
+            tle->resname = generate_positional_name(tle->resno);
+        }
+        tle->ressortgroupref = 0;
+        tle->resorigtbl = 0;
+        tle->resorigcol = 0;
+        tle->resjunk = false;
+    }
+
+    if (tle != NULL)
+    {
+        var = makeNode(PGVar);
+        var->varno = 1; /* one and only */
+        var->varattno = tle->resno; /* by construction */
+        var->vartype = exprType((PGNode *)tle->expr);
+        var->vartypmod = exprTypmod((PGNode *)tle->expr);
+        var->varcollid = exprCollation((PGNode *)tle->expr);
+        var->varlevelsup = 0;
+        var->varnoold = 1;
+        var->varoattno = tle->resno;
+        var->location = 0;
+    }
+
+    return var;
+};
+
+PGList*
+generate_alternate_vars(PGVar *invar, grouped_window_ctx *ctx)
+{
+    PGList * rtable = ctx->subrtable;
+    PGRangeTblEntry * inrte;
+    PGList * alternates = NIL;
+
+    Assert(IsA(invar, PGVar))
+
+    inrte = rt_fetch(invar->varno, rtable);
+
+    if (inrte->rtekind == PG_RTE_JOIN)
+    {
+        PGNode * ja = (PGNode *)list_nth(inrte->joinaliasvars, invar->varattno - 1);
+
+        /* Though Node types other than Var (e.g., CoalesceExpr or Const) may occur
+		 * as joinaliasvars, we ignore them.
+		 */
+        if (IsA(ja, PGVar))
+        {
+            alternates = lappend(alternates, copyObject(ja));
+        }
+    }
+    else
+    {
+        ListCell * jlc;
+        Index varno = 0;
+
+        foreach (jlc, rtable)
+        {
+            PGRangeTblEntry * rte = (PGRangeTblEntry *)lfirst(jlc);
+
+            varno++; /* This RTE's varno */
+
+            if (rte->rtekind == PG_RTE_JOIN)
+            {
+                PGListCell * alc;
+                PGAttrNumber attno = 0;
+
+                foreach (alc, rte->joinaliasvars)
+                {
+                    PGListCell * tlc;
+                    PGNode * altnode = (PGNode *)lfirst(alc);
+                    PGVar * altvar = (PGVar *)altnode;
+
+                    attno++; /* This attribute's attno in its join RTE */
+
+                    if (!IsA(altvar, PGVar) || !equal(invar, altvar))
+                        continue;
+
+                    /* Look for a matching Var in the target list. */
+
+                    foreach (tlc, ctx->subtlist)
+                    {
+                        PGTargetEntry * tle = (PGTargetEntry *)lfirst(tlc);
+                        PGVar * v = (PGVar *)tle->expr;
+
+                        if (IsA(v, PGVar) && v->varno == varno && v->varattno == attno)
+                        {
+                            alternates = lappend(alternates, tle->expr);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return alternates;
+};
+
+PGNode* grouped_window_mutator(PGNode *node, void *context)
+{
+    PGNode * result = NULL;
+
+    grouped_window_ctx * ctx = (grouped_window_ctx *)context;
+
+    if (!node)
+        return result;
+
+    ctx->call_depth++;
+
+    if (IsA(node, PGTargetEntry))
+    {
+        PGTargetEntry * tle = (PGTargetEntry *)node;
+        PGTargetEntry * new_tle = makeNode(PGTargetEntry);
+
+        /* Copy the target entry. */
+        new_tle->resno = tle->resno;
+        if (tle->resname == NULL)
+        {
+            new_tle->resname = generate_positional_name(new_tle->resno);
+        }
+        else
+        {
+            new_tle->resname = pstrdup(tle->resname);
+        }
+        new_tle->ressortgroupref = tle->ressortgroupref;
+        new_tle->resorigtbl = InvalidOid;
+        new_tle->resorigcol = 0;
+        new_tle->resjunk = tle->resjunk;
+
+        /* This is pretty shady, but we know our call pattern.  The target
+		 * list is at level 1, so we're interested in target entries at level
+		 * 2.  We record them in context so var_for_gw_expr can maybe make a better
+		 * than default choice of alias.
+		 */
+        if (ctx->call_depth == 2)
+        {
+            ctx->tle = tle;
+        }
+        else
+        {
+            ctx->tle = NULL;
+        }
+
+        new_tle->expr = (PGExpr *)grouped_window_mutator((PGNode *)tle->expr, ctx);
+
+        ctx->tle = NULL;
+        result = (PGNode *)new_tle;
+    }
+	//TODO kindred
+    else if (IsA(node, PGAggref) || IsA(node, PGGroupingFunc)/*  || IsA(node, PGGroupId) */)
+    {
+        /* Aggregation expression */
+        result = (PGNode *)var_for_gw_expr(ctx, node, true);
+    }
+    else if (IsA(node, PGVar))
+    {
+        PGVar * var = (PGVar *)node;
+
+        /* Since this is a Var (leaf node), we must be able to mutate it,
+		 * else we can't finish the transformation and must give up.
+		 */
+        result = (PGNode *)var_for_gw_expr(ctx, node, false);
+
+        if (!result)
+        {
+            PGList * altvars = generate_alternate_vars(var, ctx);
+            PGListCell * lc;
+            foreach (lc, altvars)
+            {
+                result = (PGNode *)var_for_gw_expr(ctx, (PGNode *)lfirst(lc), false);
+                if (result)
+                    break;
+            }
+        }
+
+        if (!result)
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_WINDOWING_ERROR),
+                 errmsg("unresolved grouping key in window query"),
+                 errhint("You might need to use explicit aliases and/or to refer to grouping keys in the same way throughout the query.")));
+    }
+    else if (IsA(node, PGSubLink))
+    {
+        /* put the subquery into Q'' */
+        result = (PGNode *)var_for_gw_expr(ctx, node, true /* force */);
+    }
+    else
+    {
+        /* Grouping expression; may not find one. */
+        result = (PGNode *)var_for_gw_expr(ctx, node, false /* force */);
+    }
+
+
+    if (!result)
+    {
+        result = pg_expression_tree_mutator(node, grouped_window_mutator, ctx);
+    }
+
+    ctx->call_depth--;
+    return result;
+};
+
+PGAlias * make_replacement_alias(PGQuery *qry, const char *aname)
+{
+    PGListCell * lc = NULL;
+    char * name = NULL;
+    PGAlias * alias = makeNode(PGAlias);
+    PGAttrNumber attrno = 0;
+
+    alias->aliasname = pstrdup(aname);
+    alias->colnames = NIL;
+
+    foreach (lc, qry->targetList)
+    {
+        PGTargetEntry * tle = (PGTargetEntry *)lfirst(lc);
+        attrno++;
+
+        if (tle->resname)
+        {
+            /* Prefer the target's resname. */
+            name = pstrdup(tle->resname);
+        }
+        else if (IsA(tle->expr, PGVar))
+        {
+            /* If the target expression is a Var, use the name of the
+			 * attribute in the query's range table. */
+            PGVar * var = (PGVar *)tle->expr;
+            PGRangeTblEntry * rte = rt_fetch(var->varno, qry->rtable);
+            name = pstrdup(get_rte_attribute_name(rte, var->varattno));
+        }
+        else
+        {
+            /* If all else, fails, generate a name based on position. */
+            name = generate_positional_name(attrno);
+        }
+
+        alias->colnames = lappend(alias->colnames, makeString(name));
+    }
+    return alias;
+};
+
+void IncrementVarSublevelsUpInTransformGroupedWindows(PGNode * node, int delta_sublevels_up, int min_sublevels_up)
+{
+    IncrementVarSublevelsUp_context context;
+
+    context.delta_sublevels_up = delta_sublevels_up;
+    context.min_sublevels_up = min_sublevels_up;
+    context.ignore_min_sublevels_up = true;
+
+    /*
+	 * Must be prepared to start with a Query or a bare expression tree; if
+	 * it's a Query, we don't want to increment sublevels_up.
+	 */
+    pg_query_or_expression_tree_walker(node, (walker_func)PGIncrementVarSublevelsUp_walker, (void *)&context, QTW_EXAMINE_RTES);
 };
