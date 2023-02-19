@@ -279,7 +279,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             /*
 				 * We check the catalog name and then ignore it.
 				 */
-            if (strcmp(catname, relation_provider->get_database_name(MyDatabaseId)) != 0)
+            if (strcmp(catname, relation_provider->get_database_name(MyDatabaseId).c_str()) != 0)
             {
                 crerr = CRERR_WRONG_DB;
                 break;
@@ -359,14 +359,14 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
                 ereport(
                     ERROR,
                     (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-                     errmsg("cross-database references are not implemented: %s", NameListToString(cref->fields)),
+                     errmsg("cross-database references are not implemented: %s", PGNameListToString(cref->fields).c_str()),
                      parser_errposition(pstate, cref->location)));
                 break;
             case CRERR_TOO_MANY:
                 ereport(
                     ERROR,
                     (errcode(ERRCODE_SYNTAX_ERROR),
-                     errmsg("improper qualified name (too many dotted names): %s", NameListToString(cref->fields)),
+                     errmsg("improper qualified name (too many dotted names): %s", PGNameListToString(cref->fields).c_str()),
                      parser_errposition(pstate, cref->location)));
                 break;
         }

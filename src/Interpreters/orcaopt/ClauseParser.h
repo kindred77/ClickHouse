@@ -133,12 +133,23 @@ public:
 						duckdb_libpgquery::PGList **targetlist,
                         duckdb_libpgquery::PGList *sortClause, bool is_agg);
 
-    duckdb_libpgquery::PGList *
-    transformGroupClause(PGParseState *pstate, duckdb_libpgquery::PGList *grouplist,
-                    duckdb_libpgquery::PGList **groupingSets,
-					duckdb_libpgquery::PGList **targetlist,
-                    duckdb_libpgquery::PGList *sortClause,
-					PGParseExprKind exprKind, bool useSQL99);
+    void freeGroupList(duckdb_libpgquery::PGList * grouplist);
+
+    duckdb_libpgquery::PGList * transformRowExprToGroupClauses(PGParseState * pstate,
+        duckdb_libpgquery::PGRowExpr * rowexpr, duckdb_libpgquery::PGList * groupsets,
+        duckdb_libpgquery::PGList * targetList);
+
+    duckdb_libpgquery::PGList * reorderGroupList(duckdb_libpgquery::PGList * grouplist);
+
+    duckdb_libpgquery::PGList * findListTargetlistEntries(
+        PGParseState * pstate, duckdb_libpgquery::PGNode * node,
+        duckdb_libpgquery::PGList ** tlist, bool in_grpext, bool ignore_in_grpext,
+        PGParseExprKind exprKind, bool useSQL99);
+
+    duckdb_libpgquery::PGList * transformGroupClause(
+        PGParseState * pstate, duckdb_libpgquery::PGList * grouplist,
+        duckdb_libpgquery::PGList ** targetlist, duckdb_libpgquery::PGList * sortClause,
+        PGParseExprKind exprKind, bool useSQL99);
 
     duckdb_libpgquery::PGList *
     transformDistinctOnClause(PGParseState *pstate, duckdb_libpgquery::PGList *distinctlist,

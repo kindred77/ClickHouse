@@ -1,4 +1,5 @@
 #include <Interpreters/orcaopt/walkers.h>
+#include <Interpreters/orcaopt/equalfuncs.h>
 
 using namespace duckdb_libpgquery;
 
@@ -2420,7 +2421,7 @@ bool pg_grouping_rewrite_walker(PGNode * node, void * context)
 
 bool pg_check_ungrouped_columns_walker(PGNode * node, check_ungrouped_columns_context * context)
 {
-    ListCell * gl;
+    PGListCell * gl;
 
     if (node == NULL)
         return false;
@@ -2471,7 +2472,7 @@ bool pg_check_ungrouped_columns_walker(PGNode * node, check_ungrouped_columns_co
     {
         foreach (gl, context->groupClauses)
         {
-            if (equal(node, lfirst(gl)))
+            if (pg_equal(node, lfirst(gl)))
                 return false; /* acceptable, do not descend more */
         }
     }
@@ -2486,7 +2487,8 @@ bool pg_check_ungrouped_columns_walker(PGNode * node, check_ungrouped_columns_co
     {
         PGVar * var = (PGVar *)node;
         PGRangeTblEntry * rte;
-        const char * attname;
+		//TODO kindred
+        //const char * attname;
 
         if (var->varlevelsup != context->sublevels_up)
             return false; /* it's not local to my query, ignore */
@@ -2536,22 +2538,22 @@ bool pg_check_ungrouped_columns_walker(PGNode * node, check_ungrouped_columns_co
         }
 
         /* Found an ungrouped local variable; generate error message */
-        attname = get_rte_attribute_name(rte, var->varattno);
+        //attname = get_rte_attribute_name(rte, var->varattno);
         if (context->sublevels_up == 0)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_GROUPING_ERROR),
                  errmsg(
-                     "column \"%s.%s\" must appear in the GROUP BY clause or be used in an aggregate function",
-                     rte->eref->aliasname,
-                     attname),
+                     "column number is \"%d\" in \"%s\" must appear in the GROUP BY clause or be used in an aggregate function",
+                     var->varattno,
+					 rte->eref->aliasname),
                  context->in_agg_direct_args ? errdetail("Direct arguments of an ordered-set aggregate must use only grouped columns.") : 0,
                  parser_errposition(context->pstate, var->location)));
         else
             ereport(
                 ERROR,
                 (errcode(ERRCODE_GROUPING_ERROR),
-                 errmsg("subquery uses ungrouped column \"%s.%s\" from outer query", rte->eref->aliasname, attname),
+                 errmsg("subquery uses ungrouped column number is \"%d\" in \"%s\" from outer query", var->varattno, rte->eref->aliasname),
                  parser_errposition(context->pstate, var->location)));
     }
 

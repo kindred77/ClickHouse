@@ -56,7 +56,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too few dotted names): %s",
-								NameListToString(typeName->names))));
+								PGNameListToString(typeName->names).c_str())));
 				break;
 			case 2:
 				rel->relname = strVal(linitial(typeName->names));
@@ -78,7 +78,7 @@ TypeParser::LookupTypeName(PGParseState *pstate, const PGTypeName *typeName,
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("improper %%TYPE reference (too many dotted names): %s",
-								NameListToString(typeName->names))));
+								PGNameListToString(typeName->names).c_str())));
 				break;
 		}
 

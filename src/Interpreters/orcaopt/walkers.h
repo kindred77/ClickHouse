@@ -249,7 +249,7 @@ struct grouping_rewrite_ctx
 {
 	duckdb_libpgquery::PGList *grp_tles;
 	PGParseState *pstate;
-} grouping_rewrite_ctx;
+};
 
 extern bool
 pg_grouping_rewrite_walker(duckdb_libpgquery::PGNode *node, void *context);

@@ -1294,7 +1294,7 @@ PGList * AggParser::get_groupclause_exprs(PGNode * grpcl,
     if (!grpcl)
         return result;
 
-    Assert(IsA(grpcl, PGSortGroupClause) /* || IsA(grpcl, GroupingClause) */ || IsA(grpcl, PGList));
+    Assert(IsA(grpcl, PGSortGroupClause) /* || IsA(grpcl, GroupingClause) */ || IsA(grpcl, PGList))
 
 	//TODO kindred
     if (IsA(grpcl, PGSortGroupClause))
@@ -1370,7 +1370,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
     PGNode * clause;
 
     /* This should only be called if we found aggregates or grouping */
-    Assert(pstate->p_hasAggs || qry->groupClause || qry->havingQual);
+    Assert(pstate->p_hasAggs || qry->groupClause || qry->havingQual)
 
     /*
 	 * Scan the range table to see if there are JOIN or self-reference CTE

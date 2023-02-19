@@ -1141,7 +1141,7 @@ const char *
 FuncParser::func_signature_string(PGList *funcname, int nargs,
 					  PGList *argnames, const Oid *argtypes)
 {
-	return funcname_signature_string(NameListToString(funcname).c_str(),
+	return funcname_signature_string(PGNameListToString(funcname).c_str(),
 									 nargs, argnames, argtypes);
 };
 
@@ -1425,43 +1425,43 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("%s(*) specified, but %s is not an aggregate function", NameListToString(funcname), NameListToString(funcname)),
+                 errmsg("%s(*) specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str(), PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
         if (agg_distinct)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("DISTINCT specified, but %s is not an aggregate function", NameListToString(funcname)),
+                 errmsg("DISTINCT specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
         if (agg_within_group)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("WITHIN GROUP specified, but %s is not an aggregate function", NameListToString(funcname)),
+                 errmsg("WITHIN GROUP specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
         if (agg_within_group)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("WITHIN GROUP specified, but %s is not an aggregate function", NameListToString(funcname)),
+                 errmsg("WITHIN GROUP specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
         if (agg_order != NIL)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("ORDER BY specified, but %s is not an aggregate function", NameListToString(funcname)),
+                 errmsg("ORDER BY specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
         if (agg_filter)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("FILTER specified, but %s is not an aggregate function", NameListToString(funcname)),
+                 errmsg("FILTER specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
         if (over)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("OVER specified, but %s is not a window function nor an aggregate function", NameListToString(funcname)),
+                 errmsg("OVER specified, but %s is not a window function nor an aggregate function", PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
     }
     else if (fdresult == FUNCDETAIL_AGGREGATE)
@@ -1490,13 +1490,13 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                 ereport(
                     ERROR,
                     (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                     errmsg("WITHIN GROUP is required for ordered-set aggregate %s", NameListToString(funcname)),
+                     errmsg("WITHIN GROUP is required for ordered-set aggregate %s", PGNameListToString(funcname).c_str()),
                      parser_errposition(pstate, location)));
             if (over)
                 ereport(
                     ERROR,
                     (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-                     errmsg("OVER is not supported for ordered-set aggregate %s", NameListToString(funcname)),
+                     errmsg("OVER is not supported for ordered-set aggregate %s", PGNameListToString(funcname).c_str()),
                      parser_errposition(pstate, location)));
             /* gram.y rejects DISTINCT + WITHIN GROUP */
             Assert(!agg_distinct);
@@ -1526,7 +1526,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                          errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types)),
                          errhint(
                              "There is an ordered-set aggregate %s, but it requires %d direct arguments, not %d.",
-                             NameListToString(funcname),
+                             PGNameListToString(funcname).c_str(),
                              catDirectArgs,
                              numDirectArgs),
                          parser_errposition(pstate, location)));
@@ -1555,7 +1555,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                              errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types)),
                              errhint(
                                  "There is an ordered-set aggregate %s, but it requires %d direct arguments, not %d.",
-                                 NameListToString(funcname),
+                                 PGNameListToString(funcname).c_str(),
                                  catDirectArgs,
                                  numDirectArgs),
                              parser_errposition(pstate, location)));
@@ -1581,7 +1581,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                                  errhint(
                                      "To use the hypothetical-set aggregate %s, the number of hypothetical direct arguments (here %d) must "
                                      "match the number of ordering columns (here %d).",
-                                     NameListToString(funcname),
+                                     PGNameListToString(funcname).c_str(),
                                      nvargs - numAggregatedArgs,
                                      numAggregatedArgs),
                                  parser_errposition(pstate, location)));
@@ -1595,7 +1595,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                                  errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types)),
                                  errhint(
                                      "There is an ordered-set aggregate %s, but it requires at least %d direct arguments.",
-                                     NameListToString(funcname),
+                                     PGNameListToString(funcname).c_str(),
                                      catDirectArgs),
                                  parser_errposition(pstate, location)));
                     }
@@ -1613,7 +1613,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                 ereport(
                     ERROR,
                     (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                     errmsg("%s is not an ordered-set aggregate, so it cannot have WITHIN GROUP", NameListToString(funcname)),
+                     errmsg("%s is not an ordered-set aggregate, so it cannot have WITHIN GROUP", PGNameListToString(funcname).c_str()),
                      parser_errposition(pstate, location)));
         }
     }
@@ -1626,14 +1626,14 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("window function %s requires an OVER clause", NameListToString(funcname)),
+                 errmsg("window function %s requires an OVER clause", PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
         /* And, per spec, WITHIN GROUP isn't allowed */
         if (agg_within_group)
             ereport(
                 ERROR,
                 (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("window function %s cannot have WITHIN GROUP", NameListToString(funcname)),
+                 errmsg("window function %s cannot have WITHIN GROUP", PGNameListToString(funcname).c_str()),
                  parser_errposition(pstate, location)));
     }
     else
@@ -1827,7 +1827,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("%s(*) must be used to call a parameterless aggregate function",
-							NameListToString(funcname)),
+							PGNameListToString(funcname).c_str()),
 					 parser_errposition(pstate, location)));
 #endif
 
@@ -1911,7 +1911,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("%s(*) must be used to call a parameterless aggregate function",
-							NameListToString(funcname)),
+							PGNameListToString(funcname).c_str()),
 					 parser_errposition(pstate, location)));
 #endif
 

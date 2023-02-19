@@ -1636,58 +1636,6 @@ get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause * sgClause, duckdb
     return (duckdb_libpgquery::PGNode *)tle->expr;
 };
 
-/*
- * DeconstructQualifiedName
- *		Given a possibly-qualified name expressed as a list of String nodes,
- *		extract the schema name and object name.
- *
- * *nspname_p is set to NULL if there is no explicit schema name.
- */
-void DeconstructQualifiedName(duckdb_libpgquery::PGList * names, char ** nspname_p, char ** objname_p)
-{
-	using duckdb_libpgquery::ereport;
-	using duckdb_libpgquery::errcode;
-	using duckdb_libpgquery::errmsg;
-	using duckdb_libpgquery::PGValue;
-
-    //char * catalogname;
-    char * schemaname = NULL;
-    char * objname = NULL;
-
-    switch (list_length(names))
-    {
-        case 1:
-            objname = strVal(linitial(names));
-            break;
-        case 2:
-            schemaname = strVal(linitial(names));
-            objname = strVal(lsecond(names));
-            break;
-        // case 3:
-        //     catalogname = strVal(linitial(names));
-        //     schemaname = strVal(lsecond(names));
-        //     objname = strVal(lthird(names));
-
-        //     /*
-		// 	 * We check the catalog name and then ignore it.
-		// 	 */
-        //     if (strcmp(catalogname, get_database_name(MyDatabaseId)) != 0)
-        //         ereport(
-        //             ERROR,
-        //             (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-        //              errmsg("cross-database references are not implemented: %s", NameListToString(names))));
-        //     break;
-        default:
-            ereport(
-                ERROR,
-                (errcode(ERRCODE_SYNTAX_ERROR), errmsg("improper qualified name (too many dotted names): %s", NameListToString(names))));
-            break;
-    }
-
-    *nspname_p = schemaname;
-    *objname_p = objname;
-};
-
 #define INT64CONST(x)  (x##L)
 
 bool scanint8(const char * str, bool errorOK, int64 * result)
@@ -1772,7 +1720,7 @@ gotdigits:
     return true;
 };
 
-std::string NameListToString(duckdb_libpgquery::PGList * names)
+std::string PGNameListToString(duckdb_libpgquery::PGList * names)
 {
 	using duckdb_libpgquery::elog;
 	using duckdb_libpgquery::PGListCell;
@@ -1812,68 +1760,57 @@ std::string NameListToString(duckdb_libpgquery::PGList * names)
     return result;
 };
 
-std::string get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, PGAttrNumber attnum)
+/*
+ * DeconstructQualifiedName
+ *		Given a possibly-qualified name expressed as a list of String nodes,
+ *		extract the schema name and object name.
+ *
+ * *nspname_p is set to NULL if there is no explicit schema name.
+ */
+void DeconstructQualifiedName(duckdb_libpgquery::PGList * names, char ** nspname_p, char ** objname_p)
 {
 	using duckdb_libpgquery::ereport;
 	using duckdb_libpgquery::errcode;
-	using duckdb_libpgquery::errmsg_internal;
+	using duckdb_libpgquery::errmsg;
 	using duckdb_libpgquery::PGValue;
 
-    const char * name;
+    //char * catalogname;
+    char * schemaname = NULL;
+    char * objname = NULL;
 
-    if (attnum == InvalidAttrNumber)
-        return "*";
+    switch (list_length(names))
+    {
+        case 1:
+            objname = strVal(linitial(names));
+            break;
+        case 2:
+            schemaname = strVal(linitial(names));
+            objname = strVal(lsecond(names));
+            break;
+        // case 3:
+        //     catalogname = strVal(linitial(names));
+        //     schemaname = strVal(lsecond(names));
+        //     objname = strVal(lthird(names));
 
-    /*
-	 * If there is a user-written column alias, use it.
-	 */
-    if (rte->alias && attnum > 0 && attnum <= list_length(rte->alias->colnames))
-        return strVal(list_nth(rte->alias->colnames, attnum - 1));
+        //     /*
+		// 	 * We check the catalog name and then ignore it.
+		// 	 */
+        //     if (strcmp(catalogname, get_database_name(MyDatabaseId)) != 0)
+        //         ereport(
+        //             ERROR,
+        //             (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+        //              errmsg("cross-database references are not implemented: %s", NameListToString(names))));
+        //     break;
+        default:
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_SYNTAX_ERROR), errmsg("improper qualified name (too many dotted names): %s", PGNameListToString(names).c_str())));
+            break;
+    }
 
-    /*
-	 * CDB: Pseudo columns have negative attribute numbers below the
-	 * lowest system attribute number.
-	 */
-	//TODO kindred
-    // if (attnum <= FirstLowInvalidHeapAttributeNumber)
-    // {
-    //     CdbRelColumnInfo * rci = cdb_rte_find_pseudo_column(rte, attnum);
-
-    //     if (!rci)
-    //         goto bogus;
-    //     return rci->colname;
-    // }
-
-    /*
-	 * If the RTE is a relation, go to the system catalogs not the
-	 * eref->colnames list.  This is a little slower but it will give the
-	 * right answer if the column has been renamed since the eref list was
-	 * built (which can easily happen for rules).
-	 */
-    if (rte->rtekind == duckdb_libpgquery::PG_RTE_RELATION)
-        return get_relid_attribute_name(rte->relid, attnum);
-
-    /*
-	 * Otherwise use the column name from eref.  There should always be one.
-	 */
-    if (rte->eref != NULL && attnum > 0 && attnum <= list_length(rte->eref->colnames))
-        return strVal(list_nth(rte->eref->colnames, attnum - 1));
-
-    /* CDB: Get name of sysattr even if relid is no good (e.g. SubqueryScan) */
-	//TODO kindred
-    // if (attnum < 0 && attnum > FirstLowInvalidHeapAttributeNumber)
-    // {
-    //     Form_pg_attribute att_tup = SystemAttributeDefinition(attnum, true);
-
-    //     return NameStr(att_tup->attname);
-    // }
-
-bogus:
-    /* else caller gave us a bogus attnum */
-    name = (rte->eref && rte->eref->aliasname) ? rte->eref->aliasname : "*BOGUS*";
-    ereport(WARNING, (errcode(ERRCODE_INTERNAL_ERROR), errmsg_internal("invalid attnum %d for rangetable entry %s", attnum, name)));
-    return "*BOGUS*";
-}
+    *nspname_p = schemaname;
+    *objname_p = objname;
+};
 
 // duckdb_libpgquery::PGTargetEntry *
 // get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)

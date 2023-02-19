@@ -6,6 +6,16 @@
 
 #include <Interpreters/orcaopt/TypeProvider.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wsometimes-uninitialized"
+#else
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
+#endif
+
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -280,9 +290,9 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 				// 						  Int32GetDatum(-1));
 				// cancel_parser_errposition_callback(&pcbstate);
 
-				// typeoid = NUMERICOID;
-				// typelen = -1;	/* variable len */
-				// typebyval = false;
+				typeoid = NUMERICOID;
+				typelen = -1;	/* variable len */
+				typebyval = false;
 			}
 			break;
 
@@ -311,9 +321,9 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 			// 						  ObjectIdGetDatum(InvalidOid),
 			// 						  Int32GetDatum(-1));
 			// cancel_parser_errposition_callback(&pcbstate);
-			// typeoid = BITOID;
-			// typelen = -1;
-			// typebyval = false;
+			typeoid = BITOID;
+			typelen = -1;
+			typebyval = false;
 			break;
 
 		case T_PGNull:

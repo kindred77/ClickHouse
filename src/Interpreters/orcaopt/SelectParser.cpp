@@ -11,6 +11,12 @@
 #include <Interpreters/orcaopt/AggParser.h>
 #include <Interpreters/orcaopt/FuncParser.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wswitch"
+#else
+#pragma GCC diagnostic ignored "-Wswitch"
+#endif
+
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -111,153 +117,146 @@ SelectParser::markTargetListOrigins(PGParseState *pstate, PGList *targetlist)
 	}
 };
 
+PGQuery * SelectParser::transformGroupedWindows(PGParseState * pstate,
+        PGQuery * qry)
+{
+    PGQuery * subq;
+    PGRangeTblEntry * rte;
+    PGRangeTblRef * ref;
+    PGAlias * alias;
+    bool hadSubLinks = qry->hasSubLinks;
+
+    grouped_window_ctx ctx;
+
+    Assert(qry->commandType == PG_CMD_SELECT)
+    Assert(!PointerIsValid(qry->utilityStmt))
+    Assert(qry->returningList == NIL)
+
+    if (!qry->hasWindowFuncs || !(qry->groupClause || qry->hasAggs))
+        return qry;
+
+    /* Make the new subquery (Q'').  Note that (per SQL:2003) there
+	 * can't be any window functions called in the WHERE, GROUP BY,
+	 * or HAVING clauses.
+	 */
+    subq = makeNode(PGQuery);
+    subq->commandType = PG_CMD_SELECT;
+    subq->querySource = PG_QSRC_PARSER;
+    subq->canSetTag = true;
+    subq->utilityStmt = NULL;
+    subq->resultRelation = 0;
+    subq->hasAggs = qry->hasAggs;
+    subq->hasWindowFuncs = false; /* reevaluate later */
+    subq->hasSubLinks = qry->hasSubLinks; /* reevaluate later */
+
+    /* Core of subquery input table expression: */
+    subq->rtable = qry->rtable; /* before windowing */
+    subq->jointree = qry->jointree; /* before windowing */
+    subq->targetList = NIL; /* fill in later */
+
+    subq->returningList = NIL;
+    subq->groupClause = qry->groupClause; /* before windowing */
+    subq->havingQual = qry->havingQual; /* before windowing */
+    subq->windowClause = NIL; /* by construction */
+    subq->distinctClause = NIL; /* after windowing */
+    subq->sortClause = NIL; /* after windowing */
+    subq->limitOffset = NULL; /* after windowing */
+    subq->limitCount = NULL; /* after windowing */
+    subq->rowMarks = NIL;
+    subq->setOperations = NULL;
+
+    /* Check if there is a window function in the join tree. If so
+	 * we must mark hasWindowFuncs in the sub query as well.
+	 */
+    if (contain_window_function((PGNode *)subq->jointree))
+        subq->hasWindowFuncs = true;
+
+    /* Make the single range table entry for the outer query Q' as
+	 * a wrapper for the subquery (Q'') currently under construction.
+	 */
+    rte = makeNode(PGRangeTblEntry);
+    rte->rtekind = PG_RTE_SUBQUERY;
+    rte->subquery = subq;
+    rte->alias = NULL; /* fill in later */
+    rte->eref = NULL; /* fill in later */
+    rte->inFromCl = true;
+	//TODO kindred
+    //rte->requiredPerms = ACL_SELECT;
+    /* Default?
+	 * rte->inh = 0;
+	 * rte->checkAsUser = 0;
+	 * rte->pseudocols = 0;
+	*/
+
+    /* Make a reference to the new range table entry .
+	 */
+    ref = makeNode(PGRangeTblRef);
+    ref->rtindex = 1;
+
+    /* Set up context for mutating the target list.  Careful.
+	 * This is trickier than it looks.  The context will be
+	 * "primed" with grouping targets.
+	 */
+    init_grouped_window_context(&ctx, qry);
+
+    /* Begin rewriting the outer query in place.
+     */
+    qry->hasAggs = false; /* by constuction */
+    /* qry->hasSubLinks -- reevaluate later. */
+
+    /* Core of outer query input table expression: */
+    qry->rtable = list_make1(rte);
+    qry->jointree = (PGFromExpr *)makeNode(PGFromExpr);
+    qry->jointree->fromlist = list_make1(ref);
+    qry->jointree->quals = NULL;
+    /* qry->targetList -- to be mutated from Q to Q' below */
+
+    qry->groupClause = NIL; /* by construction */
+    qry->havingQual = NULL; /* by construction */
+
+    /* Mutate the Q target list and windowClauses for use in Q' and, at the
+	 * same time, update state with info needed to assemble the target list
+	 * for the subquery (Q'').
+	 */
+    qry->targetList = (PGList *)grouped_window_mutator((PGNode *)qry->targetList, &ctx);
+    qry->windowClause = (PGList *)grouped_window_mutator((PGNode *)qry->windowClause, &ctx);
+    qry->hasSubLinks = checkExprHasSubLink((PGNode *)qry->targetList);
+
+    /* New subquery fields
+	 */
+    subq->targetList = ctx.subtlist;
+    subq->groupClause = ctx.subgroupClause;
+
+    /* We always need an eref, but we shouldn't really need a filled in alias.
+	 * However, view deparse (or at least the fix for MPP-2189) wants one.
+	 */
+    alias = make_replacement_alias(subq, "Window");
+    rte->eref = (PGAlias *)copyObject(alias);
+    rte->alias = alias;
+
+    /* Accomodate depth change in new subquery, Q''.
+	 */
+    IncrementVarSublevelsUpInTransformGroupedWindows((PGNode *)subq, 1, 1);
+
+    /* Might have changed. */
+    subq->hasSubLinks = checkExprHasSubLink((PGNode *)subq);
+
+    Assert(PointerIsValid(qry->targetList))
+    Assert(IsA(qry->targetList, PGList))
+    /* Use error instead of assertion to "use" hadSubLinks and keep compiler happy. */
+    if (hadSubLinks != (qry->hasSubLinks || subq->hasSubLinks))
+        elog(ERROR, "inconsistency detected in internal grouped windows transformation");
+
+    discard_grouped_window_context(&ctx);
+
+    assign_query_collations(pstate, subq);
+
+    return qry;
+};
+
 PGQuery *
 SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 {
-    PGQuery	   *qry = makeNode(PGQuery);
-	PGNode	   *qual;
-	PGListCell   *l;
-
-	qry->commandType = PG_CMD_SELECT;
-
-	/* process the WITH clause independently of all else */
-	if (stmt->withClause)
-	{
-		qry->hasRecursive = stmt->withClause->recursive;
-		qry->cteList = cte_parser->transformWithClause(pstate, stmt->withClause);
-		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
-	}
-
-	/* Complain if we get called from someplace where INTO is not allowed */
-	parser_errposition(pstate, exprLocation((PGNode *) stmt->intoClause));
-	if (stmt->intoClause)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("SELECT ... INTO is not allowed here")));
-
-	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
-	pstate->p_locking_clause = stmt->lockingClause;
-
-	/* make WINDOW info available for window functions, too */
-	pstate->p_windowdefs = stmt->windowClause;
-
-	/* process the FROM clause */
-	clause_parser->transformFromClause(pstate, stmt->fromClause);
-
-	/* transform targetlist */
-	qry->targetList = target_parser->transformTargetList(pstate, stmt->targetList,
-										  PGParseExprKind::EXPR_KIND_SELECT_TARGET);
-
-	/* mark column origins */
-	markTargetListOrigins(pstate, qry->targetList);
-
-	/* transform WHERE */
-	qual = clause_parser->transformWhereClause(pstate, stmt->whereClause,
-								PGParseExprKind::EXPR_KIND_WHERE, "WHERE");
-
-	/* initial processing of HAVING clause is much like WHERE clause */
-	qry->havingQual = clause_parser->transformWhereClause(pstate, stmt->havingClause,
-										   PGParseExprKind::EXPR_KIND_HAVING, "HAVING");
-
-	/*
-	 * Transform sorting/grouping stuff.  Do ORDER BY first because both
-	 * transformGroupClause and transformDistinctClause need the results. Note
-	 * that these functions can also change the targetList, so it's passed to
-	 * them by reference.
-	 */
-	qry->sortClause = clause_parser->transformSortClause(pstate,
-										  stmt->sortClause,
-										  &qry->targetList,
-										  PGParseExprKind::EXPR_KIND_ORDER_BY,
-										  false /* allow SQL92 rules */ );
-
-	qry->groupClause = clause_parser->transformGroupClause(pstate,
-											stmt->groupClause,
-											&qry->groupingSets,
-											&qry->targetList,
-											qry->sortClause,
-											PGParseExprKind::EXPR_KIND_GROUP_BY,
-											false /* allow SQL92 rules */ );
-
-	/*
-	 * SCATTER BY clause on a table function TableValueExpr subquery.
-	 *
-	 * Note: a given subquery cannot have both a SCATTER clause and an INTO
-	 * clause, because both of those control distribution.  This should not
-	 * possible due to grammar restrictions on where a SCATTER clause is
-	 * allowed.
-	 */
-	Assert(!(stmt->scatterClause && stmt->intoClause));
-	// qry->scatterClause = transformScatterClause(pstate,
-	// 											stmt->scatterClause,
-	// 											&qry->targetList);
-
-	if (stmt->distinctClause == NIL)
-	{
-		qry->distinctClause = NIL;
-		qry->hasDistinctOn = false;
-	}
-	else if (linitial(stmt->distinctClause) == NULL)
-	{
-		/* We had SELECT DISTINCT */
-		qry->distinctClause = clause_parser.transformDistinctClause(pstate,
-													  &qry->targetList,
-													  qry->sortClause,
-													  false);
-		qry->hasDistinctOn = false;
-	}
-	else
-	{
-		/* We had SELECT DISTINCT ON */
-		qry->distinctClause = clause_parser.transformDistinctOnClause(pstate,
-														stmt->distinctClause,
-														&qry->targetList,
-														qry->sortClause);
-		qry->hasDistinctOn = true;
-	}
-
-	/* transform LIMIT */
-	qry->limitOffset = clause_parser.transformLimitClause(pstate, stmt->limitOffset,
-											PGParseExprKind::EXPR_KIND_OFFSET, "OFFSET");
-	qry->limitCount = clause_parser.transformLimitClause(pstate, stmt->limitCount,
-										   PGParseExprKind::EXPR_KIND_LIMIT, "LIMIT");
-
-	/* transform window clauses after we have seen all window functions */
-	qry->windowClause = clause_parser.transformWindowDefinitions(pstate,
-												   pstate->p_windowdefs,
-												   &qry->targetList);
-
-	/* resolve any still-unresolved output columns as being type text */
-	if (pstate->p_resolve_unknowns)
-		target_parser.resolveTargetListUnknowns(pstate, qry->targetList);
-
-	qry->rtable = pstate->p_rtable;
-	qry->jointree = makeFromExpr(pstate->p_joinlist, qual);
-
-	qry->hasSubLinks = pstate->p_hasSubLinks;
-	qry->hasWindowFuncs = pstate->p_hasWindowFuncs;
-	qry->hasTargetSRFs = pstate->p_hasTargetSRFs;
-	qry->hasAggs = pstate->p_hasAggs;
-	// qry->hasFuncsWithExecRestrictions = pstate->p_hasFuncsWithExecRestrictions;
-
-	if (pstate->p_hasTblValueExpr)
-		parseCheckTableFunctions(pstate, qry);
-
-	// foreach(l, stmt->lockingClause)
-	// {
-	// 	transformLockingClause(pstate, qry,
-	// 						   (PGLockingClause *) lfirst(l), false);
-	// }
-
-	collation_parser.assign_query_collations(pstate, qry);
-
-	/* this must be done after collations, for reliable comparison of exprs */
-	if (pstate->p_hasAggs || qry->groupClause || qry->groupingSets || qry->havingQual)
-		agg_parser.parseCheckAggregates(pstate, qry);
-
-	return qry;
-
-	--------------------------;
     PGQuery * qry = makeNode(PGQuery);
     PGNode * qual;
     PGListCell * l;

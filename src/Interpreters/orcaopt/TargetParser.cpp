@@ -784,22 +784,22 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 			switch (crserr)
 			{
 				case CRSERR_NO_RTE:
-					relation_parser.errorMissingRTE(pstate, makeRangeVar(nspname, relname,
+					relation_parser->errorMissingRTE(pstate, makeRangeVar(nspname, relname,
 														 cref->location));
 					break;
 				case CRSERR_WRONG_DB:
-					node_parser.parser_errposition(pstate, cref->location);
+					parser_errposition(pstate, cref->location);
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cross-database references are not implemented: %s",
-									NameListToString(cref->fields))));
+									PGNameListToString(cref->fields).c_str())));
 					break;
 				case CRSERR_TOO_MANY:
-					node_parser.parser_errposition(pstate, cref->location);
+					parser_errposition(pstate, cref->location);
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
 							 errmsg("improper qualified name (too many dotted names): %s",
-									NameListToString(cref->fields))));
+									PGNameListToString(cref->fields).c_str())));
 					break;
 			}
 		}

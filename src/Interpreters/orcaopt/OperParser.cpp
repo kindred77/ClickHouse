@@ -617,7 +617,7 @@ const char * OperParser::op_signature_string(PGList * op, char oprkind, Oid arg1
     if (oprkind != 'l')
         appendStringInfo(&argbuf, "%s ", format_type_be(arg1));
 
-    appendStringInfoString(&argbuf, NameListToString(op));
+    appendStringInfoString(&argbuf, PGNameListToString(op).c_str());
 
     if (oprkind != 'r')
         appendStringInfo(&argbuf, " %s", format_type_be(arg2));
