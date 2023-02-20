@@ -19,6 +19,8 @@ public:
 	explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	
 	PGProcPtr getProcByOid(Oid oid) const;
+
+    bool get_func_retset(Oid funcid);
 };
 
 }

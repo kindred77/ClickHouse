@@ -188,10 +188,11 @@ add_object_library(clickhouse_interpreters_mysql Interpreters/MySQL)
 add_object_library(clickhouse_interpreters_clusterproxy Interpreters/ClusterProxy)
 add_object_library(clickhouse_interpreters_jit Interpreters/JIT)
 
-#add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt)
+#add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/pgopt_hawq) #for hawq 3.0.0.0
 #add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/pgopt) #for gpdb 6.19.0
 #add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/pgoptnew) #for gpdb 6.21.x
-add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt) #for hawq 3.0.0.0
+add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt) #for gpdb 6.21.x
+add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/provider)
 
 add_object_library(clickhouse_columns Columns)
 add_object_library(clickhouse_storages Storages)

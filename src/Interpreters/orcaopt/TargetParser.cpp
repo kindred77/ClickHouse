@@ -356,10 +356,10 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 	return target;
 };
 
-TupleDesc
+PGTupleDesc
 TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsup)
 {
-	TupleDesc	tupleDesc;
+	PGTupleDesc	tupleDesc;
 	int			netlevelsup;
 	PGRangeTblEntry *rte;
 	PGAttrNumber	attnum;

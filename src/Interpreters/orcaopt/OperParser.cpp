@@ -3,6 +3,9 @@
 #include <Interpreters/orcaopt/CoerceParser.h>
 #include <Interpreters/orcaopt/FuncParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
+#include <Interpreters/orcaopt/provider/OperProvider.h>
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
+#include <Interpreters/orcaopt/provider/ProcProvider.h>
 
 namespace DB
 {
@@ -48,7 +51,7 @@ PGOperatorPtr OperParser::compatible_oper(PGParseState * pstate, PGList * op, Oi
         ereport(
             ERROR,
             (errcode(ERRCODE_UNDEFINED_FUNCTION),
-             errmsg("operator requires run-time type coercion: %s", op_signature_string(op, 'b', arg1, arg2))));
+             errmsg("operator requires run-time type coercion: %s", op_signature_string(op, 'b', arg1, arg2).c_str())));
     }
 
     return NULL;
@@ -57,8 +60,9 @@ PGOperatorPtr OperParser::compatible_oper(PGParseState * pstate, PGList * op, Oi
 void OperParser::get_sort_group_operators(
     Oid argtype, bool needLT, bool needEQ, bool needGT, Oid * ltOpr, Oid * eqOpr, Oid * gtOpr, bool * isHashable)
 {
-    TypeCacheEntry * typentry;
-    int cache_flags;
+    //TODO kindred
+    //TypeCacheEntry * typentry;
+    //int cache_flags;
     Oid lt_opr;
     Oid eq_opr;
     Oid gt_opr;
@@ -70,12 +74,12 @@ void OperParser::get_sort_group_operators(
 	 * Note: the search algorithm used by typcache.c ensures that the results
 	 * are consistent, ie all from matching opclasses.
 	 */
-    if (isHashable != NULL)
-        cache_flags = TYPECACHE_LT_OPR | TYPECACHE_EQ_OPR | TYPECACHE_GT_OPR | TYPECACHE_HASH_PROC;
-    else
-        cache_flags = TYPECACHE_LT_OPR | TYPECACHE_EQ_OPR | TYPECACHE_GT_OPR;
+    // if (isHashable != NULL)
+    //     cache_flags = TYPECACHE_LT_OPR | TYPECACHE_EQ_OPR | TYPECACHE_GT_OPR | TYPECACHE_HASH_PROC;
+    // else
+    //     cache_flags = TYPECACHE_LT_OPR | TYPECACHE_EQ_OPR | TYPECACHE_GT_OPR;
 
-    typentry = lookup_type_cache(argtype, cache_flags);
+    PGSortGroupOperPtr typentry = oper_provider->get_sort_group_operators(argtype);
     lt_opr = typentry->lt_opr;
     eq_opr = typentry->eq_opr;
     gt_opr = typentry->gt_opr;
@@ -132,7 +136,7 @@ PGOperatorPtr OperParser::right_oper(PGParseState * pstate, PGList * op, Oid arg
     /*
 	 * First try for an "exact" match.
 	 */
-    operOid = oper_provider->OpernameGetOprid(op, arg, InvalidOid);
+    operOid = oper_provider->getOperByName(op, arg, InvalidOid);
     if (!OidIsValid(operOid))
     {
         /*
@@ -197,7 +201,7 @@ PGOperatorPtr OperParser::left_oper(PGParseState * pstate, PGList * op, Oid arg,
     /*
 	 * First try for an "exact" match.
 	 */
-    operOid = oper_provider->OpernameGetOprid(op, InvalidOid, arg);
+    operOid = oper_provider->getOperByName(op, InvalidOid, arg);
     if (!OidIsValid(operOid))
     {
         /*
@@ -299,18 +303,18 @@ Oid OperParser::binary_oper_exact(PGList * opname, Oid arg1, Oid arg2)
         was_unknown = true;
     }
 
-    result = oper_provider->OpernameGetOprid(opname, arg1, arg2);
+    result = oper_provider->getOperByName(opname, arg1, arg2);
     if (OidIsValid(result))
         return result;
 
     if (was_unknown)
     {
         /* arg1 and arg2 are the same here, need only look at arg1 */
-        Oid basetype = getBaseType(arg1);
+        Oid basetype = type_provider->getBaseType(arg1);
 
         if (basetype != arg1)
         {
-            result = oper_provider->OpernameGetOprid(opname, basetype, basetype);
+            result = oper_provider->getOperByName(opname, basetype, basetype);
             if (OidIsValid(result))
                 return result;
         }
@@ -342,7 +346,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
         rtypeId = UNKNOWNOID;
     else
     {
-        rtypeId = get_base_element_type(atypeId);
+        rtypeId = type_provider->get_base_element_type(atypeId);
         if (!OidIsValid(rtypeId))
         {
             parser_errposition(pstate, location);
@@ -361,7 +365,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
         ereport(
             ERROR,
             (errcode(ERRCODE_UNDEFINED_FUNCTION),
-             errmsg("operator is only a shell: %s", op_signature_string(opname, tup->oprkind, tup->oprleft, tup->oprright))));
+             errmsg("operator is only a shell: %s", op_signature_string(opname, tup->oprkind, tup->oprleft, tup->oprright).c_str())));
     }
 
     args = list_make2(ltree, rtree);
@@ -375,7 +379,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
 	 * possibly adjusting return type or declared_arg_types (which will be
 	 * used as the cast destination by make_fn_arguments)
 	 */
-    rettype = coerce_parser->enforce_generic_type_consistency(actual_arg_types, declared_arg_types, 2, opform->oprresult, false);
+    rettype = coerce_parser->enforce_generic_type_consistency(actual_arg_types, declared_arg_types, 2, tup->oprresult, false);
 
     /*
 	 * Check that operator result is boolean
@@ -385,7 +389,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
         parser_errposition(pstate, location);
         ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("op ANY/ALL (array) requires operator to yield boolean")));
     }
-    if (get_func_retset(tup->oprcode))
+    if (proc_provider->get_func_retset(tup->oprcode))
     {
         parser_errposition(pstate, location);
         ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("op ANY/ALL (array) requires operator not to return a set")));
@@ -404,14 +408,14 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
     }
     else
     {
-        res_atypeId = get_array_type(declared_arg_types[1]);
+        res_atypeId = type_provider->get_array_type(declared_arg_types[1]);
         if (!OidIsValid(res_atypeId))
         {
             parser_errposition(pstate, location);
             ereport(
                 ERROR,
                 (errcode(ERRCODE_UNDEFINED_OBJECT),
-                 errmsg("could not find array type for data type %s", format_type_be(declared_arg_types[1]))));
+                 errmsg("could not find array type for data type %s", type_provider->format_type_be(declared_arg_types[1]))));
         }
     }
     actual_arg_types[1] = atypeId;
@@ -590,7 +594,7 @@ void OperParser::op_error(PGParseState * pstate, PGList * op, char oprkind, Oid 
         ereport(
             ERROR,
             (errcode(ERRCODE_AMBIGUOUS_FUNCTION),
-             errmsg("operator is not unique: %s", op_signature_string(op, oprkind, arg1, arg2)),
+             errmsg("operator is not unique: %s", op_signature_string(op, oprkind, arg1, arg2).c_str()),
              errhint("Could not choose a best candidate operator. "
                      "You might need to add explicit type casts.")));
     }
@@ -600,7 +604,7 @@ void OperParser::op_error(PGParseState * pstate, PGList * op, char oprkind, Oid 
         ereport(
             ERROR,
             (errcode(ERRCODE_UNDEFINED_FUNCTION),
-             errmsg("operator does not exist: %s", op_signature_string(op, oprkind, arg1, arg2)),
+             errmsg("operator does not exist: %s", op_signature_string(op, oprkind, arg1, arg2).c_str()),
              (!arg1 || !arg2) ? errhint("No operator matches the given name and argument type. "
                                         "You might need to add an explicit type cast.")
                               : errhint("No operator matches the given name and argument types. "
@@ -608,24 +612,30 @@ void OperParser::op_error(PGParseState * pstate, PGList * op, char oprkind, Oid 
     }
 };
 
-const char * OperParser::op_signature_string(PGList * op, char oprkind, Oid arg1, Oid arg2)
+std::string OperParser::op_signature_string(PGList * op, char oprkind, Oid arg1, Oid arg2)
 {
-    StringInfoData argbuf;
-
-    initStringInfo(&argbuf);
+    std::string argbuf = "";
 
     if (oprkind != 'l')
-        appendStringInfo(&argbuf, "%s ", format_type_be(arg1));
+    {
+        //appendStringInfo(&argbuf, "%s ", format_type_be(arg1));
+        argbuf += std::string(type_provider->format_type_be(arg1)) + " ";
+    }
 
-    appendStringInfoString(&argbuf, PGNameListToString(op).c_str());
+    //appendStringInfoString(&argbuf, PGNameListToString(op).c_str());
+    argbuf += PGNameListToString(op);
 
     if (oprkind != 'r')
-        appendStringInfo(&argbuf, " %s", format_type_be(arg2));
+    {
+        //appendStringInfo(&argbuf, " %s", format_type_be(arg2));
+        argbuf += " " + std::string(type_provider->format_type_be(arg2));
+    }
 
-    return argbuf.data; /* return palloc'd string buffer */
+    return argbuf; /* return palloc'd string buffer */
 };
 
-PGExpr * OperParser::make_op(PGParseState * pstate, PGList * opname, PGNode * ltree, PGNode * rtree, PGNode * last_srf, int location)
+PGExpr * OperParser::make_op(PGParseState * pstate, PGList * opname,
+		PGNode * ltree, PGNode * rtree, int location)
 {
     Oid ltypeId, rtypeId;
     PGOperatorPtr tup;
@@ -660,17 +670,13 @@ PGExpr * OperParser::make_op(PGParseState * pstate, PGList * opname, PGNode * lt
         tup = oper(pstate, opname, ltypeId, rtypeId, false, location);
     }
 
-    //opform = (Form_pg_operator)GETSTRUCT(tup);
-
     /* Check it's not a shell */
     if (!OidIsValid(tup->oprcode))
-    {
-        parser_errposition(pstate, location);
         ereport(
             ERROR,
             (errcode(ERRCODE_UNDEFINED_FUNCTION),
-             errmsg("operator is only a shell: %s", op_signature_string(opname, tup->oprkind, tup->oprleft, tup->oprright))));
-    }
+             errmsg("operator is only a shell: %s", op_signature_string(opname, tup->oprkind, tup->oprleft, tup->oprright).c_str()),
+             parser_errposition(pstate, location)));
 
     /* Do typecasting and build the expression tree */
     if (rtree == NULL)
@@ -712,23 +718,13 @@ PGExpr * OperParser::make_op(PGParseState * pstate, PGList * opname, PGNode * lt
 
     /* and build the expression node */
     result = makeNode(PGOpExpr);
-    result->opno = oprid(tup);
+    result->opno = tup->oid;
     result->opfuncid = tup->oprcode;
     result->opresulttype = rettype;
-    result->opretset = get_func_retset(tup->oprcode);
+    result->opretset = proc_provider->get_func_retset(tup->oprcode);
     /* opcollid and inputcollid will be set by parse_collate.c */
     result->args = args;
     result->location = location;
-
-    /* if it returns a set, check that's OK */
-    if (result->opretset)
-    {
-        func_parser->check_srf_call_placement(pstate, last_srf, location);
-        /* ... and remember it for error checks at higher levels */
-        pstate->p_last_srf = (PGNode *)result;
-    }
-
-    //ReleaseSysCache(tup);
 
     return (PGExpr *)result;
 };

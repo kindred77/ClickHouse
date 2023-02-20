@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/OperProvider.h>
+#include <Interpreters/orcaopt/provider/OperProvider.h>
 
 using namespace duckdb_libpgquery;
 
@@ -313,6 +313,12 @@ bool OperProvider::op_hashjoinable(Oid opno, Oid inputtype)
             result = op->oprcanhash;
         }
     // }
+    return result;
+};
+
+PGSortGroupOperPtr OperProvider::get_sort_group_operators(Oid type_id)
+{
+    auto result = std::make_shared<Sort_group_operator>();
     return result;
 };
 

@@ -61,7 +61,7 @@ public:
     ExpandIndirectionStar(PGParseState *pstate, duckdb_libpgquery::PGAIndirection *ind,
 					  bool make_target_entry, PGParseExprKind exprKind);
 
-    TupleDesc
+    PGTupleDesc
     expandRecordVariable(PGParseState *pstate, duckdb_libpgquery::PGVar *var, int levelsup);
 
     duckdb_libpgquery::PGList *

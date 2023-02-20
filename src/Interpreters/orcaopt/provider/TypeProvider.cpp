@@ -1,5 +1,5 @@
-#include <Interpreters/orcaopt/TypeProvider.h>
-#include <Interpreters/orcaopt/FunctionProvider.h>
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
+#include <Interpreters/orcaopt/provider/FunctionProvider.h>
 #include <Interpreters/orcaopt/TypeParser.h>
 
 #include "naucrates/dxl/CDXLUtils.h"
@@ -913,9 +913,9 @@ char * TypeProvider::format_type_internal(Oid type_oid, int32 typemod, bool type
     return buf;
 };
 
-TupleDesc TypeProvider::lookup_rowtype_tupdesc(Oid type_id, int32 typmod)
+PGTupleDesc TypeProvider::lookup_rowtype_tupdesc(Oid type_id, int32 typmod)
 {
-    TupleDesc tupDesc;
+    PGTupleDesc tupDesc;
 
     tupDesc = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
     IncrTupleDescRefCount(tupDesc);

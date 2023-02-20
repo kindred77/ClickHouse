@@ -33,6 +33,10 @@ public:
     Datum OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2);
 
     Datum OidFunctionCall1Coll(Oid functionId, Datum arg1);
+
+    FuncCandidateList
+    FuncnameGetCandidates(duckdb_libpgquery::PGList * names, int nargs, duckdb_libpgquery::PGList * argnames,
+		bool expand_variadic, bool expand_defaults, bool missing_ok);
 };
 
 }

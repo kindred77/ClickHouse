@@ -5,10 +5,10 @@
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/TypeParser.h>
 
-#include <Interpreters/orcaopt/TypeProvider.h>
-#include <Interpreters/orcaopt/ClassProvider.h>
-#include <Interpreters/orcaopt/ProcProvider.h>
-#include <Interpreters/orcaopt/CastProvider.h>
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
+#include <Interpreters/orcaopt/provider/ClassProvider.h>
+#include <Interpreters/orcaopt/provider/ProcProvider.h>
+#include <Interpreters/orcaopt/provider/CastProvider.h>
 
 using namespace duckdb_libpgquery;
 
@@ -141,7 +141,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 						 int location)
 {
     PGRowExpr * rowexpr;
-    TupleDesc tupdesc;
+    PGTupleDesc tupdesc;
     PGList * args = NIL;
     PGList * newargs;
     int i;

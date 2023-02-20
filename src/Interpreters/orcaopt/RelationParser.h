@@ -61,13 +61,13 @@ public:
 			   duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars);
 
 	void
-	expandTupleDesc(TupleDesc tupdesc, duckdb_libpgquery::PGAlias *eref, int count, int offset,
+	expandTupleDesc(PGTupleDesc tupdesc, duckdb_libpgquery::PGAlias *eref, int count, int offset,
 				int rtindex, int sublevels_up,
 				int location, bool include_dropped,
 				duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars);
 
 	void
-	buildRelationAliases(TupleDesc tupdesc, duckdb_libpgquery::PGAlias *alias,
+	buildRelationAliases(PGTupleDesc tupdesc, duckdb_libpgquery::PGAlias *alias,
 				duckdb_libpgquery::PGAlias *eref);
 
 	duckdb_libpgquery::PGRangeTblEntry *
@@ -105,7 +105,7 @@ public:
 					   int sublevels_up);
 
     duckdb_libpgquery::PGNode * scanRTEForColumn(PGParseState * pstate, duckdb_libpgquery::PGRangeTblEntry * rte,
-		char * colname, int location);
+		const char * colname, int location);
 
     duckdb_libpgquery::PGNode *
 	colNameToVar(PGParseState *pstate, const char *colname, bool localonly,

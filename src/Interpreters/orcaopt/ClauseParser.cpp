@@ -9,8 +9,8 @@
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/TargetParser.h>
 #include <Interpreters/orcaopt/TypeParser.h>
-#include <Interpreters/orcaopt/OperProvider.h>
-#include <Interpreters/orcaopt/FunctionProvider.h>
+#include <Interpreters/orcaopt/provider/OperProvider.h>
+#include <Interpreters/orcaopt/provider/FunctionProvider.h>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wcovered-switch-default"

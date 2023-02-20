@@ -11,8 +11,8 @@
 //#include <Interpreters/orcaopt/CollationParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/AggParser.h>
-#include <Interpreters/orcaopt/TypeProvider.h>
-#include <Interpreters/orcaopt/RelationProvider.h>
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
+#include <Interpreters/orcaopt/provider/RelationProvider.h>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wswitch"
@@ -1036,106 +1036,70 @@ ExprParser::operator_precedence_group(PGNode *node, const char **nodename)
 PGNode *
 ExprParser::transformAExprOp(PGParseState *pstate, PGAExpr *a)
 {
-	PGNode	   *lexpr = a->lexpr;
-	PGNode	   *rexpr = a->rexpr;
-	PGNode	   *result;
+    PGNode * lexpr = a->lexpr;
+    PGNode * rexpr = a->rexpr;
+    PGNode * result;
 
-	if (operator_precedence_warning)
-	{
-		int			opgroup;
-		const char *opname;
-
-		opgroup = operator_precedence_group((PGNode *) a, &opname);
-		if (opgroup > 0)
-			emit_precedence_warnings(pstate, opgroup, opname,
-									 lexpr, rexpr,
-									 a->location);
-
-		/* Look through AEXPR_PAREN nodes so they don't affect tests below */
-		while (lexpr && IsA(lexpr, PGAExpr) &&
-			   ((PGAExpr *) lexpr)->kind == AEXPR_PAREN)
-			lexpr = ((PGAExpr *) lexpr)->lexpr;
-		while (rexpr && IsA(rexpr, PGAExpr) &&
-			   ((PGAExpr *) rexpr)->kind == AEXPR_PAREN)
-			rexpr = ((PGAExpr *) rexpr)->lexpr;
-	}
-
-	/*
+    /*
 	 * Special-case "foo = NULL" and "NULL = foo" for compatibility with
 	 * standards-broken products (like Microsoft's).  Turn these into IS NULL
 	 * exprs. (If either side is a CaseTestExpr, then the expression was
 	 * generated internally from a CASE-WHEN expression, and
 	 * transform_null_equals does not apply.)
 	 */
-	if (Transform_null_equals &&
-		list_length(a->name) == 1 &&
-		strcmp(strVal(linitial(a->name)), "=") == 0 &&
-		(exprIsNullConstant(lexpr) || exprIsNullConstant(rexpr)) &&
-		(!IsA(lexpr, PGCaseTestExpr) &&!IsA(rexpr, PGCaseTestExpr)))
-	{
-		PGNullTest   *n = makeNode(PGNullTest);
+    if (Transform_null_equals && list_length(a->name) == 1 && strcmp(strVal(linitial(a->name)), "=") == 0
+        && (exprIsNullConstant(lexpr) || exprIsNullConstant(rexpr)) && (!IsA(lexpr, PGCaseTestExpr) && !IsA(rexpr, PGCaseTestExpr)))
+    {
+        PGNullTest * n = makeNode(PGNullTest);
 
-		n->nulltesttype = PG_IS_NULL;
-		n->location = a->location;
+        n->nulltesttype = PG_IS_NULL;
 
-		if (exprIsNullConstant(lexpr))
-			n->arg = (PGExpr *) rexpr;
-		else
-			n->arg = (PGExpr *) lexpr;
+        if (exprIsNullConstant(lexpr))
+            n->arg = (PGExpr *)rexpr;
+        else
+            n->arg = (PGExpr *)lexpr;
 
-		result = transformExprRecurse(pstate, (PGNode *) n);
-	}
-	else if (lexpr && IsA(lexpr, PGRowExpr) &&
-			 rexpr && IsA(rexpr, PGSubLink) &&
-			 ((PGSubLink *) rexpr)->subLinkType == PG_EXPR_SUBLINK)
-	{
-		/*
+        result = transformExprRecurse(pstate, (PGNode *)n);
+    }
+    else if (lexpr && IsA(lexpr, PGRowExpr) && rexpr && IsA(rexpr, PGSubLink) && ((PGSubLink *)rexpr)->subLinkType == PG_EXPR_SUBLINK)
+    {
+        /*
 		 * Convert "row op subselect" into a ROWCOMPARE sublink. Formerly the
 		 * grammar did this, but now that a row construct is allowed anywhere
 		 * in expressions, it's easier to do it here.
 		 */
-		PGSubLink    *s = (PGSubLink *) rexpr;
+        PGSubLink * s = (PGSubLink *)rexpr;
 
-		s->subLinkType = PG_ROWCOMPARE_SUBLINK;
-		s->testexpr = lexpr;
-		s->operName = a->name;
-		s->location = a->location;
-		result = transformExprRecurse(pstate, (PGNode *) s);
-	}
-	else if (lexpr && IsA(lexpr, PGRowExpr) &&
-			 rexpr && IsA(rexpr, PGRowExpr))
-	{
-		// /* ROW() op ROW() is handled specially */
-		// lexpr = transformExprRecurse(pstate, lexpr);
-		// rexpr = transformExprRecurse(pstate, rexpr);
+        s->subLinkType = PG_ROWCOMPARE_SUBLINK;
+        s->testexpr = lexpr;
+        s->operName = a->name;
+        s->location = a->location;
+        result = transformExprRecurse(pstate, (PGNode *)s);
+    }
+    else if (lexpr && IsA(lexpr, PGRowExpr) && rexpr && IsA(rexpr, PGRowExpr))
+    {
+		//TODO kindred
+        /* ROW() op ROW() is handled specially */
+        // lexpr = transformExprRecurse(pstate, lexpr);
+        // rexpr = transformExprRecurse(pstate, rexpr);
+        // Assert(IsA(lexpr, PGRowExpr))
+        // Assert(IsA(rexpr, PGRowExpr))
 
-		// result = make_row_comparison_op(pstate,
-		// 								a->name,
-		// 								castNode(PGRowExpr, lexpr)->args,
-		// 								castNode(PGRowExpr, rexpr)->args,
-		// 								a->location);
+        // result = make_row_comparison_op(pstate, a->name, ((PGRowExpr *)lexpr)->args, ((PGRowExpr *)rexpr)->args, a->location);
 
-		parser_errposition(pstate, a->location);
-			ereport(ERROR,
-					(errmsg("Row comparision do not support yet!")));
-	}
-	else
-	{
-		/* Ordinary scalar operator */
-		PGNode	   *last_srf = pstate->p_last_srf;
+        parser_errposition(pstate, a->location);
+        ereport(ERROR, (errmsg("Row comparision do not support yet!")));
+    }
+    else
+    {
+        /* Ordinary scalar operator */
+        lexpr = transformExprRecurse(pstate, lexpr);
+        rexpr = transformExprRecurse(pstate, rexpr);
 
-		lexpr = transformExprRecurse(pstate, lexpr);
-		rexpr = transformExprRecurse(pstate, rexpr);
+        result = (PGNode *)oper_parser->make_op(pstate, a->name, lexpr, rexpr, a->location);
+    }
 
-		result = (PGNode *) oper_parser->make_op(pstate,
-								  a->name,
-								  lexpr,
-								  rexpr,
-								  last_srf,
-								  a->location);
-	}
-
-	return result;
+    return result;
 };
 
 PGNode *
@@ -1262,32 +1226,22 @@ ExprParser::make_distinct_op(PGParseState *pstate, PGList *opname,
                 PGNode *ltree, PGNode *rtree,
 				int location)
 {
-	PGExpr	   *result;
+    PGExpr * result;
 
-	result = oper_parser->make_op(pstate, opname, ltree, rtree,
-					 pstate->p_last_srf, location);
-	if (((PGOpExpr *) result)->opresulttype != BOOLOID)
-	{
-		parser_errposition(pstate, location);
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-				 errmsg("IS DISTINCT FROM requires = operator to yield boolean")));
-	}
-	if (((PGOpExpr *) result)->opretset)
-	{
-		parser_errposition(pstate, location);
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-		/* translator: %s is name of a SQL construct, eg NULLIF */
-				 errmsg("%s must not return a set", "IS DISTINCT FROM")));
-	}
+    result = oper_parser->make_op(pstate, opname, ltree, rtree, location);
+    if (((PGOpExpr *)result)->opresulttype != BOOLOID)
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_DATATYPE_MISMATCH),
+             errmsg("IS DISTINCT FROM requires = operator to yield boolean"),
+             parser_errposition(pstate, location)));
 
-	/*
+    /*
 	 * We rely on DistinctExpr and OpExpr being same struct
 	 */
-	NodeSetTag(result, T_PGDistinctExpr);
+    NodeSetTag(result, T_PGDistinctExpr);
 
-	return result;
+    return result;
 };
 
 PGNode *
@@ -1392,47 +1346,33 @@ ExprParser::transformAExprDistinct(PGParseState *pstate, PGAExpr *a)
 PGNode *
 ExprParser::transformAExprNullIf(PGParseState *pstate, PGAExpr *a)
 {
-	PGNode	   *lexpr = transformExprRecurse(pstate, a->lexpr);
-	PGNode	   *rexpr = transformExprRecurse(pstate, a->rexpr);
-	PGOpExpr	   *result;
+    PGNode * lexpr = transformExprRecurse(pstate, a->lexpr);
+    PGNode * rexpr = transformExprRecurse(pstate, a->rexpr);
+    PGOpExpr * result;
 
-	result = (PGOpExpr *) oper_parser->make_op(pstate,
-								a->name,
-								lexpr,
-								rexpr,
-								pstate->p_last_srf,
-								a->location);
+    result = (PGOpExpr *)oper_parser->make_op(pstate, a->name, lexpr, rexpr, a->location);
 
-	/*
+    /*
 	 * The comparison operator itself should yield boolean ...
 	 */
-	if (result->opresulttype != BOOLOID)
-	{
-		parser_errposition(pstate, a->location);
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-				 errmsg("NULLIF requires = operator to yield boolean")));
-	}
-	if (result->opretset)
-	{
-		parser_errposition(pstate, a->location);
-		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
-		/* translator: %s is name of a SQL construct, eg NULLIF */
-				 errmsg("%s must not return a set", "NULLIF")));
-	}
+    if (result->opresulttype != BOOLOID)
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_DATATYPE_MISMATCH),
+             errmsg("NULLIF requires = operator to yield boolean"),
+             parser_errposition(pstate, a->location)));
 
-	/*
+    /*
 	 * ... but the NullIfExpr will yield the first operand's type.
 	 */
-	result->opresulttype = exprType((PGNode *) linitial(result->args));
+    result->opresulttype = exprType((PGNode *)linitial(result->args));
 
-	/*
+    /*
 	 * We rely on NullIfExpr and OpExpr being the same struct
 	 */
-	NodeSetTag(result, T_PGNullIfExpr);
+    NodeSetTag(result, T_PGNullIfExpr);
 
-	return (PGNode *) result;
+    return (PGNode *)result;
 };
 
 PGNode *
@@ -1479,30 +1419,23 @@ ExprParser::transformAExprOf(PGParseState *pstate, PGAExpr *a)
 PGNode *
 ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
 {
-	PGNode	   *result = NULL;
-	PGNode	   *lexpr;
-	PGList	   *rexprs;
-	PGList	   *rvars;
-	PGList	   *rnonvars;
-	bool		useOr;
-	PGListCell   *l;
+    PGNode * result = NULL;
+    PGNode * lexpr;
+    PGList * rexprs;
+    PGList * rvars;
+    PGList * rnonvars;
+    bool useOr;
+    PGListCell * l;
 
-	/*
+    /*
 	 * If the operator is <>, combine with AND not OR.
 	 */
-	if (strcmp(strVal(linitial(a->name)), "<>") == 0)
-		useOr = false;
-	else
-		useOr = true;
+    if (strcmp(strVal(linitial(a->name)), "<>") == 0)
+        useOr = false;
+    else
+        useOr = true;
 
-	if (operator_precedence_warning)
-		emit_precedence_warnings(pstate,
-								 useOr ? PREC_GROUP_IN : PREC_GROUP_NOT_IN,
-								 "IN",
-								 a->lexpr, NULL,
-								 a->location);
-
-	/*
+    /*
 	 * We try to generate a ScalarArrayOpExpr from IN/NOT IN, but this is only
 	 * possible if there is a suitable array type available.  If not, we fall
 	 * back to a boolean condition tree with multiple copies of the lefthand
@@ -1513,133 +1446,114 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
 	 * First step: transform all the inputs, and detect whether any contain
 	 * Vars.
 	 */
-	lexpr = transformExprRecurse(pstate, a->lexpr);
-	rexprs = rvars = rnonvars = NIL;
-	foreach(l, (PGList *) a->rexpr)
-	{
-		PGNode	   *rexpr = transformExprRecurse(pstate, (PGNode *)lfirst(l));
+    lexpr = transformExprRecurse(pstate, a->lexpr);
+    rexprs = rvars = rnonvars = NIL;
+    foreach (l, (PGList *)a->rexpr)
+    {
+        PGNode * rexpr = transformExprRecurse(pstate, (PGNode *)lfirst(l));
 
-		rexprs = lappend(rexprs, rexpr);
-		if (contain_vars_of_level(rexpr, 0))
-			rvars = lappend(rvars, rexpr);
-		else
-			rnonvars = lappend(rnonvars, rexpr);
-	}
+        rexprs = lappend(rexprs, rexpr);
+        if (contain_vars_of_level(rexpr, 0))
+            rvars = lappend(rvars, rexpr);
+        else
+            rnonvars = lappend(rnonvars, rexpr);
+    }
 
-	/*
+    /*
 	 * ScalarArrayOpExpr is only going to be useful if there's more than one
 	 * non-Var righthand item.
 	 */
-	if (list_length(rnonvars) > 1)
-	{
-		PGList	   *allexprs;
-		Oid			scalar_type;
-		Oid			array_type;
+    if (list_length(rnonvars) > 1)
+    {
+        PGList * allexprs;
+        Oid scalar_type;
+        Oid array_type;
 
-		/*
+        /*
 		 * Try to select a common type for the array elements.  Note that
 		 * since the LHS' type is first in the list, it will be preferred when
 		 * there is doubt (eg, when all the RHS items are unknown literals).
 		 *
 		 * Note: use list_concat here not lcons, to avoid damaging rnonvars.
 		 */
-		allexprs = list_concat(list_make1(lexpr), rnonvars);
-		scalar_type = coerce_parser->select_common_type(pstate, allexprs, NULL, NULL);
+        allexprs = list_concat(list_make1(lexpr), rnonvars);
+        scalar_type = coerce_parser->select_common_type(pstate, allexprs, NULL, NULL);
 
-		/*
+        /*
 		 * Do we have an array type to use?  Aside from the case where there
 		 * isn't one, we don't risk using ScalarArrayOpExpr when the common
 		 * type is RECORD, because the RowExpr comparison logic below can cope
 		 * with some cases of non-identical row types.
 		 */
-		if (OidIsValid(scalar_type) && scalar_type != RECORDOID)
-			array_type = type_provider->get_array_type(scalar_type);
-		else
-			array_type = InvalidOid;
-		if (array_type != InvalidOid)
-		{
-			/*
+        if (OidIsValid(scalar_type) && scalar_type != RECORDOID)
+            array_type = type_provider->get_array_type(scalar_type);
+        else
+            array_type = InvalidOid;
+        if (array_type != InvalidOid)
+        {
+            /*
 			 * OK: coerce all the right-hand non-Var inputs to the common type
 			 * and build an ArrayExpr for them.
 			 */
-			PGList	   *aexprs;
-			PGArrayExpr  *newa;
+            PGList * aexprs;
+            PGArrayExpr * newa;
 
-			aexprs = NIL;
-			foreach(l, rnonvars)
-			{
-				PGNode	   *rexpr = (PGNode *) lfirst(l);
+            aexprs = NIL;
+            foreach (l, rnonvars)
+            {
+                PGNode * rexpr = (PGNode *)lfirst(l);
 
-				rexpr = coerce_parser->coerce_to_common_type(pstate, rexpr,
-											  scalar_type,
-											  "IN");
-				aexprs = lappend(aexprs, rexpr);
-			}
-			newa = makeNode(PGArrayExpr);
-			newa->array_typeid = array_type;
-			/* array_collid will be set by parse_collate.c */
-			newa->element_typeid = scalar_type;
-			newa->elements = aexprs;
-			newa->multidims = false;
-			newa->location = -1;
+                rexpr = coerce_parser->coerce_to_common_type(pstate, rexpr, scalar_type, "IN");
+                aexprs = lappend(aexprs, rexpr);
+            }
+            newa = makeNode(PGArrayExpr);
+            newa->array_typeid = array_type;
+            /* array_collid will be set by parse_collate.c */
+            newa->element_typeid = scalar_type;
+            newa->elements = aexprs;
+            newa->multidims = false;
+            newa->location = -1;
 
-			result = (PGNode *) oper_parser->make_scalar_array_op(pstate,
-												   a->name,
-												   useOr,
-												   lexpr,
-												   (PGNode *) newa,
-												   a->location);
+            result = (PGNode *)oper_parser->make_scalar_array_op(pstate, a->name, useOr, lexpr, (PGNode *)newa, a->location);
 
-			/* Consider only the Vars (if any) in the loop below */
-			rexprs = rvars;
-		}
-	}
+            /* Consider only the Vars (if any) in the loop below */
+            rexprs = rvars;
+        }
+    }
 
-	/*
+    /*
 	 * Must do it the hard way, ie, with a boolean expression tree.
 	 */
-	foreach(l, rexprs)
-	{
-		PGNode	   *rexpr = (PGNode *) lfirst(l);
-		PGNode	   *cmp;
+    foreach (l, rexprs)
+    {
+        PGNode * rexpr = (PGNode *)lfirst(l);
+        PGNode * cmp;
 
-		if (IsA(lexpr, PGRowExpr) &&
-			IsA(rexpr, PGRowExpr))
-		{
-			/* ROW() op ROW() is handled specially */
+        if (IsA(lexpr, PGRowExpr) && IsA(rexpr, PGRowExpr))
+        {
+            /* ROW() op ROW() is handled specially */
 			//TODO kindred
+            // cmp = make_row_comparison_op(
+            //     pstate, a->name, (PGList *)copyObject(((PGRowExpr *)lexpr)->args), ((PGRowExpr *)rexpr)->args, a->location);
 
 			parser_errposition(pstate, a->location);
 			ereport(ERROR,
 					(errmsg("Row comparision do not support yet!")));
-
-			// cmp = make_row_comparison_op(pstate,
-			// 							 a->name,
-			// 							 (PGList *)copyObject(((PGRowExpr *) lexpr)->args),
-			// 							 ((PGRowExpr *) rexpr)->args,
-			// 							 a->location);
 		}
-		else
-		{
-			/* Ordinary scalar operator */
-			cmp = (PGNode *) oper_parser->make_op(pstate,
-								   a->name,
-								   (PGNode *)copyObject(lexpr),
-								   rexpr,
-								   pstate->p_last_srf,
-								   a->location);
-		}
+        else
+        {
+            /* Ordinary scalar operator */
+            cmp = (PGNode *)oper_parser->make_op(pstate, a->name, (PGNode *)copyObject(lexpr), rexpr, a->location);
+        }
 
-		cmp = coerce_parser->coerce_to_boolean(pstate, cmp, "IN");
-		if (result == NULL)
-			result = cmp;
-		else
-			result = (PGNode *) makeBoolExpr(useOr ? PG_OR_EXPR : PG_AND_EXPR,
-										   list_make2(result, cmp),
-										   a->location);
-	}
+        cmp = coerce_parser->coerce_to_boolean(pstate, cmp, "IN");
+        if (result == NULL)
+            result = cmp;
+        else
+            result = (PGNode *)makeBoolExpr(useOr ? PG_OR_EXPR : PG_AND_EXPR, list_make2(result, cmp), a->location);
+    }
 
-	return result;
+    return result;
 };
 
 PGNode *

@@ -463,7 +463,9 @@ struct Form_pg_attribute
     /* Column-level access permissions */
 };
 
-struct TupleDesc
+using PGAttrPtr = std::shared_ptr<Form_pg_attribute>;
+
+struct PGTupleDesc
 {
     int natts; /* number of attributes in the tuple */
     Form_pg_attribute * attrs;
@@ -789,6 +791,40 @@ struct Form_pg_agg
 };
 
 using PGAggPtr = std::shared_ptr<Form_pg_agg>;
+
+struct Sort_group_operator
+{
+    /* typeId is the hash lookup key and MUST BE FIRST */
+    Oid type_id; /* OID of the data type */
+
+    /* some subsidiary information copied from the pg_type row */
+    int16 typlen;
+    bool typbyval;
+    char typalign;
+    char typstorage;
+    char typtype;
+    Oid typrelid;
+
+    /*
+	 * Information obtained from opfamily entries
+	 *
+	 * These will be InvalidOid if no match could be found, or if the
+	 * information hasn't yet been requested.  Also note that for array and
+	 * composite types, typcache.c checks that the contained types are
+	 * comparable or hashable before allowing eq_opr etc to become set.
+	 */
+    Oid btree_opf; /* the default btree opclass' family */
+    Oid btree_opintype; /* the default btree opclass' opcintype */
+    Oid hash_opf; /* the default hash opclass' family */
+    Oid hash_opintype; /* the default hash opclass' opcintype */
+    Oid eq_opr; /* the equality operator */
+    Oid lt_opr; /* the less-than operator */
+    Oid gt_opr; /* the greater-than operator */
+    Oid cmp_proc; /* the btree comparison function */
+    Oid hash_proc; /* the hash calculation function */
+};
+
+using PGSortGroupOperPtr = std::shared_ptr<Sort_group_operator>;
 
 typedef enum
 {

@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/ClassProvider.h>
+#include <Interpreters/orcaopt/provider/ClassProvider.h>
 
 namespace DB
 {

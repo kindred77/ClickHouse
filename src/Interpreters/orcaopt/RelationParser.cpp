@@ -3,7 +3,7 @@
 #include <Interpreters/orcaopt/CoerceParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 //#include <Interpreters/orcaopt/ENRParser.h>
-#include <Interpreters/orcaopt/RelationProvider.h>
+#include <Interpreters/orcaopt/provider/RelationProvider.h>
 
 using namespace duckdb_libpgquery;
 
@@ -143,7 +143,7 @@ RelationParser::scanNameSpaceForENR(PGParseState *pstate, const char *refname)
 };
 
 void
-RelationParser::buildRelationAliases(TupleDesc tupdesc, PGAlias *alias, PGAlias *eref)
+RelationParser::buildRelationAliases(PGTupleDesc tupdesc, PGAlias *alias, PGAlias *eref)
 {
 	int			maxattrs = tupdesc->natts;
 	PGListCell   *aliaslc;
@@ -552,7 +552,7 @@ RelationParser::addRangeTableEntryForENR(PGParseState *pstate,
 };
 
 void
-RelationParser::expandTupleDesc(TupleDesc tupdesc, PGAlias *eref, int count, int offset,
+RelationParser::expandTupleDesc(PGTupleDesc tupdesc, PGAlias *eref, int count, int offset,
 				int rtindex, int sublevels_up,
 				int location, bool include_dropped,
 				PGList **colnames, PGList **colvars)
@@ -1796,7 +1796,7 @@ int RelationParser::specialAttNum(const char * attname)
 };
 
 PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate, PGRangeTblEntry * rte,
-		char * colname, int location)
+		const char * colname, int location)
 {
     PGNode * result = NULL;
     int attnum = 0;

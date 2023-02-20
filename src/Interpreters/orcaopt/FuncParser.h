@@ -16,6 +16,7 @@ class ClauseParser;
 class TypeProvider;
 class ProcProvider;
 class AggProvider;
+class FunctionProvider;
 
 using RelationParserPtr = std::unique_ptr<RelationParser>;
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
@@ -28,6 +29,7 @@ using ClauseParserPtr = std::unique_ptr<ClauseParser>;
 using TypeProviderPtr = std::unique_ptr<TypeProvider>;
 using ProcProviderPtr = std::unique_ptr<ProcProvider>;
 using AggProviderPtr = std::unique_ptr<AggProvider>;
+using FunctionProviderPtr = std::unique_ptr<FunctionProvider>;
 
 class FuncParser
 {
@@ -43,6 +45,7 @@ private:
 	TypeProviderPtr type_provider;
 	ProcProviderPtr proc_provider;
 	AggProviderPtr agg_provider;
+	FunctionProviderPtr func_provider;
 public:
 	explicit FuncParser();
 
@@ -67,11 +70,11 @@ public:
     Oid
     FuncNameAsType(duckdb_libpgquery::PGList *funcname);
 
-    const char *
+    std::string
     funcname_signature_string(const char *funcname, int nargs,
 						  duckdb_libpgquery::PGList *argnames, const Oid *argtypes);
 
-    const char *
+    std::string
     func_signature_string(duckdb_libpgquery::PGList *funcname, int nargs,
 					  duckdb_libpgquery::PGList *argnames, const Oid *argtypes);
 

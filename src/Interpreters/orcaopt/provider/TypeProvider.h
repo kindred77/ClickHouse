@@ -41,7 +41,7 @@ public:
 
     bool TypeIsVisible(Oid typid);
 
-    TupleDesc lookup_rowtype_tupdesc(Oid type_id, int32 typmod);
+    PGTupleDesc lookup_rowtype_tupdesc(Oid type_id, int32 typmod);
 
     Oid get_element_type(Oid typid);
 

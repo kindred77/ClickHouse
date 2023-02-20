@@ -4,7 +4,7 @@
 #include <Interpreters/orcaopt/ExprParser.h>
 #include <Interpreters/orcaopt/RelationParser.h>
 
-#include <Interpreters/orcaopt/TypeProvider.h>
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-variable"

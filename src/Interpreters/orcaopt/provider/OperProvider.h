@@ -36,6 +36,8 @@ public:
     Oid get_equality_op_for_ordering_op(Oid opno, bool * reverse);
 
     bool op_hashjoinable(Oid opno, Oid inputtype);
+
+	PGSortGroupOperPtr get_sort_group_operators(Oid type_id);
 };
 
 }

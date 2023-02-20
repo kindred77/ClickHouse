@@ -8,11 +8,15 @@ class FuncParser;
 class NodeParser;
 class CoerceParser;
 class OperProvider;
+class TypeProvider;
+class ProcProvider;
 
 using FuncParserPtr = std::unique_ptr<FuncParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
 using OperProviderPtr = std::unique_ptr<OperProvider>;
+using TypeProviderPtr = std::unique_ptr<TypeProvider>;
+using ProcProviderPtr = std::unique_ptr<ProcProvider>;
 
 class OperParser
 {
@@ -22,6 +26,8 @@ private:
 	CoerceParserPtr coerce_parser;
 
 	OperProviderPtr oper_provider;
+	TypeProviderPtr type_provider;
+	ProcProviderPtr proc_provider;
 public:
 	explicit OperParser();
 
@@ -57,7 +63,7 @@ public:
 					  FuncCandidateList candidates,
 					  Oid *operOid); /* output argument */
 
-	const char *
+	std::string
 	op_signature_string(duckdb_libpgquery::PGList *op, char oprkind, Oid arg1, Oid arg2);
 	
 	PGOperatorPtr
@@ -72,12 +78,10 @@ public:
 	oper(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
 		Oid ltypeId, Oid rtypeId,bool noError, int location);
 
-	duckdb_libpgquery::PGExpr *
-	make_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname, 
-		duckdb_libpgquery::PGNode *ltree, duckdb_libpgquery::PGNode *rtree,
-		duckdb_libpgquery::PGNode *last_srf, int location);
+    duckdb_libpgquery::PGExpr * make_op(PGParseState * pstate, duckdb_libpgquery::PGList * opname,
+		duckdb_libpgquery::PGNode * ltree, duckdb_libpgquery::PGNode * rtree, int location);
 
-	void
+    void
 	op_error(PGParseState *pstate, duckdb_libpgquery::PGList *op, char oprkind,
 		 Oid arg1, Oid arg2,
 		 FuncDetailCode fdresult, int location);
