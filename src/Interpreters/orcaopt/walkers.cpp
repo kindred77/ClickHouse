@@ -231,7 +231,7 @@ pg_expression_tree_walker(PGNode *node,
 					PGCaseWhen   *when = (PGCaseWhen *) lfirst(temp);
 
 					//Assert(IsA(when, PGCaseWhen));
-                    Assert(nodeTag(when) == T_PGCaseExpr);
+                    Assert(nodeTag(when) == T_PGCaseExpr)
 					if (walker(reinterpret_cast<PGNode*>(when->expr), reinterpret_cast<assign_collations_context*>(context)))
 						return true;
 					if (walker(reinterpret_cast<PGNode*>(when->result), reinterpret_cast<assign_collations_context*>(context)))
@@ -501,7 +501,7 @@ pg_query_tree_walker(PGQuery *query,
 				  void *context,
 				  int flags)
 {
-	Assert(query != NULL && IsA(query, PGQuery));
+	Assert(query != NULL && IsA(query, PGQuery))
 
 	/*
 	 * We don't walk any utilityStmt here. However, we can't easily assert
@@ -1848,7 +1848,7 @@ pg_query_tree_mutator(PGQuery *query,
 				   void *context,
 				   int flags)
 {
-	Assert(query != NULL && IsA(query, PGQuery));
+	Assert(query != NULL && IsA(query, PGQuery))
 
 	if (!(flags & QTW_DONT_COPY_QUERY))
 	{
@@ -1930,7 +1930,7 @@ pg_flatten_join_alias_vars_mutator(PGNode *node,
             PGListCell * ln;
 
             attnum = 0;
-            Assert(list_length(rte->joinaliasvars) == list_length(rte->eref->colnames));
+            Assert(list_length(rte->joinaliasvars) == list_length(rte->eref->colnames))
             forboth(lv, rte->joinaliasvars, ln, rte->eref->colnames)
             {
                 newvar = (PGNode *)lfirst(lv);
@@ -1967,9 +1967,9 @@ pg_flatten_join_alias_vars_mutator(PGNode *node,
         }
 
         /* Expand join alias reference */
-        Assert(var->varattno > 0);
+        Assert(var->varattno > 0)
         newvar = (PGNode *)list_nth(rte->joinaliasvars, var->varattno - 1);
-        Assert(newvar != NULL);
+        Assert(newvar != NULL)
         newvar = (PGNode *)copyObject(newvar);
 
         /*
@@ -2461,7 +2461,7 @@ bool pg_check_ungrouped_columns_walker(PGNode * node, check_ungrouped_columns_co
 			 */
             bool result;
 
-            Assert(!context->in_agg_direct_args);
+            Assert(!context->in_agg_direct_args)
             context->in_agg_direct_args = true;
             result = pg_check_ungrouped_columns_walker((PGNode *)agg->aggdirectargs, context);
             context->in_agg_direct_args = false;
@@ -2711,7 +2711,7 @@ bool maxSortGroupRef_walker(PGNode *node, maxSortGroupRef_context *cxt)
             {
                 PGSortGroupClause * sort = (PGSortGroupClause *)lfirst(lc);
                 Assert(IsA(sort, PGSortGroupClause))
-                Assert(sort->tleSortGroupRef != 0);
+                Assert(sort->tleSortGroupRef != 0)
                 if (sort->tleSortGroupRef > cxt->maxsgr)
                     cxt->maxsgr = sort->tleSortGroupRef;
             }

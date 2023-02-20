@@ -27,6 +27,8 @@
 
 #include<string.h>
 
+#include <Interpreters/orcaopt/parser_common_macro.h>
+
 /* class RelationParser;
 class CTEParser;
 class ExprParser;
@@ -52,14 +54,6 @@ using FuncParserPtr = std::unique_ptr<FuncParser>;
 using OperParserPtr = std::unique_ptr<OperParser>;
 using TypeParserPtr = std::unique_ptr<TypeParser>;
 using SelectParserPtr = std::unique_ptr<SelectParser>; */
-
-/*
- * Symbolic values for prokind column
- */
-#define PG_PROKIND_FUNCTION 'f'
-#define PG_PROKIND_AGGREGATE 'a'
-#define PG_PROKIND_WINDOW 'w'
-#define PG_PROKIND_PROCEDURE 'p'
 
 bool		SQL_inheritance = true;
 
@@ -337,8 +331,6 @@ typedef duckdb_libpgquery::PGBitmapset *PGRelids;
 // 	std::vector<PGColumn> columns;
 // };
 
-#define NAMEDATALEN 64
-
 struct NameData
 {
     char data[NAMEDATALEN];
@@ -468,7 +460,7 @@ using PGAttrPtr = std::shared_ptr<Form_pg_attribute>;
 struct PGTupleDesc
 {
     int natts; /* number of attributes in the tuple */
-    Form_pg_attribute * attrs;
+    std::vector<PGAttrPtr> attrs;
     /* attrs[N] is a pointer to the description of Attribute Number N+1 */
     //TupleConstr *constr;		/* constraints, or NULL if none */
     Oid tdtypeid; /* composite type ID for tuple type */
@@ -826,6 +818,158 @@ struct Sort_group_operator
 
 using PGSortGroupOperPtr = std::shared_ptr<Sort_group_operator>;
 
+using PGTupleDescPtr = std::shared_ptr<PGTupleDesc>;
+
+PGTupleDescPtr PGCreateTemplateTupleDesc(int natts, bool hasoid)
+{
+	//TODO kindred
+    // PGTupleDesc * desc;
+    // char * stg;
+    // int attroffset;
+
+    // /*
+	//  * sanity checks
+	//  */
+    // Assert(natts >= 0)
+
+    /*
+	 * Allocate enough memory for the tuple descriptor, including the
+	 * attribute rows, and set up the attribute row pointers.
+	 *
+	 * Note: we assume that sizeof(struct tupleDesc) is a multiple of the
+	 * struct pointer alignment requirement, and hence we don't need to insert
+	 * alignment padding between the struct and the array of attribute row
+	 * pointers.
+	 *
+	 * Note: Only the fixed part of pg_attribute rows is included in tuple
+	 * descriptors, so we only need ATTRIBUTE_FIXED_PART_SIZE space per attr.
+	 * That might need alignment padding, however.
+	 */
+    // attroffset = sizeof(struct tupleDesc) + natts * sizeof(Form_pg_attribute);
+    // attroffset = MAXALIGN(attroffset);
+    // stg = (char *)palloc(attroffset + natts * MAXALIGN(ATTRIBUTE_FIXED_PART_SIZE));
+    // desc = (PGTupleDesc *)stg;
+
+    // if (natts > 0)
+    // {
+    //     Form_pg_attribute * attrs;
+    //     int i;
+
+    //     attrs = (Form_pg_attribute *)(stg + sizeof(struct tupleDesc));
+    //     desc->attrs = attrs;
+    //     stg += attroffset;
+    //     for (i = 0; i < natts; i++)
+    //     {
+    //         attrs[i] = (Form_pg_attribute)stg;
+    //         stg += MAXALIGN(ATTRIBUTE_FIXED_PART_SIZE);
+    //     }
+    // }
+    // else
+    //     desc->attrs = NULL;
+
+    /*
+	 * Initialize other fields of the tupdesc.
+	 */
+    // desc->natts = natts;
+    // desc->constr = NULL;
+    // desc->tdtypeid = RECORDOID;
+    // desc->tdtypmod = -1;
+    // desc->tdhasoid = hasoid;
+    // desc->tdrefcount = -1; /* assume not reference-counted */
+
+    // return desc;
+
+	auto result = std::make_shared<PGTupleDesc>();
+	result->natts = natts;
+	result->tdtypeid = RECORDOID;
+    result->tdtypmod = -1;
+    result->tdhasoid = hasoid;
+    result->tdrefcount = -1;
+
+	return ;
+};
+
+int
+namestrcpy(Name name, const char *str)
+{
+	if (!name || !str)
+		return -1;
+	StrNCpy(NameStr(*name), str, NAMEDATALEN);
+	return 0;
+};
+
+void PGTupleDescInitEntry(
+    PGTupleDescPtr desc, PGAttrNumber attributeNumber, const char * attributeName, Oid oidtypeid, int32 typmod, int attdim)
+{
+    HeapTuple tuple;
+    //Form_pg_type typeForm;
+    PGAttrPtr att;
+
+    /*
+	 * sanity checks
+	 */
+    Assert(PointerIsValid(desc.get()))
+    Assert(attributeNumber >= 1)
+    Assert(attributeNumber <= desc->natts)
+
+    /*
+	 * initialize the attribute fields
+	 */
+    att = desc->attrs[attributeNumber - 1];
+
+    att->attrelid = 0; /* dummy value */
+
+    /*
+	 * Note: attributeName can be NULL, because the planner doesn't always
+	 * fill in valid resname values in targetlists, particularly for resjunk
+	 * attributes. Also, do nothing if caller wants to re-use the old attname.
+	 */
+    if (attributeName == NULL)
+        MemSet(NameStr(att->attname), 0, NAMEDATALEN);
+    else if (attributeName != NameStr(att->attname))
+        namestrcpy(&(att->attname), attributeName);
+
+    att->attstattarget = -1;
+    att->attcacheoff = -1;
+    att->atttypmod = typmod;
+
+    att->attnum = attributeNumber;
+    att->attndims = attdim;
+
+    att->attnotnull = false;
+    att->atthasdef = false;
+    att->attisdropped = false;
+    att->attislocal = true;
+    att->attinhcount = 0;
+    /* attacl, attoptions and attfdwoptions are not present in tupledescs */
+
+    tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(oidtypeid));
+    if (!HeapTupleIsValid(tuple))
+        elog(ERROR, "cache lookup failed for type %u", oidtypeid);
+    typeForm = (Form_pg_type)GETSTRUCT(tuple);
+
+    att->atttypid = oidtypeid;
+    att->attlen = typeForm->typlen;
+    att->attbyval = typeForm->typbyval;
+    att->attalign = typeForm->typalign;
+    att->attstorage = typeForm->typstorage;
+    //att->attcollation = typeForm->typcollation;
+
+    //ReleaseSysCache(tuple);
+};
+
+void PGTupleDescInitEntryCollation(PGTupleDescPtr desc, PGAttrNumber attributeNumber, Oid collationid)
+{
+    /*
+	 * sanity checks
+	 */
+    Assert(PointerIsValid(desc.get()))
+    Assert(attributeNumber >= 1)
+    Assert(attributeNumber <= desc->natts)
+
+    //desc->attrs[attributeNumber - 1]->attcollation = collationid;
+};
+
 typedef enum
 {
 	INH_NO,						/* Do NOT scan child tables */
@@ -878,8 +1022,6 @@ typedef enum
 	COLLATE_EXPLICIT			/* collation was derived explicitly */
 } CollateStrength;
 
-#define DEFAULT_COLLATION_OID	100
-
 /*
  * Arrays are varlena objects, so must meet the varlena convention that
  * the first int32 of the object contains the total object size in bytes.
@@ -904,9 +1046,6 @@ struct FuzzyAttrMatchState
 	duckdb_libpgquery::PGRangeTblEntry *rsecond;		/* RTE of second */
 	PGAttrNumber	second;			/* Second closest attribute so far */
 };
-
-#define NAMEDATALEN 64
-#define MAX_CACHED_PATH_LEN		16
 
 struct OprCacheKey
 {
@@ -1308,7 +1447,6 @@ static inline Datum Int64GetDatum(int64 i64) { return (Datum) i64; };
 
 #define DatumGetPointer(X) ((Pointer) (X))
 #define PointerGetDatum(X) ((Datum) (X))
-#define PointerIsValid(pointer) ((const void*)(pointer) != NULL)
 
 static inline Datum CStringGetDatum(const char *p) { return PointerGetDatum(p); };
 static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; } ;
@@ -1321,170 +1459,8 @@ static const int oldprecedence_r[] = {
 	0, 10, 10, 3, 2, 8, 4, 5, 6, 1, 1, 1, 7, 8, 9
 };
 
-#define FLOAT8PASSBYVAL true
-
-#define MAX_FUZZY_DISTANCE				3
-#define MaxTupleAttributeNumber 1664	/* 8 * 208 */
-
-/* Error level codes */
-#define DEBUG5		10			/* Debugging messages, in categories of
-								 * decreasing detail. */
-#define DEBUG4		11
-#define DEBUG3		12
-#define DEBUG2		13
-#define DEBUG1		14			/* used by GUC debug_* variables */
-#define LOG			15			/* Server operational messages; sent only to
-								 * server log by default. */
-#define LOG_SERVER_ONLY 16		/* Same as LOG for server reporting, but never
-								 * sent to client. */
-#define COMMERROR	LOG_SERVER_ONLY /* Client communication problems; same as
-									 * LOG for server reporting, but never
-									 * sent to client. */
-#define INFO		17			/* Messages specifically requested by user (eg
-								 * VACUUM VERBOSE output); always sent to
-								 * client regardless of client_min_messages,
-								 * but by default not sent to server log. */
-#define NOTICE		18			/* Helpful messages to users about query
-								 * operation; sent to client and not to server
-								 * log by default. */
-#define WARNING		19			/* Warnings.  NOTICE is for expected messages
-								 * like implicit sequence creation by SERIAL.
-								 * WARNING is for unexpected messages. */
-#define ERROR		20			/* user error - abort transaction; return to
-								 * known state */
-
-#define AGGKIND_NORMAL			'n'
-#define AGGKIND_ORDERED_SET		'o'
-#define AGGKIND_HYPOTHETICAL	'h'
-
-//#define InvalidOid		((Oid) 0)
-#define UNKNOWNOID		705
-#define TEXTOID			25
-#define OIDOID			26
-#define INT8OID			20
-#define INT2VECTOROID	22
-#define INT4OID			23
-#define BOOLOID         16
-#define OIDVECTOROID	30
-#define INT2ARRAYOID		1005
-#define OIDARRAYOID			1028
-#define VOIDOID			2278
-#define RECORDOID		2249
-#define NUMERICOID		1700
-#define INTERVALOID		1186
-#define CSTRINGOID		2275
-#define RECORDARRAYOID	2287
-#define BITOID	 1560
-#define ANYOID			2276
-#define ANYARRAYOID		2277
-#define ANYELEMENTOID	2283
-#define ANYNONARRAYOID	2776
-#define ANYENUMOID		3500
-#define ANYRANGEOID		3831
-#define ANYTABLEOID     7053
-
-/* Is a type OID a polymorphic pseudotype?	(Beware of multiple evaluation) */
-#define IsPolymorphicType(typid)  \
-	((typid) == ANYELEMENTOID || \
-	 (typid) == ANYARRAYOID || \
-	 (typid) == ANYNONARRAYOID || \
-	 (typid) == ANYENUMOID || \
-	 (typid) == ANYRANGEOID)
-
-#define OidIsValid(objectId)  ((bool) ((objectId) != InvalidOid))
-
 #define rt_fetch(rangetable_index, rangetable) \
 	((duckdb_libpgquery::PGRangeTblEntry *) list_nth(rangetable, (rangetable_index)-1))
-
-/*
- * macros
- */
-#define  TYPTYPE_BASE		'b' /* base type (ordinary scalar type) */
-#define  TYPTYPE_COMPOSITE	'c' /* composite (e.g., table's rowtype) */
-#define  TYPTYPE_DOMAIN		'd' /* domain over another type */
-#define  TYPTYPE_ENUM		'e' /* enumerated type */
-#define  TYPTYPE_PSEUDO		'p' /* pseudo-type */
-#define  TYPTYPE_RANGE		'r' /* range type */
-
-#define  TYPCATEGORY_INVALID	'\0'	/* not an allowed category */
-#define  TYPCATEGORY_ARRAY		'A'
-#define  TYPCATEGORY_BOOLEAN	'B'
-#define  TYPCATEGORY_COMPOSITE	'C'
-#define  TYPCATEGORY_DATETIME	'D'
-#define  TYPCATEGORY_ENUM		'E'
-#define  TYPCATEGORY_GEOMETRIC	'G'
-#define  TYPCATEGORY_NETWORK	'I'		/* think INET */
-#define  TYPCATEGORY_NUMERIC	'N'
-#define  TYPCATEGORY_PSEUDOTYPE 'P'
-#define  TYPCATEGORY_RANGE		'R'
-#define  TYPCATEGORY_STRING		'S'
-#define  TYPCATEGORY_TIMESPAN	'T'
-#define  TYPCATEGORY_USER		'U'
-#define  TYPCATEGORY_BITSTRING	'V'		/* er ... "varbit"? */
-#define  TYPCATEGORY_UNKNOWN	'X'
-
-#define PREC_GROUP_POSTFIX_IS	1	/* postfix IS tests (NullTest, etc) */
-#define PREC_GROUP_INFIX_IS		2	/* infix IS (IS DISTINCT FROM, etc) */
-#define PREC_GROUP_LESS			3	/* < > */
-#define PREC_GROUP_EQUAL		4	/* = */
-#define PREC_GROUP_LESS_EQUAL	5	/* <= >= <> */
-#define PREC_GROUP_LIKE			6	/* LIKE ILIKE SIMILAR */
-#define PREC_GROUP_BETWEEN		7	/* BETWEEN */
-#define PREC_GROUP_IN			8	/* IN */
-#define PREC_GROUP_NOT_LIKE		9	/* NOT LIKE/ILIKE/SIMILAR */
-#define PREC_GROUP_NOT_BETWEEN	10	/* NOT BETWEEN */
-#define PREC_GROUP_NOT_IN		11	/* NOT IN */
-#define PREC_GROUP_POSTFIX_OP	12	/* generic postfix operators */
-#define PREC_GROUP_INFIX_OP		13	/* generic infix operators */
-#define PREC_GROUP_PREFIX_OP	14	/* generic prefix operators */
-
-/* Get a bit mask of the bits set in non-long aligned addresses */
-#define LONG_ALIGN_MASK (sizeof(long) - 1)
-#define MEMSET_LOOP_LIMIT 1024
-/*
- * MemSet
- *	Exactly the same as standard library function memset(), but considerably
- *	faster for zeroing small word-aligned structures (such as parsetree nodes).
- *	This has to be a macro because the main point is to avoid function-call
- *	overhead.   However, we have also found that the loop is faster than
- *	native libc memset() on some platforms, even those with assembler
- *	memset() functions.  More research needs to be done, perhaps with
- *	MEMSET_LOOP_LIMIT tests in configure.
- */
-#define MemSet(start, val, len) \
-	do \
-	{ \
-		/* must be void* because we don't know if it is integer aligned yet */ \
-		void   *_vstart = (void *) (start); \
-		int		_val = (val); \
-		size_t	_len = (len); \
-\
-		if ((((uintptr_t) _vstart) & LONG_ALIGN_MASK) == 0 && \
-			(_len & LONG_ALIGN_MASK) == 0 && \
-			_val == 0 && \
-			_len <= MEMSET_LOOP_LIMIT && \
-			/* \
-			 *	If MEMSET_LOOP_LIMIT == 0, optimizer should find \
-			 *	the whole "if" false at compile time. \
-			 */ \
-			MEMSET_LOOP_LIMIT != 0) \
-		{ \
-			long *_start = (long *) _vstart; \
-			long *_stop = (long *) ((char *) _start + _len); \
-			while (_start < _stop) \
-				*_start++ = 0; \
-		} \
-		else \
-			memset(_vstart, _val, _len); \
-	} while (0)
-
-#define TypeSupportsDescribe(typid)  \
-	((typid) == RECORDOID)
-
-#define Min(x, y)		((x) < (y) ? (x) : (y))
-#define Max(x, y)		((x) > (y) ? (x) : (y))
-
-#define NameStr(name)	((name).data)
 
 #define foreach_with_count(cell, list, counter) \
 	for ((cell) = list_head(list), (counter)=0; \
@@ -1671,8 +1647,6 @@ get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause * sgClause, duckdb
 
     return (duckdb_libpgquery::PGNode *)tle->expr;
 };
-
-#define INT64CONST(x)  (x##L)
 
 bool scanint8(const char * str, bool errorOK, int64 * result)
 {
@@ -1864,101 +1838,3 @@ struct grouped_window_ctx
     int call_depth;
     duckdb_libpgquery::PGTargetEntry * tle;
 };
-
-// duckdb_libpgquery::PGTargetEntry *
-// get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList *targetList)
-// {
-// 	duckdb_libpgquery::PGListCell   *l;
-
-// 	foreach(l, targetList)
-// 	{
-// 		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(l);
-
-// 		if (tle->ressortgroupref == sortref)
-// 			return tle;
-// 	}
-
-// 	/*
-// 	 * XXX: we probably should catch this earlier, but we have a
-// 	 * few queries in the regression suite that hit this.
-// 	 */
-// 	duckdb_libpgquery::ereport(ERROR,
-// 			(duckdb_libpgquery::errcode(ERRCODE_SYNTAX_ERROR),
-// 			 duckdb_libpgquery::errmsg("ORDER/GROUP BY expression not found in targetlist")));
-// 	return NULL;				/* keep compiler quiet */
-// };
-
-// duckdb_libpgquery::PGTargetEntry *
-// get_sortgroupclause_tle(duckdb_libpgquery::PGSortGroupClause *sgClause,
-// 						duckdb_libpgquery::PGList *targetList)
-// {
-// 	return get_sortgroupref_tle(sgClause->tleSortGroupRef, targetList);
-// };
-
-// duckdb_libpgquery::PGNode *
-// get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause *sgClause,
-// 	duckdb_libpgquery::PGList *targetList)
-// {
-// 	duckdb_libpgquery::PGTargetEntry *tle = get_sortgroupclause_tle(sgClause, targetList);
-
-// 	return (duckdb_libpgquery::PGNode *) tle->expr;
-// };
-
-// bool
-// contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up);
-
-// bool
-// contain_vars_of_level(duckdb_libpgquery::PGNode *node, int levelsup)
-// {
-// 	int			sublevels_up = levelsup;
-
-// 	return query_or_expression_tree_walker(node,
-// 										   contain_vars_of_level_walker,
-// 										   (void *) &sublevels_up,
-// 										   0);
-// };
-
-// bool
-// contain_vars_of_level_walker(duckdb_libpgquery::PGNode *node, int *sublevels_up)
-// {
-// 	using duckdb_libpgquery::PGVar;
-// 	using duckdb_libpgquery::PGCurrentOfExpr;
-// 	//using duckdb_libpgquery::PGPlaceHolderVar;
-// 	using duckdb_libpgquery::PGQuery;
-// 	if (node == NULL)
-// 		return false;
-// 	if (IsA(node, PGVar))
-// 	{
-// 		if (((PGVar *) node)->varlevelsup == *sublevels_up)
-// 			return true;		/* abort tree traversal and return true */
-// 		return false;
-// 	}
-// 	if (IsA(node, PGCurrentOfExpr))
-// 	{
-// 		if (*sublevels_up == 0)
-// 			return true;
-// 		return false;
-// 	}
-// 	// if (IsA(node, PGPlaceHolderVar))
-// 	// {
-// 	// 	if (((PGPlaceHolderVar *) node)->phlevelsup == *sublevels_up)
-// 	// 		return true;		/* abort the tree traversal and return true */
-// 	// 	/* else fall through to check the contained expr */
-// 	// }
-// 	if (IsA(node, PGQuery))
-// 	{
-// 		/* Recurse into subselects */
-// 		bool		result;
-
-// 		(*sublevels_up)++;
-// 		result = query_tree_walker((PGQuery *) node,
-// 								   contain_vars_of_level_walker,
-// 								   (void *) sublevels_up,
-// 								   0);
-// 		(*sublevels_up)--;
-// 		return result;
-// 	}
-// 	return expression_tree_walker(node,
-// 								  contain_vars_of_level_walker,
-// 								  (void *) sublevels_up);
-// };

@@ -13,253 +13,196 @@ namespace DB
 int
 TargetParser::FigureColnameInternal(PGNode *node, char **name)
 {
-	int			strength = 0;
+    int strength = 0;
 
-	if (node == NULL)
-		return strength;
+    if (node == NULL)
+        return strength;
 
-	switch (nodeTag(node))
-	{
-		case T_PGColumnRef:
-			{
-				char	   *fname = NULL;
-				PGListCell   *l;
+    switch (nodeTag(node))
+    {
+        case T_PGColumnRef: {
+            char * fname = NULL;
+            ListCell * l;
 
-				/* find last field name, if any, ignoring "*" */
-				foreach(l, ((PGColumnRef *) node)->fields)
-				{
-					PGNode	   *i = (PGNode *)lfirst(l);
+            /* find last field name, if any, ignoring "*" */
+            foreach (l, ((PGColumnRef *)node)->fields)
+            {
+                PGNode * i = (PGNode *)lfirst(l);
 
-					if (IsA(i, PGString))
-						fname = strVal(i);
-				}
-				if (fname)
-				{
-					*name = fname;
-					return 2;
-				}
-			}
-			break;
-		case T_PGAIndirection:
-			{
-				PGAIndirection *ind = (PGAIndirection *) node;
-				char	   *fname = NULL;
-				ListCell   *l;
+                if (IsA(i, PGString))
+                    fname = strVal(i);
+            }
+            if (fname)
+            {
+                *name = fname;
+                return 2;
+            }
+        }
+        break;
+        case T_PGAIndirection: {
+            PGAIndirection * ind = (PGAIndirection *)node;
+            char * fname = NULL;
+            ListCell * l;
 
-				/* find last field name, if any, ignoring "*" and subscripts */
-				foreach(l, ind->indirection)
-				{
-					PGNode	   *i = (PGNode *)lfirst(l);
+            /* find last field name, if any, ignoring "*" and subscripts */
+            foreach (l, ind->indirection)
+            {
+                PGNode * i = (PGNode *)lfirst(l);
 
-					if (IsA(i, PGString))
-						fname = strVal(i);
-				}
-				if (fname)
-				{
-					*name = fname;
-					return 2;
-				}
-				return FigureColnameInternal(ind->arg, name);
-			}
-			break;
-		case T_PGFuncCall:
-			*name = strVal(llast(((PGFuncCall *) node)->funcname));
-			return 2;
-		case T_PGAExpr:
-			if (((PGAExpr *) node)->kind == T_PGNullIfExpr)
-			{
-				/* make nullif() act like a regular function */
-				*name = "nullif";
-				return 2;
-			}
-			if (((PGAExpr *) node)->kind == AEXPR_PAREN)
-			{
-				/* look through dummy parenthesis node */
-				return FigureColnameInternal(((PGAExpr *) node)->lexpr, name);
-			}
-			break;
-		case T_PGTypeCast:
-			strength = FigureColnameInternal(((PGTypeCast *) node)->arg,
-											 name);
-			if (strength <= 1)
-			{
-				if (((PGTypeCast *) node)->typeName != NULL)
-				{
-					*name = strVal(llast(((PGTypeCast *) node)->typeName->names));
-					return 1;
-				}
-			}
-			break;
-		case T_PGCollateClause:
-			return FigureColnameInternal(((PGCollateClause *) node)->arg, name);
-		case T_PGGroupingFunc:
-			/* make GROUPING() act like a regular function */
-			*name = "grouping";
-			return 2;
-		// case T_PGGroupId:
-		// 	/* make GROUP_ID() act like a regular function */
-		// 	*name = "group_id";
-		// 	return 2;
-		case T_PGSubLink:
-			switch (((PGSubLink *) node)->subLinkType)
-			{
-				case PG_EXISTS_SUBLINK:
-					*name = "exists";
-					return 2;
-				case PG_ARRAY_SUBLINK:
-					*name = "array";
-					return 2;
-				case PG_EXPR_SUBLINK:
-					{
-						/* Get column name of the subquery's single target */
-						PGSubLink    *sublink = (PGSubLink *) node;
-						PGQuery	   *query = (PGQuery *) sublink->subselect;
+                if (IsA(i, PGString))
+                    fname = strVal(i);
+            }
+            if (fname)
+            {
+                *name = fname;
+                return 2;
+            }
+            return FigureColnameInternal(ind->arg, name);
+        }
+        break;
+        case T_PGFuncCall:
+            *name = strVal(llast(((PGFuncCall *)node)->funcname));
+            return 2;
+        case T_PGAExpr:
+            /* make nullif() act like a regular function */
+            if (((PGAExpr *)node)->kind == PG_AEXPR_NULLIF)
+            {
+                *name = "nullif";
+                return 2;
+            }
+            break;
+        case T_PGTypeCast:
+            strength = FigureColnameInternal(((PGTypeCast *)node)->arg, name);
+            if (strength <= 1)
+            {
+                if (((PGTypeCast *)node)->typeName != NULL)
+                {
+                    *name = strVal(llast(((PGTypeCast *)node)->typeName->names));
+                    return 1;
+                }
+            }
+            break;
+        case T_PGCollateClause:
+            return FigureColnameInternal(((PGCollateClause *)node)->arg, name);
+        case T_PGSubLink:
+            switch (((PGSubLink *)node)->subLinkType)
+            {
+                case PG_EXISTS_SUBLINK:
+                    *name = "exists";
+                    return 2;
+                case PG_ARRAY_SUBLINK:
+                    *name = "array";
+                    return 2;
+                case PG_EXPR_SUBLINK: {
+                    /* Get column name of the subquery's single target */
+                    PGSubLink * sublink = (PGSubLink *)node;
+                    PGQuery * query = (PGQuery *)sublink->subselect;
 
-						/*
+                    /*
 						 * The subquery has probably already been transformed,
 						 * but let's be careful and check that.  (The reason
 						 * we can see a transformed subquery here is that
 						 * transformSubLink is lazy and modifies the SubLink
 						 * node in-place.)
 						 */
-						if (IsA(query, PGQuery))
-						{
-							PGTargetEntry *te = (PGTargetEntry *) linitial(query->targetList);
+                    if (IsA(query, PGQuery))
+                    {
+                            PGTargetEntry * te = (PGTargetEntry *)linitial(query->targetList);
 
-							if (te->resname)
-							{
-								*name = te->resname;
-								return 2;
-							}
-						}
-					}
-					break;
+                            if (te->resname)
+                            {
+                                *name = te->resname;
+                                return 2;
+                            }
+                    }
+                }
+                break;
 
-					/* As with other operator-like nodes, these have no names */
-				case PG_MULTIEXPR_SUBLINK:
-				case PG_ALL_SUBLINK:
-				case PG_ANY_SUBLINK:
-				case PG_ROWCOMPARE_SUBLINK:
-				case PG_CTE_SUBLINK:
-				// case PG_INITPLAN_FUNC_SUBLINK:
-				// case PG_NOT_EXISTS_SUBLINK:
-					break;
-			}
-			break;
-		case T_PGCaseExpr:
-			strength = FigureColnameInternal((PGNode *) ((PGCaseExpr *) node)->defresult,
-											 name);
-			if (strength <= 1)
-			{
-				*name = "case";
-				return 1;
-			}
-			break;
-		case T_PGAArrayExpr:
-			/* make ARRAY[] act like a function */
-			*name = "array";
-			return 2;
-		case T_PGRowExpr:
-			/* make ROW() act like a function */
-			*name = "row";
-			return 2;
-		case T_PGCoalesceExpr:
-			/* make coalesce() act like a regular function */
-			*name = "coalesce";
-			return 2;
-		case T_PGMinMaxExpr:
-			/* make greatest/least act like a regular function */
-			switch (((PGMinMaxExpr *) node)->op)
-			{
-				case PG_IS_GREATEST:
-					*name = "greatest";
-					return 2;
-				case IS_LEAST:
-					*name = "least";
-					return 2;
-			}
-			break;
-		case T_PGSQLValueFunction:
-			/* make these act like a function or variable */
-			switch (((PGSQLValueFunction *) node)->op)
-			{
-				case PG_SVFOP_CURRENT_DATE:
-					*name = "current_date";
-					return 2;
-				case PG_SVFOP_CURRENT_TIME:
-				case PG_SVFOP_CURRENT_TIME_N:
-					*name = "current_time";
-					return 2;
-				case PG_SVFOP_CURRENT_TIMESTAMP:
-				case PG_SVFOP_CURRENT_TIMESTAMP_N:
-					*name = "current_timestamp";
-					return 2;
-				case PG_SVFOP_LOCALTIME:
-				case PG_SVFOP_LOCALTIME_N:
-					*name = "localtime";
-					return 2;
-				case PG_SVFOP_LOCALTIMESTAMP:
-				case PG_SVFOP_LOCALTIMESTAMP_N:
-					*name = "localtimestamp";
-					return 2;
-				case PG_SVFOP_CURRENT_ROLE:
-					*name = "current_role";
-					return 2;
-				case PG_SVFOP_CURRENT_USER:
-					*name = "current_user";
-					return 2;
-				case PG_SVFOP_USER:
-					*name = "user";
-					return 2;
-				case PG_SVFOP_SESSION_USER:
-					*name = "session_user";
-					return 2;
-				case PG_SVFOP_CURRENT_CATALOG:
-					*name = "current_catalog";
-					return 2;
-				case PG_SVFOP_CURRENT_SCHEMA:
-					*name = "current_schema";
-					return 2;
-			}
-			break;
-		// case T_PGXmlExpr:
-		// 	/* make SQL/XML functions act like a regular function */
-		// 	switch (((PGXmlExpr *) node)->op)
-		// 	{
-		// 		case PG_IS_XMLCONCAT:
-		// 			*name = "xmlconcat";
-		// 			return 2;
-		// 		case PG_IS_XMLELEMENT:
-		// 			*name = "xmlelement";
-		// 			return 2;
-		// 		case PG_IS_XMLFOREST:
-		// 			*name = "xmlforest";
-		// 			return 2;
-		// 		case IS_XMLPARSE:
-		// 			*name = "xmlparse";
-		// 			return 2;
-		// 		case PG_IS_XMLPI:
-		// 			*name = "xmlpi";
-		// 			return 2;
-		// 		case PG_IS_XMLROOT:
-		// 			*name = "xmlroot";
-		// 			return 2;
-		// 		case PG_IS_XMLSERIALIZE:
-		// 			*name = "xmlserialize";
-		// 			return 2;
-		// 		case PG_IS_DOCUMENT:
-		// 			/* nothing */
-		// 			break;
-		// 	}
-		// 	break;
-		case T_PGXmlSerialize:
-			*name = "xmlserialize";
-			return 2;
-		default:
-			break;
-	}
+                    /* As with other operator-like nodes, these have no names */
+                case PG_ALL_SUBLINK:
+                case PG_ANY_SUBLINK:
+                case PG_ROWCOMPARE_SUBLINK:
+                case PG_CTE_SUBLINK:
+				//TODO kindred
+                // case INITPLAN_FUNC_SUBLINK:
+                // case NOT_EXISTS_SUBLINK:
+                    break;
+            }
+            break;
+        case T_PGCaseExpr:
+            strength = FigureColnameInternal((PGNode *)((PGCaseExpr *)node)->defresult, name);
+            if (strength <= 1)
+            {
+                *name = "case";
+                return 1;
+            }
+            break;
+        case T_PGAArrayExpr:
+            /* make ARRAY[] act like a function */
+            *name = "array";
+            return 2;
+        case T_PGRowExpr:
+            /* make ROW() act like a function */
+            *name = "row";
+            return 2;
+        case T_PGCoalesceExpr:
+            /* make coalesce() act like a regular function */
+            *name = "coalesce";
+            return 2;
+        case T_PGMinMaxExpr:
+            /* make greatest/least act like a regular function */
+            switch (((PGMinMaxExpr *)node)->op)
+            {
+                case PG_IS_GREATEST:
+                    *name = "greatest";
+                    return 2;
+                case IS_LEAST:
+                    *name = "least";
+                    return 2;
+            }
+            break;
+		//TODO kindred
+        // case T_PGXmlExpr:
+        //     /* make SQL/XML functions act like a regular function */
+        //     switch (((XmlExpr *)node)->op)
+        //     {
+        //         case IS_XMLCONCAT:
+        //             *name = "xmlconcat";
+        //             return 2;
+        //         case IS_XMLELEMENT:
+        //             *name = "xmlelement";
+        //             return 2;
+        //         case IS_XMLFOREST:
+        //             *name = "xmlforest";
+        //             return 2;
+        //         case IS_XMLPARSE:
+        //             *name = "xmlparse";
+        //             return 2;
+        //         case IS_XMLPI:
+        //             *name = "xmlpi";
+        //             return 2;
+        //         case IS_XMLROOT:
+        //             *name = "xmlroot";
+        //             return 2;
+        //         case IS_XMLSERIALIZE:
+        //             *name = "xmlserialize";
+        //             return 2;
+        //         case IS_DOCUMENT:
+        //             /* nothing */
+        //             break;
+        //     }
+        //     break;
+        case T_PGXmlSerialize:
+            *name = "xmlserialize";
+            return 2;
+        case T_PGGroupingFunc:
+            *name = "grouping";
+            return 2;
+        default:
+            break;
+    }
 
-	return strength;
+    return strength;
 };
 
 char *
@@ -293,7 +236,7 @@ TargetParser::transformTargetEntry(PGParseState *pstate,
 		if (exprKind == EXPR_KIND_UPDATE_SOURCE && IsA(node, PGSetToDefault))
 			expr = node;
 		else
-			expr = expr_parser.transformExpr(pstate, node, exprKind);
+			expr = expr_parser->transformExpr(pstate, node, exprKind);
 	}
 
 	if (colname == NULL && !resjunk)
@@ -327,14 +270,14 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 		if (!nsitem->p_cols_visible)
 			continue;
 		/* Should not have any lateral-only items when parsing targetlist */
-		Assert(!nsitem->p_lateral_only);
+		Assert(!nsitem->p_lateral_only)
 		/* Remember we found a p_cols_visible item */
 		found_table = true;
 
 		target = list_concat(target,
-							 relation_parser.expandRelAttrs(pstate,
+							 relation_parser->expandRelAttrs(pstate,
 											rte,
-											relation_parser.RTERangeTablePosn(pstate, rte,
+											relation_parser->RTERangeTablePosn(pstate, rte,
 															  NULL),
 											0,
 											location));
@@ -347,7 +290,7 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 	 */
 	if (!found_table)
 	{
-		node_parser.parser_errposition(pstate, location);
+		parser_errposition(pstate, location);
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT * with no tables specified is not valid")));
@@ -356,21 +299,20 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 	return target;
 };
 
-PGTupleDesc
+PGTupleDescPtr
 TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsup)
 {
-	PGTupleDesc	tupleDesc;
 	int			netlevelsup;
 	PGRangeTblEntry *rte;
 	PGAttrNumber	attnum;
 	PGNode	   *expr;
 
 	/* Check my caller didn't mess up */
-	Assert(IsA(var, Var));
-	Assert(var->vartype == RECORDOID);
+	Assert(IsA(var, PGVar))
+	Assert(var->vartype == RECORDOID)
 
 	netlevelsup = var->varlevelsup + levelsup;
-	rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+	rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
 	attnum = var->varattno;
 
 	if (attnum == InvalidAttrNumber)
@@ -382,26 +324,26 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
 				   *lvar;
 		int			i;
 
-		relation_parser.expandRTE(rte, var->varno, 0, var->location, false,
+		relation_parser->expandRTE(rte, var->varno, 0, var->location, false,
 				  &names, &vars);
 
-		tupleDesc = CreateTemplateTupleDesc(list_length(vars));
+		auto tupleDesc = PGCreateTemplateTupleDesc(list_length(vars), false);
 		i = 1;
 		forboth(lname, names, lvar, vars)
 		{
 			char	   *label = strVal(lfirst(lname));
 			PGNode	   *varnode = (PGNode *) lfirst(lvar);
 
-			TupleDescInitEntry(tupleDesc, i,
+			PGTupleDescInitEntry(tupleDesc, i,
 							   label,
 							   exprType(varnode),
 							   exprTypmod(varnode),
 							   0);
-			TupleDescInitEntryCollation(tupleDesc, i,
+			PGTupleDescInitEntryCollation(tupleDesc, i,
 										exprCollation(varnode));
 			i++;
 		}
-		Assert(lname == NULL && lvar == NULL);	/* lists same length? */
+		Assert(lname == NULL && lvar == NULL)	/* lists same length? */
 
 		return tupleDesc;
 	}
@@ -424,7 +366,7 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
 		case PG_RTE_SUBQUERY:
 			{
 				/* Subselect-in-FROM: examine sub-select's output expr */
-				PGTargetEntry *ste = relation_parser.get_tle_by_resno(rte->subquery->targetList,
+				PGTargetEntry *ste = relation_parser->get_tle_by_resno(rte->subquery->targetList,
 													attnum);
 
 				if (ste == NULL || ste->resjunk)
@@ -452,9 +394,9 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
 			break;
 		case PG_RTE_JOIN:
 			/* Join RTE --- recursively inspect the alias variable */
-			Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars));
+			Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars))
 			expr = (PGNode *) list_nth(rte->joinaliasvars, attnum - 1);
-			Assert(expr != NULL);
+			Assert(expr != NULL)
 			/* We intentionally don't strip implicit coercions here */
 			if (IsA(expr, PGVar))
 				return expandRecordVariable(pstate, (PGVar *) expr, netlevelsup);
@@ -478,10 +420,10 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
 			/* CTE reference: examine subquery's output expr */
 			if (!rte->self_reference)
 			{
-				PGCommonTableExpr *cte = relation_parser.GetCTEForRTE(pstate, rte, netlevelsup);
+				PGCommonTableExpr *cte = relation_parser->GetCTEForRTE(pstate, rte, netlevelsup);
 				PGTargetEntry *ste;
 
-				ste = relation_parser.get_tle_by_resno(GetCTETargetList(cte), attnum);
+				ste = relation_parser->get_tle_by_resno(GetCTETargetList(cte), attnum);
 				if (ste == NULL || ste->resjunk)
 					elog(ERROR, "subquery %s does not have attribute %d",
 						 rte->eref->aliasname, attnum);
@@ -548,7 +490,7 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 		PGVar		   *var = (PGVar *) expr;
 		PGRangeTblEntry *rte;
 
-		rte = relation_parser.GetRTEByRangeTablePosn(pstate, var->varno, var->varlevelsup);
+		rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, var->varlevelsup);
 		return ExpandSingleTable(pstate, rte, var->location, make_target_entry);
 	}
 
@@ -570,7 +512,7 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 		tupleDesc = expandRecordVariable(pstate, (PGVar *) expr, 0);
 	else
 		tupleDesc = get_expr_result_tupdesc(expr, false);
-	Assert(tupleDesc);
+	Assert(tupleDesc)
 
 	/* Generate a list of references to the individual fields */
 	numAttrs = tupleDesc->natts;
@@ -615,12 +557,12 @@ TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 	int			sublevels_up;
 	int			rtindex;
 
-	rtindex = relation_parser.RTERangeTablePosn(pstate, rte, &sublevels_up);
+	rtindex = relation_parser->RTERangeTablePosn(pstate, rte, &sublevels_up);
 
 	if (make_target_entry)
 	{
 		/* expandRelAttrs handles permissions marking */
-		return relation_parser.expandRelAttrs(pstate, rte, rtindex, sublevels_up,
+		return relation_parser->expandRelAttrs(pstate, rte, rtindex, sublevels_up,
 							  location);
 	}
 	else
@@ -628,7 +570,7 @@ TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 		PGList	   *vars;
 		ListCell   *l;
 
-		relation_parser.expandRTE(rte, rtindex, sublevels_up, location, false,
+		relation_parser->expandRTE(rte, rtindex, sublevels_up, location, false,
 				  NULL, &vars);
 
 		/*
@@ -643,7 +585,7 @@ TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 		{
 			PGVar		   *var = (PGVar *) lfirst(l);
 
-			relation_parser.markVarForSelectPriv(pstate, var, rte);
+			relation_parser->markVarForSelectPriv(pstate, var, rte);
 		}
 
 		return vars;
@@ -716,14 +658,14 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 		{
 			case 2:
 				relname = strVal(linitial(fields));
-				rte = relation_parser.refnameRangeTblEntry(pstate, nspname, relname,
+				rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname,
 										   cref->location,
 										   &levels_up);
 				break;
 			case 3:
 				nspname = strVal(linitial(fields));
 				relname = strVal(lsecond(fields));
-				rte = relation_parser.refnameRangeTblEntry(pstate, nspname, relname,
+				rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname,
 										   cref->location,
 										   &levels_up);
 				break;
@@ -741,7 +683,7 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 					}
 					nspname = strVal(lsecond(fields));
 					relname = strVal(lthird(fields));
-					rte = relation_parser.refnameRangeTblEntry(pstate, nspname, relname,
+					rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname,
 											   cref->location,
 											   &levels_up);
 					break;
@@ -823,7 +765,7 @@ TargetParser::ExpandIndirectionStar(PGParseState *pstate, PGAIndirection *ind,
 									 list_length(ind->indirection) - 1);
 
 	/* And transform that */
-	expr = expr_parser.transformExpr(pstate, (PGNode *) ind, exprKind);
+	expr = expr_parser->transformExpr(pstate, (PGNode *) ind, exprKind);
 
 	/* Expand the rowtype expression into individual fields */
 	return ExpandRowReference(pstate, expr, make_target_entry);
@@ -838,7 +780,7 @@ TargetParser::transformTargetList(PGParseState *pstate, PGList *targetlist,
 	PGListCell   *o_target;
 
 	/* Shouldn't have any leftover multiassign items at start */
-	Assert(pstate->p_multiassign_exprs == NIL);
+	Assert(pstate->p_multiassign_exprs == NIL)
 
 	/* Expand "something.*" in SELECT and RETURNING, but not UPDATE */
 	expand_star = (exprKind != PGParseExprKind::EXPR_KIND_UPDATE_SOURCE);
@@ -974,7 +916,7 @@ TargetParser::resolveTargetListUnknowns(PGParseState *pstate, PGList *targetlist
 
 		if (restype == UNKNOWNOID)
 		{
-			tle->expr = (PGExpr *) coerce_parser.coerce_type(pstate, (PGNode *) tle->expr,
+			tle->expr = (PGExpr *) coerce_parser->coerce_type(pstate, (PGNode *) tle->expr,
 											 restype, TEXTOID, -1,
 											 PG_COERCION_IMPLICIT,
 											 PG_COERCE_IMPLICIT_CAST,
