@@ -25,7 +25,8 @@
 //#include <funcapi.h>
 #include <Common/Exception.h>
 
-#include<string.h>
+#include <string.h>
+#include <boost/algorithm/string.hpp>
 
 #include <Interpreters/orcaopt/parser_common_macro.h>
 
@@ -291,7 +292,9 @@ typedef enum {
 	ERRCODE_QUERY_CANCELED,
     ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE,
 	ERRCODE_INVALID_TEXT_REPRESENTATION,
-	ERRCODE_INTERNAL_ERROR
+	ERRCODE_INTERNAL_ERROR,
+	ERRCODE_INVALID_NAME,
+	ERRCODE_INVALID_TABLE_DEFINITION
 } PGPostgresParserErrors;
 
 typedef struct ErrorContextCallback
@@ -453,6 +456,9 @@ struct Form_pg_attribute
 	 */
 
     /* Column-level access permissions */
+
+	/* attribute's collation */
+	Oid			attcollation;
 };
 
 using PGAttrPtr = std::shared_ptr<Form_pg_attribute>;
@@ -468,6 +474,8 @@ struct PGTupleDesc
     bool tdhasoid; /* tuple has oid attribute in its header */
     int tdrefcount; /* reference count, or -1 if not counting */
 };
+
+using PGTupleDescPtr = std::shared_ptr<PGTupleDesc>;
 
 struct Form_pg_operator
 {
@@ -818,8 +826,6 @@ struct Sort_group_operator
 
 using PGSortGroupOperPtr = std::shared_ptr<Sort_group_operator>;
 
-using PGTupleDescPtr = std::shared_ptr<PGTupleDesc>;
-
 PGTupleDescPtr PGCreateTemplateTupleDesc(int natts, bool hasoid)
 {
 	//TODO kindred
@@ -886,7 +892,7 @@ PGTupleDescPtr PGCreateTemplateTupleDesc(int natts, bool hasoid)
     result->tdhasoid = hasoid;
     result->tdrefcount = -1;
 
-	return ;
+	return result;
 };
 
 int
@@ -898,66 +904,6 @@ namestrcpy(Name name, const char *str)
 	return 0;
 };
 
-void PGTupleDescInitEntry(
-    PGTupleDescPtr desc, PGAttrNumber attributeNumber, const char * attributeName, Oid oidtypeid, int32 typmod, int attdim)
-{
-    HeapTuple tuple;
-    //Form_pg_type typeForm;
-    PGAttrPtr att;
-
-    /*
-	 * sanity checks
-	 */
-    Assert(PointerIsValid(desc.get()))
-    Assert(attributeNumber >= 1)
-    Assert(attributeNumber <= desc->natts)
-
-    /*
-	 * initialize the attribute fields
-	 */
-    att = desc->attrs[attributeNumber - 1];
-
-    att->attrelid = 0; /* dummy value */
-
-    /*
-	 * Note: attributeName can be NULL, because the planner doesn't always
-	 * fill in valid resname values in targetlists, particularly for resjunk
-	 * attributes. Also, do nothing if caller wants to re-use the old attname.
-	 */
-    if (attributeName == NULL)
-        MemSet(NameStr(att->attname), 0, NAMEDATALEN);
-    else if (attributeName != NameStr(att->attname))
-        namestrcpy(&(att->attname), attributeName);
-
-    att->attstattarget = -1;
-    att->attcacheoff = -1;
-    att->atttypmod = typmod;
-
-    att->attnum = attributeNumber;
-    att->attndims = attdim;
-
-    att->attnotnull = false;
-    att->atthasdef = false;
-    att->attisdropped = false;
-    att->attislocal = true;
-    att->attinhcount = 0;
-    /* attacl, attoptions and attfdwoptions are not present in tupledescs */
-
-    tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(oidtypeid));
-    if (!HeapTupleIsValid(tuple))
-        elog(ERROR, "cache lookup failed for type %u", oidtypeid);
-    typeForm = (Form_pg_type)GETSTRUCT(tuple);
-
-    att->atttypid = oidtypeid;
-    att->attlen = typeForm->typlen;
-    att->attbyval = typeForm->typbyval;
-    att->attalign = typeForm->typalign;
-    att->attstorage = typeForm->typstorage;
-    //att->attcollation = typeForm->typcollation;
-
-    //ReleaseSysCache(tuple);
-};
-
 void PGTupleDescInitEntryCollation(PGTupleDescPtr desc, PGAttrNumber attributeNumber, Oid collationid)
 {
     /*
@@ -967,7 +913,39 @@ void PGTupleDescInitEntryCollation(PGTupleDescPtr desc, PGAttrNumber attributeNu
     Assert(attributeNumber >= 1)
     Assert(attributeNumber <= desc->natts)
 
-    //desc->attrs[attributeNumber - 1]->attcollation = collationid;
+    desc->attrs[attributeNumber - 1]->attcollation = collationid;
+};
+
+void PGTupleDescCopyEntry(PGTupleDescPtr dst, PGAttrNumber dstAttno, PGTupleDescPtr src, PGAttrNumber srcAttno)
+{
+    /*
+	 * sanity checks
+	 */
+    Assert(src != nullptr)
+    Assert(dst != nullptr)
+    Assert(srcAttno >= 1)
+    Assert(srcAttno <= src->natts)
+    Assert(dstAttno >= 1)
+    Assert(dstAttno <= dst->natts)
+
+	dst->attrs[dstAttno - 1] = src->attrs[srcAttno - 1];
+    //memcpy(dst->attrs[dstAttno - 1], src->attrs[srcAttno - 1], ATTRIBUTE_FIXED_PART_SIZE);
+
+    /*
+	 * Aside from updating the attno, we'd better reset attcacheoff.
+	 *
+	 * XXX Actually, to be entirely safe we'd need to reset the attcacheoff of
+	 * all following columns in dst as well.  Current usage scenarios don't
+	 * require that though, because all following columns will get initialized
+	 * by other uses of this function or TupleDescInitEntry.  So we cheat a
+	 * bit to avoid a useless O(N^2) penalty.
+	 */
+    dst->attrs[dstAttno - 1]->attnum = dstAttno;
+    dst->attrs[dstAttno - 1]->attcacheoff = -1;
+
+    /* since we're not copying constraints or defaults, clear these */
+    dst->attrs[dstAttno - 1]->attnotnull = false;
+    dst->attrs[dstAttno - 1]->atthasdef = false;
 };
 
 typedef enum
@@ -1038,14 +1016,14 @@ struct ArrayType
 	Oid			elemtype;		/* element type OID */
 };
 
-struct FuzzyAttrMatchState
-{
-	int			distance;		/* Weighted distance (lowest so far) */
-	duckdb_libpgquery::PGRangeTblEntry *rfirst;		/* RTE of first */
-	PGAttrNumber	first;			/* Closest attribute so far */
-	duckdb_libpgquery::PGRangeTblEntry *rsecond;		/* RTE of second */
-	PGAttrNumber	second;			/* Second closest attribute so far */
-};
+// struct FuzzyAttrMatchState
+// {
+// 	int			distance;		/* Weighted distance (lowest so far) */
+// 	duckdb_libpgquery::PGRangeTblEntry *rfirst;		/* RTE of first */
+// 	PGAttrNumber	first;			/* Closest attribute so far */
+// 	duckdb_libpgquery::PGRangeTblEntry *rsecond;		/* RTE of second */
+// 	PGAttrNumber	second;			/* Second closest attribute so far */
+// };
 
 struct OprCacheKey
 {
@@ -1441,7 +1419,9 @@ struct PGPlannerInfo
 
 static inline Datum BoolGetDatum(bool b) { return (b ? 1 : 0); } 
 
+
 static inline int32 DatumGetInt32(Datum d) { return (int32) d; };
+static inline Datum Int16GetDatum(int16 i16) { return (Datum) i16; } 
 static inline Datum Int32GetDatum(int32 i32) { return (Datum) i32; };
 static inline Datum Int64GetDatum(int64 i64) { return (Datum) i64; };
 
@@ -1837,4 +1817,282 @@ struct grouped_window_ctx
     duckdb_libpgquery::PGList * subrtable;
     int call_depth;
     duckdb_libpgquery::PGTargetEntry * tle;
+};
+
+struct RelFileNode
+{
+	Oid			spcNode;		/* tablespace */
+	Oid			dbNode;			/* database */
+	Oid			relNode;		/* relation */
+};
+
+typedef int BackendId;
+
+typedef uint32 SubTransactionId;
+
+typedef struct LockRelId
+{
+	Oid			relId;			/* a relation identifier */
+	Oid			dbId;			/* a database identifier */
+} LockRelId;
+
+typedef struct LockInfoData
+{
+	LockRelId	lockRelId;
+} LockInfoData;
+
+/*
+ * GpPolicyType represents a type of policy under which a relation's
+ * tuples may be assigned to a component database.
+ */
+typedef enum
+{
+    POLICYTYPE_PARTITIONED, /* Tuples partitioned onto segment database. */
+    POLICYTYPE_ENTRY, /* Tuples stored on entry database. */
+    POLICYTYPE_REPLICATED /* Tuples stored a copy on all segment database. */
+} PGPolicyType;
+
+/*
+ * GpPolicy represents a Greenplum DB data distribution policy. The ptype field
+ * is always significant.  Other fields may be specific to a particular
+ * type.
+ *
+ * A GpPolicy is typically palloc'd with space for nattrs integer
+ * attribute numbers (attrs) in addition to sizeof(GpPolicy).
+ */
+struct PGPolicy
+{
+    duckdb_libpgquery::PGNodeTag type;
+    PGPolicyType ptype;
+    int numsegments;
+
+    /* These fields apply to POLICYTYPE_PARTITIONED. */
+    int nattrs;
+    PGAttrNumber * attrs; /* array of attribute numbers  */
+    Oid * opclasses; /* and their opclasses */
+};
+
+using PGPolicyPtr = std::shared_ptr<PGPolicy>;
+
+struct PGRelation
+{
+    RelFileNode rd_node; /* relation physical identifier */
+    /* use "struct" here to avoid needing to include smgr.h: */
+	//TODO kindred
+    //struct SMgrRelationData * rd_smgr; /* cached file handle, or NULL */
+    int rd_refcnt; /* reference count */
+    BackendId rd_backend; /* owning backend id, if temporary relation */
+    bool rd_islocaltemp; /* rel is a temp rel of this session */
+    bool rd_isnailed; /* rel is nailed in cache */
+    bool rd_isvalid; /* relcache entry is valid */
+    char rd_indexvalid; /* state of rd_indexlist: 0 = not valid, 1 =
+								 * valid, 2 = temporarily forced */
+
+    /*
+	 * rd_createSubid is the ID of the highest subtransaction the rel has
+	 * survived into; or zero if the rel was not created in the current top
+	 * transaction.  This can be now be relied on, whereas previously it could
+	 * be "forgotten" in earlier releases. Likewise, rd_newRelfilenodeSubid is
+	 * the ID of the highest subtransaction the relfilenode change has
+	 * survived into, or zero if not changed in the current transaction (or we
+	 * have forgotten changing it). rd_newRelfilenodeSubid can be forgotten
+	 * when a relation has multiple new relfilenodes within a single
+	 * transaction, with one of them occuring in a subsequently aborted
+	 * subtransaction, e.g. BEGIN; TRUNCATE t; SAVEPOINT save; TRUNCATE t;
+	 * ROLLBACK TO save; -- rd_newRelfilenode is now forgotten
+	 */
+    SubTransactionId rd_createSubid; /* rel was created in current xact */
+    SubTransactionId rd_newRelfilenodeSubid; /* new relfilenode assigned in
+												 * current xact */
+
+    PGClassPtr rd_rel; /* RELATION tuple */
+    PGTupleDescPtr rd_att; /* tuple descriptor */
+    Oid rd_id; /* relation's object id */
+    LockInfoData rd_lockInfo; /* lock mgr's info for locking relation */
+    //RuleLock * rd_rules; /* rewrite rules */
+    //MemoryContext rd_rulescxt; /* private memory cxt for rd_rules, if any */
+    //TriggerDesc * trigdesc; /* Trigger info, or NULL if rel has none */
+    PGPolicyPtr rd_cdbpolicy; /* Partitioning info if distributed rel */
+    bool rd_cdbDefaultStatsWarningIssued;
+
+    /* data managed by RelationGetIndexList: */
+    duckdb_libpgquery::PGList * rd_indexlist; /* list of OIDs of indexes on relation */
+    Oid rd_oidindex; /* OID of unique index on OID, if any */
+    Oid rd_replidindex; /* OID of replica identity index, if any */
+
+    /* data managed by RelationGetIndexAttrBitmap: */
+    duckdb_libpgquery::PGBitmapset * rd_indexattr; /* identifies columns used in indexes */
+    duckdb_libpgquery::PGBitmapset * rd_keyattr; /* cols that can be ref'd by foreign keys */
+    duckdb_libpgquery::PGBitmapset * rd_idattr; /* included in replica identity index */
+
+    /*
+	 * rd_options is set whenever rd_rel is loaded into the relcache entry.
+	 * Note that you can NOT look into rd_rel for this data.  NULL means "use
+	 * defaults".
+	 */
+    bytea * rd_options; /* parsed pg_class.reloptions */
+
+    /* These are non-NULL only for an index relation: */
+    //Form_pg_index rd_index; /* pg_index tuple describing this index */
+    /* use "struct" here to avoid needing to include htup.h: */
+    //struct HeapTupleData * rd_indextuple; /* all of pg_index tuple */
+    //Form_pg_am rd_am; /* pg_am tuple for index's AM */
+
+    /*
+	 * index access support info (used only for an index relation)
+	 *
+	 * Note: only default support procs for each opclass are cached, namely
+	 * those with lefttype and righttype equal to the opclass's opcintype. The
+	 * arrays are indexed by support function number, which is a sufficient
+	 * identifier given that restriction.
+	 *
+	 * Note: rd_amcache is available for index AMs to cache private data about
+	 * an index.  This must be just a cache since it may get reset at any time
+	 * (in particular, it will get reset by a relcache inval message for the
+	 * index).  If used, it must point to a single memory chunk palloc'd in
+	 * rd_indexcxt.  A relcache reset will include freeing that chunk and
+	 * setting rd_amcache = NULL.
+	 */
+    //MemoryContext rd_indexcxt; /* private memory cxt for this stuff */
+    //RelationAmInfo * rd_aminfo; /* lookup info for funcs found in pg_am */
+    Oid * rd_opfamily; /* OIDs of op families for each index col */
+    Oid * rd_opcintype; /* OIDs of opclass declared input data types */
+    //RegProcedure * rd_support; /* OIDs of support procedures */
+    //FmgrInfo * rd_supportinfo; /* lookup info for support procedures */
+    int16 * rd_indoption; /* per-column AM-specific flags */
+    duckdb_libpgquery::PGList * rd_indexprs; /* index expression trees, if any */
+    duckdb_libpgquery::PGList * rd_indpred; /* index predicate tree, if any */
+    Oid * rd_exclops; /* OIDs of exclusion operators, if any */
+    Oid * rd_exclprocs; /* OIDs of exclusion ops' procs, if any */
+    uint16 * rd_exclstrats; /* exclusion ops' strategy numbers, if any */
+    void * rd_amcache; /* available for use by index AM */
+    Oid * rd_indcollation; /* OIDs of index collations */
+
+    /*
+	 * foreign-table support
+	 *
+	 * rd_fdwroutine must point to a single memory chunk palloc'd in
+	 * CacheMemoryContext.  It will be freed and reset to NULL on a relcache
+	 * reset.
+	 */
+
+    /* use "struct" here to avoid needing to include fdwapi.h: */
+    //struct FdwRoutine * rd_fdwroutine; /* cached function pointers, or NULL */
+
+    /*
+	 * Hack for CLUSTER, rewriting ALTER TABLE, etc: when writing a new
+	 * version of a table, we need to make any toast pointers inserted into it
+	 * have the existing toast table's OID, not the OID of the transient toast
+	 * table.  If rd_toastoid isn't InvalidOid, it is the OID to place in
+	 * toast pointers inserted into this rel.  (Note it's set on the new
+	 * version of the main heap, not the toast table itself.)  This also
+	 * causes toast_save_datum() to try to preserve toast value OIDs.
+	 */
+    Oid rd_toastoid; /* Real TOAST table's OID, or InvalidOid */
+
+    /*
+	 * AO table support info (used only for AO and AOCS relations)
+	 */
+    //Form_pg_appendonly rd_appendonly;
+    //struct HeapTupleData * rd_aotuple; /* all of pg_appendonly tuple */
+
+    /* use "struct" here to avoid needing to include pgstat.h: */
+    //struct PgStat_TableStatus * pgstat_info; /* statistics collection area */
+} RelationData;
+
+using PGRelationPtr = std::shared_ptr<PGRelation>;
+
+#define RelationGetRelationName(relation) \
+	(NameStr((relation)->rd_rel->relname))
+
+duckdb_libpgquery::PGList * stringToQualifiedNameList(const char * string)
+{
+	using duckdb_libpgquery::ereport;
+	using duckdb_libpgquery::errcode;
+	using duckdb_libpgquery::errmsg;
+	using duckdb_libpgquery::pstrdup;
+	using duckdb_libpgquery::lappend;
+	using duckdb_libpgquery::PGList;
+	using duckdb_libpgquery::PGListCell;
+
+    PGList * result = NULL;
+
+	std::string rawname = std::string(string);
+
+	std::vector<std::string> vecSegTag;
+	boost::split(vecSegTag, rawname, boost::is_any_of(","));
+
+	if (vecSegTag.size() == 0)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INVALID_NAME), errmsg("invalid name syntax")));
+	}
+
+    for (auto l : vecSegTag)
+    {
+        result = lappend(result, makeString(pstrdup(l.c_str())));
+    }
+
+    return result;
+};
+
+duckdb_libpgquery::PGRangeVar * makeRangeVarFromNameList(duckdb_libpgquery::PGList * names)
+{
+	using duckdb_libpgquery::ereport;
+	using duckdb_libpgquery::errcode;
+	using duckdb_libpgquery::errmsg;
+	using duckdb_libpgquery::PGValue;
+	using duckdb_libpgquery::makeRangeVar;
+
+    duckdb_libpgquery::PGRangeVar * rel = makeRangeVar(NULL, NULL, -1);
+
+    switch (list_length(names))
+    {
+        case 1:
+            rel->relname = strVal(linitial(names));
+            break;
+        case 2:
+            rel->schemaname = strVal(linitial(names));
+            rel->relname = strVal(lsecond(names));
+            break;
+        case 3:
+            rel->catalogname = strVal(linitial(names));
+            rel->schemaname = strVal(lsecond(names));
+            rel->relname = strVal(lthird(names));
+            break;
+        default:
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_SYNTAX_ERROR), errmsg("improper relation name (too many dotted names): %s", NameListToString(names))));
+            break;
+    }
+
+    return rel;
+};
+
+int pg_strcasecmp(const char * s1, const char * s2)
+{
+    for (;;)
+    {
+        unsigned char ch1 = (unsigned char)*s1++;
+        unsigned char ch2 = (unsigned char)*s2++;
+
+        if (ch1 != ch2)
+        {
+            if (ch1 >= 'A' && ch1 <= 'Z')
+                ch1 += 'a' - 'A';
+            else if (IS_HIGHBIT_SET(ch1) && isupper(ch1))
+                ch1 = tolower(ch1);
+
+            if (ch2 >= 'A' && ch2 <= 'Z')
+                ch2 += 'a' - 'A';
+            else if (IS_HIGHBIT_SET(ch2) && isupper(ch2))
+                ch2 = tolower(ch2);
+
+            if (ch1 != ch2)
+                return (int)ch1 - (int)ch2;
+        }
+        if (ch1 == 0)
+            break;
+    }
+    return 0;
 };

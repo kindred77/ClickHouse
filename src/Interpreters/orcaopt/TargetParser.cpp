@@ -4,6 +4,14 @@
 #include <Interpreters/orcaopt/ExprParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/CoerceParser.h>
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
+#include <Interpreters/orcaopt/provider/RelationProvider.h>
+
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wswitch"
+#else
+#pragma GCC diagnostic ignored "-Wswitch"
+#endif
 
 using namespace duckdb_libpgquery;
 
@@ -11,7 +19,7 @@ namespace DB
 {
 
 int
-TargetParser::FigureColnameInternal(PGNode *node, char **name)
+TargetParser::FigureColnameInternal(PGNode *node, std::string & name)
 {
     int strength = 0;
 
@@ -34,7 +42,7 @@ TargetParser::FigureColnameInternal(PGNode *node, char **name)
             }
             if (fname)
             {
-                *name = fname;
+                name = std::string(fname);
                 return 2;
             }
         }
@@ -54,20 +62,20 @@ TargetParser::FigureColnameInternal(PGNode *node, char **name)
             }
             if (fname)
             {
-                *name = fname;
+                name = std::string(fname);
                 return 2;
             }
             return FigureColnameInternal(ind->arg, name);
         }
-        break;
+        //break;
         case T_PGFuncCall:
-            *name = strVal(llast(((PGFuncCall *)node)->funcname));
+            name = std::string(strVal(llast(((PGFuncCall *)node)->funcname)));
             return 2;
         case T_PGAExpr:
             /* make nullif() act like a regular function */
             if (((PGAExpr *)node)->kind == PG_AEXPR_NULLIF)
             {
-                *name = "nullif";
+                name = "nullif";
                 return 2;
             }
             break;
@@ -77,7 +85,7 @@ TargetParser::FigureColnameInternal(PGNode *node, char **name)
             {
                 if (((PGTypeCast *)node)->typeName != NULL)
                 {
-                    *name = strVal(llast(((PGTypeCast *)node)->typeName->names));
+                    name = std::string(strVal(llast(((PGTypeCast *)node)->typeName->names)));
                     return 1;
                 }
             }
@@ -88,10 +96,10 @@ TargetParser::FigureColnameInternal(PGNode *node, char **name)
             switch (((PGSubLink *)node)->subLinkType)
             {
                 case PG_EXISTS_SUBLINK:
-                    *name = "exists";
+                    name = "exists";
                     return 2;
                 case PG_ARRAY_SUBLINK:
-                    *name = "array";
+                    name = "array";
                     return 2;
                 case PG_EXPR_SUBLINK: {
                     /* Get column name of the subquery's single target */
@@ -111,7 +119,7 @@ TargetParser::FigureColnameInternal(PGNode *node, char **name)
 
                             if (te->resname)
                             {
-                                *name = te->resname;
+                                name = std::string(te->resname);
                                 return 2;
                             }
                     }
@@ -133,31 +141,31 @@ TargetParser::FigureColnameInternal(PGNode *node, char **name)
             strength = FigureColnameInternal((PGNode *)((PGCaseExpr *)node)->defresult, name);
             if (strength <= 1)
             {
-                *name = "case";
+                name = "case";
                 return 1;
             }
             break;
         case T_PGAArrayExpr:
             /* make ARRAY[] act like a function */
-            *name = "array";
+            name = "array";
             return 2;
         case T_PGRowExpr:
             /* make ROW() act like a function */
-            *name = "row";
+            name = "row";
             return 2;
         case T_PGCoalesceExpr:
             /* make coalesce() act like a regular function */
-            *name = "coalesce";
+            name = "coalesce";
             return 2;
         case T_PGMinMaxExpr:
             /* make greatest/least act like a regular function */
             switch (((PGMinMaxExpr *)node)->op)
             {
                 case PG_IS_GREATEST:
-                    *name = "greatest";
+                    name = "greatest";
                     return 2;
                 case IS_LEAST:
-                    *name = "least";
+                    name = "least";
                     return 2;
             }
             break;
@@ -193,10 +201,10 @@ TargetParser::FigureColnameInternal(PGNode *node, char **name)
         //     }
         //     break;
         case T_PGXmlSerialize:
-            *name = "xmlserialize";
+            name = "xmlserialize";
             return 2;
         case T_PGGroupingFunc:
-            *name = "grouping";
+            name = "grouping";
             return 2;
         default:
             break;
@@ -205,13 +213,13 @@ TargetParser::FigureColnameInternal(PGNode *node, char **name)
     return strength;
 };
 
-char *
+std::string
 TargetParser::FigureColname(PGNode *node)
 {
-	char	   *name = NULL;
+	std::string name = "";
 
-	(void) FigureColnameInternal(node, &name);
-	if (name != NULL)
+	(void) FigureColnameInternal(node, name);
+	if (name != "")
 		return name;
 	/* default result if we can't guess anything */
 	return "?column?";
@@ -245,7 +253,8 @@ TargetParser::transformTargetEntry(PGParseState *pstate,
 		 * Generate a suitable column name for a column without any explicit
 		 * 'AS ColumnName' clause.
 		 */
-		colname = FigureColname(node);
+		//TODO kindred
+		colname = pstrdup(FigureColname(node).c_str());
 	}
 
 	return makeTargetEntry((PGExpr *) expr,
@@ -302,180 +311,168 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 PGTupleDescPtr
 TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsup)
 {
-	int			netlevelsup;
-	PGRangeTblEntry *rte;
-	PGAttrNumber	attnum;
-	PGNode	   *expr;
+    int netlevelsup;
+    PGRangeTblEntry * rte;
+    PGAttrNumber attnum;
+    PGNode * expr;
+	PGTupleDescPtr tupleDesc = nullptr;
 
-	/* Check my caller didn't mess up */
-	Assert(IsA(var, PGVar))
-	Assert(var->vartype == RECORDOID)
+    /* Check my caller didn't mess up */
+    Assert(IsA(var, PGVar))
+    Assert(var->vartype == RECORDOID)
 
-	netlevelsup = var->varlevelsup + levelsup;
-	rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
-	attnum = var->varattno;
+    netlevelsup = var->varlevelsup + levelsup;
+    rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+    attnum = var->varattno;
 
-	if (attnum == InvalidAttrNumber)
-	{
-		/* Whole-row reference to an RTE, so expand the known fields */
-		PGList	   *names,
-				   *vars;
-		ListCell   *lname,
-				   *lvar;
-		int			i;
+    if (attnum == InvalidAttrNumber)
+    {
+        /* Whole-row reference to an RTE, so expand the known fields */
+        PGList *names, *vars;
+        PGListCell *lname, *lvar;
+        int i;
 
-		relation_parser->expandRTE(rte, var->varno, 0, var->location, false,
-				  &names, &vars);
+        relation_parser->expandRTE(rte, var->varno, 0, var->location, false, &names, &vars);
 
-		auto tupleDesc = PGCreateTemplateTupleDesc(list_length(vars), false);
-		i = 1;
-		forboth(lname, names, lvar, vars)
-		{
-			char	   *label = strVal(lfirst(lname));
-			PGNode	   *varnode = (PGNode *) lfirst(lvar);
+        tupleDesc = PGCreateTemplateTupleDesc(list_length(vars), false);
+        i = 1;
+        forboth(lname, names, lvar, vars)
+        {
+            char * label = strVal(lfirst(lname));
+            PGNode * varnode = (PGNode *)lfirst(lvar);
 
-			PGTupleDescInitEntry(tupleDesc, i,
-							   label,
-							   exprType(varnode),
-							   exprTypmod(varnode),
-							   0);
-			PGTupleDescInitEntryCollation(tupleDesc, i,
-										exprCollation(varnode));
-			i++;
-		}
-		Assert(lname == NULL && lvar == NULL)	/* lists same length? */
+            type_provider->PGTupleDescInitEntry(tupleDesc, i, label, exprType(varnode), exprTypmod(varnode), 0);
+            PGTupleDescInitEntryCollation(tupleDesc, i, exprCollation(varnode));
+            i++;
+        }
+        Assert(lname == NULL && lvar == NULL) /* lists same length? */
 
-		return tupleDesc;
-	}
+        return tupleDesc;
+    }
 
-	expr = (PGNode *) var;		/* default if we can't drill down */
+    expr = (PGNode *)var; /* default if we can't drill down */
 
-	switch (rte->rtekind)
-	{
-		case PG_RTE_RELATION:
-		case PG_RTE_VALUES:
-		case RTE_NAMEDTUPLESTORE:
-		// case PG_RTE_RESULT:
+    switch (rte->rtekind)
+    {
+        case PG_RTE_RELATION:
+        case PG_RTE_VALUES:
 
-			/*
-			 * This case should not occur: a column of a table, values list,
-			 * or ENR shouldn't have type RECORD.  Fall through and fail (most
+            /*
+			 * This case should not occur: a column of a table or values list
+			 * shouldn't have type RECORD.  Fall through and fail (most
 			 * likely) at the bottom.
 			 */
-			break;
-		case PG_RTE_SUBQUERY:
-			{
-				/* Subselect-in-FROM: examine sub-select's output expr */
-				PGTargetEntry *ste = relation_parser->get_tle_by_resno(rte->subquery->targetList,
-													attnum);
+            break;
+        case PG_RTE_SUBQUERY: {
+            /* Subselect-in-FROM: examine sub-select's output expr */
+            PGTargetEntry * ste = relation_parser->get_tle_by_resno(rte->subquery->targetList, attnum);
 
-				if (ste == NULL || ste->resjunk)
-					elog(ERROR, "subquery %s does not have attribute %d",
-						 rte->eref->aliasname, attnum);
-				expr = (PGNode *) ste->expr;
-				if (IsA(expr, PGVar))
-				{
-					/*
+            if (ste == NULL || ste->resjunk)
+                elog(ERROR, "subquery %s does not have attribute %d", rte->eref->aliasname, attnum);
+            expr = (PGNode *)ste->expr;
+            if (IsA(expr, PGVar))
+            {
+                /*
 					 * Recurse into the sub-select to see what its Var refers
 					 * to.  We have to build an additional level of ParseState
 					 * to keep in step with varlevelsup in the subselect.
 					 */
-					PGParseState	mypstate;
+                PGParseState mypstate;
 
-					MemSet(&mypstate, 0, sizeof(mypstate));
-					mypstate.parentParseState = pstate;
-					mypstate.p_rtable = rte->subquery->rtable;
-					/* don't bother filling the rest of the fake pstate */
+                MemSet(&mypstate, 0, sizeof(mypstate));
+                mypstate.parentParseState = pstate;
+                mypstate.p_rtable = rte->subquery->rtable;
+                /* don't bother filling the rest of the fake pstate */
 
-					return expandRecordVariable(&mypstate, (PGVar *) expr, 0);
-				}
-				/* else fall through to inspect the expression */
-			}
-			break;
-		case PG_RTE_JOIN:
-			/* Join RTE --- recursively inspect the alias variable */
-			Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars))
-			expr = (PGNode *) list_nth(rte->joinaliasvars, attnum - 1);
-			Assert(expr != NULL)
-			/* We intentionally don't strip implicit coercions here */
-			if (IsA(expr, PGVar))
-				return expandRecordVariable(pstate, (PGVar *) expr, netlevelsup);
-			/* else fall through to inspect the expression */
-			break;
-		// case PG_RTE_TABLEFUNCTION:
-		case PG_RTE_FUNCTION:
+                return expandRecordVariable(&mypstate, (PGVar *)expr, 0);
+            }
+            /* else fall through to inspect the expression */
+        }
+        break;
+        case PG_RTE_JOIN:
+            /* Join RTE --- recursively inspect the alias variable */
+            Assert(attnum > 0 && attnum <= list_length(rte->joinaliasvars))
+            expr = (PGNode *)list_nth(rte->joinaliasvars, attnum - 1);
+            Assert(expr != NULL)
+            /* We intentionally don't strip implicit coercions here */
+            if (IsA(expr, PGVar))
+                return expandRecordVariable(pstate, (PGVar *)expr, netlevelsup);
+            /* else fall through to inspect the expression */
+            break;
+		//TODO kindred
+        // case RTE_TABLEFUNCTION:
+        case PG_RTE_FUNCTION:
 
-			/*
+            /*
 			 * We couldn't get here unless a function is declared with one of
 			 * its result columns as RECORD, which is not allowed.
 			 */
-			break;
-		case PG_RTE_TABLEFUNC:
+            break;
+        case PG_RTE_CTE:
+            /* CTE reference: examine subquery's output expr */
+            if (!rte->self_reference)
+            {
+                PGCommonTableExpr * cte = relation_parser->GetCTEForRTE(pstate, rte, netlevelsup);
+                PGTargetEntry * ste;
 
-			/*
-			 * Table function cannot have columns with RECORD type.
-			 */
-			break;
-		case PG_RTE_CTE:
-			/* CTE reference: examine subquery's output expr */
-			if (!rte->self_reference)
-			{
-				PGCommonTableExpr *cte = relation_parser->GetCTEForRTE(pstate, rte, netlevelsup);
-				PGTargetEntry *ste;
-
-				ste = relation_parser->get_tle_by_resno(GetCTETargetList(cte), attnum);
-				if (ste == NULL || ste->resjunk)
-					elog(ERROR, "subquery %s does not have attribute %d",
-						 rte->eref->aliasname, attnum);
-				expr = (PGNode *) ste->expr;
-				if (IsA(expr, PGVar))
-				{
-					/*
+                ste = relation_parser->get_tle_by_resno(GetCTETargetList(cte), attnum);
+                if (ste == NULL || ste->resjunk)
+                    elog(ERROR, "subquery %s does not have attribute %d", rte->eref->aliasname, attnum);
+                expr = (PGNode *)ste->expr;
+                if (IsA(expr, PGVar))
+                {
+                    /*
 					 * Recurse into the CTE to see what its Var refers to. We
 					 * have to build an additional level of ParseState to keep
 					 * in step with varlevelsup in the CTE; furthermore it
 					 * could be an outer CTE.
 					 */
-					PGParseState	mypstate;
-					Index		levelsup;
+                    PGParseState mypstate;
+                    Index levelsup_cte;
 
-					MemSet(&mypstate, 0, sizeof(mypstate));
-					/* this loop must work, since GetCTEForRTE did */
-					for (levelsup = 0;
-						 levelsup < rte->ctelevelsup + netlevelsup;
-						 levelsup++)
-						pstate = pstate->parentParseState;
-					mypstate.parentParseState = pstate;
-					mypstate.p_rtable = ((PGQuery *) cte->ctequery)->rtable;
-					/* don't bother filling the rest of the fake pstate */
+                    MemSet(&mypstate, 0, sizeof(mypstate));
+                    /* this loop must work, since GetCTEForRTE did */
+                    for (levelsup_cte = 0; levelsup_cte < rte->ctelevelsup + netlevelsup; levelsup_cte++)
+                        pstate = pstate->parentParseState;
+                    mypstate.parentParseState = pstate;
+                    mypstate.p_rtable = ((PGQuery *)cte->ctequery)->rtable;
+                    /* don't bother filling the rest of the fake pstate */
 
-					return expandRecordVariable(&mypstate, (PGVar *) expr, 0);
-				}
-				/* else fall through to inspect the expression */
-			}
-			break;
-		// case PG_RTE_VOID:
-		// 	elog(ERROR, "unexpected RTE type RTE_VOID");
-		// 	break;
+                    return expandRecordVariable(&mypstate, (PGVar *)expr, 0);
+                }
+                /* else fall through to inspect the expression */
+            }
+            break;
+		//TODO kindred
+        // case RTE_VOID:
+        //     Insist(0);
+        //     break;
+    }
+
+    /*
+	 * We now have an expression we can't expand any more, so see if
+	 * get_expr_result_type() can do anything with it.  If not, pass to
+	 * lookup_rowtype_tupdesc() which will probably fail, but will give an
+	 * appropriate error message while failing.
+	 */
+    if (type_provider->get_expr_result_type(expr, NULL, tupleDesc) != TYPEFUNC_COMPOSITE)
+	{
+        tupleDesc = type_provider->lookup_rowtype_tupdesc_copy(exprType(expr), exprTypmod(expr));
 	}
 
-	/*
-	 * We now have an expression we can't expand any more, so see if
-	 * get_expr_result_tupdesc() can do anything with it.
-	 */
-	return get_expr_result_tupdesc(expr, false);
+	return tupleDesc;
 };
 
 PGList *
 TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 				   bool make_target_entry)
 {
-	PGList	   *result = NIL;
-	TupleDesc	tupleDesc;
-	int			numAttrs;
-	int			i;
+    PGList * result = NIL;
+    PGTupleDescPtr tupleDesc = nullptr;
+    int numAttrs;
+    int i;
 
-	/*
+    /*
 	 * If the rowtype expression is a whole-row Var, we can expand the fields
 	 * as simple Vars.  Note: if the RTE is a relation, this case leaves us
 	 * with the RTE's selectedCols bitmap showing the whole row as needing
@@ -484,70 +481,68 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 	 * trying to clean up --- arguably, the permissions marking is correct
 	 * anyway for such cases.
 	 */
-	if (IsA(expr, PGVar) &&
-		((PGVar *) expr)->varattno == InvalidAttrNumber)
-	{
-		PGVar		   *var = (PGVar *) expr;
-		PGRangeTblEntry *rte;
+    if (IsA(expr, PGVar) && ((PGVar *)expr)->varattno == InvalidAttrNumber)
+    {
+        PGVar * var = (PGVar *)expr;
+        PGRangeTblEntry * rte;
 
-		rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, var->varlevelsup);
-		return ExpandSingleTable(pstate, rte, var->location, make_target_entry);
-	}
+        rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, var->varlevelsup);
+        return ExpandSingleTable(pstate, rte, var->location, make_target_entry);
+    }
 
-	/*
+    /*
 	 * Otherwise we have to do it the hard way.  Our current implementation is
 	 * to generate multiple copies of the expression and do FieldSelects.
 	 * (This can be pretty inefficient if the expression involves nontrivial
 	 * computation :-(.)
 	 *
-	 * Verify it's a composite type, and get the tupdesc.
-	 * get_expr_result_tupdesc() handles this conveniently.
+	 * Verify it's a composite type, and get the tupdesc.  We use
+	 * get_expr_result_type() because that can handle references to functions
+	 * returning anonymous record types.  If that fails, use
+	 * lookup_rowtype_tupdesc(), which will almost certainly fail as well, but
+	 * it will give an appropriate error message.
 	 *
 	 * If it's a Var of type RECORD, we have to work even harder: we have to
-	 * find what the Var refers to, and pass that to get_expr_result_tupdesc.
+	 * find what the Var refers to, and pass that to get_expr_result_type.
 	 * That task is handled by expandRecordVariable().
 	 */
-	if (IsA(expr, PGVar) &&
-		((PGVar *) expr)->vartype == RECORDOID)
-		tupleDesc = expandRecordVariable(pstate, (PGVar *) expr, 0);
-	else
-		tupleDesc = get_expr_result_tupdesc(expr, false);
-	Assert(tupleDesc)
+    if (IsA(expr, PGVar) && ((PGVar *)expr)->vartype == RECORDOID)
+        tupleDesc = expandRecordVariable(pstate, (PGVar *)expr, 0);
+    else if (type_provider->get_expr_result_type(expr, NULL, tupleDesc) != TYPEFUNC_COMPOSITE)
+        tupleDesc = type_provider->lookup_rowtype_tupdesc_copy(exprType(expr), exprTypmod(expr));
+    Assert(tupleDesc)
 
-	/* Generate a list of references to the individual fields */
-	numAttrs = tupleDesc->natts;
-	for (i = 0; i < numAttrs; i++)
-	{
-		Form_pg_attribute att = TupleDescAttr(tupleDesc, i);
-		PGFieldSelect *fselect;
+    /* Generate a list of references to the individual fields */
+    numAttrs = tupleDesc->natts;
+    for (i = 0; i < numAttrs; i++)
+    {
+        PGAttrPtr att = tupleDesc->attrs[i];
+        PGFieldSelect * fselect;
 
-		if (att->attisdropped)
-			continue;
+        if (att->attisdropped)
+            continue;
 
-		fselect = makeNode(PGFieldSelect);
-		fselect->arg = (PGExpr *) copyObject(expr);
-		fselect->fieldnum = i + 1;
-		fselect->resulttype = att->atttypid;
-		fselect->resulttypmod = att->atttypmod;
-		/* save attribute's collation for parse_collate.c */
-		fselect->resultcollid = att->attcollation;
+        fselect = makeNode(PGFieldSelect);
+        fselect->arg = (PGExpr *)copyObject(expr);
+        fselect->fieldnum = i + 1;
+        fselect->resulttype = att->atttypid;
+        fselect->resulttypmod = att->atttypmod;
+        /* save attribute's collation for parse_collate.c */
+        fselect->resultcollid = att->attcollation;
 
-		if (make_target_entry)
-		{
-			/* add TargetEntry decoration */
-			PGTargetEntry *te;
+        if (make_target_entry)
+        {
+            /* add TargetEntry decoration */
+            PGTargetEntry * te;
 
-			te = makeTargetEntry((PGExpr *) fselect,
-								 (PGAttrNumber) pstate->p_next_resno++,
-								 pstrdup(att->attname.data),
-								 false);
-			result = lappend(result, te);
-		}
-		else
-			result = lappend(result, fselect);
-	}
+            te = makeTargetEntry((PGExpr *)fselect, (PGAttrNumber)pstate->p_next_resno++, pstrdup(NameStr(att->attname)), false);
+            result = lappend(result, te);
+        }
+        else
+            result = lappend(result, fselect);
+    }
 
-	return result;
+    return result;
 };
 
 PGList *
@@ -676,7 +671,7 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 					/*
 					 * We check the catalog name and then ignore it.
 					 */
-					if (strcmp(catname, get_database_name(MyDatabaseId)) != 0)
+					if (strcmp(catname, relation_provider->get_database_name(MyDatabaseId).c_str()) != 0)
 					{
 						crserr = CRSERR_WRONG_DB;
 						break;

@@ -30,30 +30,6 @@ namespace DB
 {
 
 PGRangeTblEntry *
-ClauseParser::getRTEForSpecialRelationTypes(PGParseState *pstate, PGRangeVar *rv)
-{
-	PGCommonTableExpr *cte;
-	Index		levelsup;
-	PGRangeTblEntry *rte;
-
-	/*
-	 * if it is a qualified name, it can't be a CTE or tuplestore reference
-	 */
-	if (rv->schemaname)
-		return NULL;
-
-	cte = relation_parser->scanNameSpaceForCTE(pstate, rv->relname, &levelsup);
-	if (cte)
-		rte = relation_parser->addRangeTableEntryForCTE(pstate, cte, levelsup, rv, true);
-	else if (relation_parser->scanNameSpaceForENR(pstate, rv->relname))
-		rte = relation_parser->addRangeTableEntryForENR(pstate, rv, true);
-	else
-		rte = NULL;
-
-	return rte;
-};
-
-PGRangeTblEntry *
 ClauseParser::transformTableEntry(PGParseState *pstate, PGRangeVar *r)
 {
 	PGRangeTblEntry *rte;
@@ -408,149 +384,347 @@ ClauseParser::setNamespaceColumnVisibility(PGList *namespace_ptr, bool cols_visi
 	}
 };
 
+PGRangeTblEntry * ClauseParser::transformCTEReference(PGParseState * pstate,
+        PGRangeVar * r, PGCommonTableExpr * cte, Index levelsup)
+{
+    PGRangeTblEntry * rte;
+
+    rte = relation_parser->addRangeTableEntryForCTE(pstate, cte, levelsup, r, true);
+
+    return rte;
+};
+
+PGRangeTblEntry * ClauseParser::transformRangeFunction(PGParseState * pstate, PGRangeFunction * r)
+{
+    PGList * funcexprs = NIL;
+    PGList * funcnames = NIL;
+    PGList * coldeflists = NIL;
+    bool is_lateral;
+    PGRangeTblEntry * rte;
+    PGListCell * lc;
+
+    if (!r->is_rowsfrom && list_length(r->functions) == 1)
+    {
+        PGList * pair = (PGList *)linitial(r->functions);
+        PGNode * fexpr;
+        PGList * coldeflist;
+
+        /* Disassemble the function-call/column-def-list pairs */
+        Assert(list_length(pair) == 2)
+        fexpr = (PGNode *)linitial(pair);
+        coldeflist = (PGList *)lsecond(pair);
+
+        /* If we see a gp_dist_random('name') call with no special decoration, it actually
+		 * refers to a table.
+		 */
+        if (IsA(fexpr, PGFuncCall))
+        {
+            PGFuncCall * fc = (PGFuncCall *)fexpr;
+
+            if (list_length(fc->funcname) == 1 && pg_strcasecmp(strVal(linitial(fc->funcname)), GP_DIST_RANDOM_NAME) == 0
+                && fc->agg_order == NIL && fc->agg_filter == NULL && !fc->agg_star && !fc->agg_distinct && !fc->func_variadic
+                && fc->over == NULL && coldeflist == NIL)
+            {
+                /* OK, now we need to check the arguments and generate a RTE */
+
+                if (list_length(fc->args) != 1)
+                    elog(ERROR, "Invalid %s syntax.", GP_DIST_RANDOM_NAME);
+
+                if (IsA(linitial(fc->args), PGAConst))
+                {
+                    PGAConst * arg_val;
+                    PGList * qualified_name_list;
+                    PGRangeVar * rel;
+
+                    arg_val = (PGAConst *)linitial(fc->args);
+                    if (!IsA(&arg_val->val, PGString))
+                    {
+                        elog(ERROR, "%s: invalid argument type, non-string in value", GP_DIST_RANDOM_NAME);
+                    }
+
+                    /* Build the RTE for the table. */
+                    qualified_name_list = stringToQualifiedNameList(strVal(&arg_val->val));
+                    rel = makeRangeVarFromNameList(qualified_name_list);
+                    rel->location = arg_val->location;
+
+                    rte = relation_parser->addRangeTableEntry(pstate, rel, r->alias, false, true);
+
+                    /* Now we set our special attribute in the rte. */
+					//TODO kindred
+                    //rte->forceDistRandom = true;
+
+                    return rte;
+                }
+                else
+                {
+                    elog(ERROR, "%s: invalid argument type", GP_DIST_RANDOM_NAME);
+                }
+            }
+        }
+    }
+
+    /*
+	 * We make lateral_only names of this level visible, whether or not the
+	 * RangeFunction is explicitly marked LATERAL.  This is needed for SQL
+	 * spec compliance in the case of UNNEST(), and seems useful on
+	 * convenience grounds for all functions in FROM.
+	 *
+	 * (LATERAL can't nest within a single pstate level, so we don't need
+	 * save/restore logic here.)
+	 */
+    Assert(!pstate->p_lateral_active)
+    pstate->p_lateral_active = true;
+
+    /*
+	 * Transform the raw expressions.
+	 *
+	 * While transforming, also save function names for possible use as alias
+	 * and column names.  We use the same transformation rules as for a SELECT
+	 * output expression.  For a FuncCall node, the result will be the
+	 * function name, but it is possible for the grammar to hand back other
+	 * node types.
+	 *
+	 * We have to get this info now, because FigureColname only works on raw
+	 * parsetrees.  Actually deciding what to do with the names is left up to
+	 * addRangeTableEntryForFunction.
+	 *
+	 * Likewise, collect column definition lists if there were any.  But
+	 * complain if we find one here and the RangeFunction has one too.
+	 */
+    foreach (lc, r->functions)
+    {
+        PGList * pair = (PGList *)lfirst(lc);
+        PGNode * fexpr;
+        PGList * coldeflist;
+
+        /* Disassemble the function-call/column-def-list pairs */
+        Assert(list_length(pair) == 2)
+        fexpr = (PGNode *)linitial(pair);
+        coldeflist = (PGList *)lsecond(pair);
+
+        /*
+		 * If we find a function call unnest() with more than one argument and
+		 * no special decoration, transform it into separate unnest() calls on
+		 * each argument.  This is a kluge, for sure, but it's less nasty than
+		 * other ways of implementing the SQL-standard UNNEST() syntax.
+		 *
+		 * If there is any decoration (including a coldeflist), we don't
+		 * transform, which probably means a no-such-function error later.  We
+		 * could alternatively throw an error right now, but that doesn't seem
+		 * tremendously helpful.  If someone is using any such decoration,
+		 * then they're not using the SQL-standard syntax, and they're more
+		 * likely expecting an un-tweaked function call.
+		 *
+		 * Note: the transformation changes a non-schema-qualified unnest()
+		 * function name into schema-qualified pg_catalog.unnest().  This
+		 * choice is also a bit debatable, but it seems reasonable to force
+		 * use of built-in unnest() when we make this transformation.
+		 */
+        if (IsA(fexpr, PGFuncCall))
+        {
+            PGFuncCall * fc = (PGFuncCall *)fexpr;
+
+            if (list_length(fc->funcname) == 1 && strcmp(strVal(linitial(fc->funcname)), "unnest") == 0 && list_length(fc->args) > 1
+                && fc->agg_order == NIL && fc->agg_filter == NULL && !fc->agg_star && !fc->agg_distinct && !fc->func_variadic
+                && fc->over == NULL && coldeflist == NIL)
+            {
+                PGListCell * lc2;
+
+                foreach (lc2, fc->args)
+                {
+                    PGNode * arg = (PGNode *)lfirst(lc2);
+                    PGFuncCall * newfc;
+
+                    newfc = makeFuncCall(function_provider->SystemFuncName("unnest"), list_make1(arg), fc->location);
+
+                    funcexprs = lappend(funcexprs, expr_parser->transformExpr(pstate, (PGNode *)newfc, EXPR_KIND_FROM_FUNCTION));
+
+                    funcnames = lappend(funcnames, (void *)target_parser->FigureColname((PGNode *)newfc).c_str());
+
+                    /* coldeflist is empty, so no error is possible */
+
+                    coldeflists = lappend(coldeflists, coldeflist);
+                }
+                continue; /* done with this function item */
+            }
+        }
+
+        /* normal case ... */
+        funcexprs = lappend(funcexprs, expr_parser->transformExpr(pstate, fexpr, EXPR_KIND_FROM_FUNCTION));
+
+        funcnames = lappend(funcnames, (void *)target_parser->FigureColname(fexpr).c_str());
+
+        if (coldeflist && r->coldeflist)
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_SYNTAX_ERROR),
+                 errmsg("multiple column definition lists are not allowed for the same function"),
+                 parser_errposition(pstate, exprLocation((PGNode *)r->coldeflist))));
+
+        coldeflists = lappend(coldeflists, coldeflist);
+    }
+
+    pstate->p_lateral_active = false;
+
+    /*
+	 * We must assign collations now so that the RTE exposes correct collation
+	 * info for Vars created from it.
+	 */
+	//TODO kindred
+    //assign_list_collations(pstate, funcexprs);
+
+    /*
+	 * Install the top-level coldeflist if there was one (we already checked
+	 * that there was no conflicting per-function coldeflist).
+	 *
+	 * We only allow this when there's a single function (even after UNNEST
+	 * expansion) and no WITH ORDINALITY.  The reason for the latter
+	 * restriction is that it's not real clear whether the ordinality column
+	 * should be in the coldeflist, and users are too likely to make mistakes
+	 * in one direction or the other.  Putting the coldeflist inside ROWS
+	 * FROM() is much clearer in this case.
+	 */
+    if (r->coldeflist)
+    {
+        if (list_length(funcexprs) != 1)
+        {
+            if (r->is_rowsfrom)
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_SYNTAX_ERROR),
+                     errmsg("ROWS FROM() with multiple functions cannot have a column definition list"),
+                     errhint("Put a separate column definition list for each function inside ROWS FROM()."),
+                     parser_errposition(pstate, exprLocation((PGNode *)r->coldeflist))));
+            else
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_SYNTAX_ERROR),
+                     errmsg("UNNEST() with multiple arguments cannot have a column definition list"),
+                     errhint("Use separate UNNEST() calls inside ROWS FROM(), and attach a column definition list to each one."),
+                     parser_errposition(pstate, exprLocation((PGNode *)r->coldeflist))));
+        }
+        if (r->ordinality)
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_SYNTAX_ERROR),
+                 errmsg("WITH ORDINALITY cannot be used with a column definition list"),
+                 errhint("Put the column definition list inside ROWS FROM()."),
+                 parser_errposition(pstate, exprLocation((PGNode *)r->coldeflist))));
+
+        coldeflists = list_make1(r->coldeflist);
+    }
+
+    /*
+	 * Mark the RTE as LATERAL if the user said LATERAL explicitly, or if
+	 * there are any lateral cross-references in it.
+	 */
+    is_lateral = r->lateral || contain_vars_of_level((PGNode *)funcexprs, 0);
+
+    /*
+	 * OK, build an RTE for the function.
+	 */
+    rte = relation_parser->addRangeTableEntryForFunction(pstate, funcnames, funcexprs, coldeflists, r, is_lateral, true);
+
+    return rte;
+};
+
 PGNode *
 ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 						PGRangeTblEntry **top_rte, int *top_rti,
 						PGList **namespace_ptr)
 {
-	if (IsA(n, PGRangeVar))
-	{
-		/* Plain relation reference, or perhaps a CTE reference */
-		PGRangeVar   *rv = (PGRangeVar *) n;
-		PGRangeTblRef *rtr;
-		PGRangeTblEntry *rte;
-		int			rtindex;
+    PGNode * result;
 
-		/* Check if it's a CTE or tuplestore reference */
-		rte = getRTEForSpecialRelationTypes(pstate, rv);
+    if (IsA(n, PGRangeVar))
+    {
+        /* Plain relation reference, or perhaps a CTE reference */
+        PGRangeVar * rv = (PGRangeVar *)n;
+        PGRangeTblRef * rtr;
+        PGRangeTblEntry * rte = NULL;
+        int rtindex;
 
-		/* if not found above, must be a table reference */
-		if (!rte)
-			rte = transformTableEntry(pstate, rv);
+        /* if it is an unqualified name, it might be a CTE reference */
+        if (!rv->schemaname)
+        {
+            PGCommonTableExpr * cte;
+            Index levelsup;
 
-		/* assume new rte is at end */
-		rtindex = list_length(pstate->p_rtable);
-		Assert(rte == rt_fetch(rtindex, pstate->p_rtable))
-		*top_rte = rte;
-		*top_rti = rtindex;
-		*namespace_ptr = list_make1(makeNamespaceItem(rte, true, true, false, true));
-		rtr = makeNode(PGRangeTblRef);
-		rtr->rtindex = rtindex;
-		return (PGNode *) rtr;
-	}
-	else if (IsA(n, PGRangeSubselect))
-	{
-		/* sub-SELECT is like a plain relation */
-		PGRangeTblRef *rtr;
-		PGRangeTblEntry *rte;
-		int			rtindex;
+            cte = relation_parser->scanNameSpaceForCTE(pstate, rv->relname, &levelsup);
+            if (cte)
+                rte = transformCTEReference(pstate, rv, cte, levelsup);
+        }
 
-		rte = transformRangeSubselect(pstate, (PGRangeSubselect *) n);
-		/* assume new rte is at end */
-		rtindex = list_length(pstate->p_rtable);
-		Assert(rte == rt_fetch(rtindex, pstate->p_rtable))
-		*top_rte = rte;
-		*top_rti = rtindex;
-		*namespace_ptr = list_make1(makeNamespaceItem(rte, true, true, false, true));
-		rtr = makeNode(PGRangeTblRef);
-		rtr->rtindex = rtindex;
-		return (PGNode *) rtr;
-	}
-	// else if (IsA(n, PGRangeFunction))
-	// {
-	// 	/* function is like a plain relation */
-	// 	PGRangeTblRef *rtr;
-	// 	PGRangeTblEntry *rte;
-	// 	int			rtindex;
+        /* if not found as a CTE, must be a table reference */
+        if (!rte)
+            rte = transformTableEntry(pstate, rv);
 
-	// 	rte = transformRangeFunction(pstate, (PGRangeFunction *) n);
-	// 	/* assume new rte is at end */
-	// 	rtindex = list_length(pstate->p_rtable);
-	// 	Assert(rte == rt_fetch(rtindex, pstate->p_rtable));
-	// 	*top_rte = rte;
-	// 	*top_rti = rtindex;
-	// 	*namespace_ptr = list_make1(makeDefaultNSItem(rte));
-	// 	rtr = makeNode(PGRangeTblRef);
-	// 	rtr->rtindex = rtindex;
-	// 	return (PGNode *) rtr;
-	// }
-	// else if (IsA(n, PGRangeTableFunc))
-	// {
-	// 	/* table function is like a plain relation */
-	// 	RangeTblRef *rtr;
-	// 	RangeTblEntry *rte;
-	// 	int			rtindex;
+        /* assume new rte is at end */
+        rtindex = list_length(pstate->p_rtable);
+        Assert(rte == rt_fetch(rtindex, pstate->p_rtable))
+        *top_rte = rte;
+        *top_rti = rtindex;
+        *namespace_ptr = list_make1(makeNamespaceItem(rte, true, true, false, true));
+        rtr = makeNode(PGRangeTblRef);
+        rtr->rtindex = rtindex;
+        result = (PGNode *)rtr;
+    }
+    else if (IsA(n, PGRangeSubselect))
+    {
+        /* sub-SELECT is like a plain relation */
+        PGRangeTblRef * rtr;
+        PGRangeTblEntry * rte;
+        int rtindex;
 
-	// 	rte = transformRangeTableFunc(pstate, (RangeTableFunc *) n);
-	// 	/* assume new rte is at end */
-	// 	rtindex = list_length(pstate->p_rtable);
-	// 	Assert(rte == rt_fetch(rtindex, pstate->p_rtable));
-	// 	*top_rte = rte;
-	// 	*top_rti = rtindex;
-	// 	*namespace = list_make1(makeDefaultNSItem(rte));
-	// 	rtr = makeNode(RangeTblRef);
-	// 	rtr->rtindex = rtindex;
-	// 	return (Node *) rtr;
-	// }
-	// else if (IsA(n, RangeTableSample))
-	// {
-	// 	/* TABLESAMPLE clause (wrapping some other valid FROM node) */
-	// 	RangeTableSample *rts = (RangeTableSample *) n;
-	// 	Node	   *rel;
-	// 	RangeTblRef *rtr;
-	// 	RangeTblEntry *rte;
+        rte = transformRangeSubselect(pstate, (PGRangeSubselect *)n);
+        /* assume new rte is at end */
+        rtindex = list_length(pstate->p_rtable);
+        Assert(rte == rt_fetch(rtindex, pstate->p_rtable))
+        *top_rte = rte;
+        *top_rti = rtindex;
+        *namespace_ptr = list_make1(makeNamespaceItem(rte, true, true, false, true));
+        rtr = makeNode(PGRangeTblRef);
+        rtr->rtindex = rtindex;
+        result = (PGNode *)rtr;
+    }
+    else if (IsA(n, PGRangeFunction))
+    {
+        /* function is like a plain relation */
+        PGRangeTblRef * rtr;
+        PGRangeTblEntry * rte;
+        int rtindex;
 
-	// 	/* Recursively transform the contained relation */
-	// 	rel = transformFromClauseItem(pstate, rts->relation,
-	// 								  top_rte, top_rti, namespace);
-	// 	/* Currently, grammar could only return a RangeVar as contained rel */
-	// 	rtr = castNode(RangeTblRef, rel);
-	// 	rte = rt_fetch(rtr->rtindex, pstate->p_rtable);
-	// 	/* We only support this on plain relations and matviews */
-	// 	if (rte->relkind != RELKIND_RELATION &&
-	// 		rte->relkind != RELKIND_MATVIEW &&
-	// 		rte->relkind != RELKIND_PARTITIONED_TABLE)
-	// 		ereport(ERROR,
-	// 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-	// 				 errmsg("TABLESAMPLE clause can only be applied to tables and materialized views"),
-	// 				 parser_errposition(pstate, exprLocation(rts->relation))));
+        rte = transformRangeFunction(pstate, (PGRangeFunction *)n);
+        /* assume new rte is at end */
+        rtindex = list_length(pstate->p_rtable);
+        Assert(rte == rt_fetch(rtindex, pstate->p_rtable))
+        *top_rte = rte;
+        *top_rti = rtindex;
+        *namespace_ptr = list_make1(makeNamespaceItem(rte, true, true, false, true));
+        rtr = makeNode(PGRangeTblRef);
+        rtr->rtindex = rtindex;
+        result = (PGNode *)rtr;
+    }
+    else if (IsA(n, PGJoinExpr))
+    {
+        /* A newfangled join expression */
+        PGJoinExpr * j = (PGJoinExpr *)n;
+        PGRangeTblEntry * l_rte;
+        PGRangeTblEntry * r_rte;
+        int l_rtindex;
+        int r_rtindex;
+        PGList *l_namespace, *r_namespace, *my_namespace, *l_colnames, *r_colnames, *res_colnames, *l_colvars, *r_colvars, *res_colvars;
+        bool lateral_ok;
+        int sv_namespace_length;
+        PGRangeTblEntry * rte;
+        int k;
 
-	// 	/* Transform TABLESAMPLE details and attach to the RTE */
-	// 	rte->tablesample = transformRangeTableSample(pstate, rts);
-	// 	return (Node *) rtr;
-	// }
-	else if (IsA(n, PGJoinExpr))
-	{
-		/* A newfangled join expression */
-		PGJoinExpr   *j = (PGJoinExpr *) n;
-		PGRangeTblEntry *l_rte;
-		PGRangeTblEntry *r_rte;
-		int			l_rtindex;
-		int			r_rtindex;
-		PGList	   *l_namespace,
-				   *r_namespace,
-				   *my_namespace,
-				   *l_colnames,
-				   *r_colnames,
-				   *res_colnames,
-				   *l_colvars,
-				   *r_colvars,
-				   *res_colvars;
-		bool		lateral_ok;
-		int			sv_namespace_length;
-		PGRangeTblEntry *rte;
-		int			k;
-
-		/*
+        /*
 		 * Recursively process the left subtree, then the right.  We must do
 		 * it in this order for correct visibility of LATERAL references.
 		 */
-		j->larg = transformFromClauseItem(pstate, j->larg,
-										  &l_rte,
-										  &l_rtindex,
-										  &l_namespace);
+        j->larg = transformFromClauseItem(pstate, j->larg, &l_rte, &l_rtindex, &l_namespace);
 
-		/*
+        /*
 		 * Make the left-side RTEs available for LATERAL access within the
 		 * right side, by temporarily adding them to the pstate's namespace
 		 * list.  Per SQL:2008, if the join type is not INNER or LEFT then the
@@ -565,45 +739,39 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 		 * NB: this coding relies on the fact that list_concat is not
 		 * destructive to its second argument.
 		 */
-		lateral_ok = (j->jointype == PG_JOIN_INNER || j->jointype == PG_JOIN_LEFT);
-		setNamespaceLateralState(l_namespace, true, lateral_ok);
+        lateral_ok = (j->jointype == PG_JOIN_INNER || j->jointype == PG_JOIN_LEFT);
+        setNamespaceLateralState(l_namespace, true, lateral_ok);
 
-		sv_namespace_length = list_length(pstate->p_namespace);
-		pstate->p_namespace = list_concat(pstate->p_namespace, l_namespace);
+        sv_namespace_length = list_length(pstate->p_namespace);
+        pstate->p_namespace = list_concat(pstate->p_namespace, l_namespace);
 
-		/* And now we can process the RHS */
-		j->rarg = transformFromClauseItem(pstate, j->rarg,
-										  &r_rte,
-										  &r_rtindex,
-										  &r_namespace);
+        /* And now we can process the RHS */
+        j->rarg = transformFromClauseItem(pstate, j->rarg, &r_rte, &r_rtindex, &r_namespace);
 
-		/* Remove the left-side RTEs from the namespace list again */
-		pstate->p_namespace = list_truncate(pstate->p_namespace,
-											sv_namespace_length);
+        /* Remove the left-side RTEs from the namespace list again */
+        pstate->p_namespace = list_truncate(pstate->p_namespace, sv_namespace_length);
 
-		/*
+        /*
 		 * Check for conflicting refnames in left and right subtrees. Must do
 		 * this because higher levels will assume I hand back a self-
 		 * consistent namespace list.
 		 */
-		relation_parser->checkNameSpaceConflicts(pstate, l_namespace, r_namespace);
+        relation_parser->checkNameSpaceConflicts(pstate, l_namespace, r_namespace);
 
-		/*
+        /*
 		 * Generate combined namespace info for possible use below.
 		 */
-		my_namespace = list_concat(l_namespace, r_namespace);
+        my_namespace = list_concat(l_namespace, r_namespace);
 
-		/*
+        /*
 		 * Extract column name and var lists from both subtrees
 		 *
 		 * Note: expandRTE returns new lists, safe for me to modify
 		 */
-		relation_parser->expandRTE(l_rte, l_rtindex, 0, -1, false,
-				  &l_colnames, &l_colvars);
-		relation_parser->expandRTE(r_rte, r_rtindex, 0, -1, false,
-				  &r_colnames, &r_colvars);
+        relation_parser->expandRTE(l_rte, l_rtindex, 0, -1, false, &l_colnames, &l_colvars);
+        relation_parser->expandRTE(r_rte, r_rtindex, 0, -1, false, &r_colnames, &r_colvars);
 
-		/*
+        /*
 		 * Natural join does not explicitly specify columns; must generate
 		 * columns to join. Need to run through the list of columns from each
 		 * table or join result and match up the column names. Use the first
@@ -612,206 +780,186 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 		 * this step is a list of column names just like an explicitly-written
 		 * USING list.
 		 */
-		if (j->isNatural)
-		{
-			PGList	   *rlist = NIL;
-			PGListCell   *lx,
-					   *rx;
+        if (j->isNatural)
+        {
+            PGList * rlist = NIL;
+            PGListCell *lx, *rx;
 
-			Assert(j->usingClause == NIL)	/* shouldn't have USING() too */
+            Assert(j->usingClause == NIL) /* shouldn't have USING() too */
 
-			foreach(lx, l_colnames)
-			{
-				char	   *l_colname = strVal(lfirst(lx));
-				PGValue	   *m_name = NULL;
+            foreach (lx, l_colnames)
+            {
+                char * l_colname = strVal(lfirst(lx));
+                PGValue * m_name = NULL;
 
-				foreach(rx, r_colnames)
-				{
-					char	   *r_colname = strVal(lfirst(rx));
+                foreach (rx, r_colnames)
+                {
+                    char * r_colname = strVal(lfirst(rx));
 
-					if (strcmp(l_colname, r_colname) == 0)
-					{
-						m_name = makeString(l_colname);
-						break;
-					}
-				}
+                    if (strcmp(l_colname, r_colname) == 0)
+                    {
+                        m_name = makeString(l_colname);
+                        break;
+                    }
+                }
 
-				/* matched a right column? then keep as join column... */
-				if (m_name != NULL)
-					rlist = lappend(rlist, m_name);
-			}
+                /* matched a right column? then keep as join column... */
+                if (m_name != NULL)
+                    rlist = lappend(rlist, m_name);
+            }
 
-			j->usingClause = rlist;
-		}
+            j->usingClause = rlist;
+        }
 
-		/*
+        /*
 		 * Now transform the join qualifications, if any.
 		 */
-		res_colnames = NIL;
-		res_colvars = NIL;
+        res_colnames = NIL;
+        res_colvars = NIL;
 
-		if (j->usingClause)
-		{
-			/*
+        if (j->usingClause)
+        {
+            /*
 			 * JOIN/USING (or NATURAL JOIN, as transformed above). Transform
 			 * the list into an explicit ON-condition, and generate a list of
 			 * merged result columns.
 			 */
-			PGList	   *ucols = j->usingClause;
-			PGList	   *l_usingvars = NIL;
-			PGList	   *r_usingvars = NIL;
-			PGListCell   *ucol;
+            PGList * ucols = j->usingClause;
+            PGList * l_usingvars = NIL;
+            PGList * r_usingvars = NIL;
+            PGListCell * ucol;
 
-			Assert(j->quals == NULL)	/* shouldn't have ON() too */
+            Assert(j->quals == NULL) /* shouldn't have ON() too */
 
-			foreach(ucol, ucols)
-			{
-				char	   *u_colname = strVal(lfirst(ucol));
-				PGListCell   *col;
-				int			ndx;
-				int			l_index = -1;
-				int			r_index = -1;
-				PGVar		   *l_colvar,
-						   *r_colvar;
+            foreach (ucol, ucols)
+            {
+                char * u_colname = strVal(lfirst(ucol));
+                PGListCell * col;
+                int ndx;
+                int l_index = -1;
+                int r_index = -1;
+                PGVar *l_colvar, *r_colvar;
 
-				/* Check for USING(foo,foo) */
-				foreach(col, res_colnames)
-				{
-					char	   *res_colname = strVal(lfirst(col));
+                /* Check for USING(foo,foo) */
+                foreach (col, res_colnames)
+                {
+                    char * res_colname = strVal(lfirst(col));
 
-					if (strcmp(res_colname, u_colname) == 0)
-						ereport(ERROR,
-								(errcode(ERRCODE_DUPLICATE_COLUMN),
-								 errmsg("column name \"%s\" appears more than once in USING clause",
-										u_colname)));
-				}
+                    if (strcmp(res_colname, u_colname) == 0)
+                        ereport(
+                            ERROR,
+                            (errcode(ERRCODE_DUPLICATE_COLUMN),
+                             errmsg("column name \"%s\" appears more than once in USING clause", u_colname)));
+                }
 
-				/* Find it in left input */
-				ndx = 0;
-				foreach(col, l_colnames)
-				{
-					char	   *l_colname = strVal(lfirst(col));
+                /* Find it in left input */
+                ndx = 0;
+                foreach (col, l_colnames)
+                {
+                    char * l_colname = strVal(lfirst(col));
 
-					if (strcmp(l_colname, u_colname) == 0)
-					{
-						if (l_index >= 0)
-							ereport(ERROR,
-									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-									 errmsg("common column name \"%s\" appears more than once in left table",
-											u_colname)));
-						l_index = ndx;
-					}
-					ndx++;
-				}
-				if (l_index < 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_COLUMN),
-							 errmsg("column \"%s\" specified in USING clause does not exist in left table",
-									u_colname)));
+                    if (strcmp(l_colname, u_colname) == 0)
+                    {
+                        if (l_index >= 0)
+                            ereport(
+                                ERROR,
+                                (errcode(ERRCODE_AMBIGUOUS_COLUMN),
+                                 errmsg("common column name \"%s\" appears more than once in left table", u_colname)));
+                        l_index = ndx;
+                    }
+                    ndx++;
+                }
+                if (l_index < 0)
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_UNDEFINED_COLUMN),
+                         errmsg("column \"%s\" specified in USING clause does not exist in left table", u_colname)));
 
-				/* Find it in right input */
-				ndx = 0;
-				foreach(col, r_colnames)
-				{
-					char	   *r_colname = strVal(lfirst(col));
+                /* Find it in right input */
+                ndx = 0;
+                foreach (col, r_colnames)
+                {
+                    char * r_colname = strVal(lfirst(col));
 
-					if (strcmp(r_colname, u_colname) == 0)
-					{
-						if (r_index >= 0)
-							ereport(ERROR,
-									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-									 errmsg("common column name \"%s\" appears more than once in right table",
-											u_colname)));
-						r_index = ndx;
-					}
-					ndx++;
-				}
-				if (r_index < 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_COLUMN),
-							 errmsg("column \"%s\" specified in USING clause does not exist in right table",
-									u_colname)));
+                    if (strcmp(r_colname, u_colname) == 0)
+                    {
+                        if (r_index >= 0)
+                            ereport(
+                                ERROR,
+                                (errcode(ERRCODE_AMBIGUOUS_COLUMN),
+                                 errmsg("common column name \"%s\" appears more than once in right table", u_colname)));
+                        r_index = ndx;
+                    }
+                    ndx++;
+                }
+                if (r_index < 0)
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_UNDEFINED_COLUMN),
+                         errmsg("column \"%s\" specified in USING clause does not exist in right table", u_colname)));
 
-				l_colvar = (PGVar *)list_nth(l_colvars, l_index);
-				l_usingvars = lappend(l_usingvars, l_colvar);
-				r_colvar = (PGVar *)list_nth(r_colvars, r_index);
-				r_usingvars = lappend(r_usingvars, r_colvar);
+                l_colvar = (PGVar *)list_nth(l_colvars, l_index);
+                l_usingvars = lappend(l_usingvars, l_colvar);
+                r_colvar = (PGVar *)list_nth(r_colvars, r_index);
+                r_usingvars = lappend(r_usingvars, r_colvar);
 
-				res_colnames = lappend(res_colnames, lfirst(ucol));
-				res_colvars = lappend(res_colvars,
-									  buildMergedJoinVar(pstate,
-														 j->jointype,
-														 l_colvar,
-														 r_colvar));
-			}
+                res_colnames = lappend(res_colnames, lfirst(ucol));
+                res_colvars = lappend(res_colvars, buildMergedJoinVar(pstate, j->jointype, l_colvar, r_colvar));
+            }
 
-			j->quals = transformJoinUsingClause(pstate,
-												l_rte,
-												r_rte,
-												l_usingvars,
-												r_usingvars);
-		}
-		else if (j->quals)
-		{
-			/* User-written ON-condition; transform it */
-			j->quals = transformJoinOnClause(pstate, j, my_namespace);
-		}
-		else
-		{
-			/* CROSS JOIN: no quals */
-		}
+            j->quals = transformJoinUsingClause(pstate, l_rte, r_rte, l_usingvars, r_usingvars);
+        }
+        else if (j->quals)
+        {
+            /* User-written ON-condition; transform it */
+            j->quals = transformJoinOnClause(pstate, j, my_namespace);
+        }
+        else
+        {
+            /* CROSS JOIN: no quals */
+        }
 
-		/* Add remaining columns from each side to the output columns */
-		extractRemainingColumns(res_colnames,
-								l_colnames, l_colvars,
-								&l_colnames, &l_colvars);
-		extractRemainingColumns(res_colnames,
-								r_colnames, r_colvars,
-								&r_colnames, &r_colvars);
-		res_colnames = list_concat(res_colnames, l_colnames);
-		res_colvars = list_concat(res_colvars, l_colvars);
-		res_colnames = list_concat(res_colnames, r_colnames);
-		res_colvars = list_concat(res_colvars, r_colvars);
+        /* Add remaining columns from each side to the output columns */
+        extractRemainingColumns(res_colnames, l_colnames, l_colvars, &l_colnames, &l_colvars);
+        extractRemainingColumns(res_colnames, r_colnames, r_colvars, &r_colnames, &r_colvars);
+        res_colnames = list_concat(res_colnames, l_colnames);
+        res_colvars = list_concat(res_colvars, l_colvars);
+        res_colnames = list_concat(res_colnames, r_colnames);
+        res_colvars = list_concat(res_colvars, r_colvars);
 
-		/*
+        /*
 		 * Check alias (AS clause), if any.
 		 */
-		if (j->alias)
-		{
-			if (j->alias->colnames != NIL)
-			{
-				if (list_length(j->alias->colnames) > list_length(res_colnames))
-					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("column alias list for \"%s\" has too many entries",
-									j->alias->aliasname)));
-			}
-		}
+        if (j->alias)
+        {
+            if (j->alias->colnames != NIL)
+            {
+                if (list_length(j->alias->colnames) > list_length(res_colnames))
+                    ereport(
+                        ERROR,
+                        (errcode(ERRCODE_SYNTAX_ERROR), errmsg("column alias list for \"%s\" has too many entries", j->alias->aliasname)));
+            }
+        }
 
-		/*
+        /*
 		 * Now build an RTE for the result of the join
 		 */
-		rte = relation_parser->addRangeTableEntryForJoin(pstate,
-										res_colnames,
-										j->jointype,
-										res_colvars,
-										j->alias,
-										true);
+        rte = relation_parser->addRangeTableEntryForJoin(pstate, res_colnames, j->jointype, res_colvars, j->alias, true);
 
-		/* assume new rte is at end */
-		j->rtindex = list_length(pstate->p_rtable);
-		Assert(rte == rt_fetch(j->rtindex, pstate->p_rtable))
+        /* assume new rte is at end */
+        j->rtindex = list_length(pstate->p_rtable);
+        Assert(rte == rt_fetch(j->rtindex, pstate->p_rtable))
 
-		*top_rte = rte;
-		*top_rti = j->rtindex;
+        *top_rte = rte;
+        *top_rti = j->rtindex;
 
-		/* make a matching link to the JoinExpr for later use */
-		for (k = list_length(pstate->p_joinexprs) + 1; k < j->rtindex; k++)
-			pstate->p_joinexprs = lappend(pstate->p_joinexprs, NULL);
-		pstate->p_joinexprs = lappend(pstate->p_joinexprs, j);
-		Assert(list_length(pstate->p_joinexprs) == j->rtindex)
+        /* make a matching link to the JoinExpr for later use */
+        for (k = list_length(pstate->p_joinexprs) + 1; k < j->rtindex; k++)
+            pstate->p_joinexprs = lappend(pstate->p_joinexprs, NULL);
+        pstate->p_joinexprs = lappend(pstate->p_joinexprs, j);
+        Assert(list_length(pstate->p_joinexprs) == j->rtindex)
 
-		/*
+        /*
 		 * Prepare returned namespace list.  If the JOIN has an alias then it
 		 * hides the contained RTEs completely; otherwise, the contained RTEs
 		 * are still visible as table names, but are not visible for
@@ -822,27 +970,26 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 		 * nor p_cols_visible set.  We could delete such list items, but it's
 		 * unclear that it's worth expending cycles to do so.
 		 */
-		if (j->alias != NULL)
-			my_namespace = NIL;
-		else
-			setNamespaceColumnVisibility(my_namespace, false);
+        if (j->alias != NULL)
+            my_namespace = NIL;
+        else
+            setNamespaceColumnVisibility(my_namespace, false);
 
-		/*
+        /*
 		 * The join RTE itself is always made visible for unqualified column
 		 * names.  It's visible as a relation name only if it has an alias.
 		 */
-		*namespace_ptr = lappend(my_namespace,
-							 makeNamespaceItem(rte,
-											   (j->alias != NULL),
-											   true,
-											   false,
-											   true));
+        *namespace_ptr = lappend(my_namespace, makeNamespaceItem(rte, (j->alias != NULL), true, false, true));
 
-		return (PGNode *) j;
-	}
-	else
-		elog(ERROR, "unrecognized node type: %d", (int) nodeTag(n));
-	return NULL;				/* can't get here, keep compiler quiet */
+        result = (PGNode *)j;
+    }
+    else
+    {
+        result = NULL;
+        elog(ERROR, "unrecognized node type: %d", (int)nodeTag(n));
+    }
+
+    return result;
 };
 
 void

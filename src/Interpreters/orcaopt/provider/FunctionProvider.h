@@ -37,6 +37,10 @@ public:
     FuncCandidateList
     FuncnameGetCandidates(duckdb_libpgquery::PGList * names, int nargs, duckdb_libpgquery::PGList * argnames,
 		bool expand_variadic, bool expand_defaults, bool missing_ok);
+
+    duckdb_libpgquery::PGList * SystemFuncName(const char * name);
+
+    char * get_func_result_name(Oid functionId);
 };
 
 }

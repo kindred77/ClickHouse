@@ -41,9 +41,11 @@ public:
 
     bool TypeIsVisible(Oid typid);
 
-    PGTupleDesc lookup_rowtype_tupdesc(Oid type_id, int32 typmod);
+    PGTupleDescPtr lookup_rowtype_tupdesc(Oid type_id, int32 typmod);
 
     Oid get_element_type(Oid typid);
+
+	Oid get_typeoid_by_typename_namespaceoid(const char * type_name, Oid namespace_oid);
 
     void getTypeOutputInfo(Oid type, Oid * typOutput, bool * typIsVarlena);
 
@@ -68,6 +70,18 @@ public:
     Oid get_typcollation(Oid typid);
 
     bool type_is_collatable(Oid typid);
+
+    void PGTupleDescInitEntry(
+        PGTupleDescPtr desc, PGAttrNumber attributeNumber, const char * attributeName,
+		Oid oidtypeid, int32 typmod, int attdim);
+
+    TypeFuncClass get_expr_result_type(duckdb_libpgquery::PGNode * expr, Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc);
+
+    PGTupleDescPtr lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod);
+
+    Oid TypenameGetTypidExtended(const char * typname, bool temp_ok);
+
+    Oid getTypeIOParam(PGTypePtr typeTuple);
 
 private:
 	FunctionProviderPtr function_provider;

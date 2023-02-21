@@ -44,6 +44,10 @@
 #define INT2VECTOROID	22
 #define INT4OID			23
 #define BOOLOID         16
+#define INT2OID			21
+#define BPCHAROID		1042
+#define FLOAT4OID 700
+#define FLOAT8OID 701
 #define OIDVECTOROID	30
 #define INT2ARRAYOID		1005
 #define OIDARRAYOID			1028
@@ -61,6 +65,12 @@
 #define ANYENUMOID		3500
 #define ANYRANGEOID		3831
 #define ANYTABLEOID     7053
+#define TIMEOID			1083
+#define TIMETZOID		1266
+#define TIMESTAMPOID	1114
+#define TIMESTAMPTZOID	1184
+#define VARBITOID	  1562
+#define VARCHAROID		1043
 
 /* Is a type OID a polymorphic pseudotype?	(Beware of multiple evaluation) */
 #define IsPolymorphicType(typid)  \
@@ -193,3 +203,53 @@
 			_dst[_len-1] = '\0'; \
 		} \
 	} while (0)
+
+/* NoLock is not a lock mode, but a flag value meaning "don't get a lock" */
+#define NoLock					0
+
+#define AccessShareLock			1		/* SELECT */
+#define RowShareLock			2		/* SELECT FOR UPDATE/FOR SHARE */
+#define RowExclusiveLock		3		/* INSERT, UPDATE, DELETE */
+#define ShareUpdateExclusiveLock 4		/* VACUUM (non-FULL),ANALYZE, CREATE
+										 * INDEX CONCURRENTLY */
+#define ShareLock				5		/* CREATE INDEX (WITHOUT CONCURRENTLY) */
+#define ShareRowExclusiveLock	6		/* like EXCLUSIVE MODE, but allows ROW
+										 * SHARE */
+#define ExclusiveLock			7		/* blocks ROW SHARE/SELECT...FOR
+										 * UPDATE */
+#define AccessExclusiveLock		8		/* ALTER TABLE, DROP TABLE, VACUUM
+										 * FULL, and unqualified LOCK TABLE */
+
+#define PG_RELKIND_RELATION 'r' /* ordinary table */
+#define PG_RELKIND_INDEX 'i' /* secondary index */
+#define PG_RELKIND_SEQUENCE 'S' /* sequence object */
+#define PG_RELKIND_TOASTVALUE 't' /* for out-of-line values */
+#define PG_RELKIND_VIEW 'v' /* view */
+#define PG_RELKIND_COMPOSITE_TYPE 'c' /* composite type */
+#define PG_RELKIND_FOREIGN_TABLE 'f' /* foreign table */
+#define PG_RELKIND_UNCATALOGED 'u' /* not yet cataloged */
+#define PG_RELKIND_MATVIEW 'm' /* materialized view */
+#define PG_RELKIND_AOSEGMENTS 'o' /* AO segment files and eof's */
+#define PG_RELKIND_AOBLOCKDIR 'b' /* AO block directory */
+#define PG_RELKIND_AOVISIMAP 'M' /* AO visibility map */
+
+/*
+ * relstorage describes how a relkind is physically stored in the database.
+ *
+ * RELSTORAGE_HEAP    - stored on disk using heap storage.
+ * RELSTORAGE_AOROWS  - stored on disk using append only storage.
+ * RELSTORAGE_AOCOLS  - stored on dist using append only column storage.
+ * RELSTORAGE_VIRTUAL - has virtual storage, meaning, relation has no
+ *						data directly stored forit  (right now this
+ *						relates to views and comp types).
+ * RELSTORAGE_EXTERNAL-	stored externally using external tables.
+ * RELSTORAGE_FOREIGN - stored in another server.  
+ */
+#define		  PG_RELSTORAGE_HEAP	'h'
+#define		  PG_RELSTORAGE_AOROWS	'a'
+#define 	  PG_RELSTORAGE_AOCOLS	'c'
+#define		  PG_RELSTORAGE_VIRTUAL	'v'
+#define		  PG_RELSTORAGE_EXTERNAL 'x'
+#define		  PG_RELSTORAGE_FOREIGN 'f'
+
+#define GP_DIST_RANDOM_NAME "GP_DIST_RANDOM"

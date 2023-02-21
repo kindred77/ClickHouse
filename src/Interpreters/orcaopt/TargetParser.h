@@ -8,11 +8,15 @@ class RelationParser;
 class ExprParser;
 class NodeParser;
 class CoerceParser;
+class TypeProvider;
+class RelationProvider;
 
 using RelationParserPtr = std::unique_ptr<RelationParser>;
 using ExprParserPtr = std::unique_ptr<ExprParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
+using TypeProviderPtr = std::unique_ptr<TypeProvider>;
+using RelationProviderPtr = std::unique_ptr<RelationProvider>;
 
 class TargetParser
 {
@@ -21,6 +25,8 @@ private:
     ExprParserPtr expr_parser;
     NodeParserPtr node_parser;
     CoerceParserPtr coerce_parser;
+    TypeProviderPtr type_provider;
+    RelationProviderPtr relation_provider;
 public:
 	explicit TargetParser();
 
@@ -37,9 +43,9 @@ public:
 					 bool resjunk);
     
     int
-    FigureColnameInternal(duckdb_libpgquery::PGNode *node, char **name);
+    FigureColnameInternal(duckdb_libpgquery::PGNode *node, std::string & name);
 
-    char *
+    std::string
     FigureColname(duckdb_libpgquery::PGNode *node);
 
     duckdb_libpgquery::PGList *

@@ -141,7 +141,6 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 						 int location)
 {
     PGRowExpr * rowexpr;
-    PGTupleDesc tupdesc;
     PGList * args = NIL;
     PGList * newargs;
     int i;
@@ -173,18 +172,18 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
              errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID), type_provider->format_type_be(targetTypeId)),
              parser_coercion_errposition(pstate, location, node)));
 
-    tupdesc = type_provider->lookup_rowtype_tupdesc(targetTypeId, -1);
+    PGTupleDescPtr tupdesc = type_provider->lookup_rowtype_tupdesc(targetTypeId, -1);
     newargs = NIL;
     ucolno = 1;
     arg = list_head(args);
-    for (i = 0; i < tupdesc.natts; i++)
+    for (i = 0; i < tupdesc->natts; i++)
     {
         PGNode * expr;
         PGNode * cexpr;
         Oid exprtype;
 
         /* Fill in NULLs for dropped columns in rowtype */
-        if (tupdesc.attrs[i].attisdropped)
+        if (tupdesc->attrs[i]->attisdropped)
         {
             /*
 			 * can't use atttypid here, but it doesn't really matter what type
@@ -205,7 +204,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
         exprtype = exprType(expr);
 
         cexpr = coerce_to_target_type(
-            pstate, expr, exprtype, tupdesc.attrs[i].atttypid, tupdesc.attrs[i].atttypmod, ccontext, PG_COERCE_IMPLICIT_CAST, -1);
+            pstate, expr, exprtype, tupdesc->attrs[i]->atttypid, tupdesc->attrs[i]->atttypmod, ccontext, PG_COERCE_IMPLICIT_CAST, -1);
         if (cexpr == NULL)
             ereport(
                 ERROR,
@@ -214,7 +213,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
                  errdetail(
                      "Cannot cast type %s to %s in column %d.",
                      type_provider->format_type_be(exprtype),
-                     type_provider->format_type_be(tupdesc.attrs[i].atttypid),
+                     type_provider->format_type_be(tupdesc->attrs[i]->atttypid),
                      ucolno),
                  parser_coercion_errposition(pstate, location, expr)));
         newargs = lappend(newargs, cexpr);

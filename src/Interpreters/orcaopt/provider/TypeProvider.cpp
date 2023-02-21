@@ -913,12 +913,10 @@ char * TypeProvider::format_type_internal(Oid type_oid, int32 typemod, bool type
     return buf;
 };
 
-PGTupleDesc TypeProvider::lookup_rowtype_tupdesc(Oid type_id, int32 typmod)
+PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc(Oid type_id, int32 typmod)
 {
-    PGTupleDesc tupDesc;
-
-    tupDesc = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
-    IncrTupleDescRefCount(tupDesc);
+    PGTupleDescPtr tupDesc = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
+    //IncrTupleDescRefCount(tupDesc);
     return tupDesc;
 };
 
@@ -1194,4 +1192,139 @@ TypeProvider::type_is_collatable(Oid typid)
 {
     return OidIsValid(get_typcollation(typid));
 };
+
+void TypeProvider::PGTupleDescInitEntry(
+        PGTupleDescPtr desc, PGAttrNumber attributeNumber, const char * attributeName,
+		Oid oidtypeid, int32 typmod, int attdim)
+{
+	//HeapTuple tuple;
+    //Form_pg_type typeForm;
+    PGAttrPtr att;
+
+    /*
+	 * sanity checks
+	 */
+    Assert(PointerIsValid(desc.get()))
+    Assert(attributeNumber >= 1)
+    Assert(attributeNumber <= desc->natts)
+
+    /*
+	 * initialize the attribute fields
+	 */
+    att = desc->attrs[attributeNumber - 1];
+
+    att->attrelid = 0; /* dummy value */
+
+    /*
+	 * Note: attributeName can be NULL, because the planner doesn't always
+	 * fill in valid resname values in targetlists, particularly for resjunk
+	 * attributes. Also, do nothing if caller wants to re-use the old attname.
+	 */
+    if (attributeName == NULL)
+        MemSet(NameStr(att->attname), 0, NAMEDATALEN);
+    else if (attributeName != NameStr(att->attname))
+        namestrcpy(&(att->attname), attributeName);
+
+    att->attstattarget = -1;
+    att->attcacheoff = -1;
+    att->atttypmod = typmod;
+
+    att->attnum = attributeNumber;
+    att->attndims = attdim;
+
+    att->attnotnull = false;
+    att->atthasdef = false;
+    att->attisdropped = false;
+    att->attislocal = true;
+    att->attinhcount = 0;
+    /* attacl, attoptions and attfdwoptions are not present in tupledescs */
+
+    PGTypePtr tuple = getTypeByOid(oidtypeid);;
+    if (tuple == NULL)
+        elog(ERROR, "cache lookup failed for type %u", oidtypeid);
+    //typeForm = (Form_pg_type)GETSTRUCT(tuple);
+
+    att->atttypid = oidtypeid;
+    att->attlen = tuple->typlen;
+    att->attbyval = tuple->typbyval;
+    att->attalign = tuple->typalign;
+    att->attstorage = tuple->typstorage;
+    //att->attcollation = tuple->typcollation;
+
+    //ReleaseSysCache(tuple);
+};
+
+TypeFuncClass TypeProvider::get_expr_result_type(PGNode * expr, Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc)
+{
+    TypeFuncClass result;
+
+    if (expr && IsA(expr, PGFuncExpr))
+        result = internal_get_result_type(((PGFuncExpr *)expr)->funcid, expr, NULL, resultTypeId, resultTupleDesc);
+    else if (expr && IsA(expr, PGOpExpr))
+        result = internal_get_result_type(get_opcode(((PGOpExpr *)expr)->opno), expr, NULL, resultTypeId, resultTupleDesc);
+    else
+    {
+        /* handle as a generic expression; no chance to resolve RECORD */
+        Oid typid = exprType(expr);
+
+        if (resultTypeId)
+            *resultTypeId = typid;
+        if (resultTupleDesc)
+            *resultTupleDesc = NULL;
+        result = get_type_func_class(typid);
+        if (result == TYPEFUNC_COMPOSITE && resultTupleDesc)
+            *resultTupleDesc = lookup_rowtype_tupdesc_copy(typid, -1);
+    }
+
+    return result;
+};
+
+PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod)
+{
+    TupleDesc tmp;
+
+    tmp = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
+    return CreateTupleDescCopyConstr(tmp);
+};
+
+Oid TypeProvider::get_typeoid_by_typename_namespaceoid(const char * type_name, Oid namespace_oid)
+{
+	return Oid(0);
+};
+
+Oid TypeProvider::TypenameGetTypidExtended(const char * typname, bool temp_ok)
+{
+    Oid typid;
+    PGListCell * l;
+
+    recomputeNamespacePath();
+
+    foreach (l, activeSearchPath)
+    {
+        Oid namespaceId = lfirst_oid(l);
+
+        if (!temp_ok && namespaceId == myTempNamespace)
+            continue; /* do not look in temp namespace */
+
+        typid = GetSysCacheOid2(TYPENAMENSP, PointerGetDatum(typname), ObjectIdGetDatum(namespaceId));
+        if (OidIsValid(typid))
+            return typid;
+    }
+
+    /* Not found in path */
+    return InvalidOid;
+};
+
+Oid TypeProvider::getTypeIOParam(PGTypePtr typeTuple)
+{
+    /*
+	 * Array types get their typelem as parameter; everybody else gets their
+	 * own type OID as parameter.
+	 */
+    if (OidIsValid(typeTuple->typelem))
+        return typeTuple->typelem;
+    else
+        return typeTuple->oid;
+};
+
 }

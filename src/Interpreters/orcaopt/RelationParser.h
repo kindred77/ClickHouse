@@ -10,11 +10,17 @@ namespace DB
 {
 class CoerceParser;
 class NodeParser;
+class TypeParser;
 class RelationProvider;
+class TypeProvider;
+class FunctionProvider;
 
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
+using TypeParserPtr = std::unique_ptr<TypeParser>;
 using RelationProviderPtr = std::unique_ptr<RelationProvider>;
+using TypeProviderPtr = std::unique_ptr<TypeProvider>;
+using FunctionProviderPtr = std::unique_ptr<FunctionProvider>;
 
 class RelationParser
 {
@@ -22,8 +28,11 @@ private:
     CoerceParserPtr coerce_parser;
 	//std::shared_ptr<RelationProvider> relation_provider;
 	NodeParserPtr node_parser;
+	TypeParserPtr type_parser;
 
 	RelationProviderPtr relation_provider;
+	TypeProviderPtr type_provider;
+	FunctionProviderPtr function_provider;
 	//ENRParser enr_parser;
 
     int specialAttNum(const char * attname);
@@ -47,27 +56,19 @@ public:
 						 duckdb_libpgquery::PGRangeVar *rv,
 						 bool inFromCl);
 
-	bool
-	scanNameSpaceForENR(PGParseState *pstate, const char *refname);
-
-	duckdb_libpgquery::PGRangeTblEntry *
-	addRangeTableEntryForENR(PGParseState *pstate,
-						 duckdb_libpgquery::PGRangeVar *rv,
-						 bool inFromCl);
-
 	void
 	expandRelation(Oid relid, duckdb_libpgquery::PGAlias *eref, int rtindex, int sublevels_up,
 			   int location, bool include_dropped,
 			   duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars);
 
 	void
-	expandTupleDesc(PGTupleDesc tupdesc, duckdb_libpgquery::PGAlias *eref, int count, int offset,
+	expandTupleDesc(PGTupleDescPtr tupdesc, duckdb_libpgquery::PGAlias *eref, int count, int offset,
 				int rtindex, int sublevels_up,
 				int location, bool include_dropped,
 				duckdb_libpgquery::PGList **colnames, duckdb_libpgquery::PGList **colvars);
 
 	void
-	buildRelationAliases(PGTupleDesc tupdesc, duckdb_libpgquery::PGAlias *alias,
+	buildRelationAliases(PGTupleDescPtr tupdesc, duckdb_libpgquery::PGAlias *alias,
 				duckdb_libpgquery::PGAlias *eref);
 
 	duckdb_libpgquery::PGRangeTblEntry *
@@ -104,14 +105,25 @@ public:
 					   int varno,
 					   int sublevels_up);
 
-    duckdb_libpgquery::PGNode * scanRTEForColumn(PGParseState * pstate, duckdb_libpgquery::PGRangeTblEntry * rte,
-		const char * colname, int location);
+    int32 * getValuesTypmods(duckdb_libpgquery::PGRangeTblEntry * rte);
+
+    duckdb_libpgquery::PGNode * scanRTEForColumn(PGParseState * pstate,
+		duckdb_libpgquery::PGRangeTblEntry * rte, const char * colname, int location);
 
     duckdb_libpgquery::PGNode *
 	colNameToVar(PGParseState *pstate, const char *colname, bool localonly,
 			 int location);
 
-	void
+    duckdb_libpgquery::PGRangeTblEntry * addRangeTableEntryForFunction(
+        PGParseState * pstate,
+        duckdb_libpgquery::PGList * funcnames,
+        duckdb_libpgquery::PGList * funcexprs,
+        duckdb_libpgquery::PGList * coldeflists,
+        duckdb_libpgquery::PGRangeFunction * rangefunc,
+        bool lateral,
+        bool inFromCl);
+
+    void
 	markRTEForSelectPriv(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte,
 					 int rtindex, PGAttrNumber col);
 
@@ -123,11 +135,6 @@ public:
 
 	duckdb_libpgquery::PGRangeTblEntry *
 	scanNameSpaceForRefname(PGParseState *pstate, const char *refname, int location);
-
-	void
-	updateFuzzyAttrMatchState(int fuzzy_rte_penalty,
-						  FuzzyAttrMatchState *fuzzystate, duckdb_libpgquery::PGRangeTblEntry *rte,
-						  const char *actual, const char *match, int attnum);
 
 	duckdb_libpgquery::PGRangeTblEntry *
 	refnameRangeTblEntry(PGParseState *pstate,
@@ -141,13 +148,11 @@ public:
 
 	void
 	errorMissingColumn(PGParseState *pstate,
-				   const char *relname, const char *colname, int location);
+				   const char *relname, char *colname, int location);
 
-	FuzzyAttrMatchState *
-	searchRangeTableForCol(PGParseState *pstate, const char *alias, const char *colname,
-					   int location);
+    duckdb_libpgquery::PGRangeTblEntry * searchRangeTableForCol(PGParseState * pstate, char * colname, int location);
 
-	int
+    int
 	RTERangeTablePosn(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int *sublevels_up);
 
 	duckdb_libpgquery::PGList *
@@ -173,6 +178,9 @@ public:
 	void
 	check_lateral_ref_ok(PGParseState *pstate, PGParseNamespaceItem *nsitem,
 					 int location);
+
+    char * chooseScalarFunctionAlias(duckdb_libpgquery::PGNode * funcexpr, char * funcname,
+		duckdb_libpgquery::PGAlias * alias, int nfuncs);
 };
 
 }

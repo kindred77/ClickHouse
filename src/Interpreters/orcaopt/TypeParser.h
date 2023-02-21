@@ -7,15 +7,21 @@ namespace DB
 
 class RelationParser;
 class NodeParser;
+class TypeProvider;
+class RelationProvider;
 
 using RelationParserPtr = std::unique_ptr<RelationParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
+using TypeProviderPtr = std::unique_ptr<TypeProvider>;
+using RelationProviderPtr = std::unique_ptr<RelationProvider>;
 
 class TypeParser
 {
 private:
     RelationParserPtr relation_parser;
     NodeParserPtr node_parser;
+    TypeProviderPtr type_provider;
+    RelationProviderPtr relation_provider;
 public:
 	explicit TypeParser();
 
@@ -28,11 +34,13 @@ public:
     PGTypePtr
     typenameType(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, int32 *typmod_p);
 
-    PGTypePtr
-    LookupTypeName(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName,
-			   int32 *typmod_p, bool missing_ok);
+    PGTypePtr LookupTypeName(PGParseState * pstate, const duckdb_libpgquery::PGTypeName * typeName,
+        int32 * typmod_p, bool missing_ok);
 
-    char *
+    PGTypePtr LookupTypeNameExtended(PGParseState * pstate, const duckdb_libpgquery::PGTypeName * typeName,
+        int32 * typmod_p, bool temp_ok, bool missing_ok);
+
+    std::string
     TypeNameToString(const duckdb_libpgquery::PGTypeName *typeName);
 
     int32
@@ -66,6 +74,8 @@ public:
 
     Oid
     LookupCollation(PGParseState *pstate, duckdb_libpgquery::PGList *collnames, int location);
+
+    char * printTypmod(const char * typname, int32 typmod, Oid typmodout);
 
     char * format_type_with_typemod(Oid type_oid, int32 typemod);
 

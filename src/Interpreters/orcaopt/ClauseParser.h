@@ -70,14 +70,16 @@ public:
         duckdb_libpgquery::PGList * orderlist,
         duckdb_libpgquery::PGList ** targetlist,
         PGParseExprKind exprKind, bool resolveUnknown, bool useSQL99);
-    
+
+    duckdb_libpgquery::PGRangeTblEntry * transformCTEReference(PGParseState * pstate,
+        duckdb_libpgquery::PGRangeVar * r, duckdb_libpgquery::PGCommonTableExpr * cte, Index levelsup);
+
+    duckdb_libpgquery::PGRangeTblEntry * transformRangeFunction(PGParseState * pstate, duckdb_libpgquery::PGRangeFunction * r);
+
     duckdb_libpgquery::PGNode *
     transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::PGNode *n,
 						duckdb_libpgquery::PGRangeTblEntry **top_rte, int *top_rti,
 						duckdb_libpgquery::PGList **namespace_ptr);
-
-    duckdb_libpgquery::PGRangeTblEntry *
-    getRTEForSpecialRelationTypes(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *rv);
 
     duckdb_libpgquery::PGRangeTblEntry *
     transformTableEntry(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *r);

@@ -27,7 +27,7 @@ PGNode *
 FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, PGNode *first_arg,
 					   int location)
 {
-    PGTupleDesc tupdesc;
+    PGTupleDescPtr tupdesc = nullptr;
     int i;
 
     /*
@@ -69,23 +69,24 @@ FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, P
     }
     //else if (get_expr_result_type(first_arg, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
     //    return NULL; /* unresolvable RECORD type */
-    //Assert(tupdesc)
+    Assert(tupdesc != nullptr)
 
-    for (i = 0; i < tupdesc.natts; i++)
+    for (i = 0; i < tupdesc->natts; i++)
     {
-        Form_pg_attribute att = tupdesc.attrs[i];
+        PGAttrPtr att = tupdesc->attrs[i];
 
-        if (strcmp(funcname, NameStr(att.attname)) == 0 && !att.attisdropped)
+        if (strcmp(funcname, NameStr(att->attname)) == 0 && !att->attisdropped)
         {
             /* Success, so generate a FieldSelect expression */
             PGFieldSelect * fselect = makeNode(PGFieldSelect);
 
             fselect->arg = (PGExpr *)first_arg;
             fselect->fieldnum = i + 1;
-            fselect->resulttype = att.atttypid;
-            fselect->resulttypmod = att.atttypmod;
+            fselect->resulttype = att->atttypid;
+            fselect->resulttypmod = att->atttypmod;
             /* save attribute's collation for parse_collate.c */
-            //fselect->resultcollid = att.attcollation;
+            //TODO kindred
+            //fselect->resultcollid = att->attcollation;
             return (PGNode *)fselect;
         }
     }
