@@ -22,7 +22,8 @@ using TypeParserPtr = std::unique_ptr<TypeParser>;
 class TypeProvider
 {
 public:
-	explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	//explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	explicit TypeProvider();
 	//IMDTypePtr getTypeByOID(Oid oid);
 	PGTypePtr getTypeByOid(Oid oid) const;
 	//IMDTypePtr getType(Field::Types::Which which);

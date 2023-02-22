@@ -16,7 +16,8 @@ private:
 
 	Map oid_agg_map;
 public:
-	explicit AggProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	//explicit AggProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	explicit AggProvider();
 	
 	PGAggPtr getAggByFuncOid(Oid func_oid) const;
 };

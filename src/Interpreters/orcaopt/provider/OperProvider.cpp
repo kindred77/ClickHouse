@@ -5,14 +5,14 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-OperProvider::OperProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
-		: context(std::move(context_)),
-		  mp(std::move(mp_))
-{
-	auto operator1= std::make_shared<Form_pg_operator>(Oid(1), "+", Oid(1), Oid(1), 'l', true, Oid(1),
-		 Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1));
-	oid_oper_map.insert(std::pair<Oid, PGOperatorPtr>(Oid(1), operator1));
-};
+// OperProvider::OperProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
+// 		: context(std::move(context_)),
+// 		  mp(std::move(mp_))
+// {
+// 	auto operator1= std::make_shared<Form_pg_operator>(Oid(1), "+", Oid(1), Oid(1), 'l', true, Oid(1),
+// 		 Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1));
+// 	oid_oper_map.insert(std::pair<Oid, PGOperatorPtr>(Oid(1), operator1));
+// };
 
 PGOperatorPtr
 OperProvider::getOperByOID(Oid oid)

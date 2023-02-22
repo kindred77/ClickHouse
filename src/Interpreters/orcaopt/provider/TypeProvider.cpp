@@ -464,40 +464,40 @@ namespace DB
 // 	return mdname;
 // }
 
-TypeProvider::TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
-		: context(std::move(context_)),
-		  mp(std::move(mp_))
-{
-	// oid_types_map.insert(TYPE_FLOAT32);
-	// oid_types_map.insert(TYPE_FLOAT64);
-	// oid_types_map.insert(TYPE_BOOLEAN);
-	// oid_types_map.insert(TYPE_UINT8);
-	// oid_types_map.insert(TYPE_UINT16);
-	// oid_types_map.insert(TYPE_UINT32);
-	// oid_types_map.insert(TYPE_UINT64);
-	// oid_types_map.insert(TYPE_UINT128);
-	// oid_types_map.insert(TYPE_UINT256);
-	// oid_types_map.insert(TYPE_INT8);
-	// oid_types_map.insert(TYPE_INT16);
-	// oid_types_map.insert(TYPE_INT32);
-	// oid_types_map.insert(TYPE_INT64);
-	// oid_types_map.insert(TYPE_INT128);
-	// oid_types_map.insert(TYPE_INT256);
-	// oid_types_map.insert(TYPE_STRING);
-	// oid_types_map.insert(TYPE_FIXEDSTRING);
-	// oid_types_map.insert(TYPE_DATE);
-	// oid_types_map.insert(TYPE_DATETIME);
-	// oid_types_map.insert(TYPE_DATETIME64);
-	// oid_types_map.insert(TYPE_ARRAY);
-	// oid_types_map.insert(TYPE_TUPLE);
-	// oid_types_map.insert(TYPE_DECIMAL32);
-	// oid_types_map.insert(TYPE_DECIMAL64);
-	// oid_types_map.insert(TYPE_DECIMAL128);
-	// oid_types_map.insert(TYPE_DECIMAL256);
-	// oid_types_map.insert(TYPE_AGGFUNCSTATE);
-	// oid_types_map.insert(TYPE_MAP);
-	// oid_types_map.insert(TYPE_UUID);
-}
+// TypeProvider::TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
+// 		: context(std::move(context_)),
+// 		  mp(std::move(mp_))
+// {
+// 	oid_types_map.insert(TYPE_FLOAT32);
+// 	oid_types_map.insert(TYPE_FLOAT64);
+// 	oid_types_map.insert(TYPE_BOOLEAN);
+// 	oid_types_map.insert(TYPE_UINT8);
+// 	oid_types_map.insert(TYPE_UINT16);
+// 	oid_types_map.insert(TYPE_UINT32);
+// 	oid_types_map.insert(TYPE_UINT64);
+// 	oid_types_map.insert(TYPE_UINT128);
+// 	oid_types_map.insert(TYPE_UINT256);
+// 	oid_types_map.insert(TYPE_INT8);
+// 	oid_types_map.insert(TYPE_INT16);
+// 	oid_types_map.insert(TYPE_INT32);
+// 	oid_types_map.insert(TYPE_INT64);
+// 	oid_types_map.insert(TYPE_INT128);
+// 	oid_types_map.insert(TYPE_INT256);
+// 	oid_types_map.insert(TYPE_STRING);
+// 	oid_types_map.insert(TYPE_FIXEDSTRING);
+// 	oid_types_map.insert(TYPE_DATE);
+// 	oid_types_map.insert(TYPE_DATETIME);
+// 	oid_types_map.insert(TYPE_DATETIME64);
+// 	oid_types_map.insert(TYPE_ARRAY);
+// 	oid_types_map.insert(TYPE_TUPLE);
+// 	oid_types_map.insert(TYPE_DECIMAL32);
+// 	oid_types_map.insert(TYPE_DECIMAL64);
+// 	oid_types_map.insert(TYPE_DECIMAL128);
+// 	oid_types_map.insert(TYPE_DECIMAL256);
+// 	oid_types_map.insert(TYPE_AGGFUNCSTATE);
+// 	oid_types_map.insert(TYPE_MAP);
+// 	oid_types_map.insert(TYPE_UUID);
+// };
 
 // IMDTypePtr
 // TypeProvider::getTypeByOID(OID oid)

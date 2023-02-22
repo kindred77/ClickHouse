@@ -19,7 +19,8 @@ private:
 	ContextPtr context;
 	gpos::CMemoryPool *mp;
 public:
-	explicit OperProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	//explicit OperProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	explicit OperProvider();
 	PGOperatorPtr getOperByOID(Oid oid) const;
 	Oid getOperByName(duckdb_libpgquery::PGList *names, Oid oprleft, Oid oprright) const;
 

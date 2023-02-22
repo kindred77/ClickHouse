@@ -16,7 +16,8 @@ private:
 
 	Map oid_class_map;
 public:
-	explicit ClassProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	//explicit ClassProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	explicit ClassProvider();
 	
 	PGClassPtr getClassByRelOid(Oid oid) const;
 };

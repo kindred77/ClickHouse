@@ -1,6 +1,16 @@
 #include <Interpreters/orcaopt/walkers.h>
 #include <Interpreters/orcaopt/equalfuncs.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunreachable-code-break"
+#pragma clang diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wsign-compare"
+#else
+#pragma GCC diagnostic ignored "-Wunreachable-code-break"
+#pragma GCC diagnostic ignored "-Wswitch"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
+
 using namespace duckdb_libpgquery;
 
 PGTargetEntry *
@@ -619,17 +629,17 @@ pg_query_tree_walker(PGQuery *query,
 	return false;
 };
 
-bool
-pg_contain_windowfuncs_walker(PGNode *node, void *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, PGWindowFunc))
-		return true;			/* abort the tree traversal and return true */
-	/* Mustn't recurse into subselects */
-	return pg_expression_tree_walker(node, (walker_func)pg_contain_windowfuncs_walker,
-								  (void *) context);
-};
+// bool
+// pg_contain_windowfuncs_walker(PGNode *node, void *context)
+// {
+// 	if (node == NULL)
+// 		return false;
+// 	if (IsA(node, PGWindowFunc))
+// 		return true;			/* abort the tree traversal and return true */
+// 	/* Mustn't recurse into subselects */
+// 	return pg_expression_tree_walker(node, (walker_func)pg_contain_windowfuncs_walker,
+// 								  (void *) context);
+// };
 
 bool
 pg_contain_aggs_of_level_walker(PGNode *node,
@@ -836,30 +846,30 @@ pg_locate_var_of_level_walker(PGNode *node,
 								  (void *) context);
 };
 
-bool
-pg_contain_windowfuncs_walker(PGNode *node, void *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, PGWindowFunc))
-		return true;			/* abort the tree traversal and return true */
-	/* Mustn't recurse into subselects */
-	return pg_expression_tree_walker(node, (walker_func)pg_contain_windowfuncs_walker,
-								  (void *) context);
-};
+// bool
+// pg_contain_windowfuncs_walker(PGNode *node, void *context)
+// {
+// 	if (node == NULL)
+// 		return false;
+// 	if (IsA(node, PGWindowFunc))
+// 		return true;			/* abort the tree traversal and return true */
+// 	/* Mustn't recurse into subselects */
+// 	return pg_expression_tree_walker(node, (walker_func)pg_contain_windowfuncs_walker,
+// 								  (void *) context);
+// };
 
-bool
-pg_contain_windowfuncs(PGNode *node)
-{
-	/*
-	 * Must be prepared to start with a Query or a bare expression tree; if
-	 * it's a Query, we don't want to increment sublevels_up.
-	 */
-	return pg_query_or_expression_tree_walker(node,
-										   (walker_func)pg_contain_windowfuncs_walker,
-										   NULL,
-										   0);
-};
+// bool
+// pg_contain_windowfuncs(PGNode *node)
+// {
+// 	/*
+// 	 * Must be prepared to start with a Query or a bare expression tree; if
+// 	 * it's a Query, we don't want to increment sublevels_up.
+// 	 */
+// 	return pg_query_or_expression_tree_walker(node,
+// 										   (walker_func)pg_contain_windowfuncs_walker,
+// 										   NULL,
+// 										   0);
+// };
 
 bool
 pg_locate_windowfunc_walker(PGNode *node, locate_windowfunc_context *context)
@@ -903,103 +913,88 @@ bool
 PGIncrementVarSublevelsUp_walker(PGNode *node,
 							   IncrementVarSublevelsUp_context *context)
 {
-	if (node == NULL)
-		return false;
-	if (IsA(node, PGVar))
-	{
-		PGVar		   *var = (PGVar *) node;
+    if (node == NULL)
+        return false;
+    if (IsA(node, PGVar))
+    {
+        PGVar * var = (PGVar *)node;
 
-		if (var->varlevelsup >= context->min_sublevels_up)
-			var->varlevelsup += context->delta_sublevels_up;
-		return false;			/* done here */
-	}
-	if (IsA(node, PGCurrentOfExpr))
-	{
-		/* this should not happen */
-		if (context->min_sublevels_up == 0)
-			elog(ERROR, "cannot push down CurrentOfExpr");
-		return false;
-	}
-	if (IsA(node, PGAggref))
-	{
-		PGAggref	   *agg = (PGAggref *) node;
+        if (var->varlevelsup >= context->min_sublevels_up)
+            var->varlevelsup += context->delta_sublevels_up;
+        return false; /* done here */
+    }
+    if (IsA(node, PGCurrentOfExpr))
+    {
+        /* this should not happen */
+        if (context->min_sublevels_up == 0)
+            elog(ERROR, "cannot push down CurrentOfExpr");
+        return false;
+    }
+    if (IsA(node, PGAggref))
+    {
+        PGAggref * agg = (PGAggref *)node;
 
-		if (agg->agglevelsup >= context->min_sublevels_up)
-			agg->agglevelsup += context->delta_sublevels_up;
-		/* fall through to recurse into argument */
-	}
-	if (IsA(node, PGGroupingFunc))
-	{
-		PGGroupingFunc *grp = (PGGroupingFunc *) node;
+        if (agg->agglevelsup >= context->min_sublevels_up)
+            agg->agglevelsup += context->delta_sublevels_up;
+        /* fall through to recurse into argument */
+    }
+    // if (IsA(node, PlaceHolderVar))
+    // {
+    //     PlaceHolderVar * phv = (PlaceHolderVar *)node;
 
-		if (grp->agglevelsup >= context->min_sublevels_up)
-			grp->agglevelsup += context->delta_sublevels_up;
-		/* fall through to recurse into argument */
-	}
-	// if (IsA(node, PlaceHolderVar))
-	// {
-	// 	PlaceHolderVar *phv = (PlaceHolderVar *) node;
+    //     if (phv->phlevelsup >= context->min_sublevels_up)
+    //         phv->phlevelsup += context->delta_sublevels_up;
+    //     /* fall through to recurse into argument */
+    // }
+    if (IsA(node, PGRangeTblEntry))
+    {
+        PGRangeTblEntry * rte = (PGRangeTblEntry *)node;
 
-	// 	if (phv->phlevelsup >= context->min_sublevels_up)
-	// 		phv->phlevelsup += context->delta_sublevels_up;
-	// 	/* fall through to recurse into argument */
-	// }
-	if (IsA(node, PGRangeTblEntry))
-	{
-		PGRangeTblEntry *rte = (PGRangeTblEntry *) node;
+        if (rte->rtekind == PG_RTE_CTE)
+        {
+            if (rte->ctelevelsup >= context->min_sublevels_up)
+                rte->ctelevelsup += context->delta_sublevels_up;
 
-		if (rte->rtekind == PG_RTE_CTE)
-		{
-			if (rte->ctelevelsup >= context->min_sublevels_up)
-				rte->ctelevelsup += context->delta_sublevels_up;
-
-			/*
+            /*
 			* Fix for MPP-19436: in transformGroupedWindows, min_sublevels_up
 			* is ignored. For RTE refer to the original query ctelist should
 			* all be incremented.
 			*/
-			if(context->ignore_min_sublevels_up && rte->ctelevelsup == context->min_sublevels_up - 1)
-			{
-				rte->ctelevelsup += context->delta_sublevels_up;
-			}
-		}
-		return false;			/* allow range_table_walker to continue */
-	}
-	if (IsA(node, PGQuery))
-	{
-		/* Recurse into subselects */
-		bool		result;
+            if (context->ignore_min_sublevels_up && rte->ctelevelsup == context->min_sublevels_up - 1)
+            {
+                rte->ctelevelsup += context->delta_sublevels_up;
+            }
+        }
+        return false; /* allow range_table_walker to continue */
+    }
+    if (IsA(node, PGQuery))
+    {
+        /* Recurse into subselects */
+        bool result;
 
-		context->min_sublevels_up++;
-		result = pg_query_tree_walker((PGQuery *) node,
-								   (walker_func)PGIncrementVarSublevelsUp_walker,
-								   (void *) context,
-								   QTW_EXAMINE_RTES_BEFORE);
-		context->min_sublevels_up--;
-		return result;
-	}
-	return pg_expression_tree_walker(node, (walker_func)PGIncrementVarSublevelsUp_walker,
-								  (void *) context);
+        context->min_sublevels_up++;
+        result = pg_query_tree_walker((PGQuery *)node, (walker_func)PGIncrementVarSublevelsUp_walker, (void *)context, QTW_EXAMINE_RTES);
+        context->min_sublevels_up--;
+        return result;
+    }
+    return pg_expression_tree_walker(node, (walker_func)PGIncrementVarSublevelsUp_walker, (void *)context);
 };
 
 void
 PGIncrementVarSublevelsUp(PGNode *node, int delta_sublevels_up,
 						int min_sublevels_up)
 {
-	IncrementVarSublevelsUp_context context;
+    IncrementVarSublevelsUp_context context;
 
-	context.delta_sublevels_up = delta_sublevels_up;
-	context.min_sublevels_up = min_sublevels_up;
-	context.ignore_min_sublevels_up = false;
+    context.delta_sublevels_up = delta_sublevels_up;
+    context.min_sublevels_up = min_sublevels_up;
+    context.ignore_min_sublevels_up = false;
 
-	/*
+    /*
 	 * Must be prepared to start with a Query or a bare expression tree; if
 	 * it's a Query, we don't want to increment sublevels_up.
 	 */
-	pg_query_or_expression_tree_walker(node,
-									(walker_func)PGIncrementVarSublevelsUp_walker,
-									(void *) &context,
-									QTW_EXAMINE_RTES_BEFORE);
+    pg_query_or_expression_tree_walker(node, (walker_func)PGIncrementVarSublevelsUp_walker, (void *)&context, QTW_EXAMINE_RTES);
 };
 
 extern PGNode *
@@ -1028,7 +1023,8 @@ pg_expression_tree_mutator(PGNode *node,
 		return NULL;
 
 	/* Guard against stack overflow due to overly complex expressions */
-	check_stack_depth();
+	//TODO kindred
+	//check_stack_depth();
 
 	switch (nodeTag(node))
 	{
@@ -1344,7 +1340,8 @@ pg_expression_tree_mutator(PGNode *node,
 
 				FLATCOPY(newnode, acoerce, PGArrayCoerceExpr);
 				MUTATE(newnode->arg, acoerce->arg, PGExpr *);
-				MUTATE(newnode->elemexpr, acoerce->elemexpr, PGExpr *);
+				//TODO kindred
+				//MUTATE(newnode->elemexpr, acoerce->elemexpr, PGExpr *);
 				return (PGNode *) newnode;
 			}
 			break;
@@ -1720,17 +1717,17 @@ pg_expression_tree_mutator(PGNode *node,
 		// 		return (Node *)new_action_expr;
 		// 	}
 		// 	break;
-		case T_PGTableSampleClause:
-			{
-				PGTableSampleClause *tsc = (PGTableSampleClause *) node;
-				PGTableSampleClause *newnode;
+		// case T_PGTableSampleClause:
+		// 	{
+		// 		PGTableSampleClause *tsc = (PGTableSampleClause *) node;
+		// 		PGTableSampleClause *newnode;
 
-				FLATCOPY(newnode, tsc, PGTableSampleClause);
-				MUTATE(newnode->args, tsc->args, PGList *);
-				MUTATE(newnode->repeatable, tsc->repeatable, PGExpr *);
-				return (PGNode *) newnode;
-			}
-			break;
+		// 		FLATCOPY(newnode, tsc, PGTableSampleClause);
+		// 		MUTATE(newnode->args, tsc->args, PGList *);
+		// 		MUTATE(newnode->repeatable, tsc->repeatable, PGExpr *);
+		// 		return (PGNode *) newnode;
+		// 	}
+		// 	break;
 		// case T_AggExprId:
 		// 	{
 		// 		AggExprId *exprId = (AggExprId *)node;
@@ -1889,7 +1886,7 @@ bool checkExprHasSubLink(PGNode * node)
     return pg_query_or_expression_tree_walker(node, (walker_func)checkExprHasSubLink_walker, NULL, QTW_IGNORE_RC_SUBQUERIES);
 };
 
-static bool checkExprHasSubLink_walker(PGNode * node, void * context)
+bool checkExprHasSubLink_walker(PGNode * node, void * context)
 {
     if (node == NULL)
         return false;
@@ -1903,7 +1900,9 @@ pg_flatten_join_alias_vars_mutator(PGNode *node,
 			void *context_arg)
 {
     if (node == NULL)
+	{
         return NULL;
+	}
 	
 	flatten_join_alias_vars_context * context = (flatten_join_alias_vars_context *)context_arg;
 
@@ -1925,16 +1924,16 @@ pg_flatten_join_alias_vars_mutator(PGNode *node,
             PGRowExpr * rowexpr;
             PGList * fields = NIL;
             PGList * colnames = NIL;
-            PGAttrNumber attnum;
+            //PGAttrNumber attnum;
             PGListCell * lv;
             PGListCell * ln;
 
-            attnum = 0;
+            //attnum = 0;
             Assert(list_length(rte->joinaliasvars) == list_length(rte->eref->colnames))
             forboth(lv, rte->joinaliasvars, ln, rte->eref->colnames)
             {
                 newvar = (PGNode *)lfirst(lv);
-                attnum++;
+                //attnum++;
                 /* Ignore dropped columns */
                 if (newvar == NULL)
                     continue;
@@ -2154,7 +2153,7 @@ bool contain_vars_of_level(PGNode * node, int levelsup)
     return pg_query_or_expression_tree_walker(node, (walker_func)contain_vars_of_level_walker, (void *)&sublevels_up, 0);
 };
 
-static bool contain_vars_of_level_walker(PGNode * node, int * sublevels_up)
+bool contain_vars_of_level_walker(PGNode * node, int * sublevels_up)
 {
     if (node == NULL)
         return false;
@@ -2285,7 +2284,7 @@ void parseCheckTableFunctions(PGParseState * pstate, PGQuery * qry)
     pg_query_tree_walker(qry, (walker_func)checkTableFunctions_walker, (void *)&context, 0);
 };
 
-static bool checkTableFunctions_walker(PGNode * node, check_table_func_context * context)
+bool checkTableFunctions_walker(PGNode * node, check_table_func_context * context)
 {
     if (node == NULL)
         return false;
@@ -2369,14 +2368,14 @@ bool pg_grouping_rewrite_walker(PGNode * node, void * context)
         foreach (arg_lc, gf->args)
         {
             long i = 0;
-            PGNode * node = (PGNode *)lfirst(arg_lc);
+            PGNode * node_lc = (PGNode *)lfirst(arg_lc);
             PGListCell * grp_lc = NULL;
 
             foreach (grp_lc, ctx->grp_tles)
             {
                 PGTargetEntry * grp_tle = (PGTargetEntry *)lfirst(grp_lc);
 
-                if (equal(grp_tle->expr, node))
+                if (equal(grp_tle->expr, node_lc))
                     break;
                 i++;
             }
@@ -2387,20 +2386,20 @@ bool pg_grouping_rewrite_walker(PGNode * node, void * context)
                 PGRangeTblEntry * rte;
 				//TODO kindred
                 //const char * attname;
-                PGVar * var = (PGVar *)node;
+                PGVar * var = (PGVar *)node_lc;
 
                 PGParseState * pstate = ctx->pstate;
                 Index levelsup;
 
                 /* Do not allow expressions inside a grouping function. */
-                if (IsA(node, PGRowExpr))
+                if (IsA(node_lc, PGRowExpr))
                     ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("row type can not be used inside a grouping function")));
 
-                if (!IsA(node, PGVar))
+                if (!IsA(node_lc, PGVar))
                     ereport(
                         ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("expression in a grouping function does not appear in GROUP BY")));
 
-                Assert(IsA(node, PGVar))
+                Assert(IsA(node_lc, PGVar))
                 Assert(var->varno > 0)
 
                 for (levelsup = var->varlevelsup; levelsup > 0; levelsup--)
@@ -2547,11 +2546,12 @@ bool pg_check_ungrouped_columns_walker(PGNode * node, check_ungrouped_columns_co
         rte = rt_fetch(var->varno, context->pstate->p_rtable);
         if (rte->rtekind == PG_RTE_RELATION)
         {
-            if (check_functional_grouping(rte->relid, var->varno, 0, context->groupClauses, &context->qry->constraintDeps))
-            {
-                *context->func_grouped_rels = lappend_int(*context->func_grouped_rels, var->varno);
-                return false; /* acceptable */
-            }
+			//TODO kindred
+            // if (check_functional_grouping(rte->relid, var->varno, 0, context->groupClauses, &context->qry->constraintDeps))
+            // {
+            //     *context->func_grouped_rels = lappend_int(*context->func_grouped_rels, var->varno);
+            //     return false; /* acceptable */
+            // }
         }
 
         /* Found an ungrouped local variable; generate error message */
@@ -2970,45 +2970,6 @@ PGNode* grouped_window_mutator(PGNode *node, void *context)
 
     ctx->call_depth--;
     return result;
-};
-
-PGAlias * make_replacement_alias(PGQuery *qry, const char *aname)
-{
-    PGListCell * lc = NULL;
-    char * name = NULL;
-    PGAlias * alias = makeNode(PGAlias);
-    PGAttrNumber attrno = 0;
-
-    alias->aliasname = pstrdup(aname);
-    alias->colnames = NIL;
-
-    foreach (lc, qry->targetList)
-    {
-        PGTargetEntry * tle = (PGTargetEntry *)lfirst(lc);
-        attrno++;
-
-        if (tle->resname)
-        {
-            /* Prefer the target's resname. */
-            name = pstrdup(tle->resname);
-        }
-        else if (IsA(tle->expr, PGVar))
-        {
-            /* If the target expression is a Var, use the name of the
-			 * attribute in the query's range table. */
-            PGVar * var = (PGVar *)tle->expr;
-            PGRangeTblEntry * rte = rt_fetch(var->varno, qry->rtable);
-            name = pstrdup(get_rte_attribute_name(rte, var->varattno));
-        }
-        else
-        {
-            /* If all else, fails, generate a name based on position. */
-            name = generate_positional_name(attrno);
-        }
-
-        alias->colnames = lappend(alias->colnames, makeString(name));
-    }
-    return alias;
 };
 
 void IncrementVarSublevelsUpInTransformGroupedWindows(PGNode * node, int delta_sublevels_up, int min_sublevels_up)

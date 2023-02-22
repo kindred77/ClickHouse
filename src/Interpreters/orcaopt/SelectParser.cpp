@@ -10,13 +10,16 @@
 //#include <Interpreters/orcaopt/CollationParser.h>
 #include <Interpreters/orcaopt/AggParser.h>
 #include <Interpreters/orcaopt/FuncParser.h>
+#include <Interpreters/orcaopt/provider/RelationProvider.h>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wswitch"
 #pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wsometimes-uninitialized"
 #else
 #pragma GCC diagnostic ignored "-Wswitch"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
 #endif
 
 using namespace duckdb_libpgquery;
@@ -634,6 +637,45 @@ SelectParser::parse_sub_analyze(PGNode *parseTree, PGParseState *parentParseStat
     free_parsestate(pstate);
 
     return query;
+};
+
+PGAlias * SelectParser::make_replacement_alias(PGQuery *qry, const char *aname)
+{
+    PGListCell * lc = NULL;
+    char * name = NULL;
+    PGAlias * alias = makeNode(PGAlias);
+    PGAttrNumber attrno = 0;
+
+    alias->aliasname = pstrdup(aname);
+    alias->colnames = NIL;
+
+    foreach (lc, qry->targetList)
+    {
+        PGTargetEntry * tle = (PGTargetEntry *)lfirst(lc);
+        attrno++;
+
+        if (tle->resname)
+        {
+            /* Prefer the target's resname. */
+            name = pstrdup(tle->resname);
+        }
+        else if (IsA(tle->expr, PGVar))
+        {
+            /* If the target expression is a Var, use the name of the
+			 * attribute in the query's range table. */
+            PGVar * var = (PGVar *)tle->expr;
+            PGRangeTblEntry * rte = rt_fetch(var->varno, qry->rtable);
+            name = pstrdup(relation_provider->get_rte_attribute_name(rte, var->varattno).c_str());
+        }
+        else
+        {
+            /* If all else, fails, generate a name based on position. */
+            name = generate_positional_name(attrno);
+        }
+
+        alias->colnames = lappend(alias->colnames, makeString(name));
+    }
+    return alias;
 };
 
 }

@@ -308,6 +308,4 @@ extern duckdb_libpgquery::PGVar * var_for_gw_expr(grouped_window_ctx * ctx, duck
 
 extern duckdb_libpgquery::PGNode* grouped_window_mutator(duckdb_libpgquery::PGNode *node, void *context);
 
-extern duckdb_libpgquery::PGAlias * make_replacement_alias(duckdb_libpgquery::PGQuery *qry, const char *aname);
-
 extern void IncrementVarSublevelsUpInTransformGroupedWindows(duckdb_libpgquery::PGNode * node, int delta_sublevels_up, int min_sublevels_up);

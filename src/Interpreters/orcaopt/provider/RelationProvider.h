@@ -29,7 +29,8 @@ private:
 	ContextPtr context;
 	gpos::CMemoryPool *mp;
 public:
-	explicit RelationProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	//explicit RelationProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+    explicit RelationProvider();
 	StoragePtr getStorageByOID(Oid oid) const;
 
 	std::optional<std::tuple<Oid, StoragePtr, char> >

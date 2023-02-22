@@ -253,3 +253,5 @@
 #define		  PG_RELSTORAGE_FOREIGN 'f'
 
 #define GP_DIST_RANDOM_NAME "GP_DIST_RANDOM"
+
+#define QTW_EXAMINE_SORTGROUP 0x80 /* include SortGroupNode lists */

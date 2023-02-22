@@ -16,7 +16,8 @@ private:
 
 	Map oid_cast_map;
 public:
-	explicit CastProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	//explicit CastProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	explicit CastProvider();
 	
 	PGCastPtr getCastBySourceTypeAndTargetTypeOid(Oid sourceTypeId, Oid targetTypeId) const;
 };

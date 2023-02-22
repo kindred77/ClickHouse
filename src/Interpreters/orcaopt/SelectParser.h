@@ -12,6 +12,7 @@ class RelationParser;
 class CTEParser;
 class FuncParser;
 class AggParser;
+class RelationProvider;
 using ClauseParserPtr = std::unique_ptr<ClauseParser>;
 using TargetParserPtr = std::unique_ptr<TargetParser>;
 using CoerceParserPtr = std::unique_ptr<CoerceParser>;
@@ -20,6 +21,7 @@ using RelationParserPtr = std::unique_ptr<RelationParser>;
 using CTEParserPtr = std::unique_ptr<CTEParser>;
 using FuncParserPtr = std::unique_ptr<FuncParser>;
 using AggParserPtr = std::unique_ptr<AggParser>;
+using RelationProviderPtr = std::unique_ptr<RelationProvider>;
 
 class SelectParser
 {
@@ -33,6 +35,7 @@ private:
     //CollationParserPtr collation_parser;
     AggParserPtr agg_parser;
     FuncParserPtr func_parser;
+    RelationProviderPtr relation_provider;
 public:
 	explicit SelectParser();
 
@@ -62,6 +65,8 @@ public:
     parse_sub_analyze(duckdb_libpgquery::PGNode *parseTree, PGParseState *parentParseState,
 				  duckdb_libpgquery::PGCommonTableExpr *parentCTE,
 				  duckdb_libpgquery::PGLockingClause *lockclause_from_parent);
+    
+    duckdb_libpgquery::PGAlias * make_replacement_alias(duckdb_libpgquery::PGQuery *qry, const char *aname);
 };
 
 }

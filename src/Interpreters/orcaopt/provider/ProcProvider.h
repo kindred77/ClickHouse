@@ -16,7 +16,8 @@ private:
 
 	Map oid_proc_map;
 public:
-	explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	//explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
+	explicit ProcProvider();
 	
 	PGProcPtr getProcByOid(Oid oid) const;
 
