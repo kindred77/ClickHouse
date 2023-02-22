@@ -6,6 +6,8 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #endif
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
 

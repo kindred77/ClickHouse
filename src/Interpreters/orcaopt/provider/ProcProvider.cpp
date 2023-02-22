@@ -1,5 +1,11 @@
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#else
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 using namespace duckdb_libpgquery;
 
 namespace DB

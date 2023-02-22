@@ -1,5 +1,7 @@
 #include <Interpreters/orcaopt/provider/ClassProvider.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
 

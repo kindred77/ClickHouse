@@ -24,7 +24,7 @@ private:
     ContextPtr context;
     gpos::CMemoryPool * mp;
 
-    gpmd::CMDName * CreateMDName(gpos::CMemoryPool * mp, const char * name_str);
+    gpmd::CMDName * CreateMDName(const char * name_str);
 
 public:
     //explicit FunctionProvider(gpos::CMemoryPool *mp_, ContextPtr context);
