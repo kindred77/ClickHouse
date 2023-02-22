@@ -307,6 +307,53 @@ Datum FunctionProvider::OidFunctionCall1Coll(Oid functionId, Datum arg1)
     return result;
 };
 
+Datum FunctionProvider::OidFunctionCall1Coll(Oid functionId, Oid collation, Datum arg1)
+{
+    FmgrInfo flinfo;
+    FunctionCallInfoData fcinfo;
+    Datum result;
+
+    fmgr_info(functionId, &flinfo);
+
+    InitFunctionCallInfoData(fcinfo, &flinfo, 1, collation, NULL, NULL);
+
+    fcinfo.arg[0] = arg1;
+    fcinfo.argnull[0] = false;
+
+    result = FunctionCallInvoke(&fcinfo);
+
+    /* Check for null result, since caller is clearly not expecting one */
+    if (fcinfo.isnull)
+        elog(ERROR, "function %u returned NULL", flinfo.fn_oid);
+
+    return result;
+};
+
+Datum FunctionProvider::OidFunctionCall1_DatumArr(Oid functionId, Datum * datums)
+{
+    /* hardwired knowledge about cstring's representation details here */
+    ArrayType * arrtypmod = construct_array(datums, n, CSTRINGOID, -2, false, 'c');
+
+    /* arrange to report location if type's typmodin function fails */
+    setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
+
+    result = DatumGetInt32(OidFunctionCall1(typmodin, PointerGetDatum(arrtypmod)));
+
+    cancel_parser_errposition_callback(&pcbstate);
+
+    pfree(arrtypmod);
+
+    return result;
+};
+
+Datum FunctionProvider::OidInputFunctionCall(Oid functionId, const char * str, Oid typioparam, int32 typmod)
+{
+    FmgrInfo	flinfo;
+
+	fmgr_info(functionId, &flinfo);
+	return InputFunctionCall(&flinfo, str, typioparam, typmod);
+};
+
 FuncCandidateList
 FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argnames,
 		bool expand_variadic, bool expand_defaults, bool missing_ok)

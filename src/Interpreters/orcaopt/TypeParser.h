@@ -9,11 +9,13 @@ class RelationParser;
 class NodeParser;
 class TypeProvider;
 class RelationProvider;
+class FunctionProvider;
 
 using RelationParserPtr = std::unique_ptr<RelationParser>;
 using NodeParserPtr = std::unique_ptr<NodeParser>;
 using TypeProviderPtr = std::unique_ptr<TypeProvider>;
 using RelationProviderPtr = std::unique_ptr<RelationProvider>;
+using FunctionProviderPtr = std::unique_ptr<FunctionProvider>;
 
 class TypeParser
 {
@@ -22,6 +24,7 @@ private:
     NodeParserPtr node_parser;
     TypeProviderPtr type_provider;
     RelationProviderPtr relation_provider;
+    FunctionProviderPtr function_provider;
 public:
 	explicit TypeParser();
 

@@ -2,6 +2,8 @@
 
 #include <Storages/IStorage.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
 

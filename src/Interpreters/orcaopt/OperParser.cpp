@@ -7,10 +7,10 @@
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
-
-using namespace duckdb_libpgquery;
 
 Oid OperParser::compatible_oper_opid(PGList * op, Oid arg1, Oid arg2, bool noError)
 {

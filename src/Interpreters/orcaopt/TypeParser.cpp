@@ -4,16 +4,22 @@
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
+#include <Interpreters/orcaopt/provider/FunctionProvider.h>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wsometimes-uninitialized"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-variable"
 #else
 #pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-variable"
 #endif
+
+using namespace duckdb_libpgquery;
 
 namespace DB
 {
-using namespace duckdb_libpgquery;
 
 void
 TypeParser::typenameTypeIdAndMod(PGParseState *pstate, const PGTypeName *typeName,
@@ -228,7 +234,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PG
     Datum * datums;
     int n;
     PGListCell * l;
-    ArrayType * arrtypmod;
+    //ArrayType * arrtypmod;
     PGParseCallbackState pcbstate;
 
     /* Return prespecified typmod if no typmod expressions */
@@ -298,18 +304,21 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PG
         datums[n++] = CStringGetDatum(cstr);
     }
 
-    /* hardwired knowledge about cstring's representation details here */
-    arrtypmod = construct_array(datums, n, CSTRINGOID, -2, false, 'c');
+    //TODO kindred
+    // /* hardwired knowledge about cstring's representation details here */
+    // arrtypmod = construct_array(datums, n, CSTRINGOID, -2, false, 'c');
 
-    /* arrange to report location if type's typmodin function fails */
-    setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
+    // /* arrange to report location if type's typmodin function fails */
+    // setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
 
-    result = DatumGetInt32(OidFunctionCall1(typmodin, PointerGetDatum(arrtypmod)));
+    // result = DatumGetInt32(OidFunctionCall1(typmodin, PointerGetDatum(arrtypmod)));
 
-    cancel_parser_errposition_callback(&pcbstate);
+    // cancel_parser_errposition_callback(&pcbstate);
+
+    result = DatumGetInt32(function_provider->OidFunctionCall1_DatumArr(typmodin, datums));
 
     pfree(datums);
-    pfree(arrtypmod);
+    //pfree(arrtypmod);
 
     return result;
 };
@@ -382,7 +391,7 @@ TypeParser::stringTypeDatum(PGTypePtr tp, const char *string, int32 atttypmod)
 	Oid			typinput = tp->typinput;
 	Oid			typioparam = type_provider->getTypeIOParam(tp);
 
-	return OidInputFunctionCall(typinput, string, typioparam, atttypmod);
+	return function_provider->OidInputFunctionCall(typinput, string, typioparam, atttypmod);
 };
 
 Oid
@@ -425,16 +434,18 @@ TypeParser::typeTypeId(PGTypePtr tp)
 Oid
 TypeParser::LookupCollation(PGParseState *pstate, PGList *collnames, int location)
 {
-	Oid			colloid;
-	PGParseCallbackState pcbstate;
+	Oid			colloid = InvalidOid;
+    //TODO kindred
+    elog(ERROR, "Collation lookuping do not supported yet!");
+	// PGParseCallbackState pcbstate;
 
-	if (pstate)
-		setup_parser_errposition_callback(&pcbstate, pstate, location);
+	// if (pstate)
+	// 	setup_parser_errposition_callback(&pcbstate, pstate, location);
 
-	colloid = get_collation_oid(collnames, false);
+	// colloid = get_collation_oid(collnames, false);
 
-	if (pstate)
-		cancel_parser_errposition_callback(&pcbstate);
+	// if (pstate)
+	// 	cancel_parser_errposition_callback(&pcbstate);
 
 	return colloid;
 };
@@ -461,7 +472,7 @@ char * TypeParser::printTypmod(const char * typname, int32 typmod, Oid typmodout
         /* Use the type-specific typmodout procedure */
         char * tmstr;
 
-        tmstr = DatumGetCString(OidFunctionCall1(typmodout, Int32GetDatum(typmod)));
+        tmstr = DatumGetCString(function_provider->OidFunctionCall1Coll(typmodout, InvalidOid, Int32GetDatum(typmod)));
         res = psprintf("%s%s", typname, tmstr);
     }
 
@@ -476,7 +487,9 @@ char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemo
     char * buf;
 
     if (type_oid == InvalidOid && allow_invalid)
+    {
         return pstrdup("-");
+    }
 
 	PGTypePtr tuple = type_provider->getTypeByOid(type_oid);
     if (tuple == NULL)

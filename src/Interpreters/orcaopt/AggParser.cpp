@@ -13,9 +13,10 @@
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #endif
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
-using namespace duckdb_libpgquery;
 
 bool
 check_agg_arguments_walker(PGNode *node,

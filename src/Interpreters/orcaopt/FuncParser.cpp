@@ -19,9 +19,10 @@
 #pragma GCC diagnostic ignored "-Wswitch"
 #endif
 
+using namespace duckdb_libpgquery;
+
 namespace DB
 {
-using namespace duckdb_libpgquery;
 
 PGNode *
 FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, PGNode *first_arg,

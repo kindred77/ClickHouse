@@ -34,6 +34,13 @@ public:
 
     Datum OidFunctionCall1Coll(Oid functionId, Datum arg1);
 
+    Datum OidFunctionCall1Coll(Oid functionId, Oid collation, Datum arg1);
+
+    Datum OidFunctionCall1_DatumArr(Oid functionId, Datum * datums);
+
+    Datum OidInputFunctionCall(Oid functionId, const char * str, Oid typioparam, int32 typmod);
+
+
     FuncCandidateList
     FuncnameGetCandidates(duckdb_libpgquery::PGList * names, int nargs, duckdb_libpgquery::PGList * argnames,
 		bool expand_variadic, bool expand_defaults, bool missing_ok);
