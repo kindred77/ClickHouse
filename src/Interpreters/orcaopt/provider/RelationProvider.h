@@ -33,8 +33,8 @@ public:
     explicit RelationProvider();
 	StoragePtr getStorageByOID(Oid oid) const;
 
-	std::optional<std::tuple<Oid, StoragePtr, char> >
-	getPairByDBAndTableName(const String & database_name, const String & table_name) const;
+	//std::optional<std::tuple<Oid, StoragePtr, char> >
+	//getPairByDBAndTableName(const String & database_name, const String & table_name) const;
 
     std::string get_database_name(Oid dbid) const;
 

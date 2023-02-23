@@ -4,8 +4,10 @@
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-label"
 #else
 #pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-label"
 #endif
 
 using namespace duckdb_libpgquery;
@@ -27,18 +29,16 @@ RelationProvider::getStorageByOID(Oid oid) const
 	if (it == oid_storageid_map.end())
 	    return {};
 	return it->second;
-}
+};
 
-std::optional<std::tuple<Oid, StoragePtr, char> >
-RelationProvider::getPairByDBAndTableName(const String & database_name, const String & table_name) const
-{
-	// auto it = oid_storageid_map.find(oid);
-	// if (it == oid_storageid_map.end())
-	//     return nullptr;
-	// return {it->first, it->second, 'r'};
-
-    return nullptr;
-}
+// std::optional<std::tuple<Oid, StoragePtr, char> >
+// RelationProvider::getPairByDBAndTableName(const String & database_name, const String & table_name) const
+// {
+// 	auto it = oid_storageid_map.find(oid);
+// 	if (it == oid_storageid_map.end())
+// 	    return nullptr;
+// 	return {it->first, it->second, 'r'};
+// }
 
 std::string RelationProvider::get_database_name(Oid dbid) const
 {
