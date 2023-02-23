@@ -361,7 +361,7 @@ void RelationProvider::relation_close(PGRelationPtr relation, LOCKMODE lockmode)
 
 PGRelationPtr RelationProvider::try_heap_open(Oid relationId, LOCKMODE lockmode, bool noWait)
 {
-
+    return nullptr;
 };
 
 bool RelationProvider::IsSystemRelation(PGRelationPtr relation)

@@ -22,8 +22,14 @@
 #include <Storages/MergeTree/MergeTreeSelectProcessor.h>
 #include <Storages/MergeTree/MergeTreeDataSelectExecutor.h>
 #include <Processors/QueryPlan/ForCalcite/TableScan.h>
-#include <Interpreters/orcaopt/TranslatorQueryToDXL.h>
+//#include <Interpreters/orcaopt/TranslatorQueryToDXL.h>
 #include "clickhouse_grpc.grpc.pb.h"
+
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wpessimizing-move"
+#else
+#pragma GCC diagnostic ignored "-Wpessimizing-move"
+#endif
 
 namespace DB
 {
@@ -350,7 +356,7 @@ void doTableScanForGRPC(ContextMutablePtr& query_context, QueryPlan & query_plan
     query_plan.addStep(std::move(table_scan));
 
     LOG_INFO(log, "-----------begin test with gporca integration-------");
-    auto query_to_dxl_translator = std::make_unique<TranslatorQueryToDXL>();
+    //auto query_to_dxl_translator = std::make_unique<TranslatorQueryToDXL>();
     LOG_INFO(log, "-----------end test with gporca integration-------");
 }
 

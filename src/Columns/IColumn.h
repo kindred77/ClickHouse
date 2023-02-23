@@ -7,6 +7,11 @@
 #include <common/StringRef.h>
 #include <Core/Types.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wdeprecated-copy-with-dtor"
+#else
+#pragma GCC diagnostic ignored "-Wdeprecated-copy-with-dtor"
+#endif
 
 class SipHash;
 class Collator;

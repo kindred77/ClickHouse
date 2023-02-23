@@ -3,6 +3,12 @@
 #include <Storages/MergeTree/RangesInDataPart.h>
 #include <Storages/MergeTree/MergeTreeDataSelectExecutor.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-private-field"
+#else
+#pragma GCC diagnostic ignored "-Wunused-private-field"
+#endif
+
 namespace DB
 {
 

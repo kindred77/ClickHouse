@@ -6,6 +6,12 @@
 #include "ColumnsNumber.h"
 
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wdeprecated-copy"
+#else
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
+
 namespace DB
 {
 

@@ -19,6 +19,12 @@ using GRPCStepType = clickhouse::grpc::StepType;
 using GRPCTableScanStep = clickhouse::grpc::TableScanStep;
 using GRPCFilterStep = clickhouse::grpc::FilterStep;
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-member-function"
+#else
+#pragma GCC diagnostic ignored "-Wunused-member-function"
+#endif
+
 namespace Poco { class Logger; }
 
 namespace grpc

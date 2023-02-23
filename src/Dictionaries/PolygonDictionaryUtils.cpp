@@ -8,6 +8,12 @@
 #include <thread>
 #include <numeric>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#else
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
+
 namespace DB
 {
 

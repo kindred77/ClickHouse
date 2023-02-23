@@ -24,6 +24,12 @@
 #include <common/logger_useful.h>
 #include <Common/JSONBuilder.h>
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#else
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
+
 namespace ProfileEvents
 {
     extern const Event SelectedParts;
