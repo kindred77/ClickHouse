@@ -9,6 +9,9 @@
 
 namespace DB
 {
+/*
+pg_proc  -> CMDFunctionGPDB
+*/
 class ProcProvider
 {
 private:

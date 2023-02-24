@@ -729,6 +729,7 @@ struct oidvector
 
 struct Form_pg_proc
 {
+	Oid oid;
     NameData proname; /* procedure name */
     Oid pronamespace; /* OID of namespace containing this proc */
     Oid proowner; /* procedure owner */
