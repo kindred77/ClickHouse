@@ -520,7 +520,7 @@ Oid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missing
     return InvalidOid;
 };
 
-char * RelationProvider::get_namespace_name(Oid nspid)
+std::string RelationProvider::get_namespace_name(Oid nspid)
 {
     // HeapTuple tp;
 

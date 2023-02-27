@@ -504,7 +504,7 @@ using PGOperatorPtr = std::shared_ptr<Form_pg_operator>;
 struct Form_pg_type
 {
 	Oid oid;
-    NameData typname; /* type name */
+    std::string typname; /* type name */
     Oid typnamespace; /* OID of namespace containing this type */
     Oid typowner; /* type owner */
 
@@ -716,21 +716,21 @@ struct Form_pg_class
 
 using PGClassPtr = std::shared_ptr<Form_pg_class>;
 
-struct oidvector
-{
-    int32 vl_len_; /* these fields must match ArrayType! */
-    int ndim; /* always 1 for oidvector */
-    int32 dataoffset; /* always 0 for oidvector */
-    Oid elemtype;
-    int dim1;
-    int lbound1;
-    Oid values[1]; /* VARIABLE LENGTH ARRAY */
-};
+// struct oidvector
+// {
+//     int32 vl_len_; /* these fields must match ArrayType! */
+//     int ndim; /* always 1 for oidvector */
+//     int32 dataoffset; /* always 0 for oidvector */
+//     Oid elemtype;
+//     int dim1;
+//     int lbound1;
+//     Oid values[1]; /* VARIABLE LENGTH ARRAY */
+// };
 
 struct Form_pg_proc
 {
 	Oid oid;
-    NameData proname; /* procedure name */
+    std::string proname; /* procedure name */
     Oid pronamespace; /* OID of namespace containing this proc */
     Oid proowner; /* procedure owner */
     Oid prolang; /* OID of pg_language entry */
@@ -753,7 +753,52 @@ struct Form_pg_proc
 	 * variable-length fields start here, but we allow direct access to
 	 * proargtypes
 	 */
-    oidvector proargtypes; /* parameter types (excludes OUT params) */
+    //oidvector proargtypes; /* parameter types (excludes OUT params) */
+	std::vector<Oid> proargtypes;
+
+    // Form_pg_proc(
+    //     Oid oid_,
+    //     std::string proname_,
+    //     Oid pronamespace_,
+    //     Oid proowner_,
+    //     Oid prolang_,
+    //     float4 procost_,
+    //     float4 prorows_,
+    //     Oid provariadic_,
+    //     Oid protransform_,
+    //     bool proisagg_,
+    //     bool proiswindow_,
+    //     bool prosecdef_,
+    //     bool proleakproof_,
+    //     bool proisstrict_,
+    //     bool proretset_,
+    //     char provolatile_,
+    //     int16 pronargs_,
+    //     int16 pronargdefaults_,
+    //     Oid prorettype_,
+    //     std::vector<Oid> proargtypes_)
+    // {
+    //     oid = oid_;
+    //     proname = proname_;
+    //     pronamespace = pronamespace_;
+    //     proowner = proowner_;
+    //     prolang = prolang_;
+    //     procost = procost_;
+    //     prorows = prorows_;
+    //     provariadic = provariadic_;
+    //     protransform = protransform_;
+    //     proisagg = proisagg_;
+    //     proiswindow = proiswindow_;
+    //     prosecdef = prosecdef_;
+    //     proleakproof = proleakproof_;
+    //     proisstrict = proisstrict_;
+    //     proretset = proretset_;
+    //     provolatile = provolatile_;
+    //     pronargs = pronargs_;
+    //     pronargdefaults = pronargdefaults_;
+    //     prorettype = prorettype_;
+    //     proargtypes = proargtypes_;
+    // }
 };
 
 using PGProcPtr = std::shared_ptr<Form_pg_proc>;

@@ -11,47 +11,108 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-explicit ProcProvider::ProcProvider()
+std::pair<Oid, PGProcPtr> ProcProvider::PROC_INT2PL = std::pair<Oid, PGProcPtr>(
+    Oid(176),
+    std::make_shared<Form_pg_proc>(Form_pg_proc{
+        .oid = Oid(176),
+        /*proname*/ .proname = "plus",
+        /*pronamespace*/ .pronamespace = Oid(1),
+        /*proowner*/ .proowner = Oid(1),
+        /*prolang*/ .prolang = Oid(12),
+        /*procost*/ .procost = 1,
+        /*prorows*/ .prorows = 0.0,
+        /*provariadic*/ .provariadic = Oid(0),
+        /*protransform*/ .protransform = Oid(0),
+        /*proisagg*/ .proisagg = false,
+        /*proiswindow*/ .proiswindow = false,
+        /*prosecdef*/ .prosecdef = false,
+        /*proleakproof*/ .proleakproof = false,
+        /*proisstrict*/ .proisstrict = true,
+        /*proretset*/ .proretset = false,
+        /*provolatile*/ .provolatile = 'i',
+        /*pronargs*/ .pronargs = 2,
+        /*pronargdefaults*/ .pronargdefaults = 0,
+        /*prorettype*/ .prorettype = Oid(21),
+        /*proargtypes*/ .proargtypes = {Oid(21), Oid(21)}}));
+
+std::pair<Oid, PGProcPtr> ProcProvider::PROC_INT4PL = std::pair<Oid, PGProcPtr>(
+    Oid(177),
+    std::make_shared<Form_pg_proc>(Form_pg_proc{
+        .oid = Oid(177),
+        /*proname*/ .proname = "plus",
+        /*pronamespace*/ .pronamespace = Oid(1),
+        /*proowner*/ .proowner = Oid(1),
+        /*prolang*/ .prolang = Oid(12),
+        /*procost*/ .procost = 1,
+        /*prorows*/ .prorows = 0.0,
+        /*provariadic*/ .provariadic = Oid(0),
+        /*protransform*/ .protransform = Oid(0),
+        /*proisagg*/ .proisagg = false,
+        /*proiswindow*/ .proiswindow = false,
+        /*prosecdef*/ .prosecdef = false,
+        /*proleakproof*/ .proleakproof = false,
+        /*proisstrict*/ .proisstrict = true,
+        /*proretset*/ .proretset = false,
+        /*provolatile*/ .provolatile = 'i',
+        /*pronargs*/ .pronargs = 2,
+        /*pronargdefaults*/ .pronargdefaults = 0,
+        /*prorettype*/ .prorettype = Oid(23),
+        /*proargtypes*/ .proargtypes = {Oid(23), Oid(23)}}));
+
+std::pair<Oid, PGProcPtr> ProcProvider::PROC_INT24PL = std::pair<Oid, PGProcPtr>(
+    Oid(178),
+    std::make_shared<Form_pg_proc>(Form_pg_proc{
+        .oid = Oid(178),
+        /*proname*/ .proname = "plus",
+        /*pronamespace*/ .pronamespace = Oid(1),
+        /*proowner*/ .proowner = Oid(1),
+        /*prolang*/ .prolang = Oid(12),
+        /*procost*/ .procost = 1,
+        /*prorows*/ .prorows = 0.0,
+        /*provariadic*/ .provariadic = Oid(0),
+        /*protransform*/ .protransform = Oid(0),
+        /*proisagg*/ .proisagg = false,
+        /*proiswindow*/ .proiswindow = false,
+        /*prosecdef*/ .prosecdef = false,
+        /*proleakproof*/ .proleakproof = false,
+        /*proisstrict*/ .proisstrict = true,
+        /*proretset*/ .proretset = false,
+        /*provolatile*/ .provolatile = 'i',
+        /*pronargs*/ .pronargs = 2,
+        /*pronargdefaults*/ .pronargdefaults = 0,
+        /*prorettype*/ .prorettype = Oid(23),
+        /*proargtypes*/ .proargtypes = {Oid(21), Oid(23)}}));
+
+std::pair<Oid, PGProcPtr> ProcProvider::PROC_INT42PL = std::pair<Oid, PGProcPtr>(
+    Oid(179),
+    std::make_shared<Form_pg_proc>(Form_pg_proc{
+        .oid = Oid(179),
+        /*proname*/ .proname = "plus",
+        /*pronamespace*/ .pronamespace = Oid(1),
+        /*proowner*/ .proowner = Oid(1),
+        /*prolang*/ .prolang = Oid(12),
+        /*procost*/ .procost = 1,
+        /*prorows*/ .prorows = 0.0,
+        /*provariadic*/ .provariadic = Oid(0),
+        /*protransform*/ .protransform = Oid(0),
+        /*proisagg*/ .proisagg = false,
+        /*proiswindow*/ .proiswindow = false,
+        /*prosecdef*/ .prosecdef = false,
+        /*proleakproof*/ .proleakproof = false,
+        /*proisstrict*/ .proisstrict = true,
+        /*proretset*/ .proretset = false,
+        /*provolatile*/ .provolatile = 'i',
+        /*pronargs*/ .pronargs = 2,
+        /*pronargdefaults*/ .pronargdefaults = 0,
+        /*prorettype*/ .prorettype = Oid(23),
+        /*proargtypes*/ .proargtypes = {Oid(23), Oid(21)}}));
+
+ProcProvider::ProcProvider()
 {
-	//int2pl
-	oid_proc_map.insert(std::pair<Oid, PGProcPtr>(Oid(176), std::make_shared<Form_pg_proc>(
-			Oid(176), /*mdname*/ pstrdup("plus"), /*pronamespace*/ Oid(1),
-			/*proowner*/ Oid(1), /*prolang*/ Oid(1), /*procost*/ 0.0,
-			/*prorows*/ 0.0, /*provariadic*/ Oid(0), /*protransform*/ Oid(1),
-			/*proisagg*/ false, /*proiswindow*/ false, /*prosecdef*/ false,
-			/*proleakproof*/ false, /*proisstrict*/ true, /*proretset*/ false,
-			/*provolatile*/ 'i', /*pronargs*/ 2, /*pronargdefaults*/ 0,
-			/*prorettype*/ Oid(1), /*proargtypes*/ oidvector())));
-	
-	//int4pl
-	oid_proc_map.insert(std::pair<Oid, PGProcPtr>(Oid(177), std::make_shared<Form_pg_proc>(
-			Oid(177), /*mdname*/ pstrdup("plus"), /*pronamespace*/ Oid(1),
-			/*proowner*/ Oid(1), /*prolang*/ Oid(1), /*procost*/ 0.0,
-			/*prorows*/ 0.0, /*provariadic*/ Oid(0), /*protransform*/ Oid(1),
-			/*proisagg*/ false, /*proiswindow*/ false, /*prosecdef*/ false,
-			/*proleakproof*/ false, /*proisstrict*/ true, /*proretset*/ false,
-			/*provolatile*/ 'i', /*pronargs*/ 2, /*pronargdefaults*/ 0,
-			/*prorettype*/ Oid(1), /*proargtypes*/ oidvector())));
-
-	//int24pl
-	oid_proc_map.insert(std::pair<Oid, PGProcPtr>(Oid(178), std::make_shared<Form_pg_proc>(
-			Oid(178), /*mdname*/ pstrdup("plus"), /*pronamespace*/ Oid(1),
-			/*proowner*/ Oid(1), /*prolang*/ Oid(1), /*procost*/ 0.0,
-			/*prorows*/ 0.0, /*provariadic*/ Oid(0), /*protransform*/ Oid(1),
-			/*proisagg*/ false, /*proiswindow*/ false, /*prosecdef*/ false,
-			/*proleakproof*/ false, /*proisstrict*/ true, /*proretset*/ false,
-			/*provolatile*/ 'i', /*pronargs*/ 2, /*pronargdefaults*/ 0,
-			/*prorettype*/ Oid(1), /*proargtypes*/ oidvector())));
-
-	//int42pl
-	oid_proc_map.insert(std::pair<Oid, PGProcPtr>(Oid(179), std::make_shared<Form_pg_proc>(
-			Oid(179), /*mdname*/ pstrdup("plus"), /*pronamespace*/ Oid(1),
-			/*proowner*/ Oid(1), /*prolang*/ Oid(1), /*procost*/ 0.0,
-			/*prorows*/ 0.0, /*provariadic*/ Oid(0), /*protransform*/ Oid(1),
-			/*proisagg*/ false, /*proiswindow*/ false, /*prosecdef*/ false,
-			/*proleakproof*/ false, /*proisstrict*/ true, /*proretset*/ false,
-			/*provolatile*/ 'i', /*pronargs*/ 2, /*pronargdefaults*/ 0,
-			/*prorettype*/ Oid(1), /*proargtypes*/ oidvector())));
+	oid_proc_map.insert(PROC_INT2PL);
+	oid_proc_map.insert(PROC_INT4PL);
+	oid_proc_map.insert(PROC_INT24PL);
+	oid_proc_map.insert(PROC_INT42PL);
 };
 
 PGProcPtr ProcProvider::getProcByOid(Oid oid) const

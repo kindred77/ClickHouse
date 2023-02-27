@@ -450,14 +450,14 @@ TypeParser::LookupCollation(PGParseState *pstate, PGList *collnames, int locatio
 	return colloid;
 };
 
-char * TypeParser::format_type_with_typemod(Oid type_oid, int32 typemod)
+std::string TypeParser::format_type_with_typemod(Oid type_oid, int32 typemod)
 {
 	return format_type_internal(type_oid, typemod, true, false, false);
 };
 
-char * TypeParser::printTypmod(const char * typname, int32 typmod, Oid typmodout)
+std::string TypeParser::printTypmod(const char * typname, int32 typmod, Oid typmodout)
 {
-    char * res;
+    std::string res = "";
 
     /* Shouldn't be called if typmod is -1 */
     Assert(typmod >= 0)
@@ -465,7 +465,8 @@ char * TypeParser::printTypmod(const char * typname, int32 typmod, Oid typmodout
     if (typmodout == InvalidOid)
     {
         /* Default behavior: just print the integer typmod with parens */
-        res = psprintf("%s(%d)", typname, (int)typmod);
+        //res = psprintf("%s(%d)", typname, (int)typmod);
+        res = std::string(typname) + "(" + std::to_string(typmod) + ")";
     }
     else
     {
@@ -473,29 +474,30 @@ char * TypeParser::printTypmod(const char * typname, int32 typmod, Oid typmodout
         char * tmstr;
 
         tmstr = DatumGetCString(function_provider->OidFunctionCall1Coll(typmodout, InvalidOid, Int32GetDatum(typmod)));
-        res = psprintf("%s%s", typname, tmstr);
+        //res = psprintf("%s%s", typname, tmstr);
+        res = std::string(typname) + std::string(tmstr);
     }
 
     return res;
 };
 
-char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify)
+std::string TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify)
 {
     bool with_typemod = typemod_given && (typemod >= 0);
     Oid array_base_type;
     bool is_array;
-    char * buf;
+    std::string buf = "";
 
     if (type_oid == InvalidOid && allow_invalid)
     {
-        return pstrdup("-");
+        return "-";
     }
 
 	PGTypePtr tuple = type_provider->getTypeByOid(type_oid);
     if (tuple == NULL)
     {
         if (allow_invalid)
-            return pstrdup("???");
+            return "???";
         else
             elog(ERROR, "cache lookup failed for type %u", type_oid);
     }
@@ -516,7 +518,7 @@ char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemo
         if (tuple == NULL)
         {
             if (allow_invalid)
-                return pstrdup("???[]");
+                return "???[]";
             else
                 elog(ERROR, "cache lookup failed for type %u", type_oid);
         }
@@ -537,7 +539,7 @@ char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemo
 	 * double-quoted if it matches any lexer keyword.  This behavior is
 	 * essential for some cases, such as types "bit" and "char".
 	 */
-    buf = NULL; /* flag for no special case */
+    //buf = NULL; /* flag for no special case */
 
     switch (type_oid)
     {
@@ -553,11 +555,11 @@ char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemo
 				 */
             }
             else
-                buf = pstrdup("bit");
+                buf = "bit";
             break;
 
         case BOOLOID:
-            buf = pstrdup("boolean");
+            buf = "boolean";
             break;
 
         case BPCHAROID:
@@ -572,87 +574,87 @@ char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemo
 				 */
             }
             else
-                buf = pstrdup("character");
+                buf = "character";
             break;
 
         case FLOAT4OID:
-            buf = pstrdup("real");
+            buf = "real";
             break;
 
         case FLOAT8OID:
-            buf = pstrdup("double precision");
+            buf = "double precision";
             break;
 
         case INT2OID:
-            buf = pstrdup("smallint");
+            buf = "smallint";
             break;
 
         case INT4OID:
-            buf = pstrdup("integer");
+            buf = "integer";
             break;
 
         case INT8OID:
-            buf = pstrdup("bigint");
+            buf = "bigint";
             break;
 
         case NUMERICOID:
             if (with_typemod)
                 buf = printTypmod("numeric", typemod, tuple->typmodout);
             else
-                buf = pstrdup("numeric");
+                buf = "numeric";
             break;
 
         case INTERVALOID:
             if (with_typemod)
                 buf = printTypmod("interval", typemod, tuple->typmodout);
             else
-                buf = pstrdup("interval");
+                buf = "interval";
             break;
 
         case TIMEOID:
             if (with_typemod)
                 buf = printTypmod("time", typemod, tuple->typmodout);
             else
-                buf = pstrdup("time without time zone");
+                buf = "time without time zone";
             break;
 
         case TIMETZOID:
             if (with_typemod)
                 buf = printTypmod("time", typemod, tuple->typmodout);
             else
-                buf = pstrdup("time with time zone");
+                buf = "time with time zone";
             break;
 
         case TIMESTAMPOID:
             if (with_typemod)
                 buf = printTypmod("timestamp", typemod, tuple->typmodout);
             else
-                buf = pstrdup("timestamp without time zone");
+                buf = "timestamp without time zone";
             break;
 
         case TIMESTAMPTZOID:
             if (with_typemod)
                 buf = printTypmod("timestamp", typemod, tuple->typmodout);
             else
-                buf = pstrdup("timestamp with time zone");
+                buf = "timestamp with time zone";
             break;
 
         case VARBITOID:
             if (with_typemod)
                 buf = printTypmod("bit varying", typemod, tuple->typmodout);
             else
-                buf = pstrdup("bit varying");
+                buf = "bit varying";
             break;
 
         case VARCHAROID:
             if (with_typemod)
                 buf = printTypmod("character varying", typemod, tuple->typmodout);
             else
-                buf = pstrdup("character varying");
+                buf = "character varying";
             break;
     }
 
-    if (buf == NULL)
+    if (buf == "")
     {
         /*
 		 * Default handling: report the name as it appears in the catalog.
@@ -660,26 +662,29 @@ char * TypeParser::format_type_internal(Oid type_oid, int32 typemod, bool typemo
 		 * path, and we must double-quote it if it's not a standard identifier
 		 * or if it matches any keyword.
 		 */
-        char * nspname;
-        char * typname;
+        std::string nspname;
+        std::string typname;
 
         if (!force_qualify && type_provider->TypeIsVisible(type_oid))
-            nspname = NULL;
+            nspname = "";
         else
             nspname = relation_provider->get_namespace_name(tuple->typnamespace);
 
-        typname = NameStr(tuple->typname);
+        typname = tuple->typname;
 
 		//TODO kindred
         // buf = quote_qualified_identifier(nspname, typname);
 		buf = pstrdup((std::string(nspname) + "." + std::string(typname)).c_str());
 
         if (with_typemod)
-            buf = printTypmod(buf, typemod, tuple->typmodout);
+            buf = printTypmod(buf.c_str(), typemod, tuple->typmodout);
     }
 
     if (is_array)
-        buf = psprintf("%s[]", buf);
+    {
+        //buf = psprintf("%s[]", buf);
+        buf = buf + "[]";
+    }
 
     return buf;
 };

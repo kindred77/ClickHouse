@@ -18,6 +18,11 @@ private:
 	using Map = std::map<Oid, PGProcPtr>;
 
 	Map oid_proc_map;
+
+	static std::pair<Oid, PGProcPtr> PROC_INT2PL;
+	static std::pair<Oid, PGProcPtr> PROC_INT4PL;
+	static std::pair<Oid, PGProcPtr> PROC_INT24PL;
+	static std::pair<Oid, PGProcPtr> PROC_INT42PL;
 public:
 	//explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	explicit ProcProvider();

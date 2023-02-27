@@ -80,7 +80,7 @@ public:
 
     Oid LookupExplicitNamespace(const char * nspname, bool missing_ok);
 
-    char * get_namespace_name(Oid nspid);
+    std::string get_namespace_name(Oid nspid);
 };
 
 }

@@ -157,8 +157,8 @@ void CTEParser::analyzeCTE(PGParseState * pstate, PGCommonTableExpr * cte)
                          "recursive query \"%s\" column %d has type %s in non-recursive term but type %s overall",
                          cte->ctename,
                          varattno,
-                         type_parser->format_type_with_typemod(lfirst_oid(lctyp), lfirst_int(lctypmod)),
-                         type_parser->format_type_with_typemod(exprType(texpr), exprTypmod(texpr))),
+                         type_parser->format_type_with_typemod(lfirst_oid(lctyp), lfirst_int(lctypmod)).c_str(),
+                         type_parser->format_type_with_typemod(exprType(texpr), exprTypmod(texpr)).c_str()),
                      errhint("Cast the output of the non-recursive term to the correct type."),
                      parser_errposition(pstate, exprLocation(texpr))));
             if (exprCollation(texpr) != lfirst_oid(lccoll))
