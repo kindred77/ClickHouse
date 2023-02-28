@@ -15,13 +15,6 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-// RelationProvider::RelationProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
-// 		: context(std::move(context_)),
-// 		  mp(std::move(mp_))
-// {
-// 	oid_storageid_map.insert(std::pair<Oid, StoragePtr>(Oid(1), DatabaseCatalog::instance().getTable(StorageID("system", "one"), context)));
-// }
-
 StoragePtr
 RelationProvider::getStorageByOID(Oid oid) const
 {

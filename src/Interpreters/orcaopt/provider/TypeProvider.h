@@ -23,7 +23,7 @@ class TypeProvider
 {
 public:
 	//explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit TypeProvider();
+	explicit TypeProvider() = default;
 	//IMDTypePtr getTypeByOID(Oid oid);
 	PGTypePtr getTypeByOid(Oid oid) const;
 	//IMDTypePtr getType(Field::Types::Which which);
@@ -104,6 +104,10 @@ private:
 	static std::pair<Oid, PGTypePtr> TYPE_INT128;
 	static std::pair<Oid, PGTypePtr> TYPE_INT256;
 	static std::pair<Oid, PGTypePtr> TYPE_STRING;
+	static std::pair<Oid, PGTypePtr> TYPE_FIXEDSTRING;
+	static std::pair<Oid, PGTypePtr> TYPE_DATE;
+	static std::pair<Oid, PGTypePtr> TYPE_DATETIME;
+	static std::pair<Oid, PGTypePtr> TYPE_DATETIME64;
 	static std::pair<Oid, PGTypePtr> TYPE_ARRAY;
 	static std::pair<Oid, PGTypePtr> TYPE_TUPLE;
 	static std::pair<Oid, PGTypePtr> TYPE_DECIMAL32;
@@ -117,8 +121,8 @@ private:
 	using Map = std::map<Oid, PGTypePtr>;
 
 	static Map oid_types_map;
-	ContextPtr context;
-	gpos::CMemoryPool *mp;
+	//ContextPtr context;
+	//gpos::CMemoryPool *mp;
 
 	gpmd::CMDName *
 	CreateMDName(gpos::CMemoryPool *mp, const char *name_str);

@@ -26,8 +26,8 @@ private:
 	using Map = std::map<Oid, StoragePtr>;
 
 	Map oid_storageid_map;
-	ContextPtr context;
-	gpos::CMemoryPool *mp;
+	//ContextPtr context;
+	//gpos::CMemoryPool *mp;
 public:
 	//explicit RelationProvider(gpos::CMemoryPool *mp_, ContextPtr context);
     explicit RelationProvider();

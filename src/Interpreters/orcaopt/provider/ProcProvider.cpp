@@ -107,13 +107,13 @@ std::pair<Oid, PGProcPtr> ProcProvider::PROC_INT42PL = std::pair<Oid, PGProcPtr>
         /*prorettype*/ .prorettype = Oid(23),
         /*proargtypes*/ .proargtypes = {Oid(23), Oid(21)}}));
 
-ProcProvider::ProcProvider()
-{
-	oid_proc_map.insert(PROC_INT2PL);
-	oid_proc_map.insert(PROC_INT4PL);
-	oid_proc_map.insert(PROC_INT24PL);
-	oid_proc_map.insert(PROC_INT42PL);
-};
+// ProcProvider::ProcProvider()
+// {
+// 	oid_proc_map.insert(PROC_INT2PL);
+// 	oid_proc_map.insert(PROC_INT4PL);
+// 	oid_proc_map.insert(PROC_INT24PL);
+// 	oid_proc_map.insert(PROC_INT42PL);
+// };
 
 PGProcPtr ProcProvider::getProcByOid(Oid oid) const
 {

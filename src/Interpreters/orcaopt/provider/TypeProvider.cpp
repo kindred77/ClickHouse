@@ -18,22 +18,22 @@ namespace DB
 int TypeProvider::TYPE_OID_ID = 3;
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FLOAT32
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(700),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(700),
            /*typname*/ getTypeName(TypeIndex::Float32),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 4,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'N',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
-		   /*typarray*/ Oid(1),
+		   /*typelem*/ Oid(1021),
+		   /*typarray*/ Oid(0),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
 		   /*typreceive*/ Oid(1),
@@ -50,21 +50,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FLOAT32
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FLOAT64
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(701),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(701),
            /*typname*/ getTypeName(TypeIndex::Float64),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 8,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'N',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1022),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -82,21 +82,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FLOAT64
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_BOOLEAN
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(16),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(16),
            /*typname*/ getTypeName(TypeIndex::Int8),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 1,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'B',
 		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1000),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -116,19 +116,19 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_BOOLEAN
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT8
     = {Oid(++TypeProvider::TYPE_OID_ID),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(++TypeProvider::TYPE_OID_ID),
            /*typname*/ getTypeName(TypeIndex::UInt8),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 1,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'S',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1002),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -148,19 +148,19 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT8
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT16
     = {Oid(++TypeProvider::TYPE_OID_ID),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(++TypeProvider::TYPE_OID_ID),
            /*typname*/ getTypeName(TypeIndex::UInt16),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 2,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'N',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1005),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -180,19 +180,19 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT16
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT32
     = {Oid(++TypeProvider::TYPE_OID_ID),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(++TypeProvider::TYPE_OID_ID),
            /*typname*/ getTypeName(TypeIndex::UInt32),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 4,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'N',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1007),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -212,19 +212,19 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT32
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT64
     = {Oid(++TypeProvider::TYPE_OID_ID),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(++TypeProvider::TYPE_OID_ID),
            /*typname*/ getTypeName(TypeIndex::UInt64),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 8,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'N',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1016),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -251,10 +251,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT128
 		   /*typlen*/ 16,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -283,10 +283,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT256
 		   /*typlen*/ 32,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -306,21 +306,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT256
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT8
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(18),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(18),
            /*typname*/ getTypeName(TypeIndex::Int8),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 1,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'S',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1002),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -338,21 +338,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT8
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT16
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(21),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(21),
            /*typname*/ getTypeName(TypeIndex::Int16),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 2,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'N',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1005),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -370,21 +370,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT16
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT32
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(23),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(23),
            /*typname*/ getTypeName(TypeIndex::Int32),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 4,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'N',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1007),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -402,21 +402,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT32
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT64
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(20),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(20),
            /*typname*/ getTypeName(TypeIndex::Int64),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 8,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'N',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1016),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -443,10 +443,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT128
 		   /*typlen*/ 16,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -475,10 +475,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT256
 		   /*typlen*/ 32,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -498,21 +498,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT256
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_STRING
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(25),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(25),
            /*typname*/ getTypeName(TypeIndex::String),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
-		   /*typlen*/ 32,
-		   /*typbyval*/ true,
+		   /*typlen*/ -1,
+		   /*typbyval*/ false,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'S',
 		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1009),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -530,21 +530,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_STRING
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FIXEDSTRING
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(1024),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(1024),
            /*typname*/ getTypeName(TypeIndex::FixedString),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
-		   /*typlen*/ 32,
-		   /*typbyval*/ true,
+		   /*typlen*/ -1,
+		   /*typbyval*/ false,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
-		   /*typispreferred*/ true,
-		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typcategory*/ 'S',
+		   /*typispreferred*/ false,
+		   /*typisdefined*/ true,
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1014),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -562,21 +562,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FIXEDSTRING
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATE
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(1082),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(1082),
            /*typname*/ getTypeName(TypeIndex::Date),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 4,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'D',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1182),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -594,21 +594,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATE
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATETIME
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(1114),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(1114),
            /*typname*/ getTypeName(TypeIndex::DateTime),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
-		   /*typlen*/ 4,
+		   /*typlen*/ 8,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'D',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1115),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -626,21 +626,21 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATETIME
 		   /*typcollation*/ Oid(1)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATETIME64
-    = {Oid(++TypeProvider::TYPE_OID_ID),
+    = {Oid(1184),
        std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ Oid(TypeProvider::TYPE_OID_ID),
+           /*oid*/ Oid(1184),
            /*typname*/ getTypeName(TypeIndex::DateTime64),
 		   /*typnamespace*/ Oid(1),
 		   /*typowner*/ Oid(1),
 		   /*typlen*/ 8,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'D',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
-		   /*typelem*/ Oid(1),
+		   /*typelem*/ Oid(1185),
 		   /*typarray*/ Oid(1),
 		   /*typinput*/ Oid(1),
 		   /*typoutput*/ Oid(1),
@@ -667,10 +667,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_ARRAY
 		   /*typlen*/ 32,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -699,10 +699,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_TUPLE
 		   /*typlen*/ 32,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -731,10 +731,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DECIMAL32
 		   /*typlen*/ 4,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -763,10 +763,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DECIMAL64
 		   /*typlen*/ 8,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -795,10 +795,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DECIMAL128
 		   /*typlen*/ 16,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -827,10 +827,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DECIMAL256
 		   /*typlen*/ 32,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -859,10 +859,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_AGGFUNCSTATE
 		   /*typlen*/ 32,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -891,10 +891,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_MAP
 		   /*typlen*/ 32,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -923,10 +923,10 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UUID
 		   /*typlen*/ 32,
 		   /*typbyval*/ true,
 		   /*typtype*/ 'b',
-		   /*typcategory*/ '',
+		   /*typcategory*/ 'A',
 		   /*typispreferred*/ true,
 		   /*typisdefined*/ false,
-		   /*typdelim*/ '',
+		   /*typdelim*/ ',',
 		   /*typrelid*/ Oid(0),
 		   /*typelem*/ Oid(1),
 		   /*typarray*/ Oid(1),
@@ -957,38 +957,38 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UUID
 // 	return mdname;
 // }
 
-TypeProvider::TypeProvider()
-{
-	oid_types_map.insert(TYPE_FLOAT32);
-	oid_types_map.insert(TYPE_FLOAT64);
-	oid_types_map.insert(TYPE_BOOLEAN);
-	oid_types_map.insert(TYPE_UINT8);
-	oid_types_map.insert(TYPE_UINT16);
-	oid_types_map.insert(TYPE_UINT32);
-	oid_types_map.insert(TYPE_UINT64);
-	oid_types_map.insert(TYPE_UINT128);
-	oid_types_map.insert(TYPE_UINT256);
-	oid_types_map.insert(TYPE_INT8);
-	oid_types_map.insert(TYPE_INT16);
-	oid_types_map.insert(TYPE_INT32);
-	oid_types_map.insert(TYPE_INT64);
-	oid_types_map.insert(TYPE_INT128);
-	oid_types_map.insert(TYPE_INT256);
-	oid_types_map.insert(TYPE_STRING);
-	oid_types_map.insert(TYPE_FIXEDSTRING);
-	oid_types_map.insert(TYPE_DATE);
-	oid_types_map.insert(TYPE_DATETIME);
-	oid_types_map.insert(TYPE_DATETIME64);
-	oid_types_map.insert(TYPE_ARRAY);
-	oid_types_map.insert(TYPE_TUPLE);
-	oid_types_map.insert(TYPE_DECIMAL32);
-	oid_types_map.insert(TYPE_DECIMAL64);
-	oid_types_map.insert(TYPE_DECIMAL128);
-	oid_types_map.insert(TYPE_DECIMAL256);
-	oid_types_map.insert(TYPE_AGGFUNCSTATE);
-	oid_types_map.insert(TYPE_MAP);
-	oid_types_map.insert(TYPE_UUID);
-};
+// TypeProvider::TypeProvider()
+// {
+// 	oid_types_map.insert(TYPE_FLOAT32);
+// 	oid_types_map.insert(TYPE_FLOAT64);
+// 	oid_types_map.insert(TYPE_BOOLEAN);
+// 	oid_types_map.insert(TYPE_UINT8);
+// 	oid_types_map.insert(TYPE_UINT16);
+// 	oid_types_map.insert(TYPE_UINT32);
+// 	oid_types_map.insert(TYPE_UINT64);
+// 	oid_types_map.insert(TYPE_UINT128);
+// 	oid_types_map.insert(TYPE_UINT256);
+// 	oid_types_map.insert(TYPE_INT8);
+// 	oid_types_map.insert(TYPE_INT16);
+// 	oid_types_map.insert(TYPE_INT32);
+// 	oid_types_map.insert(TYPE_INT64);
+// 	oid_types_map.insert(TYPE_INT128);
+// 	oid_types_map.insert(TYPE_INT256);
+// 	oid_types_map.insert(TYPE_STRING);
+// 	oid_types_map.insert(TYPE_FIXEDSTRING);
+// 	oid_types_map.insert(TYPE_DATE);
+// 	oid_types_map.insert(TYPE_DATETIME);
+// 	oid_types_map.insert(TYPE_DATETIME64);
+// 	oid_types_map.insert(TYPE_ARRAY);
+// 	oid_types_map.insert(TYPE_TUPLE);
+// 	oid_types_map.insert(TYPE_DECIMAL32);
+// 	oid_types_map.insert(TYPE_DECIMAL64);
+// 	oid_types_map.insert(TYPE_DECIMAL128);
+// 	oid_types_map.insert(TYPE_DECIMAL256);
+// 	oid_types_map.insert(TYPE_AGGFUNCSTATE);
+// 	oid_types_map.insert(TYPE_MAP);
+// 	oid_types_map.insert(TYPE_UUID);
+// };
 
 // IMDTypePtr
 // TypeProvider::getTypeByOID(OID oid)
