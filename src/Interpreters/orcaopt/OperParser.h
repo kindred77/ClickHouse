@@ -11,12 +11,12 @@ class OperProvider;
 class TypeProvider;
 class ProcProvider;
 
-using FuncParserPtr = std::unique_ptr<FuncParser>;
-using NodeParserPtr = std::unique_ptr<NodeParser>;
-using CoerceParserPtr = std::unique_ptr<CoerceParser>;
-using OperProviderPtr = std::unique_ptr<OperProvider>;
-using TypeProviderPtr = std::unique_ptr<TypeProvider>;
-using ProcProviderPtr = std::unique_ptr<ProcProvider>;
+using FuncParserPtr = std::shared_ptr<FuncParser>;
+using NodeParserPtr = std::shared_ptr<NodeParser>;
+using CoerceParserPtr = std::shared_ptr<CoerceParser>;
+using OperProviderPtr = std::shared_ptr<OperProvider>;
+using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 
 class OperParser
 {

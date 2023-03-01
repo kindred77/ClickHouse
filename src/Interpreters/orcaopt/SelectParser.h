@@ -13,15 +13,15 @@ class CTEParser;
 class FuncParser;
 class AggParser;
 class RelationProvider;
-using ClauseParserPtr = std::unique_ptr<ClauseParser>;
-using TargetParserPtr = std::unique_ptr<TargetParser>;
-using CoerceParserPtr = std::unique_ptr<CoerceParser>;
-using NodeParserPtr = std::unique_ptr<NodeParser>;
-using RelationParserPtr = std::unique_ptr<RelationParser>;
-using CTEParserPtr = std::unique_ptr<CTEParser>;
-using FuncParserPtr = std::unique_ptr<FuncParser>;
-using AggParserPtr = std::unique_ptr<AggParser>;
-using RelationProviderPtr = std::unique_ptr<RelationProvider>;
+using ClauseParserPtr = std::shared_ptr<ClauseParser>;
+using TargetParserPtr = std::shared_ptr<TargetParser>;
+using CoerceParserPtr = std::shared_ptr<CoerceParser>;
+using NodeParserPtr = std::shared_ptr<NodeParser>;
+using RelationParserPtr = std::shared_ptr<RelationParser>;
+using CTEParserPtr = std::shared_ptr<CTEParser>;
+using FuncParserPtr = std::shared_ptr<FuncParser>;
+using AggParserPtr = std::shared_ptr<AggParser>;
+using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
 class SelectParser
 {

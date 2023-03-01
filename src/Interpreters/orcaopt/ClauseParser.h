@@ -16,16 +16,16 @@ class TypeParser;
 class OperProvider;
 class FunctionProvider;
 
-using RelationParserPtr = std::unique_ptr<RelationParser>;
-using SelectParserPtr = std::unique_ptr<SelectParser>;
-using CoerceParserPtr = std::unique_ptr<CoerceParser>;
-using ExprParserPtr = std::unique_ptr<ExprParser>;
-using TargetParserPtr = std::unique_ptr<TargetParser>;
-using OperParserPtr = std::unique_ptr<OperParser>;
-using NodeParserPtr = std::unique_ptr<NodeParser>;
-using TypeParserPtr = std::unique_ptr<TypeParser>;
-using OperProviderPtr = std::unique_ptr<OperProvider>;
-using FunctionProviderPtr = std::unique_ptr<FunctionProvider>;
+using RelationParserPtr = std::shared_ptr<RelationParser>;
+using SelectParserPtr = std::shared_ptr<SelectParser>;
+using CoerceParserPtr = std::shared_ptr<CoerceParser>;
+using ExprParserPtr = std::shared_ptr<ExprParser>;
+using TargetParserPtr = std::shared_ptr<TargetParser>;
+using OperParserPtr = std::shared_ptr<OperParser>;
+using NodeParserPtr = std::shared_ptr<NodeParser>;
+using TypeParserPtr = std::shared_ptr<TypeParser>;
+using OperProviderPtr = std::shared_ptr<OperProvider>;
+using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
 class ClauseParser
 {

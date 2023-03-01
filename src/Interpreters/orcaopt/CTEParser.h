@@ -10,10 +10,10 @@ class NodeParser;
 class SelectParser;
 class TypeParser;
 
-using RelationParserPtr = std::unique_ptr<RelationParser>;
-using NodeParserPtr = std::unique_ptr<NodeParser>;
-using SelectParserPtr = std::unique_ptr<SelectParser>;
-using TypeParserPtr = std::unique_ptr<TypeParser>;
+using RelationParserPtr = std::shared_ptr<RelationParser>;
+using NodeParserPtr = std::shared_ptr<NodeParser>;
+using SelectParserPtr = std::shared_ptr<SelectParser>;
+using TypeParserPtr = std::shared_ptr<TypeParser>;
 
 class CTEParser
 {

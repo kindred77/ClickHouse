@@ -26,9 +26,9 @@ class ClauseParser;
 class NodeParser;
 class ExprParser;
 
-using ClauseParserPtr = std::unique_ptr<ClauseParser>;
-using NodeParserPtr = std::unique_ptr<NodeParser>;
-using ExprParserPtr = std::unique_ptr<ExprParser>;
+using ClauseParserPtr = std::shared_ptr<ClauseParser>;
+using NodeParserPtr = std::shared_ptr<NodeParser>;
+using ExprParserPtr = std::shared_ptr<ExprParser>;
 
 class AggParser
 {

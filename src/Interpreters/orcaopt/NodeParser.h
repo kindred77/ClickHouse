@@ -9,10 +9,10 @@ class ExprParser;
 class RelationParser;
 class TypeProvider;
 
-using CoerceParserPtr = std::unique_ptr<CoerceParser>;
-using ExprParserPtr = std::unique_ptr<ExprParser>;
-using RelationParserPtr = std::unique_ptr<RelationParser>;
-using TypeProviderPtr = std::unique_ptr<TypeProvider>;
+using CoerceParserPtr = std::shared_ptr<CoerceParser>;
+using ExprParserPtr = std::shared_ptr<ExprParser>;
+using RelationParserPtr = std::shared_ptr<RelationParser>;
+using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 
 class NodeParser
 {

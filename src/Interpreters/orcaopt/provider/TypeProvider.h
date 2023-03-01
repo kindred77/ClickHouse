@@ -16,15 +16,15 @@ namespace DB
 class FunctionProvider;
 class TypeParser;
 using IMDTypePtr = std::shared_ptr<const gpmd::IMDType>;
-using FunctionProviderPtr = std::unique_ptr<FunctionProvider>;
-using TypeParserPtr = std::unique_ptr<TypeParser>;
+using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
+using TypeParserPtr = std::shared_ptr<TypeParser>;
 
 class TypeProvider
 {
 public:
 	//explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	explicit TypeProvider();
-	static void Init();
+	//static void Init();
 	//IMDTypePtr getTypeByOID(Oid oid);
 	PGTypePtr getTypeByOid(Oid oid) const;
 	//IMDTypePtr getType(Field::Types::Which which);

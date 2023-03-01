@@ -42,13 +42,13 @@ class ClassProvider;
 class ProcProvider;
 class CastProvider;
 
-using RelationParserPtr = std::unique_ptr<RelationParser>;
-using TypeParserPtr = std::unique_ptr<TypeParser>;
-using NodeParserPtr = std::unique_ptr<NodeParser>;
-using TypeProviderPtr = std::unique_ptr<TypeProvider>;
-using ClassProviderPtr = std::unique_ptr<ClassProvider>;
-using ProcProviderPtr = std::unique_ptr<ProcProvider>;
-using CastProviderPtr = std::unique_ptr<CastProvider>;
+using RelationParserPtr = std::shared_ptr<RelationParser>;
+using TypeParserPtr = std::shared_ptr<TypeParser>;
+using NodeParserPtr = std::shared_ptr<NodeParser>;
+using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+using ClassProviderPtr = std::shared_ptr<ClassProvider>;
+using ProcProviderPtr = std::shared_ptr<ProcProvider>;
+using CastProviderPtr = std::shared_ptr<CastProvider>;
 
 class CoerceParser
 {

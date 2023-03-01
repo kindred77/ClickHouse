@@ -957,7 +957,7 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UUID
 // 	return mdname;
 // }
 
-void TypeProvider::Init()
+TypeProvider::TypeProvider()
 {
 	oid_types_map.insert(TYPE_FLOAT32);
 	oid_types_map.insert(TYPE_FLOAT64);

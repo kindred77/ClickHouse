@@ -18,18 +18,18 @@ class ProcProvider;
 class AggProvider;
 class FunctionProvider;
 
-using RelationParserPtr = std::unique_ptr<RelationParser>;
-using CoerceParserPtr = std::unique_ptr<CoerceParser>;
-using ExprParserPtr = std::unique_ptr<ExprParser>;
-using TargetParserPtr = std::unique_ptr<TargetParser>;
-using NodeParserPtr = std::unique_ptr<NodeParser>;
-using TypeParserPtr = std::unique_ptr<TypeParser>;
-using AggParserPtr = std::unique_ptr<AggParser>;
-using ClauseParserPtr = std::unique_ptr<ClauseParser>;
-using TypeProviderPtr = std::unique_ptr<TypeProvider>;
-using ProcProviderPtr = std::unique_ptr<ProcProvider>;
-using AggProviderPtr = std::unique_ptr<AggProvider>;
-using FunctionProviderPtr = std::unique_ptr<FunctionProvider>;
+using RelationParserPtr = std::shared_ptr<RelationParser>;
+using CoerceParserPtr = std::shared_ptr<CoerceParser>;
+using ExprParserPtr = std::shared_ptr<ExprParser>;
+using TargetParserPtr = std::shared_ptr<TargetParser>;
+using NodeParserPtr = std::shared_ptr<NodeParser>;
+using TypeParserPtr = std::shared_ptr<TypeParser>;
+using AggParserPtr = std::shared_ptr<AggParser>;
+using ClauseParserPtr = std::shared_ptr<ClauseParser>;
+using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+using ProcProviderPtr = std::shared_ptr<ProcProvider>;
+using AggProviderPtr = std::shared_ptr<AggProvider>;
+using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
 class FuncParser
 {
