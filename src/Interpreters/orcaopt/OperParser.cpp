@@ -12,6 +12,16 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+OperParser::OperParser()
+{
+    func_parser = std::make_shared<FuncParser>();
+	node_parser = std::make_shared<NodeParser>();
+	coerce_parser = std::make_shared<CoerceParser>();
+	oper_provider = std::make_shared<OperProvider>();
+	type_provider = std::make_shared<TypeProvider>();
+	proc_provider = std::make_shared<ProcProvider>();
+};
+
 Oid OperParser::compatible_oper_opid(PGList * op, Oid arg1, Oid arg2, bool noError)
 {
     PGOperatorPtr optup;

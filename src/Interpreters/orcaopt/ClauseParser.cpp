@@ -29,6 +29,20 @@ using PGOperatorPtr = std::shared_ptr<Form_pg_operator>;
 namespace DB
 {
 
+ClauseParser::ClauseParser()
+{
+	relation_parser = std::make_shared<RelationParser>();
+	select_parser = std::make_shared<SelectParser>();
+	coerce_parser = std::make_shared<CoerceParser>();
+	expr_parser = std::make_shared<ExprParser>();
+	target_parser = std::make_shared<TargetParser>();
+	oper_parser = std::make_shared<OperParser>();
+	node_parser = std::make_shared<NodeParser>();
+	type_parser = std::make_shared<TypeParser>();
+	oper_provider = std::make_shared<OperProvider>();
+	function_provider = std::make_shared<FunctionProvider>();
+}
+
 PGRangeTblEntry *
 ClauseParser::transformTableEntry(PGParseState *pstate, PGRangeVar *r)
 {

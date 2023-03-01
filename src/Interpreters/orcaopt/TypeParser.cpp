@@ -21,6 +21,15 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+TypeParser::TypeParser()
+{
+    relation_parser = std::make_shared<RelationParser>();
+    node_parser = std::make_shared<NodeParser>();
+    type_provider = std::make_shared<TypeProvider>();
+    relation_provider = std::make_shared<RelationProvider>();
+    function_provider = std::make_shared<FunctionProvider>();
+};
+
 void
 TypeParser::typenameTypeIdAndMod(PGParseState *pstate, const PGTypeName *typeName,
 					 Oid *typeid_p, int32 *typmod_p)

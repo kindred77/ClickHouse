@@ -15,6 +15,17 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+CoerceParser::CoerceParser()
+{
+	relation_parser = std::make_shared<RelationParser>();
+	node_parser = std::make_shared<NodeParser>();
+	type_parser = std::make_shared<TypeParser>();
+	type_provider = std::make_shared<TypeProvider>();
+	class_provider = std::make_shared<ClassProvider>();
+	proc_provider = std::make_shared<ProcProvider>();
+	cast_provider = std::make_shared<CastProvider>();
+};
+
 Oid
 CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char *context,
 				   PGNode **which_expr)

@@ -18,6 +18,16 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+TargetParser::TargetParser()
+{
+	relation_parser = std::make_shared<RelationParser>();
+    expr_parser = std::make_shared<ExprParser>();
+    node_parser = std::make_shared<NodeParser>();
+    coerce_parser = std::make_shared<CoerceParser>();
+    type_provider = std::make_shared<TypeProvider>();
+    relation_provider = std::make_shared<RelationProvider>();
+};
+
 int
 TargetParser::FigureColnameInternal(PGNode *node, std::string & name)
 {

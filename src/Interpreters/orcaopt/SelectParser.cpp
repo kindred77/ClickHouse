@@ -27,6 +27,19 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+SelectParser::SelectParser()
+{
+    clause_parser = std::make_shared<ClauseParser>();
+    target_parser = std::make_shared<TargetParser>();
+    coerce_parser = std::make_shared<CoerceParser>();
+    node_parser = std::make_shared<NodeParser>();
+    relation_parser = std::make_shared<RelationParser>();
+    cte_parser = std::make_shared<CTEParser>();
+    agg_parser = std::make_shared<AggParser>();
+    func_parser = std::make_shared<FuncParser>();
+    relation_provider = std::make_shared<RelationProvider>();
+};
+
 void
 SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 					 PGVar *var, int levelsup)

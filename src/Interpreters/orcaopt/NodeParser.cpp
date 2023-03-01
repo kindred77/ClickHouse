@@ -21,6 +21,14 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+NodeParser::NodeParser()
+{
+	coerce_parser = std::make_shared<CoerceParser>();
+	expr_parser = std::make_shared<ExprParser>();
+	relation_parser = std::make_shared<RelationParser>();
+	type_provider = std::make_shared<TypeProvider>();
+};
+
 Oid NodeParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
 {
     Oid origArrayType = *arrayType;

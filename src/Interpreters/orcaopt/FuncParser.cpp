@@ -24,6 +24,22 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+FuncParser::FuncParser()
+{
+    coerce_parser = std::make_shared<CoerceParser>();
+    agg_parser = std::make_shared<AggParser>();
+    clause_parser = std::make_shared<ClauseParser>();
+    node_parser = std::make_shared<NodeParser>();
+    type_parser = std::make_shared<TypeParser>();
+    relation_parser = std::make_shared<RelationParser>();
+	target_parser = std::make_shared<TargetParser>();
+    expr_parser = std::make_shared<ExprParser>();
+	type_provider = std::make_shared<TypeProvider>();
+	proc_provider = std::make_shared<ProcProvider>();
+	agg_provider = std::make_shared<AggProvider>();
+	func_provider = std::make_shared<FunctionProvider>();
+};
+
 PGNode *
 FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, PGNode *first_arg,
 					   int location)

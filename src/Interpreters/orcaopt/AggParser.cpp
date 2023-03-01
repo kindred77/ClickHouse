@@ -129,6 +129,13 @@ check_agg_arguments_walker(PGNode *node,
 								  (void *) context);
 };
 
+AggParser::AggParser()
+{
+	clause_parser = std::make_shared<ClauseParser>();
+	node_parser = std::make_shared<NodeParser>();
+	expr_parser = std::make_shared<ExprParser>();
+};
+
 int
 AggParser::check_agg_arguments(PGParseState *pstate,
 					PGList *directargs,

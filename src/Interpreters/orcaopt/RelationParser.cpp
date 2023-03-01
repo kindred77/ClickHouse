@@ -21,6 +21,17 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
+RelationParser::RelationParser()
+{
+	coerce_parser = std::make_shared<CoerceParser>();
+	node_parser = std::make_shared<NodeParser>();
+	type_parser = std::make_shared<TypeParser>();
+
+	relation_provider = std::make_shared<RelationProvider>();
+	type_provider = std::make_shared<TypeProvider>();
+	function_provider = std::make_shared<FunctionProvider>();
+};
+
 PGCommonTableExpr *
 RelationParser::scanNameSpaceForCTE(PGParseState *pstate, const char *refname,
 					Index *ctelevelsup)
