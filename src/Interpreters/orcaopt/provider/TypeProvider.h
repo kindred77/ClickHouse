@@ -23,7 +23,8 @@ class TypeProvider
 {
 public:
 	//explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit TypeProvider() = default;
+	explicit TypeProvider();
+	static void Init();
 	//IMDTypePtr getTypeByOID(Oid oid);
 	PGTypePtr getTypeByOid(Oid oid) const;
 	//IMDTypePtr getType(Field::Types::Which which);
