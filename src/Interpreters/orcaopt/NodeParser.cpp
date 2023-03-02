@@ -67,7 +67,7 @@ Oid NodeParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
         ereport(
             ERROR,
             (errcode(ERRCODE_DATATYPE_MISMATCH),
-             errmsg("cannot subscript type %s because it is not an array", type_provider->format_type_be(origArrayType))));
+             errmsg("cannot subscript type %s because it is not an array", type_provider->format_type_be(origArrayType).c_str())));
 
 
     return elementType;
@@ -193,8 +193,8 @@ PGArrayRef * NodeParser::transformArraySubscripts(
                  errmsg(
                      "array assignment requires type %s"
                      " but expression is of type %s",
-                     type_provider->format_type_be(typeneeded),
-                     type_provider->format_type_be(typesource)),
+                     type_provider->format_type_be(typeneeded).c_str(),
+                     type_provider->format_type_be(typesource).c_str()),
                  errhint("You will need to rewrite or cast the expression."),
                  parser_errposition(pstate, exprLocation(assignFrom))));
         assignFrom = newFrom;

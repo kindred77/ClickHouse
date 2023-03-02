@@ -2,7 +2,7 @@
 #include <Interpreters/orcaopt/RelationParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/SelectParser.h>
-#include <Interpreters/orcaopt/TypeParser.h>
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
 
 using namespace duckdb_libpgquery;
 
@@ -14,7 +14,7 @@ CTEParser::CTEParser()
 	relation_parser = std::make_shared<RelationParser>();
 	node_parser = std::make_shared<NodeParser>();
 	select_parser = std::make_shared<SelectParser>();
-	type_parser = std::make_shared<TypeParser>();
+	type_provider = std::make_shared<TypeProvider>();
 };
 
 void CTEParser::analyzeCTETargetList(PGParseState * pstate, PGCommonTableExpr * cte, PGList * tlist)
@@ -166,8 +166,8 @@ void CTEParser::analyzeCTE(PGParseState * pstate, PGCommonTableExpr * cte)
                          "recursive query \"%s\" column %d has type %s in non-recursive term but type %s overall",
                          cte->ctename,
                          varattno,
-                         type_parser->format_type_with_typemod(lfirst_oid(lctyp), lfirst_int(lctypmod)).c_str(),
-                         type_parser->format_type_with_typemod(exprType(texpr), exprTypmod(texpr)).c_str()),
+                         type_provider->format_type_with_typemod(lfirst_oid(lctyp), lfirst_int(lctypmod)).c_str(),
+                         type_provider->format_type_with_typemod(exprType(texpr), exprTypmod(texpr)).c_str()),
                      errhint("Cast the output of the non-recursive term to the correct type."),
                      parser_errposition(pstate, exprLocation(texpr))));
             if (exprCollation(texpr) != lfirst_oid(lccoll))

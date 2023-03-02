@@ -1467,7 +1467,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
             ereport(
                 ERROR,
                 (errcode(ERRCODE_UNDEFINED_OBJECT),
-                 errmsg("could not find array type for data type %s", type_provider->format_type_be(newa->element_typeid)),
+                 errmsg("could not find array type for data type %s", type_provider->format_type_be(newa->element_typeid).c_str()),
                  parser_errposition(pstate, exprLocation((PGNode *)vargs))));
         /* array_collid will be set by parse_collate.c */
         newa->multidims = false;

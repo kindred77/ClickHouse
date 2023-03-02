@@ -99,14 +99,14 @@ void OperParser::get_sort_group_operators(
     if ((needLT && !OidIsValid(lt_opr)) || (needGT && !OidIsValid(gt_opr)))
         ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("could not identify an ordering operator for type %s"/* ,
-						format_type_be(argtype) */),
+				 errmsg("could not identify an ordering operator for type %s" ,
+						type_provider->format_type_be(argtype).c_str()),
 				 errhint("Use an explicit ordering operator or modify the query.")));
     if (needEQ && !OidIsValid(eq_opr))
         ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("could not identify an equality operator for type %s"/* ,
-						format_type_be(argtype) */)));
+				 errmsg("could not identify an equality operator for type %s" ,
+						type_provider->format_type_be(argtype).c_str())));
 
     /* Return results as needed */
     if (ltOpr)
@@ -425,7 +425,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
             ereport(
                 ERROR,
                 (errcode(ERRCODE_UNDEFINED_OBJECT),
-                 errmsg("could not find array type for data type %s", type_provider->format_type_be(declared_arg_types[1]))));
+                 errmsg("could not find array type for data type %s", type_provider->format_type_be(declared_arg_types[1]).c_str())));
         }
     }
     actual_arg_types[1] = atypeId;

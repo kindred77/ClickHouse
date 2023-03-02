@@ -8,12 +8,12 @@ namespace DB
 class RelationParser;
 class NodeParser;
 class SelectParser;
-class TypeParser;
+class TypeProvider;
 
 using RelationParserPtr = std::shared_ptr<RelationParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
 using SelectParserPtr = std::shared_ptr<SelectParser>;
-using TypeParserPtr = std::shared_ptr<TypeParser>;
+using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 
 class CTEParser
 {
@@ -21,7 +21,7 @@ private:
 	RelationParserPtr relation_parser;
 	NodeParserPtr node_parser;
 	SelectParserPtr select_parser;
-	TypeParserPtr type_parser;
+	TypeProviderPtr type_provider;
 public:
 	explicit CTEParser();
 

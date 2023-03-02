@@ -1,6 +1,8 @@
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
-#include <Interpreters/orcaopt/provider/FunctionProvider.h>
+
 #include <Interpreters/orcaopt/TypeParser.h>
+#include <Interpreters/orcaopt/provider/FunctionProvider.h>
+#include <Interpreters/orcaopt/provider/RelationProvider.h>
 
 #include "naucrates/dxl/CDXLUtils.h"
 
@@ -959,42 +961,42 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UUID
 
 TypeProvider::TypeProvider()
 {
-	oid_types_map.insert(TYPE_FLOAT32);
-	oid_types_map.insert(TYPE_FLOAT64);
-	oid_types_map.insert(TYPE_BOOLEAN);
-	oid_types_map.insert(TYPE_UINT8);
-	oid_types_map.insert(TYPE_UINT16);
-	oid_types_map.insert(TYPE_UINT32);
-	oid_types_map.insert(TYPE_UINT64);
-	oid_types_map.insert(TYPE_UINT128);
-	oid_types_map.insert(TYPE_UINT256);
-	oid_types_map.insert(TYPE_INT8);
-	oid_types_map.insert(TYPE_INT16);
-	oid_types_map.insert(TYPE_INT32);
-	oid_types_map.insert(TYPE_INT64);
-	oid_types_map.insert(TYPE_INT128);
-	oid_types_map.insert(TYPE_INT256);
-	oid_types_map.insert(TYPE_STRING);
-	oid_types_map.insert(TYPE_FIXEDSTRING);
-	oid_types_map.insert(TYPE_DATE);
-	oid_types_map.insert(TYPE_DATETIME);
-	oid_types_map.insert(TYPE_DATETIME64);
-	oid_types_map.insert(TYPE_ARRAY);
-	oid_types_map.insert(TYPE_TUPLE);
-	oid_types_map.insert(TYPE_DECIMAL32);
-	oid_types_map.insert(TYPE_DECIMAL64);
-	oid_types_map.insert(TYPE_DECIMAL128);
-	oid_types_map.insert(TYPE_DECIMAL256);
-	oid_types_map.insert(TYPE_AGGFUNCSTATE);
-	oid_types_map.insert(TYPE_MAP);
-	oid_types_map.insert(TYPE_UUID);
+	oid_type_map.insert(TYPE_FLOAT32);
+	oid_type_map.insert(TYPE_FLOAT64);
+	oid_type_map.insert(TYPE_BOOLEAN);
+	oid_type_map.insert(TYPE_UINT8);
+	oid_type_map.insert(TYPE_UINT16);
+	oid_type_map.insert(TYPE_UINT32);
+	oid_type_map.insert(TYPE_UINT64);
+	oid_type_map.insert(TYPE_UINT128);
+	oid_type_map.insert(TYPE_UINT256);
+	oid_type_map.insert(TYPE_INT8);
+	oid_type_map.insert(TYPE_INT16);
+	oid_type_map.insert(TYPE_INT32);
+	oid_type_map.insert(TYPE_INT64);
+	oid_type_map.insert(TYPE_INT128);
+	oid_type_map.insert(TYPE_INT256);
+	oid_type_map.insert(TYPE_STRING);
+	oid_type_map.insert(TYPE_FIXEDSTRING);
+	oid_type_map.insert(TYPE_DATE);
+	oid_type_map.insert(TYPE_DATETIME);
+	oid_type_map.insert(TYPE_DATETIME64);
+	oid_type_map.insert(TYPE_ARRAY);
+	oid_type_map.insert(TYPE_TUPLE);
+	oid_type_map.insert(TYPE_DECIMAL32);
+	oid_type_map.insert(TYPE_DECIMAL64);
+	oid_type_map.insert(TYPE_DECIMAL128);
+	oid_type_map.insert(TYPE_DECIMAL256);
+	oid_type_map.insert(TYPE_AGGFUNCSTATE);
+	oid_type_map.insert(TYPE_MAP);
+	oid_type_map.insert(TYPE_UUID);
 };
 
 // IMDTypePtr
 // TypeProvider::getTypeByOID(OID oid)
 // {
-// 	auto it = oid_types_map.find(oid);
-// 	if (it == oid_types_map.end())
+// 	auto it = oid_type_map.find(oid);
+// 	if (it == oid_type_map.end())
 // 	    return {};
 // 	return it->second;
 // }
@@ -1056,8 +1058,10 @@ TypeProvider::TypeProvider()
 
 PGTypePtr TypeProvider::getTypeByOid(Oid oid) const
 {
-	//TODO kindred
-	return std::make_shared<Form_pg_type>();
+	auto it = oid_type_map.find(oid);
+	if (it == oid_type_map.end())
+	    return nullptr;
+	return it->second;
 };
 
 /*
@@ -1089,9 +1093,10 @@ Oid TypeProvider::getBaseTypeAndTypmod(Oid typid, int32 * typmod)
     for (;;)
     {
 		PGTypePtr tup = getTypeByOid(typid);
-		if (tup == NULL)
+		if (tup == nullptr)
 		{
-			//elog(ERROR, "cache lookup failed for type %u", typid);
+			elog(ERROR, "Lookup failed for type %u", typid);
+			return InvalidOid;
 		}
 
 		if (tup->typtype != TYPTYPE_DOMAIN)
@@ -1119,20 +1124,21 @@ void TypeProvider::get_type_category_preferred(Oid typid, char * typcategory, bo
 	PGTypePtr tup = getTypeByOid(typid);
 	if (tup == NULL)
 	{
-		//elog(ERROR, "cache lookup failed for type %u", typid);
+		elog(ERROR, "Lookup failed for type %u", typid);
+		return;
 	}
 	*typcategory = tup->typcategory;
     *typispreferred = tup->typispreferred;
 };
 
-char * TypeProvider::format_type_be(Oid type_oid)
+std::string TypeProvider::format_type_be(Oid type_oid)
 {
     return format_type_internal(type_oid, -1, false, false, false);
 };
 
-char * TypeProvider::printTypmod(const char * typname, int32 typmod, Oid typmodout)
+std::string TypeProvider::printTypmod(const char * typname, int32 typmod, Oid typmodout)
 {
-    char * res;
+    std::string res = "";
 
     /* Shouldn't be called if typmod is -1 */
     Assert(typmod >= 0)
@@ -1140,15 +1146,17 @@ char * TypeProvider::printTypmod(const char * typname, int32 typmod, Oid typmodo
     if (typmodout == InvalidOid)
     {
         /* Default behavior: just print the integer typmod with parens */
-        res = psprintf("%s(%d)", typname, (int)typmod);
+        //res = psprintf("%s(%d)", typname, (int)typmod);
+        res = std::string(typname) + "(" + std::to_string(typmod) + ")";
     }
     else
     {
         /* Use the type-specific typmodout procedure */
         char * tmstr;
 
-        tmstr = DatumGetCString(function_provider->OidFunctionCall1Coll(typmodout, Int32GetDatum(typmod)));
-        res = psprintf("%s%s", typname, tmstr);
+        tmstr = DatumGetCString(function_provider->OidFunctionCall1Coll(typmodout, InvalidOid, Int32GetDatum(typmod)));
+        //res = psprintf("%s%s", typname, tmstr);
+        res = std::string(typname) + std::string(tmstr);
     }
 
     return res;
@@ -1161,11 +1169,14 @@ bool TypeProvider::TypeIsVisible(Oid typid)
     //Oid typnamespace;
     bool visible = true;
 
-    // PGTypePtr typtup = getTypeByOid(typid);
-    // if (typtup == NULL)
-    //     elog(ERROR, "cache lookup failed for type %u", typid);
+    PGTypePtr typtup = getTypeByOid(typid);
+    if (typtup == nullptr)
+	{
+        elog(ERROR, "Lookup failed for type %u", typid);
+		return false;
+	}
 
-    // recomputeNamespacePath();
+    //recomputeNamespacePath();
 
     // /*
 	//  * Quick check: if it ain't in the path at all, it ain't visible. Items in
@@ -1207,208 +1218,215 @@ bool TypeProvider::TypeIsVisible(Oid typid)
     return visible;
 };
 
-char * TypeProvider::format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify)
+std::string TypeProvider::format_type_with_typemod(Oid type_oid, int32 typemod)
 {
-    // bool with_typemod = typemod_given && (typemod >= 0);
-    // PGTypePtr tuple;
-    // //Form_pg_type typeform;
-    // Oid array_base_type;
-    // bool is_array;
-    char * buf = pstrdup("");
+	return format_type_internal(type_oid, typemod, true, false, false);
+};
 
-    // if (type_oid == InvalidOid && allow_invalid)
-    //     return pstrdup("-");
+std::string TypeProvider::format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify)
+{
+    bool with_typemod = typemod_given && (typemod >= 0);
+    Oid array_base_type;
+    bool is_array;
+    std::string buf = "";
 
-    // PGTypePtr tuple = getTypeByOid(type_oid);
-    // if (tuple == NULL)
-    // {
-    //     if (allow_invalid)
-    //         return pstrdup("???");
-    //     else
-    //         elog(ERROR, "cache lookup failed for type %u", type_oid);
-    // }
+    if (type_oid == InvalidOid && allow_invalid)
+    {
+        return "-";
+    }
 
-    // /*
-	//  * Check if it's a regular (variable length) array type.  Fixed-length
-	//  * array types such as "name" shouldn't get deconstructed.  As of Postgres
-	//  * 8.1, rather than checking typlen we check the toast property, and don't
-	//  * deconstruct "plain storage" array types --- this is because we don't
-	//  * want to show oidvector as oid[].
-	//  */
-    // array_base_type = tuple->typelem;
+    PGTypePtr tuple = getTypeByOid(type_oid);
+    if (tuple == NULL)
+    {
+        if (allow_invalid)
+            return "???";
+        else
+            elog(ERROR, "Lookup failed for type %u", type_oid);
+    }
 
-    // if (array_base_type != InvalidOid && tuple->typstorage != 'p')
-    // {
-    //     /* Switch our attention to the array element type */
-    //     ReleaseSysCache(tuple);
-    //     tuple = getTypeByOid(array_base_type);
-    //     if (tuple == NULL)
-    //     {
-    //         if (allow_invalid)
-    //             return pstrdup("???[]");
-    //         else
-    //             elog(ERROR, "cache lookup failed for type %u", type_oid);
-    //     }
-    //     type_oid = array_base_type;
-    //     is_array = true;
-    // }
-    // else
-    //     is_array = false;
+    /*
+	 * Check if it's a regular (variable length) array type.  Fixed-length
+	 * array types such as "name" shouldn't get deconstructed.  As of Postgres
+	 * 8.1, rather than checking typlen we check the toast property, and don't
+	 * deconstruct "plain storage" array types --- this is because we don't
+	 * want to show oidvector as oid[].
+	 */
+    array_base_type = tuple->typelem;
 
-    // /*
-	//  * See if we want to special-case the output for certain built-in types.
-	//  * Note that these special cases should all correspond to special
-	//  * productions in gram.y, to ensure that the type name will be taken as a
-	//  * system type, not a user type of the same name.
-	//  *
-	//  * If we do not provide a special-case output here, the type name will be
-	//  * handled the same way as a user type name --- in particular, it will be
-	//  * double-quoted if it matches any lexer keyword.  This behavior is
-	//  * essential for some cases, such as types "bit" and "char".
-	//  */
-    // buf = NULL; /* flag for no special case */
+    if (array_base_type != InvalidOid && tuple->typstorage != 'p')
+    {
+        /* Switch our attention to the array element type */
+        tuple = getTypeByOid(array_base_type);
+        if (tuple == NULL)
+        {
+            if (allow_invalid)
+                return "???[]";
+            else
+                elog(ERROR, "cache lookup failed for type %u", type_oid);
+        }
+        type_oid = array_base_type;
+        is_array = true;
+    }
+    else
+        is_array = false;
 
-    // switch (type_oid)
-    // {
-    //     case BITOID:
-    //         if (with_typemod)
-    //             buf = printTypmod("bit", typemod, typeform->typmodout);
-    //         else if (typemod_given)
-    //         {
-    //             /*
-	// 			 * bit with typmod -1 is not the same as BIT, which means
-	// 			 * BIT(1) per SQL spec.  Report it as the quoted typename so
-	// 			 * that parser will not assign a bogus typmod.
-	// 			 */
-    //         }
-    //         else
-    //             buf = pstrdup("bit");
-    //         break;
+    /*
+	 * See if we want to special-case the output for certain built-in types.
+	 * Note that these special cases should all correspond to special
+	 * productions in gram.y, to ensure that the type name will be taken as a
+	 * system type, not a user type of the same name.
+	 *
+	 * If we do not provide a special-case output here, the type name will be
+	 * handled the same way as a user type name --- in particular, it will be
+	 * double-quoted if it matches any lexer keyword.  This behavior is
+	 * essential for some cases, such as types "bit" and "char".
+	 */
+    //buf = NULL; /* flag for no special case */
 
-    //     case BOOLOID:
-    //         buf = pstrdup("boolean");
-    //         break;
+    switch (type_oid)
+    {
+        case BITOID:
+            if (with_typemod)
+                buf = printTypmod("bit", typemod, tuple->typmodout);
+            else if (typemod_given)
+            {
+                /*
+				 * bit with typmod -1 is not the same as BIT, which means
+				 * BIT(1) per SQL spec.  Report it as the quoted typename so
+				 * that parser will not assign a bogus typmod.
+				 */
+            }
+            else
+                buf = "bit";
+            break;
 
-    //     case BPCHAROID:
-    //         if (with_typemod)
-    //             buf = printTypmod("character", typemod, typeform->typmodout);
-    //         else if (typemod_given)
-    //         {
-    //             /*
-	// 			 * bpchar with typmod -1 is not the same as CHARACTER, which
-	// 			 * means CHARACTER(1) per SQL spec.  Report it as bpchar so
-	// 			 * that parser will not assign a bogus typmod.
-	// 			 */
-    //         }
-    //         else
-    //             buf = pstrdup("character");
-    //         break;
+        case BOOLOID:
+            buf = "boolean";
+            break;
 
-    //     case FLOAT4OID:
-    //         buf = pstrdup("real");
-    //         break;
+        case BPCHAROID:
+            if (with_typemod)
+                buf = printTypmod("character", typemod, tuple->typmodout);
+            else if (typemod_given)
+            {
+                /*
+				 * bpchar with typmod -1 is not the same as CHARACTER, which
+				 * means CHARACTER(1) per SQL spec.  Report it as bpchar so
+				 * that parser will not assign a bogus typmod.
+				 */
+            }
+            else
+                buf = "character";
+            break;
 
-    //     case FLOAT8OID:
-    //         buf = pstrdup("double precision");
-    //         break;
+        case FLOAT4OID:
+            buf = "real";
+            break;
 
-    //     case INT2OID:
-    //         buf = pstrdup("smallint");
-    //         break;
+        case FLOAT8OID:
+            buf = "double precision";
+            break;
 
-    //     case INT4OID:
-    //         buf = pstrdup("integer");
-    //         break;
+        case INT2OID:
+            buf = "smallint";
+            break;
 
-    //     case INT8OID:
-    //         buf = pstrdup("bigint");
-    //         break;
+        case INT4OID:
+            buf = "integer";
+            break;
 
-    //     case NUMERICOID:
-    //         if (with_typemod)
-    //             buf = printTypmod("numeric", typemod, typeform->typmodout);
-    //         else
-    //             buf = pstrdup("numeric");
-    //         break;
+        case INT8OID:
+            buf = "bigint";
+            break;
 
-    //     case INTERVALOID:
-    //         if (with_typemod)
-    //             buf = printTypmod("interval", typemod, typeform->typmodout);
-    //         else
-    //             buf = pstrdup("interval");
-    //         break;
+        case NUMERICOID:
+            if (with_typemod)
+                buf = printTypmod("numeric", typemod, tuple->typmodout);
+            else
+                buf = "numeric";
+            break;
 
-    //     case TIMEOID:
-    //         if (with_typemod)
-    //             buf = printTypmod("time", typemod, typeform->typmodout);
-    //         else
-    //             buf = pstrdup("time without time zone");
-    //         break;
+        case INTERVALOID:
+            if (with_typemod)
+                buf = printTypmod("interval", typemod, tuple->typmodout);
+            else
+                buf = "interval";
+            break;
 
-    //     case TIMETZOID:
-    //         if (with_typemod)
-    //             buf = printTypmod("time", typemod, typeform->typmodout);
-    //         else
-    //             buf = pstrdup("time with time zone");
-    //         break;
+        case TIMEOID:
+            if (with_typemod)
+                buf = printTypmod("time", typemod, tuple->typmodout);
+            else
+                buf = "time without time zone";
+            break;
 
-    //     case TIMESTAMPOID:
-    //         if (with_typemod)
-    //             buf = printTypmod("timestamp", typemod, typeform->typmodout);
-    //         else
-    //             buf = pstrdup("timestamp without time zone");
-    //         break;
+        case TIMETZOID:
+            if (with_typemod)
+                buf = printTypmod("time", typemod, tuple->typmodout);
+            else
+                buf = "time with time zone";
+            break;
 
-    //     case TIMESTAMPTZOID:
-    //         if (with_typemod)
-    //             buf = printTypmod("timestamp", typemod, typeform->typmodout);
-    //         else
-    //             buf = pstrdup("timestamp with time zone");
-    //         break;
+        case TIMESTAMPOID:
+            if (with_typemod)
+                buf = printTypmod("timestamp", typemod, tuple->typmodout);
+            else
+                buf = "timestamp without time zone";
+            break;
 
-    //     case VARBITOID:
-    //         if (with_typemod)
-    //             buf = printTypmod("bit varying", typemod, typeform->typmodout);
-    //         else
-    //             buf = pstrdup("bit varying");
-    //         break;
+        case TIMESTAMPTZOID:
+            if (with_typemod)
+                buf = printTypmod("timestamp", typemod, tuple->typmodout);
+            else
+                buf = "timestamp with time zone";
+            break;
 
-    //     case VARCHAROID:
-    //         if (with_typemod)
-    //             buf = printTypmod("character varying", typemod, typeform->typmodout);
-    //         else
-    //             buf = pstrdup("character varying");
-    //         break;
-    // }
+        case VARBITOID:
+            if (with_typemod)
+                buf = printTypmod("bit varying", typemod, tuple->typmodout);
+            else
+                buf = "bit varying";
+            break;
 
-    // if (buf == NULL)
-    // {
-    //     /*
-	// 	 * Default handling: report the name as it appears in the catalog.
-	// 	 * Here, we must qualify the name if it is not visible in the search
-	// 	 * path, and we must double-quote it if it's not a standard identifier
-	// 	 * or if it matches any keyword.
-	// 	 */
-    //     char * nspname;
-    //     char * typname;
+        case VARCHAROID:
+            if (with_typemod)
+                buf = printTypmod("character varying", typemod, tuple->typmodout);
+            else
+                buf = "character varying";
+            break;
+    }
 
-    //     if (!force_qualify && TypeIsVisible(type_oid))
-    //         nspname = NULL;
-    //     else
-    //         nspname = get_namespace_name(typeform->typnamespace);
+    if (buf == "")
+    {
+        /*
+		 * Default handling: report the name as it appears in the catalog.
+		 * Here, we must qualify the name if it is not visible in the search
+		 * path, and we must double-quote it if it's not a standard identifier
+		 * or if it matches any keyword.
+		 */
+        std::string nspname;
+        std::string typname;
 
-    //     typname = NameStr(typeform->typname);
+        if (!force_qualify && TypeIsVisible(type_oid))
+            nspname = "";
+        else
+            nspname = relation_provider->get_namespace_name(tuple->typnamespace);
 
-    //     buf = quote_qualified_identifier(nspname, typname);
+        typname = tuple->typname;
 
-    //     if (with_typemod)
-    //         buf = printTypmod(buf, typemod, typeform->typmodout);
-    // }
+        //TODO kindred
+        // buf = quote_qualified_identifier(nspname, typname);
+        buf = pstrdup((std::string(nspname) + "." + std::string(typname)).c_str());
 
-    // if (is_array)
-    //     buf = psprintf("%s[]", buf);
+        if (with_typemod)
+            buf = printTypmod(buf.c_str(), typemod, tuple->typmodout);
+    }
 
-    // ReleaseSysCache(tuple);
+    if (is_array)
+    {
+        //buf = psprintf("%s[]", buf);
+        buf = buf + "[]";
+    }
 
     return buf;
 };
@@ -1418,6 +1436,13 @@ PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc(Oid type_id, int32 typmod)
     //PGTupleDescPtr tupDesc = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
     //IncrTupleDescRefCount(tupDesc);
     //return tupDesc;
+	
+	if (type_id == RECORDOID)
+	{
+		elog(ERROR, "Record type not supported yet: %u", type_id);
+		return nullptr;
+	}
+
 	return std::make_shared<PGTupleDesc>();
 };
 

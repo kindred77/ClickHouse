@@ -394,19 +394,31 @@ std::pair<Oid, PGProcPtr> ProcProvider::PROC_INT42DIV = std::pair<Oid, PGProcPtr
         /*prorettype*/ .prorettype = Oid(23),
         /*proargtypes*/ .proargtypes = {Oid(23), Oid(21)}}));
 
-// ProcProvider::ProcProvider()
-// {
-// 	oid_proc_map.insert(PROC_INT2PL);
-// 	oid_proc_map.insert(PROC_INT4PL);
-// 	oid_proc_map.insert(PROC_INT24PL);
-// 	oid_proc_map.insert(PROC_INT42PL);
-// };
+ProcProvider::ProcProvider()
+{
+	oid_proc_map.insert(PROC_INT2PL);
+	oid_proc_map.insert(PROC_INT4PL);
+	oid_proc_map.insert(PROC_INT24PL);
+	oid_proc_map.insert(PROC_INT42PL);
+    oid_proc_map.insert(PROC_INT2MI);
+    oid_proc_map.insert(PROC_INT4MI);
+    oid_proc_map.insert(PROC_INT24MI);
+    oid_proc_map.insert(PROC_INT42MI);
+    oid_proc_map.insert(PROC_INT2MUL);
+    oid_proc_map.insert(PROC_INT4MUL);
+    oid_proc_map.insert(PROC_INT24MUL);
+    oid_proc_map.insert(PROC_INT42MUL);
+    oid_proc_map.insert(PROC_INT2DIV);
+    oid_proc_map.insert(PROC_INT4DIV);
+    oid_proc_map.insert(PROC_INT24DIV);
+    oid_proc_map.insert(PROC_INT42DIV);
+};
 
 PGProcPtr ProcProvider::getProcByOid(Oid oid) const
 {
 	auto it = oid_proc_map.find(oid);
 	if (it == oid_proc_map.end())
-	    return {};
+	    return nullptr;
 	return it->second;
 };
 

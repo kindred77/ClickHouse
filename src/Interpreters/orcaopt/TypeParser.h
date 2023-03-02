@@ -77,12 +77,6 @@ public:
 
     Oid
     LookupCollation(PGParseState *pstate, duckdb_libpgquery::PGList *collnames, int location);
-
-    std::string printTypmod(const char * typname, int32 typmod, Oid typmodout);
-
-    std::string format_type_with_typemod(Oid type_oid, int32 typemod);
-
-    std::string format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify);
 };
 
 }

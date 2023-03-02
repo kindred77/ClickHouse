@@ -106,8 +106,8 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 				  translator: first %s is name of a SQL construct, eg CASE */
 						 errmsg("%s types %s and %s cannot be matched",
 								context,
-								type_provider->format_type_be(ptype),
-								type_provider->format_type_be(ntype))));
+								type_provider->format_type_be(ptype).c_str(),
+								type_provider->format_type_be(ntype).c_str())));
 			}
 			else if (!pispreferred &&
 					 can_coerce_type(1, &ptype, &ntype, PG_COERCION_IMPLICIT) &&
@@ -180,7 +180,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
         ereport(
             ERROR,
             (errcode(ERRCODE_CANNOT_COERCE),
-             errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID), type_provider->format_type_be(targetTypeId)),
+             errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
              parser_coercion_errposition(pstate, location, node)));
 
     PGTupleDescPtr tupdesc = type_provider->lookup_rowtype_tupdesc(targetTypeId, -1);
@@ -208,7 +208,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
             ereport(
                 ERROR,
                 (errcode(ERRCODE_CANNOT_COERCE),
-                 errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID), type_provider->format_type_be(targetTypeId)),
+                 errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
                  errdetail("Input has too few columns."),
                  parser_coercion_errposition(pstate, location, node)));
         expr = (PGNode *)lfirst(arg);
@@ -220,11 +220,11 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
             ereport(
                 ERROR,
                 (errcode(ERRCODE_CANNOT_COERCE),
-                 errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID), type_provider->format_type_be(targetTypeId)),
+                 errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
                  errdetail(
                      "Cannot cast type %s to %s in column %d.",
-                     type_provider->format_type_be(exprtype),
-                     type_provider->format_type_be(tupdesc->attrs[i]->atttypid),
+                     type_provider->format_type_be(exprtype).c_str(),
+                     type_provider->format_type_be(tupdesc->attrs[i]->atttypid).c_str(),
                      ucolno),
                  parser_coercion_errposition(pstate, location, expr)));
         newargs = lappend(newargs, cexpr);
@@ -235,7 +235,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
         ereport(
             ERROR,
             (errcode(ERRCODE_CANNOT_COERCE),
-             errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID), type_provider->format_type_be(targetTypeId)),
+             errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
              errdetail("Input has too many columns."),
              parser_coercion_errposition(pstate, location, node)));
 
@@ -826,7 +826,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
         return (PGNode *)r;
     }
     /* If we get here, caller blew it */
-    elog(ERROR, "failed to find conversion function from %s to %s", type_provider->format_type_be(inputTypeId), type_provider->format_type_be(targetTypeId));
+    elog(ERROR, "failed to find conversion function from %s to %s", type_provider->format_type_be(inputTypeId).c_str(), type_provider->format_type_be(targetTypeId).c_str());
     return NULL; /* keep compiler quiet */
 };
 
@@ -1384,7 +1384,7 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 			/* translator: first %s is name of a SQL construct, eg WHERE */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName, "boolean",
-							type_provider->format_type_be(inputTypeId))));
+							type_provider->format_type_be(inputTypeId).c_str())));
 		}
 		node = newnode;
 	}
@@ -1531,8 +1531,8 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 		/* translator: first %s is name of a SQL construct, eg CASE */
 				 errmsg("%s could not convert type %s to %s",
 						context,
-						type_provider->format_type_be(inputTypeId),
-						type_provider->format_type_be(targetTypeId))));
+						type_provider->format_type_be(inputTypeId).c_str(),
+						type_provider->format_type_be(targetTypeId).c_str())));
 	}
 	return node;
 };
@@ -1599,8 +1599,8 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyelement\" are not all alike"),
 						 errdetail("%s versus %s",
-								   type_provider->format_type_be(elem_typeid),
-								   type_provider->format_type_be(actual_type))));
+								   type_provider->format_type_be(elem_typeid).c_str(),
+								   type_provider->format_type_be(actual_type).c_str())));
 			elem_typeid = actual_type;
 		}
 		else if (decl_type == ANYARRAYOID)
@@ -1619,8 +1619,8 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyarray\" are not all alike"),
 						 errdetail("%s versus %s",
-								   type_provider->format_type_be(array_typeid),
-								   type_provider->format_type_be(actual_type))));
+								   type_provider->format_type_be(array_typeid).c_str(),
+								   type_provider->format_type_be(actual_type).c_str())));
 			array_typeid = actual_type;
 		}
 		else if (decl_type == ANYRANGEOID)
@@ -1639,8 +1639,8 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyrange\" are not all alike"),
 						 errdetail("%s versus %s",
-								   type_provider->format_type_be(range_typeid),
-								   type_provider->format_type_be(actual_type))));
+								   type_provider->format_type_be(range_typeid).c_str(),
+								   type_provider->format_type_be(actual_type).c_str())));
 			range_typeid = actual_type;
 		}
 	}
@@ -1667,7 +1667,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("argument declared %s is not an array but type %s",
-								"anyarray", type_provider->format_type_be(array_typeid))));
+								"anyarray", type_provider->format_type_be(array_typeid).c_str())));
 		}
 
 		if (!OidIsValid(elem_typeid))
@@ -1685,8 +1685,8 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 					 errmsg("argument declared %s is not consistent with argument declared %s",
 							"anyarray", "anyelement"),
 					 errdetail("%s versus %s",
-							   type_provider->format_type_be(array_typeid),
-							   type_provider->format_type_be(elem_typeid))));
+							   type_provider->format_type_be(array_typeid).c_str(),
+							   type_provider->format_type_be(elem_typeid).c_str())));
 		}
 	}
 
@@ -1706,7 +1706,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("argument declared %s is not a range type but type %s",
 								"anyrange",
-								type_provider->format_type_be(range_typeid))));
+								type_provider->format_type_be(range_typeid).c_str())));
 		}
 
 		if (!OidIsValid(elem_typeid))
@@ -1724,8 +1724,8 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 					 errmsg("argument declared %s is not consistent with argument declared %s",
 							"anyrange", "anyelement"),
 					 errdetail("%s versus %s",
-							   type_provider->format_type_be(range_typeid),
-							   type_provider->format_type_be(elem_typeid))));
+							   type_provider->format_type_be(range_typeid).c_str(),
+							   type_provider->format_type_be(elem_typeid).c_str())));
 		}
 	}
 
@@ -1754,7 +1754,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("type matched to anynonarray is an array type: %s",
-							type_provider->format_type_be(elem_typeid))));
+							type_provider->format_type_be(elem_typeid).c_str())));
 	}
 
 	if (have_anyenum && elem_typeid != ANYELEMENTOID)
@@ -1764,7 +1764,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("type matched to anyenum is not an enum type: %s",
-							type_provider->format_type_be(elem_typeid))));
+							type_provider->format_type_be(elem_typeid).c_str())));
 	}
 
 	/*
@@ -1793,7 +1793,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 						ereport(ERROR,
 								(errcode(ERRCODE_UNDEFINED_OBJECT),
 								 errmsg("could not find array type for data type %s",
-										type_provider->format_type_be(elem_typeid))));
+										type_provider->format_type_be(elem_typeid).c_str())));
 				}
 				declared_arg_types[j] = array_typeid;
 			}
@@ -1804,7 +1804,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_OBJECT),
 							 errmsg("could not find range type for data type %s",
-									type_provider->format_type_be(elem_typeid))));
+									type_provider->format_type_be(elem_typeid).c_str())));
 				}
 				declared_arg_types[j] = range_typeid;
 			}
@@ -1821,7 +1821,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find array type for data type %s",
-								type_provider->format_type_be(elem_typeid))));
+								type_provider->format_type_be(elem_typeid).c_str())));
 		}
 		return array_typeid;
 	}
@@ -1834,7 +1834,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("could not find range type for data type %s",
-							type_provider->format_type_be(elem_typeid))));
+							type_provider->format_type_be(elem_typeid).c_str())));
 		}
 		return range_typeid;
 	}
@@ -1873,8 +1873,8 @@ CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
 			/* translator: first %s is name of a SQL construct, eg LIMIT */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName,
-							type_provider->format_type_be(targetTypeId),
-							type_provider->format_type_be(inputTypeId))));
+							type_provider->format_type_be(targetTypeId).c_str(),
+							type_provider->format_type_be(inputTypeId).c_str())));
 		}
 		node = newnode;
 	}

@@ -457,7 +457,7 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_COLUMN),
 					 errmsg("column \"%s\" not found in data type %s",
-							attname, type_provider->format_type_be(relTypeId))));
+							attname, type_provider->format_type_be(relTypeId).c_str())));
 		}
 		else if (relTypeId == RECORDOID)
 		{
@@ -474,7 +474,7 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("column notation .%s applied to type %s, "
 							"which is not a composite type",
-							attname, type_provider->format_type_be(relTypeId))));
+							attname, type_provider->format_type_be(relTypeId).c_str())));
 		}
 	}
 };
@@ -628,7 +628,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find element type for data type %s",
-								type_provider->format_type_be(array_type))));
+								type_provider->format_type_be(array_type).c_str())));
 			}
 		}
 		else
@@ -641,7 +641,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find array type for data type %s",
-								type_provider->format_type_be(element_type))));
+								type_provider->format_type_be(element_type).c_str())));
 			}
 		}
 		coerce_hard = false;
@@ -677,8 +677,8 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 				ereport(ERROR,
 						(errcode(ERRCODE_CANNOT_COERCE),
 						 errmsg("cannot cast type %s to %s",
-								type_provider->format_type_be(exprType(e)),
-								type_provider->format_type_be(coerce_type))));
+								type_provider->format_type_be(exprType(e)).c_str(),
+								type_provider->format_type_be(coerce_type).c_str())));
 			}
 		}
 		else
@@ -780,8 +780,8 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 		ereport(ERROR,
 				(errcode(ERRCODE_CANNOT_COERCE),
 				 errmsg("cannot cast type %s to %s",
-						type_provider->format_type_be(inputType),
-						type_provider->format_type_be(targetType))));
+						type_provider->format_type_be(inputType).c_str(),
+						type_provider->format_type_be(targetType).c_str())));
 	}
 
 	return result;
@@ -808,7 +808,7 @@ ExprParser::transformCollateClause(PGParseState *pstate, PGCollateClause *c)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("collations are not supported by type %s",
-						type_provider->format_type_be(argtype))));
+						type_provider->format_type_be(argtype).c_str())));
 	}
 
 	newc->collOid = type_parser->LookupCollation(pstate, c->collname, c->location);

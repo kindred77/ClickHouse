@@ -13,11 +13,14 @@
 namespace DB
 {
 
-class FunctionProvider;
 class TypeParser;
+class FunctionProvider;
+class RelationProvider;
+
 using IMDTypePtr = std::shared_ptr<const gpmd::IMDType>;
-using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 using TypeParserPtr = std::shared_ptr<TypeParser>;
+using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
+using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
 class TypeProvider
 {
@@ -35,11 +38,13 @@ public:
 
     void get_type_category_preferred(Oid typid, char * typcategory, bool * typispreferred);
 
-    char * format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify);
+	std::string format_type_with_typemod(Oid type_oid, int32 typemod);
 
-    char * format_type_be(Oid type_oid);
+    std::string format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify);
 
-    char * printTypmod(const char * typname, int32 typmod, Oid typmodout);
+    std::string format_type_be(Oid type_oid);
+
+	std::string printTypmod(const char * typname, int32 typmod, Oid typmodout);
 
     bool TypeIsVisible(Oid typid);
 
@@ -88,6 +93,8 @@ public:
 private:
 	FunctionProviderPtr function_provider;
 	TypeParserPtr type_parser;
+	RelationProviderPtr relation_provider;
+
 	static int TYPE_OID_ID;
 	static std::pair<Oid, PGTypePtr> TYPE_FLOAT32;
 	static std::pair<Oid, PGTypePtr> TYPE_FLOAT64;
@@ -121,7 +128,7 @@ private:
 
 	using Map = std::map<Oid, PGTypePtr>;
 
-	static Map oid_types_map;
+	Map oid_type_map;
 	//ContextPtr context;
 	//gpos::CMemoryPool *mp;
 

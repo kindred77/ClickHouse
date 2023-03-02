@@ -2261,7 +2261,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
             ereport(
                 ERROR,
                 (errcode(ERRCODE_DATATYPE_MISMATCH),
-                 errmsg("function \"%s\" in FROM has unsupported return type %s", funcname, type_provider->format_type_be(funcrettype)),
+                 errmsg("function \"%s\" in FROM has unsupported return type %s", funcname, type_provider->format_type_be(funcrettype).c_str()),
                  parser_errposition(pstate, exprLocation(funcexpr))));
 
         /* Finish off the RangeTblFunction and add it to the RTE's list */
