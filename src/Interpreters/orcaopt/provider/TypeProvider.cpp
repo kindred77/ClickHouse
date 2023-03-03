@@ -3,6 +3,9 @@
 #include <Interpreters/orcaopt/TypeParser.h>
 #include <Interpreters/orcaopt/provider/FunctionProvider.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
+#include <Interpreters/orcaopt/provider/ClassProvider.h>
+#include <Interpreters/orcaopt/provider/OperProvider.h>
+#include <Interpreters/orcaopt/provider/ProcProvider.h>
 
 #include "naucrates/dxl/CDXLUtils.h"
 
@@ -1431,19 +1434,82 @@ std::string TypeProvider::format_type_internal(Oid type_oid, int32 typemod, bool
     return buf;
 };
 
+PGTupleDescPtr TypeProvider::get_tupdesc_by_type_relid(PGTypePtr type)
+{
+    if (!OidIsValid(type->typrelid)) /* should not happen */
+	{
+        elog(ERROR, "invalid typrelid for composite type %u", type->oid);
+		return nullptr;
+	}
+    PGRelationPtr rel = relation_provider->relation_open(type->typrelid, AccessShareLock);
+    Assert(rel->rd_rel->reltype == type->oid)
+
+    /*
+	 * Link to the tupdesc and increment its refcount (we assert it's a
+	 * refcounted descriptor).  We don't use IncrTupleDescRefCount() for this,
+	 * because the reference mustn't be entered in the current resource owner;
+	 * it can outlive the current query.
+	 */
+	//TODO kindred
+    //typentry->tupDesc = rel->rd_att;
+
+    //Assert(typentry->tupDesc->tdrefcount > 0);
+    //typentry->tupDesc->tdrefcount++;
+
+	relation_provider->relation_close(rel, AccessShareLock);
+
+	return rel->rd_att;
+};
+
+PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_internal(Oid type_id, int32 typmod, bool noError)
+{
+    if (type_id != RECORDOID)
+    {
+        /*
+		 * It's a named composite type, so use the regular typcache.
+		 */
+        // TypeCacheEntry * typentry;
+
+        // typentry = lookup_type_cache(type_id, TYPECACHE_TUPDESC);
+        // if (typentry->tupDesc == NULL && !noError)
+        //     ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("type %s is not composite", format_type_be(type_id))));
+        // return typentry->tupDesc;
+
+		PGTypePtr type = getTypeByOid(type_id);
+        if (type->typtype == TYPTYPE_COMPOSITE)
+        {
+            return get_tupdesc_by_type_relid(type->typrelid);
+        }
+    }
+    else
+    {
+        /*
+		 * It's a transient record type, so look in our record-type table.
+		 */
+        if (typmod < 0 || typmod >= NextRecordTypmod)
+        {
+            if (!noError)
+            {
+                ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("record type has not been registered")));
+            }
+            return nullptr;
+        }
+		//TODO kindred
+        //return RecordCacheArray[typmod];
+		ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("record type cache not supported yet!")));
+    }
+
+	return nullptr;
+};
+
 PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc(Oid type_id, int32 typmod)
 {
+	//TODO kindred
     //PGTupleDescPtr tupDesc = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
     //IncrTupleDescRefCount(tupDesc);
     //return tupDesc;
-	
-	if (type_id == RECORDOID)
-	{
-		elog(ERROR, "Record type not supported yet: %u", type_id);
-		return nullptr;
-	}
 
-	return std::make_shared<PGTupleDesc>();
+	return lookup_rowtype_tupdesc_internal(type_id, typmod, false);
 };
 
 Oid TypeProvider::get_element_type(Oid typid)
@@ -1484,6 +1550,29 @@ void TypeProvider::getTypeOutputInfo(Oid type, Oid * typOutput, bool * typIsVarl
     // *typIsVarlena = (!pt->typbyval) && (pt->typlen == -1);
 
     // ReleaseSysCache(typeTuple);
+
+	PGTypePtr tup = getTypeByOid(type);
+	if (tup == nullptr)
+	{
+		elog(ERROR, "cache lookup failed for type %u", type);
+		return;
+	}
+
+	if (!tup->typisdefined)
+	{
+		ereport(ERROR, (errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("type %s is only a shell", format_type_be(type).c_str())));
+		return;
+	}
+
+	if (!OidIsValid(tup->typoutput))
+	{
+		ereport(ERROR, (errcode(ERRCODE_UNDEFINED_FUNCTION), errmsg("no output function available for type %s", format_type_be(type).c_str())));
+		return;
+	}
+
+	*typOutput = tup->typoutput;
+    *typIsVarlena = (!tup->typbyval) && (tup->typlen == -1);
+
 };
 
 void TypeProvider::getTypeInputInfo(Oid type, Oid * typInput, Oid * typIOParam)
@@ -1505,27 +1594,55 @@ void TypeProvider::getTypeInputInfo(Oid type, Oid * typInput, Oid * typIOParam)
     // *typIOParam = getTypeIOParam(typeTuple);
 
     // ReleaseSysCache(typeTuple);
+
+	PGTypePtr tup = getTypeByOid(type);
+	if (tup == nullptr)
+	{
+		elog(ERROR, "cache lookup failed for type %u", type);
+		return;
+	}
+
+	if (!tup->typisdefined)
+	{
+		ereport(ERROR, (errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("type %s is only a shell", format_type_be(type).c_str())));
+		return;
+	}
+
+	if (!OidIsValid(tup->typinput))
+	{
+		ereport(ERROR, (errcode(ERRCODE_UNDEFINED_FUNCTION), errmsg("no typinput function available for type %s", format_type_be(type).c_str())));
+		return;
+	}
+
+	*typInput = tup->typinput;
+    *typIOParam = getTypeIOParam(typeTuple);
+
 };
 
 bool TypeProvider::typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
 {
     bool result = false;
+	// TODO kindred
     // Oid subclassRelid;
     // Oid superclassRelid;
-    // Relation inhrel;
+    // PGRelation inhrel;
     // PGList *visited, *queue;
     // PGListCell * queue_item;
 
     // /* We need to work with the associated relation OIDs */
     // subclassRelid = type_parser->typeidTypeRelid(subclassTypeId);
     // if (subclassRelid == InvalidOid)
+	// {
     //     return false; /* not a complex type */
+	// }
     // superclassRelid = type_parser->typeidTypeRelid(superclassTypeId);
     // if (superclassRelid == InvalidOid)
+	// {
     //     return false; /* not a complex type */
+	// }
 
     // /* No point in searching if the superclass has no subclasses */
-    // if (!has_subclass(superclassRelid))
+    // if (!class_provider->has_subclass(superclassRelid))
     //     return false;
 
     // /*
@@ -1534,7 +1651,7 @@ bool TypeProvider::typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
     // queue = list_make1_oid(subclassRelid);
     // visited = NIL;
 
-    // inhrel = heap_open(InheritsRelationId, AccessShareLock);
+    // inhrel = relation_provider->heap_open(InheritsRelationId, AccessShareLock);
 
     // /*
 	//  * Use queue to do a breadth-first traversal of the inheritance graph from
@@ -1617,6 +1734,9 @@ Oid TypeProvider::get_range_subtype(Oid rangeOid)
     // else
     //     return InvalidOid;
 
+	// TODO kindred
+	elog(ERROR, "range type not supported yet: %u", rangeOid);
+
 	return InvalidOid;
 };
 
@@ -1625,32 +1745,28 @@ Oid TypeProvider::get_base_element_type(Oid typid)
     /*
 	 * We loop to find the bottom base type in a stack of domains.
 	 */
-    // for (;;)
-    // {
-    //     HeapTuple tup;
-    //     Form_pg_type typTup;
+    for (;;)
+    {
+		PGTypePtr tup = getTypeByOid(typid);
+		if (tup == nullptr)
+		{
+			break;
+		}
+		if (tup->typtype != TYPTYPE_DOMAIN)
+		{
+			/* Not a domain, so stop descending */
+            Oid result;
 
-    //     tup = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-    //     if (!HeapTupleIsValid(tup))
-    //         break;
-    //     typTup = (Form_pg_type)GETSTRUCT(tup);
-    //     if (typTup->typtype != TYPTYPE_DOMAIN)
-    //     {
-    //         /* Not a domain, so stop descending */
-    //         Oid result;
+            /* This test must match get_element_type */
+            if (tup->typlen == -1)
+                result = tup->typelem;
+            else
+                result = InvalidOid;
+            return result;
+		}
 
-    //         /* This test must match get_element_type */
-    //         if (typTup->typlen == -1)
-    //             result = typTup->typelem;
-    //         else
-    //             result = InvalidOid;
-    //         ReleaseSysCache(tup);
-    //         return result;
-    //     }
-
-    //     typid = typTup->typbasetype;
-    //     ReleaseSysCache(tup);
-    // }
+        typid = tup->typbasetype;
+    }
 
     /* Like get_element_type, silently return InvalidOid for bogus input */
     return InvalidOid;
@@ -1658,22 +1774,17 @@ Oid TypeProvider::get_base_element_type(Oid typid)
 
 char TypeProvider::get_typtype(Oid typid)
 {
-    // HeapTuple tp;
-
-    // tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
-    // if (HeapTupleIsValid(tp))
-    // {
-    //     Form_pg_type typtup = (Form_pg_type)GETSTRUCT(tp);
-    //     char result;
-
-    //     result = typtup->typtype;
-    //     ReleaseSysCache(tp);
-    //     return result;
-    // }
-    // else
-    //     return '\0';
-
-	return '\0';
+	PGTypePtr tp = getTypeByOid(typid);
+	if (nullptr != tp)
+	{
+		char result;
+        result = tp->typtype;
+        return result;
+	}
+	else
+	{
+		return '\0';
+	}
 };
 
 bool TypeProvider::type_is_enum(Oid typid)
@@ -1784,6 +1895,147 @@ void TypeProvider::PGTupleDescInitEntry(
     //ReleaseSysCache(tuple);
 };
 
+TypeFuncClass
+TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * call_expr,
+        Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc)
+{
+    TypeFuncClass result;
+    //HeapTuple tp;
+    //Form_pg_proc procform;
+    Oid rettype;
+    PGTupleDescPtr tupdesc = nullptr;
+
+    /* First fetch the function's pg_proc row to inspect its rettype */
+    // tp = SearchSysCache1(PROCOID, ObjectIdGetDatum(funcid));
+    // if (!HeapTupleIsValid(tp))
+    //     elog(ERROR, "cache lookup failed for function %u", funcid);
+    // procform = (Form_pg_proc)GETSTRUCT(tp);
+
+	PGProcPtr tp = proc_provider->getProcByOid(funcid);
+	if (nullptr == tp)
+	{
+		elog(ERROR, "cache lookup failed for function %u", funcid);
+		return TYPEFUNC_OTHER;
+	}
+
+    rettype = tp->prorettype;
+
+    /* Check for OUT parameters defining a RECORD result */
+    tupdesc = build_function_result_tupdesc_t(tp);
+    if (tupdesc)
+    {
+        /*
+		 * It has OUT parameters, so it's basically like a regular composite
+		 * type, except we have to be able to resolve any polymorphic OUT
+		 * parameters.
+		 */
+        if (resultTypeId)
+            *resultTypeId = rettype;
+
+        if (resolve_polymorphic_tupdesc(tupdesc, &procform->proargtypes, call_expr))
+        {
+            if (tupdesc->tdtypeid == RECORDOID && tupdesc->tdtypmod < 0)
+                assign_record_type_typmod(tupdesc);
+            if (resultTupleDesc)
+                *resultTupleDesc = tupdesc;
+            result = TYPEFUNC_COMPOSITE;
+        }
+        else
+        {
+            if (resultTupleDesc)
+                *resultTupleDesc = NULL;
+            result = TYPEFUNC_RECORD;
+        }
+
+        ReleaseSysCache(tp);
+
+        return result;
+    }
+
+    /*
+	 * If scalar polymorphic result, try to resolve it.
+	 */
+    if (IsPolymorphicType(rettype))
+    {
+        Oid newrettype = exprType(call_expr);
+
+        if (!OidIsValid(newrettype)) /* this probably should not happen */
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_DATATYPE_MISMATCH),
+                 errmsg(
+                     "could not determine actual result type for function \"%s\" declared to return type %s",
+                     NameStr(procform->proname),
+                     format_type_be(rettype))));
+        rettype = newrettype;
+    }
+
+    if (resultTypeId)
+        *resultTypeId = rettype;
+    if (resultTupleDesc)
+        *resultTupleDesc = NULL; /* default result */
+
+    /* Classify the result type */
+    result = get_type_func_class(rettype);
+    switch (result)
+    {
+        case TYPEFUNC_COMPOSITE:
+            if (resultTupleDesc)
+                *resultTupleDesc = lookup_rowtype_tupdesc_copy(rettype, -1);
+            /* Named composite types can't have any polymorphic columns */
+            break;
+        case TYPEFUNC_SCALAR:
+            break;
+        case TYPEFUNC_RECORD:
+            /* We must get the tupledesc from call context */
+			// TODO kindred
+            // if (rsinfo && IsA(rsinfo, ReturnSetInfo) && rsinfo->expectedDesc != NULL)
+            // {
+            //     result = TYPEFUNC_COMPOSITE;
+            //     if (resultTupleDesc)
+            //         *resultTupleDesc = rsinfo->expectedDesc;
+            //     /* Assume no polymorphic columns here, either */
+            // }
+			elog(ERROR, "return set of record type not supported yet: %u", funcid);
+            break;
+        default:
+            break;
+    }
+
+    ReleaseSysCache(tp);
+
+    return result;
+};
+
+TypeFuncClass TypeProvider::get_type_func_class(Oid typid)
+{
+    switch (get_typtype(typid))
+    {
+        case TYPTYPE_COMPOSITE:
+            return TYPEFUNC_COMPOSITE;
+        case TYPTYPE_BASE:
+        case TYPTYPE_DOMAIN:
+        case TYPTYPE_ENUM:
+        case TYPTYPE_RANGE:
+            return TYPEFUNC_SCALAR;
+        case TYPTYPE_PSEUDO:
+            if (typid == RECORDOID)
+                return TYPEFUNC_RECORD;
+
+            /*
+			 * We treat VOID and CSTRING as legitimate scalar datatypes,
+			 * mostly for the convenience of the JDBC driver (which wants to
+			 * be able to do "SELECT * FROM foo()" for all legitimately
+			 * user-callable functions).
+			 */
+            if (typid == VOIDOID || typid == CSTRINGOID)
+                return TYPEFUNC_SCALAR;
+            return TYPEFUNC_OTHER;
+    }
+    /* shouldn't get here, probably */
+    return TYPEFUNC_OTHER;
+};
+
 TypeFuncClass TypeProvider::get_expr_result_type(PGNode * expr, Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc)
 {
     //TypeFuncClass result;
@@ -1806,17 +2058,37 @@ TypeFuncClass TypeProvider::get_expr_result_type(PGNode * expr, Oid * resultType
     //         *resultTupleDesc = lookup_rowtype_tupdesc_copy(typid, -1);
     // }
 
-    return {};
+    TypeFuncClass result;
+
+    if (expr && IsA(expr, PGFuncExpr))
+    {
+        result = internal_get_result_type(((PGFuncExpr *)expr)->funcid, expr, resultTypeId, resultTupleDesc);
+    }
+    else if (expr && IsA(expr, PGOpExpr))
+    {
+        result = internal_get_result_type(oper_provider->get_opcode(((PGOpExpr *)expr)->opno), expr, resultTypeId, resultTupleDesc);
+    }
+    else
+    {
+        /* handle as a generic expression; no chance to resolve RECORD */
+        Oid typid = exprType(expr);
+
+        if (resultTypeId)
+            *resultTypeId = typid;
+        if (resultTupleDesc)
+            resultTupleDesc = nullptr;
+        result = get_type_func_class(typid);
+        if (result == TYPEFUNC_COMPOSITE && resultTupleDesc)
+            resultTupleDesc = lookup_rowtype_tupdesc_copy(typid, -1);
+    }
+
+    return result;
 };
 
 PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod)
 {
-    // TupleDesc tmp;
-
-    // tmp = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
-    // return CreateTupleDescCopyConstr(tmp);
-
-	return nullptr;
+    PGTupleDescPtr tmp = lookup_rowtype_tupdesc_internal(type_id, typmod, false);
+    return PGCreateTupleDescCopyConstr(tmp);
 };
 
 Oid TypeProvider::get_typeoid_by_typename_namespaceoid(const char * type_name, Oid namespace_oid)

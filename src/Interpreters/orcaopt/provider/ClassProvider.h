@@ -20,6 +20,8 @@ public:
 	explicit ClassProvider();
 	
 	PGClassPtr getClassByRelOid(Oid oid) const;
+
+    bool has_subclass(Oid relationId);
 };
 
 }

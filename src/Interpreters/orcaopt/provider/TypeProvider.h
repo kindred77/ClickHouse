@@ -16,11 +16,17 @@ namespace DB
 class TypeParser;
 class FunctionProvider;
 class RelationProvider;
+class ClassProvider;
+class OperProvider;
+class ProcProvider;
 
 using IMDTypePtr = std::shared_ptr<const gpmd::IMDType>;
 using TypeParserPtr = std::shared_ptr<TypeParser>;
 using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 using RelationProviderPtr = std::shared_ptr<RelationProvider>;
+using ClassProviderPtr = std::shared_ptr<ClassProvider>;
+using OperProviderPtr = std::shared_ptr<OperProvider>;
+using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 
 class TypeProvider
 {
@@ -47,6 +53,12 @@ public:
 	std::string printTypmod(const char * typname, int32 typmod, Oid typmodout);
 
     bool TypeIsVisible(Oid typid);
+
+	PGTupleDescPtr get_tupdesc_by_type_relid(PGTypePtr type);
+
+    PGTupleDescPtr lookup_rowtype_tupdesc_internal(Oid type_id, int32 typmod, bool noError);
+
+    PGTupleDescPtr lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod);
 
     PGTupleDescPtr lookup_rowtype_tupdesc(Oid type_id, int32 typmod);
 
@@ -84,16 +96,23 @@ public:
 
     TypeFuncClass get_expr_result_type(duckdb_libpgquery::PGNode * expr, Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc);
 
-    PGTupleDescPtr lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod);
-
     Oid TypenameGetTypidExtended(const char * typname, bool temp_ok);
 
     Oid getTypeIOParam(PGTypePtr typeTuple);
+
+	TypeFuncClass
+    internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * call_expr,
+        Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc);
+
+    TypeFuncClass get_type_func_class(Oid typid);
 
 private:
 	FunctionProviderPtr function_provider;
 	TypeParserPtr type_parser;
 	RelationProviderPtr relation_provider;
+	ClassProviderPtr class_provider;
+	OperProviderPtr oper_provider;
+	ProcProviderPtr proc_provider;
 
 	static int TYPE_OID_ID;
 	static std::pair<Oid, PGTypePtr> TYPE_FLOAT32;

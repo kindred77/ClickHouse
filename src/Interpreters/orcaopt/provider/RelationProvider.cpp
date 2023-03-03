@@ -533,4 +533,18 @@ std::string RelationProvider::get_namespace_name(Oid nspid)
     return pstrdup("");
 };
 
+PGRelationPtr RelationProvider::heap_open(Oid relationId, LOCKMODE lockmode)
+{
+    PGRelationPtr r;
+
+    r = relation_open(relationId, lockmode);
+
+    if (r->rd_rel->relkind == PG_RELKIND_INDEX)
+        ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is an index", RelationGetRelationName(r))));
+    else if (r->rd_rel->relkind == PG_RELKIND_COMPOSITE_TYPE)
+        ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is a composite type", RelationGetRelationName(r))));
+
+    return r;
+};
+
 }

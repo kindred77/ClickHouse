@@ -56,6 +56,8 @@ public:
 
     void relation_close(PGRelationPtr relation, LOCKMODE lockmode);
 
+    PGRelationPtr heap_open(Oid relationId, LOCKMODE lockmode);
+
     PGRelationPtr try_heap_open(Oid relationId, LOCKMODE lockmode, bool noWait);
 
     bool IsSystemRelation(PGRelationPtr relation);
