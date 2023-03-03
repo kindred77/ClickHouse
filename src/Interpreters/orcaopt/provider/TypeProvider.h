@@ -106,6 +106,8 @@ public:
 
     TypeFuncClass get_type_func_class(Oid typid);
 
+    PGTupleDescPtr build_function_result_tupdesc_t(PGProcPtr & procTuple);
+
 private:
 	FunctionProviderPtr function_provider;
 	TypeParserPtr type_parser;

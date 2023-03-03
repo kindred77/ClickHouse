@@ -1895,6 +1895,39 @@ void TypeProvider::PGTupleDescInitEntry(
     //ReleaseSysCache(tuple);
 };
 
+PGTupleDescPtr TypeProvider::build_function_result_tupdesc_t(PGProcPtr & procTuple)
+{
+    //Form_pg_proc procform = (Form_pg_proc)GETSTRUCT(procTuple);
+    Datum proallargtypes;
+    Datum proargmodes;
+    Datum proargnames;
+    bool isnull;
+
+    /* Return NULL if the function isn't declared to return RECORD */
+    if (procTuple->prorettype != RECORDOID)
+        return nullptr;
+
+    /* If there are no OUT parameters, return NULL */
+    // if (heap_attisnull(procTuple, Anum_pg_proc_proallargtypes) || heap_attisnull(procTuple, Anum_pg_proc_proargmodes))
+    //     return NULL;
+	//TODO kindred
+	if (procTuple->proargtypes.size() == 0)
+	{
+		return nullptr;
+	}
+
+    /* Get the data out of the tuple */
+    proallargtypes = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proallargtypes, &isnull);
+    Assert(!isnull);
+    proargmodes = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargmodes, &isnull);
+    Assert(!isnull);
+    proargnames = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargnames, &isnull);
+    if (isnull)
+        proargnames = PointerGetDatum(NULL); /* just to be sure */
+
+    return build_function_result_tupdesc_d(proallargtypes, proargmodes, proargnames);
+};
+
 TypeFuncClass
 TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * call_expr,
         Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc)
