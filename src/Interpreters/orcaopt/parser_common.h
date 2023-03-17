@@ -755,6 +755,11 @@ struct Form_pg_proc
 	 */
     //oidvector proargtypes; /* parameter types (excludes OUT params) */
 	std::vector<Oid> proargtypes;
+    //added by kindred
+    std::vector<Oid> proallargtypes;
+    std::vector<char> proargmodes;
+    std::vector<std::string> proargnames;
+    duckdb_libpgquery::PGNode * proargdefaults;
 
     // Form_pg_proc(
     //     Oid oid_,

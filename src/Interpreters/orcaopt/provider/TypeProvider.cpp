@@ -1478,7 +1478,7 @@ PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_internal(Oid type_id, int32 
 		PGTypePtr type = getTypeByOid(type_id);
         if (type->typtype == TYPTYPE_COMPOSITE)
         {
-            return get_tupdesc_by_type_relid(type->typrelid);
+            return get_tupdesc_by_type_relid(type);
         }
     }
     else
@@ -1496,7 +1496,7 @@ PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_internal(Oid type_id, int32 
         }
 		//TODO kindred
         //return RecordCacheArray[typmod];
-		ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("record type cache not supported yet!")));
+		ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("record type cache in RecordCacheArray not supported yet!")));
     }
 
 	return nullptr;
@@ -1615,7 +1615,7 @@ void TypeProvider::getTypeInputInfo(Oid type, Oid * typInput, Oid * typIOParam)
 	}
 
 	*typInput = tup->typinput;
-    *typIOParam = getTypeIOParam(typeTuple);
+    *typIOParam = getTypeIOParam(tup);
 
 };
 
@@ -1901,11 +1901,13 @@ PGTupleDescPtr TypeProvider::build_function_result_tupdesc_t(PGProcPtr & procTup
     Datum proallargtypes;
     Datum proargmodes;
     Datum proargnames;
-    bool isnull;
+    //bool isnull;
 
     /* Return NULL if the function isn't declared to return RECORD */
     if (procTuple->prorettype != RECORDOID)
+	{
         return nullptr;
+	}
 
     /* If there are no OUT parameters, return NULL */
     // if (heap_attisnull(procTuple, Anum_pg_proc_proallargtypes) || heap_attisnull(procTuple, Anum_pg_proc_proargmodes))
@@ -1916,16 +1918,384 @@ PGTupleDescPtr TypeProvider::build_function_result_tupdesc_t(PGProcPtr & procTup
 		return nullptr;
 	}
 
-    /* Get the data out of the tuple */
-    proallargtypes = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proallargtypes, &isnull);
-    Assert(!isnull);
-    proargmodes = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargmodes, &isnull);
-    Assert(!isnull);
-    proargnames = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargnames, &isnull);
-    if (isnull)
-        proargnames = PointerGetDatum(NULL); /* just to be sure */
+    // /* Get the data out of the tuple */
+    // proallargtypes = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proallargtypes, &isnull);
+    // Assert(!isnull)
+    // proargmodes = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargmodes, &isnull);
+    // Assert(!isnull)
+    // proargnames = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargnames, &isnull);
+    // if (isnull)
+	// {
+    //     proargnames = PointerGetDatum(NULL); /* just to be sure */
+	// }
 
-    return build_function_result_tupdesc_d(proallargtypes, proargmodes, proargnames);
+    //return build_function_result_tupdesc_d(proallargtypes, proargmodes, proargnames);
+
+	return build_function_result_tupdesc_d(procTuple);
+};
+
+PGTupleDescPtr TypeProvider::build_function_result_tupdesc_d(PGProcPtr & procTuple)
+{
+	if (procTuple->proallargtypes.size() == 0
+	    || procTuple->proargmodes.size() == 0)
+	{
+		return nullptr;
+	}
+
+	int numargs = procTuple->proallargtypes.size();
+
+	/* zero elements probably shouldn't happen, but handle it gracefully */
+    if (numargs <= 0)
+	{
+        return nullptr;
+	}
+
+	if (numargs != procTuple->proargmodes.size())
+	{
+		elog(ERROR, "proargmodes is not a 1-D char array");
+		return nullptr;
+	}
+	/* extract output-argument types and names */
+    //Oid * outargtypes = (Oid *)palloc(numargs * sizeof(Oid));
+	std::vector<Oid> outargtypes;
+	std::vector<std::string> outargnames;
+    //char ** outargnames = (char **)palloc(numargs * sizeof(char *));
+    int numoutargs = 0;
+    for (int i = 0; i < numargs; i++)
+    {
+        std::string pname = "";
+
+        switch (procTuple->argmodes[i])
+        {
+            /* input modes */
+            case PG_PROARGMODE_IN:
+            case PG_PROARGMODE_VARIADIC:
+                break;
+
+            /* input and output */
+            case PG_PROARGMODE_INOUT:
+                /* fallthrough */
+
+            /* output modes */
+            case PG_PROARGMODE_OUT:
+            case PG_PROARGMODE_TABLE:
+				outargtypes.push_back(argtypes[i]);
+                if (procTuple->proargnames.size() > i)
+                    pname = procTuple->proargnames[i];
+                else
+                    pname = "";
+
+                if (pname == "")
+                {
+                    /* Parameter is not named, so gin up a column name */
+					pname = "column" + std::to_string(numoutargs + 1);
+                }
+				outargnames.push_back(pname);
+                numoutargs++;
+        }
+    }
+
+    /*
+	 * If there is no output argument, or only one, the function does not
+	 * return tuples.
+	 */
+    if (numoutargs < 2)
+        return nullptr;
+
+    PGTupleDescPtr desc = PGCreateTemplateTupleDesc(numoutargs, false);
+    for (int i = 0; i < numoutargs; i++)
+    {
+        PGTupleDescInitEntry(desc, i + 1, outargnames[i], outargtypes[i], -1, 0);
+    }
+
+    return desc;
+};
+
+Oid TypeProvider::get_call_expr_argtype(PGNode * expr, int argnum)
+{
+    PGList * args;
+    Oid argtype;
+
+    if (expr == NULL)
+        return InvalidOid;
+
+    if (IsA(expr, PGFuncExpr))
+        args = ((PGFuncExpr *)expr)->args;
+    else if (IsA(expr, PGOpExpr))
+        args = ((PGOpExpr *)expr)->args;
+    else if (IsA(expr, DistinctExpr))
+        args = ((DistinctExpr *)expr)->args;
+    else if (IsA(expr, PGScalarArrayOpExpr))
+        args = ((PGScalarArrayOpExpr *)expr)->args;
+    else if (IsA(expr, PGArrayCoerceExpr))
+        args = list_make1(((PGArrayCoerceExpr *)expr)->arg);
+    else if (IsA(expr, NullIfExpr))
+        args = ((NullIfExpr *)expr)->args;
+    else if (IsA(expr, PGWindowFunc))
+        args = ((PGWindowFunc *)expr)->args;
+    else
+        return InvalidOid;
+
+    if (argnum < 0 || argnum >= list_length(args))
+        return InvalidOid;
+
+    argtype = exprType((PGNode *)list_nth(args, argnum));
+
+    /*
+	 * special hack for ScalarArrayOpExpr and ArrayCoerceExpr: what the
+	 * underlying function will actually get passed is the element type of the
+	 * array.
+	 */
+    if (IsA(expr, PGScalarArrayOpExpr) && argnum == 1)
+        argtype = get_base_element_type(argtype);
+    else if (IsA(expr, PGArrayCoerceExpr) && argnum == 0)
+        argtype = get_base_element_type(argtype);
+
+    return argtype;
+};
+
+Oid TypeProvider::resolve_generic_type(Oid declared_type, Oid context_actual_type, Oid context_declared_type)
+{
+    if (declared_type == ANYARRAYOID)
+    {
+        if (context_declared_type == ANYARRAYOID)
+        {
+            /*
+			 * Use actual type, but it must be an array; or if it's a domain
+			 * over array, use the base array type.
+			 */
+            Oid context_base_type = getBaseType(context_actual_type);
+            Oid array_typelem = get_element_type(context_base_type);
+
+            if (!OidIsValid(array_typelem))
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_DATATYPE_MISMATCH),
+                     errmsg("argument declared \"anyarray\" is not an array but type %s", format_type_be(context_base_type).c_str())));
+            return context_base_type;
+        }
+        else if (
+            context_declared_type == ANYELEMENTOID || context_declared_type == ANYNONARRAYOID || context_declared_type == ANYENUMOID
+            || context_declared_type == ANYRANGEOID)
+        {
+            /* Use the array type corresponding to actual type */
+            Oid array_typeid = get_array_type(context_actual_type);
+
+            if (!OidIsValid(array_typeid))
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_UNDEFINED_OBJECT),
+                     errmsg("could not find array type for data type %s", format_type_be(context_actual_type).c_str())));
+            return array_typeid;
+        }
+    }
+    else if (
+        declared_type == ANYELEMENTOID || declared_type == ANYNONARRAYOID || declared_type == ANYENUMOID || declared_type == ANYRANGEOID)
+    {
+        if (context_declared_type == ANYARRAYOID)
+        {
+            /* Use the element type corresponding to actual type */
+            Oid context_base_type = getBaseType(context_actual_type);
+            Oid array_typelem = get_element_type(context_base_type);
+
+            if (!OidIsValid(array_typelem))
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_DATATYPE_MISMATCH),
+                     errmsg("argument declared \"anyarray\" is not an array but type %s", format_type_be(context_base_type).c_str())));
+            return array_typelem;
+        }
+        else if (context_declared_type == ANYRANGEOID)
+        {
+            /* Use the element type corresponding to actual type */
+            Oid context_base_type = getBaseType(context_actual_type);
+            Oid range_typelem = get_range_subtype(context_base_type);
+
+            if (!OidIsValid(range_typelem))
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_DATATYPE_MISMATCH),
+                     errmsg("argument declared \"anyrange\" is not a range type but type %s", format_type_be(context_base_type).c_str())));
+            return range_typelem;
+        }
+        else if (context_declared_type == ANYELEMENTOID || context_declared_type == ANYNONARRAYOID || context_declared_type == ANYENUMOID)
+        {
+            /* Use the actual type; it doesn't matter if array or not */
+            return context_actual_type;
+        }
+    }
+    else
+    {
+        /* declared_type isn't polymorphic, so return it as-is */
+        return declared_type;
+    }
+    /* If we get here, declared_type is polymorphic and context isn't */
+    /* NB: this is a calling-code logic error, not a user error */
+    elog(ERROR, "could not determine polymorphic type because context isn't polymorphic");
+    return InvalidOid; /* keep compiler quiet */
+};
+
+bool TypeProvider::resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, oidvector * declared_args, PGNode * call_expr)
+{
+    int natts = tupdesc->natts;
+    int nargs = declared_args->dim1;
+    bool have_anyelement_result = false;
+    bool have_anyarray_result = false;
+    bool have_anyrange_result = false;
+    bool have_anynonarray = false;
+    bool have_anyenum = false;
+    Oid anyelement_type = InvalidOid;
+    Oid anyarray_type = InvalidOid;
+    Oid anyrange_type = InvalidOid;
+    Oid anycollation = InvalidOid;
+    int i;
+
+    /* See if there are any polymorphic outputs; quick out if not */
+    for (i = 0; i < natts; i++)
+    {
+        switch (tupdesc->attrs[i]->atttypid)
+        {
+            case ANYELEMENTOID:
+                have_anyelement_result = true;
+                break;
+            case ANYARRAYOID:
+                have_anyarray_result = true;
+                break;
+            case ANYNONARRAYOID:
+                have_anyelement_result = true;
+                have_anynonarray = true;
+                break;
+            case ANYENUMOID:
+                have_anyelement_result = true;
+                have_anyenum = true;
+                break;
+            case ANYRANGEOID:
+                have_anyrange_result = true;
+                break;
+            default:
+                break;
+        }
+    }
+    if (!have_anyelement_result && !have_anyarray_result && !have_anyrange_result)
+        return true;
+
+    /*
+	 * Otherwise, extract actual datatype(s) from input arguments.  (We assume
+	 * the parser already validated consistency of the arguments.)
+	 */
+    if (!call_expr)
+        return false; /* no hope */
+
+    for (i = 0; i < nargs; i++)
+    {
+        switch (declared_args->values[i])
+        {
+            case ANYELEMENTOID:
+            case ANYNONARRAYOID:
+            case ANYENUMOID:
+                if (!OidIsValid(anyelement_type))
+                    anyelement_type = get_call_expr_argtype(call_expr, i);
+                break;
+            case ANYARRAYOID:
+                if (!OidIsValid(anyarray_type))
+                    anyarray_type = get_call_expr_argtype(call_expr, i);
+                break;
+            case ANYRANGEOID:
+                if (!OidIsValid(anyrange_type))
+                    anyrange_type = get_call_expr_argtype(call_expr, i);
+                break;
+            default:
+                break;
+        }
+    }
+
+    /* If nothing found, parser messed up */
+    if (!OidIsValid(anyelement_type) && !OidIsValid(anyarray_type) && !OidIsValid(anyrange_type))
+        return false;
+
+    /* If needed, deduce one polymorphic type from others */
+    if (have_anyelement_result && !OidIsValid(anyelement_type))
+    {
+        if (OidIsValid(anyarray_type))
+            anyelement_type = resolve_generic_type(ANYELEMENTOID, anyarray_type, ANYARRAYOID);
+        if (OidIsValid(anyrange_type))
+        {
+            Oid subtype = resolve_generic_type(ANYELEMENTOID, anyrange_type, ANYRANGEOID);
+
+            /* check for inconsistent array and range results */
+            if (OidIsValid(anyelement_type) && anyelement_type != subtype)
+                return false;
+            anyelement_type = subtype;
+        }
+    }
+
+    if (have_anyarray_result && !OidIsValid(anyarray_type))
+        anyarray_type = resolve_generic_type(ANYARRAYOID, anyelement_type, ANYELEMENTOID);
+
+    /*
+	 * We can't deduce a range type from other polymorphic inputs, because
+	 * there may be multiple range types for the same subtype.
+	 */
+    if (have_anyrange_result && !OidIsValid(anyrange_type))
+        return false;
+
+    /* Enforce ANYNONARRAY if needed */
+    if (have_anynonarray && get_element_type(anyelement_type) != InvalidOid)
+        return false;
+
+    /* Enforce ANYENUM if needed */
+    if (have_anyenum && !type_is_enum(anyelement_type))
+        return false;
+
+    /*
+	 * Identify the collation to use for polymorphic OUT parameters. (It'll
+	 * necessarily be the same for both anyelement and anyarray.)  Note that
+	 * range types are not collatable, so any possible internal collation of a
+	 * range type is not considered here.
+	 */
+    if (OidIsValid(anyelement_type))
+        anycollation = get_typcollation(anyelement_type);
+    else if (OidIsValid(anyarray_type))
+        anycollation = get_typcollation(anyarray_type);
+
+    if (OidIsValid(anycollation))
+    {
+        /*
+		 * The types are collatable, so consider whether to use a nondefault
+		 * collation.  We do so if we can identify the input collation used
+		 * for the function.
+		 */
+        Oid inputcollation = exprInputCollation(call_expr);
+
+        if (OidIsValid(inputcollation))
+            anycollation = inputcollation;
+    }
+
+    /* And finally replace the tuple column types as needed */
+    for (i = 0; i < natts; i++)
+    {
+        switch (tupdesc->attrs[i]->atttypid)
+        {
+            case ANYELEMENTOID:
+            case ANYNONARRAYOID:
+            case ANYENUMOID:
+                PGTupleDescInitEntry(tupdesc, i + 1, NameStr(tupdesc->attrs[i]->attname), anyelement_type, -1, 0);
+                PGTupleDescInitEntryCollation(tupdesc, i + 1, anycollation);
+                break;
+            case ANYARRAYOID:
+                PGTupleDescInitEntry(tupdesc, i + 1, NameStr(tupdesc->attrs[i]->attname), anyarray_type, -1, 0);
+                PGTupleDescInitEntryCollation(tupdesc, i + 1, anycollation);
+                break;
+            case ANYRANGEOID:
+                PGTupleDescInitEntry(tupdesc, i + 1, NameStr(tupdesc->attrs[i]->attname), anyrange_type, -1, 0);
+                /* no collation should be attached to a range type */
+                break;
+            default:
+                break;
+        }
+    }
+
+    return true;
 };
 
 TypeFuncClass
@@ -1980,7 +2350,7 @@ TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * c
             result = TYPEFUNC_RECORD;
         }
 
-        ReleaseSysCache(tp);
+        //ReleaseSysCache(tp);
 
         return result;
     }
@@ -1999,7 +2369,7 @@ TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * c
                  errmsg(
                      "could not determine actual result type for function \"%s\" declared to return type %s",
                      NameStr(procform->proname),
-                     format_type_be(rettype))));
+                     format_type_be(rettype).c_str())));
         rettype = newrettype;
     }
 
@@ -2035,7 +2405,7 @@ TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * c
             break;
     }
 
-    ReleaseSysCache(tp);
+    //ReleaseSysCache(tp);
 
     return result;
 };

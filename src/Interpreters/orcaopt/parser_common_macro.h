@@ -255,3 +255,14 @@
 #define GP_DIST_RANDOM_NAME "GP_DIST_RANDOM"
 
 #define QTW_EXAMINE_SORTGROUP 0x80 /* include SortGroupNode lists */
+
+/*
+ * Symbolic values for proargmodes column.  Note that these must agree with
+ * the FunctionParameterMode enum in parsenodes.h; we declare them here to
+ * be accessible from either header.
+ */
+#define PG_PROARGMODE_IN 'i'
+#define PG_PROARGMODE_OUT 'o'
+#define PG_PROARGMODE_INOUT 'b'
+#define PG_PROARGMODE_VARIADIC 'v'
+#define PG_PROARGMODE_TABLE 't'

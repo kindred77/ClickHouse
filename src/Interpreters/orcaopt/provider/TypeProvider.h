@@ -108,6 +108,14 @@ public:
 
     PGTupleDescPtr build_function_result_tupdesc_t(PGProcPtr & procTuple);
 
+    PGTupleDescPtr build_function_result_tupdesc_d(PGProcPtr & procTuple);
+
+    Oid get_call_expr_argtype(duckdb_libpgquery::PGNode * expr, int argnum);
+
+    Oid resolve_generic_type(Oid declared_type, Oid context_actual_type, Oid context_declared_type);
+
+    bool resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, oidvector * declared_args, duckdb_libpgquery::PGNode * call_expr);
+
 private:
 	FunctionProviderPtr function_provider;
 	TypeParserPtr type_parser;
@@ -115,6 +123,8 @@ private:
 	ClassProviderPtr class_provider;
 	OperProviderPtr oper_provider;
 	ProcProviderPtr proc_provider;
+
+	int NextRecordTypmod = 0;
 
 	static int TYPE_OID_ID;
 	static std::pair<Oid, PGTypePtr> TYPE_FLOAT32;
