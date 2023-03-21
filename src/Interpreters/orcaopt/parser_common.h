@@ -73,6 +73,13 @@ typedef int64 Datum;
 typedef char TYPCATEGORY;
 typedef char *Pointer;
 
+namespace duckdb_libpgquery
+{
+    typedef DistinctExpr PGDistinctExpr;
+
+    typedef NullIfExpr PGNullIfExpr;
+};
+
 typedef enum 
 {
 	EXPR_KIND_NONE = 0,			/* "not in an expression" */
@@ -463,12 +470,42 @@ struct Form_pg_attribute
 
 using PGAttrPtr = std::shared_ptr<Form_pg_attribute>;
 
+typedef struct attrDefault
+{
+    PGAttrNumber adnum;
+    std::string adbin; /* nodeToString representation of expr */
+} PGAttrDefault;
+
+using PGAttrDefaultPtr = std::shared_ptr<PGAttrDefault>;
+
+typedef struct constrCheck
+{
+    std::string ccname;
+    std::string ccbin; /* nodeToString representation of expr */
+    bool ccvalid;
+    bool ccnoinherit; /* this is a non-inheritable constraint */
+} PGConstrCheck;
+
+using PGConstrCheckPtr = std::shared_ptr<PGConstrCheck>;
+
+/* This structure contains constraints of a tuple */
+typedef struct tupleConstr
+{
+    std::vector<PGAttrDefaultPtr> defval; /* array */
+    std::vector<PGConstrCheckPtr> check; /* array */
+    uint16 num_defval;
+    uint16 num_check;
+    bool has_not_null;
+} PGTupleConstr;
+
+using PGTupleConstrPtr = std::shared_ptr<PGTupleConstr>;
+
 struct PGTupleDesc
 {
     int natts; /* number of attributes in the tuple */
     std::vector<PGAttrPtr> attrs;
     /* attrs[N] is a pointer to the description of Attribute Number N+1 */
-    //TupleConstr *constr;		/* constraints, or NULL if none */
+    PGTupleConstrPtr constr;		/* constraints, or NULL if none */
     Oid tdtypeid; /* composite type ID for tuple type */
     int32 tdtypmod; /* typmod for tuple type */
     bool tdhasoid; /* tuple has oid attribute in its header */
@@ -944,6 +981,94 @@ PGTupleDescPtr PGCreateTemplateTupleDesc(int natts, bool hasoid)
     result->tdrefcount = -1;
 
 	return result;
+};
+
+/*
+ * CreateTupleDescCopy
+ *		This function creates a new TupleDesc by copying from an existing
+ *		TupleDesc.
+ *
+ * !!! Constraints and defaults are not copied !!!
+ */
+PGTupleDescPtr PGCreateTupleDescCopy(PGTupleDescPtr tupdesc)
+{
+    PGTupleDescPtr desc = PGCreateTemplateTupleDesc(tupdesc->natts, tupdesc->tdhasoid);
+
+    for (int i = 0; i < desc->natts; i++)
+    {
+        desc->attrs.push_back(std::make_shared<Form_pg_attribute>(*tupdesc->attrs[i].get()));
+        desc->attrs[i]->attnotnull = false;
+        desc->attrs[i]->atthasdef = false;
+    }
+
+    desc->tdtypeid = tupdesc->tdtypeid;
+    desc->tdtypmod = tupdesc->tdtypmod;
+
+    return desc;
+};
+
+/*
+ * CreateTupleDescCopyConstr
+ *		This function creates a new TupleDesc by copying from an existing
+ *		TupleDesc (including its constraints and defaults).
+ */
+PGTupleDescPtr PGCreateTupleDescCopyConstr(PGTupleDescPtr tupdesc)
+{
+    PGTupleDescPtr desc = PGCreateTemplateTupleDesc(tupdesc->natts, tupdesc->tdhasoid);
+
+    for (int i = 0; i < desc->natts; i++)
+    {
+        desc->attrs.push_back(std::make_shared<Form_pg_attribute>(*tupdesc->attrs[i].get()));
+    }
+
+    if (tupdesc->constr != nullptr)
+    {
+        PGTupleConstrPtr cpy = std::make_shared<PGTupleConstr>();
+
+        cpy->has_not_null = tupdesc->constr->has_not_null;
+
+        if ((cpy->num_defval = tupdesc->constr->num_defval) > 0)
+        {
+            //cpy->defval = (AttrDefault *)palloc(cpy->num_defval * sizeof(AttrDefault));
+            //memcpy(cpy->defval, tupdesc->constr->defval, cpy->num_defval * sizeof(AttrDefault));
+            for (auto def_val : tupdesc->constr->defval)
+            {
+                cpy->defval.push_back(std::make_shared<PGAttrDefault>(*def_val.get()));
+            }
+            for (int i = cpy->num_defval - 1; i >= 0; i--)
+            {
+                if (tupdesc->constr->defval[i]->adbin != "")
+                    cpy->defval[i]->adbin = tupdesc->constr->defval[i]->adbin;
+            }
+        }
+
+        if ((cpy->num_check = tupdesc->constr->num_check) > 0)
+        {
+            //cpy->check = (ConstrCheck *)palloc(cpy->num_check * sizeof(ConstrCheck));
+            //memcpy(cpy->check, tupdesc->constr->check, cpy->num_check * sizeof(ConstrCheck));
+            for (auto chck : tupdesc->constr->check)
+            {
+                cpy->check.push_back(std::make_shared<PGConstrCheck>(*chck.get()));
+            }
+
+            for (int i = cpy->num_check - 1; i >= 0; i--)
+            {
+                if (tupdesc->constr->check[i]->ccname != "")
+                    cpy->check[i]->ccname = tupdesc->constr->check[i]->ccname;
+                if (tupdesc->constr->check[i]->ccbin != "")
+                    cpy->check[i]->ccbin = tupdesc->constr->check[i]->ccbin;
+                cpy->check[i]->ccvalid = tupdesc->constr->check[i]->ccvalid;
+                cpy->check[i]->ccnoinherit = tupdesc->constr->check[i]->ccnoinherit;
+            }
+        }
+
+        desc->constr = cpy;
+    }
+
+    desc->tdtypeid = tupdesc->tdtypeid;
+    desc->tdtypmod = tupdesc->tdtypmod;
+
+    return desc;
 };
 
 int

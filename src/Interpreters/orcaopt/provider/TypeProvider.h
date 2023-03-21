@@ -8,7 +8,9 @@
 
 #include <gpos/memory/CMemoryPool.h>
 
+#include <algorithm>
 #include <map>
+#include <unordered_map>
 
 namespace DB
 {
@@ -27,6 +29,17 @@ using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 using ClassProviderPtr = std::shared_ptr<ClassProvider>;
 using OperProviderPtr = std::shared_ptr<OperProvider>;
 using ProcProviderPtr = std::shared_ptr<ProcProvider>;
+
+struct PGTupleDescHash
+{
+    std::size_t operator()(const PGTupleDescPtr & key) const;
+};
+
+struct PGTupleDescEqual
+{
+    bool operator()(const PGTupleDescPtr & lhs, const PGTupleDescPtr & rhs) const;
+};
+
 
 class TypeProvider
 {
@@ -91,7 +104,7 @@ public:
     bool type_is_collatable(Oid typid);
 
     void PGTupleDescInitEntry(
-        PGTupleDescPtr desc, PGAttrNumber attributeNumber, const char * attributeName,
+        PGTupleDescPtr desc, PGAttrNumber attributeNumber, const std::string & attributeName,
 		Oid oidtypeid, int32 typmod, int attdim);
 
     TypeFuncClass get_expr_result_type(duckdb_libpgquery::PGNode * expr, Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc);
@@ -114,7 +127,9 @@ public:
 
     Oid resolve_generic_type(Oid declared_type, Oid context_actual_type, Oid context_declared_type);
 
-    bool resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, oidvector * declared_args, duckdb_libpgquery::PGNode * call_expr);
+    void assign_record_type_typmod(PGTupleDescPtr tupDesc);
+
+    bool resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, std::vector<Oid> & declared_args, duckdb_libpgquery::PGNode * call_expr);
 
 private:
 	FunctionProviderPtr function_provider;
@@ -124,7 +139,9 @@ private:
 	OperProviderPtr oper_provider;
 	ProcProviderPtr proc_provider;
 
-	int NextRecordTypmod = 0;
+	std::unordered_map<PGTupleDescPtr, const PGTupleDesc &, PGTupleDescHash, PGTupleDescEqual> recordCacheHash;
+	size_t NextRecordTypmod = 0;
+	std::vector<PGTupleDescPtr> recordCacheArray;
 
 	static int TYPE_OID_ID;
 	static std::pair<Oid, PGTypePtr> TYPE_FLOAT32;

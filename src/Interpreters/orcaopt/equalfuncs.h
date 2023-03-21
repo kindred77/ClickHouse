@@ -3599,3 +3599,141 @@ bool pg_equal(const void * a, const void * b)
 
     return retval;
 };
+
+/*
+ * Compare two TupleDesc structures for logical equality
+ *
+ * Note: we deliberately do not check the attrelid and tdtypmod fields.
+ * This allows typcache.c to use this routine to see if a cached record type
+ * matches a requested type, and is harmless for relcache.c's uses.
+ * We don't compare tdrefcount, either.
+ */
+bool equalTupleDescs(PGTupleDescPtr tupdesc1, PGTupleDescPtr tupdesc2, bool strict)
+{
+    int i, j, n;
+
+    if (tupdesc1->natts != tupdesc2->natts)
+        return false;
+    if (strict && tupdesc1->tdtypeid != tupdesc2->tdtypeid)
+        return false;
+    if (tupdesc1->tdhasoid != tupdesc2->tdhasoid)
+        return false;
+
+    for (i = 0; i < tupdesc1->natts; i++)
+    {
+        PGAttrPtr attr1 = tupdesc1->attrs[i];
+        PGAttrPtr attr2 = tupdesc2->attrs[i];
+
+        /*
+		 * We do not need to check every single field here: we can disregard
+		 * attrelid and attnum (which were used to place the row in the attrs
+		 * array in the first place).  It might look like we could dispense
+		 * with checking attlen/attbyval/attalign, since these are derived
+		 * from atttypid; but in the case of dropped columns we must check
+		 * them (since atttypid will be zero for all dropped columns) and in
+		 * general it seems safer to check them always.
+		 *
+		 * attcacheoff must NOT be checked since it's possibly not set in both
+		 * copies.
+		 */
+        if (strcmp(NameStr(attr1->attname), NameStr(attr2->attname)) != 0)
+            return false;
+        if (attr1->atttypid != attr2->atttypid)
+            return false;
+        if (attr1->attstattarget != attr2->attstattarget)
+            return false;
+        if (attr1->attlen != attr2->attlen)
+            return false;
+        if (attr1->attndims != attr2->attndims)
+            return false;
+        if (attr1->atttypmod != attr2->atttypmod)
+            return false;
+        if (attr1->attbyval != attr2->attbyval)
+            return false;
+        if (attr1->attstorage != attr2->attstorage)
+            return false;
+        if (attr1->attalign != attr2->attalign)
+            return false;
+
+        if (strict)
+        {
+            if (attr1->attnotnull != attr2->attnotnull)
+                return false;
+            if (attr1->atthasdef != attr2->atthasdef)
+                return false;
+            if (attr1->attisdropped != attr2->attisdropped)
+                return false;
+            if (attr1->attislocal != attr2->attislocal)
+                return false;
+            if (attr1->attinhcount != attr2->attinhcount)
+                return false;
+            if (attr1->attcollation != attr2->attcollation)
+                return false;
+            /* attacl and attoptions are not even present... */
+        }
+    }
+
+    if (!strict)
+        return true;
+
+    if (tupdesc1->constr != nullptr)
+    {
+        PGTupleConstrPtr constr1 = tupdesc1->constr;
+        PGTupleConstrPtr constr2 = tupdesc2->constr;
+
+        if (constr2 == NULL)
+            return false;
+        if (constr1->has_not_null != constr2->has_not_null)
+            return false;
+        n = constr1->num_defval;
+        if (n != (int)constr2->num_defval)
+            return false;
+        for (i = 0; i < n; i++)
+        {
+            PGAttrDefaultPtr defval1 = constr1->defval[i];
+            PGAttrDefaultPtr defval2 = nullptr;
+
+            /*
+			 * We can't assume that the items are always read from the system
+			 * catalogs in the same order; so use the adnum field to identify
+			 * the matching item to compare.
+			 */
+            for (j = 0; j < n; j++)
+            {
+                defval2 = constr2->defval[j];
+                if (defval1->adnum == defval2->adnum)
+                    break;
+            }
+            if (j >= n)
+                return false;
+            if (defval1->adbin != defval2->adbin)
+                return false;
+        }
+        n = constr1->num_check;
+        if (n != (int)constr2->num_check)
+            return false;
+        for (i = 0; i < n; i++)
+        {
+            PGConstrCheckPtr check1 = constr1->check[i];
+            PGConstrCheckPtr check2 = nullptr;
+
+            /*
+			 * Similarly, don't assume that the checks are always read in the
+			 * same order; match them up by name and contents. (The name
+			 * *should* be unique, but...)
+			 */
+            for (j = 0; j < n; j++)
+            {
+                check2 = constr2->check[j];
+                if (check1->ccname == check2->ccname && check1->ccbin == check2->ccbin
+                    && check1->ccvalid == check2->ccvalid && check1->ccnoinherit == check2->ccnoinherit)
+                    break;
+            }
+            if (j >= n)
+                return false;
+        }
+    }
+    else if (tupdesc2->constr != NULL)
+        return false;
+    return true;
+};

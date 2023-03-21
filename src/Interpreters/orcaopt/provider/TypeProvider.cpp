@@ -1,11 +1,15 @@
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 
+#include <Interpreters/orcaopt/equalfuncs.h>
+
 #include <Interpreters/orcaopt/TypeParser.h>
 #include <Interpreters/orcaopt/provider/FunctionProvider.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 #include <Interpreters/orcaopt/provider/ClassProvider.h>
 #include <Interpreters/orcaopt/provider/OperProvider.h>
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
+
+#include <Common/SipHash.h>
 
 #include "naucrates/dxl/CDXLUtils.h"
 
@@ -1486,7 +1490,7 @@ PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_internal(Oid type_id, int32 
         /*
 		 * It's a transient record type, so look in our record-type table.
 		 */
-        if (typmod < 0 || typmod >= NextRecordTypmod)
+        if (typmod < 0 || (size_t)typmod >= NextRecordTypmod)
         {
             if (!noError)
             {
@@ -1494,9 +1498,7 @@ PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_internal(Oid type_id, int32 
             }
             return nullptr;
         }
-		//TODO kindred
-        //return RecordCacheArray[typmod];
-		ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("record type cache in RecordCacheArray not supported yet!")));
+        return recordCacheArray[typmod];
     }
 
 	return nullptr;
@@ -1835,7 +1837,7 @@ TypeProvider::type_is_collatable(Oid typid)
 };
 
 void TypeProvider::PGTupleDescInitEntry(
-        PGTupleDescPtr desc, PGAttrNumber attributeNumber, const char * attributeName,
+        PGTupleDescPtr desc, PGAttrNumber attributeNumber, const std::string & attributeName,
 		Oid oidtypeid, int32 typmod, int attdim)
 {
 	//HeapTuple tuple;
@@ -1861,10 +1863,10 @@ void TypeProvider::PGTupleDescInitEntry(
 	 * fill in valid resname values in targetlists, particularly for resjunk
 	 * attributes. Also, do nothing if caller wants to re-use the old attname.
 	 */
-    if (attributeName == NULL)
+    if (attributeName == "")
         MemSet(NameStr(att->attname), 0, NAMEDATALEN);
-    else if (attributeName != NameStr(att->attname))
-        namestrcpy(&(att->attname), attributeName);
+    else if (attributeName != std::string(NameStr(att->attname)))
+        namestrcpy(&(att->attname), attributeName.c_str());
 
     att->attstattarget = -1;
     att->attcacheoff = -1;
@@ -1898,9 +1900,9 @@ void TypeProvider::PGTupleDescInitEntry(
 PGTupleDescPtr TypeProvider::build_function_result_tupdesc_t(PGProcPtr & procTuple)
 {
     //Form_pg_proc procform = (Form_pg_proc)GETSTRUCT(procTuple);
-    Datum proallargtypes;
-    Datum proargmodes;
-    Datum proargnames;
+    //Datum proallargtypes;
+    //Datum proargmodes;
+    //Datum proargnames;
     //bool isnull;
 
     /* Return NULL if the function isn't declared to return RECORD */
@@ -1942,7 +1944,7 @@ PGTupleDescPtr TypeProvider::build_function_result_tupdesc_d(PGProcPtr & procTup
 		return nullptr;
 	}
 
-	int numargs = procTuple->proallargtypes.size();
+	auto numargs = procTuple->proallargtypes.size();
 
 	/* zero elements probably shouldn't happen, but handle it gracefully */
     if (numargs <= 0)
@@ -1961,11 +1963,11 @@ PGTupleDescPtr TypeProvider::build_function_result_tupdesc_d(PGProcPtr & procTup
 	std::vector<std::string> outargnames;
     //char ** outargnames = (char **)palloc(numargs * sizeof(char *));
     int numoutargs = 0;
-    for (int i = 0; i < numargs; i++)
+    for (size_t i = 0; i < numargs; i++)
     {
         std::string pname = "";
 
-        switch (procTuple->argmodes[i])
+        switch (procTuple->proargmodes[i])
         {
             /* input modes */
             case PG_PROARGMODE_IN:
@@ -1979,7 +1981,7 @@ PGTupleDescPtr TypeProvider::build_function_result_tupdesc_d(PGProcPtr & procTup
             /* output modes */
             case PG_PROARGMODE_OUT:
             case PG_PROARGMODE_TABLE:
-				outargtypes.push_back(argtypes[i]);
+				outargtypes.push_back(procTuple->proallargtypes[i]);
                 if (procTuple->proargnames.size() > i)
                     pname = procTuple->proargnames[i];
                 else
@@ -2023,14 +2025,14 @@ Oid TypeProvider::get_call_expr_argtype(PGNode * expr, int argnum)
         args = ((PGFuncExpr *)expr)->args;
     else if (IsA(expr, PGOpExpr))
         args = ((PGOpExpr *)expr)->args;
-    else if (IsA(expr, DistinctExpr))
-        args = ((DistinctExpr *)expr)->args;
+    else if (IsA(expr, PGDistinctExpr))
+        args = ((PGDistinctExpr *)expr)->args;
     else if (IsA(expr, PGScalarArrayOpExpr))
         args = ((PGScalarArrayOpExpr *)expr)->args;
     else if (IsA(expr, PGArrayCoerceExpr))
         args = list_make1(((PGArrayCoerceExpr *)expr)->arg);
-    else if (IsA(expr, NullIfExpr))
-        args = ((NullIfExpr *)expr)->args;
+    else if (IsA(expr, PGNullIfExpr))
+        args = ((PGNullIfExpr *)expr)->args;
     else if (IsA(expr, PGWindowFunc))
         args = ((PGWindowFunc *)expr)->args;
     else
@@ -2135,10 +2137,10 @@ Oid TypeProvider::resolve_generic_type(Oid declared_type, Oid context_actual_typ
     return InvalidOid; /* keep compiler quiet */
 };
 
-bool TypeProvider::resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, oidvector * declared_args, PGNode * call_expr)
+bool TypeProvider::resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, std::vector<Oid> & declared_args, PGNode * call_expr)
 {
     int natts = tupdesc->natts;
-    int nargs = declared_args->dim1;
+    //int nargs = declared_args->dim1;
     bool have_anyelement_result = false;
     bool have_anyarray_result = false;
     bool have_anyrange_result = false;
@@ -2184,11 +2186,36 @@ bool TypeProvider::resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, oidvector
 	 * the parser already validated consistency of the arguments.)
 	 */
     if (!call_expr)
+	{
         return false; /* no hope */
+	}
 
-    for (i = 0; i < nargs; i++)
+    // for (i = 0; i < nargs; i++)
+    // {
+    //     switch (declared_args->values[i])
+    //     {
+    //         case ANYELEMENTOID:
+    //         case ANYNONARRAYOID:
+    //         case ANYENUMOID:
+    //             if (!OidIsValid(anyelement_type))
+    //                 anyelement_type = get_call_expr_argtype(call_expr, i);
+    //             break;
+    //         case ANYARRAYOID:
+    //             if (!OidIsValid(anyarray_type))
+    //                 anyarray_type = get_call_expr_argtype(call_expr, i);
+    //             break;
+    //         case ANYRANGEOID:
+    //             if (!OidIsValid(anyrange_type))
+    //                 anyrange_type = get_call_expr_argtype(call_expr, i);
+    //             break;
+    //         default:
+    //             break;
+    //     }
+    // }
+
+	for (const auto oid : declared_args)
     {
-        switch (declared_args->values[i])
+        switch (oid)
         {
             case ANYELEMENTOID:
             case ANYNONARRAYOID:
@@ -2298,6 +2325,82 @@ bool TypeProvider::resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, oidvector
     return true;
 };
 
+std::size_t PGTupleDescHash::operator()(const PGTupleDescPtr & key) const
+{
+	bool strict = false;
+	SipHash hash;
+    hash.update<int>(key->natts);
+	hash.update<Oid>(key->tdtypeid);
+	hash.update<bool>(key->tdhasoid);
+	for (int i = 0; i < key->natts; i++)
+	{
+		PGAttrPtr attr = key->attrs[i];
+		hash.update(std::string(attr->attname.data));
+		hash.update<Oid>(attr->atttypid);
+		hash.update<int4>(attr->attstattarget);
+		hash.update<int2>(attr->attlen);
+		hash.update<int4>(attr->attndims);
+		hash.update<int4>(attr->atttypmod);
+		hash.update<bool>(attr->attbyval);
+		hash.update<char>(attr->attstorage);
+		hash.update<char>(attr->attalign);
+		if (strict)
+		{
+			hash.update<bool>(attr->attnotnull);
+			hash.update<bool>(attr->atthasdef);
+			hash.update<bool>(attr->attisdropped);
+			hash.update<bool>(attr->attislocal);
+			hash.update<int4>(attr->attinhcount);
+			hash.update<Oid>(attr->attcollation);
+		}
+	}
+
+	if (key->constr != nullptr)
+	{
+		PGTupleConstrPtr constr = key->constr;
+		hash.update<bool>(constr->has_not_null);
+		hash.update<uint16>(constr->num_defval);
+		hash.update<uint16>(constr->num_check);
+	}
+
+    return hash.get64();
+};
+
+bool PGTupleDescEqual::operator()(const PGTupleDescPtr & lhs, const PGTupleDescPtr & rhs) const
+{
+    return equalTupleDescs(lhs, rhs, true);
+};
+
+void TypeProvider::assign_record_type_typmod(PGTupleDescPtr tupDesc)
+{
+	auto it = recordCacheHash.find(tupDesc);
+	if (it != recordCacheHash.end())
+	{
+		tupDesc->tdtypmod = it->second.tdtypmod;
+		return;
+	}
+
+    if (recordCacheArray.size() <= 0)
+    {
+        recordCacheArray.resize(64);
+    }
+    else if (NextRecordTypmod >= recordCacheArray.size())
+    {
+        int32 newlen = recordCacheArray.size() * 2;
+
+        recordCacheArray.resize(newlen);
+    }
+
+    PGTupleDescPtr entDesc = PGCreateTupleDescCopy(tupDesc);
+
+	int32 newtypmod = NextRecordTypmod++;
+	entDesc->tdtypmod = newtypmod;
+	recordCacheArray[newtypmod] = entDesc;
+
+	/* report to caller as well */
+	tupDesc->tdtypmod = newtypmod;
+};
+
 TypeFuncClass
 TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * call_expr,
         Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc)
@@ -2335,18 +2438,18 @@ TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * c
         if (resultTypeId)
             *resultTypeId = rettype;
 
-        if (resolve_polymorphic_tupdesc(tupdesc, &procform->proargtypes, call_expr))
+        if (resolve_polymorphic_tupdesc(tupdesc, tp->proargtypes, call_expr))
         {
             if (tupdesc->tdtypeid == RECORDOID && tupdesc->tdtypmod < 0)
                 assign_record_type_typmod(tupdesc);
             if (resultTupleDesc)
-                *resultTupleDesc = tupdesc;
+                resultTupleDesc = tupdesc;
             result = TYPEFUNC_COMPOSITE;
         }
         else
         {
             if (resultTupleDesc)
-                *resultTupleDesc = NULL;
+                resultTupleDesc = nullptr;
             result = TYPEFUNC_RECORD;
         }
 
@@ -2368,7 +2471,7 @@ TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * c
                 (errcode(ERRCODE_DATATYPE_MISMATCH),
                  errmsg(
                      "could not determine actual result type for function \"%s\" declared to return type %s",
-                     NameStr(procform->proname),
+                     tp->proname.c_str(),
                      format_type_be(rettype).c_str())));
         rettype = newrettype;
     }
@@ -2376,7 +2479,7 @@ TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * c
     if (resultTypeId)
         *resultTypeId = rettype;
     if (resultTupleDesc)
-        *resultTupleDesc = NULL; /* default result */
+        resultTupleDesc = nullptr; /* default result */
 
     /* Classify the result type */
     result = get_type_func_class(rettype);
@@ -2384,7 +2487,7 @@ TypeProvider::internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * c
     {
         case TYPEFUNC_COMPOSITE:
             if (resultTupleDesc)
-                *resultTupleDesc = lookup_rowtype_tupdesc_copy(rettype, -1);
+                resultTupleDesc = lookup_rowtype_tupdesc_copy(rettype, -1);
             /* Named composite types can't have any polymorphic columns */
             break;
         case TYPEFUNC_SCALAR:
