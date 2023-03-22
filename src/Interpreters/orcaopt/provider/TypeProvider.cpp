@@ -2599,7 +2599,14 @@ PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_copy(Oid type_id, int32 typm
 
 Oid TypeProvider::get_typeoid_by_typename_namespaceoid(const char * type_name, Oid namespace_oid)
 {
-	return Oid(0);
+	for (auto pair : oid_type_map)
+	{
+		if (pair.second->typname == std::string(type_name))
+		{
+			return pair.first;
+		}
+	}
+	return InvalidOid;
 };
 
 Oid TypeProvider::TypenameGetTypidExtended(const char * typname, bool temp_ok)
@@ -2622,7 +2629,7 @@ Oid TypeProvider::TypenameGetTypidExtended(const char * typname, bool temp_ok)
     // }
 
     /* Not found in path */
-    return InvalidOid;
+	return get_typeoid_by_typename_namespaceoid(typname, Oid(0));
 };
 
 Oid TypeProvider::getTypeIOParam(PGTypePtr typeTuple)
