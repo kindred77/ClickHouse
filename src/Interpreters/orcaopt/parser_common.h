@@ -341,16 +341,16 @@ typedef duckdb_libpgquery::PGBitmapset *PGRelids;
 // 	std::vector<PGColumn> columns;
 // };
 
-struct NameData
-{
-    char data[NAMEDATALEN];
-};
-typedef NameData * Name;
+// struct NameData
+// {
+//     char data[NAMEDATALEN];
+// };
+// typedef NameData * Name;
 
 struct Form_pg_attribute
 {
     Oid attrelid; /* OID of relation containing this attribute */
-    NameData attname; /* name of attribute */
+    std::string attname; /* name of attribute */
 
     /*
 	 * atttypid is the OID of the instance in Catalog Class pg_type that
@@ -517,7 +517,7 @@ using PGTupleDescPtr = std::shared_ptr<PGTupleDesc>;
 struct Form_pg_operator
 {
 	Oid oid;
-    NameData oprname; /* name of operator */
+    std::string oprname; /* name of operator */
     Oid oprnamespace; /* OID of namespace containing this oper */
     Oid oprowner; /* operator owner */
     char oprkind; /* 'l', 'r', or 'b' */
@@ -710,7 +710,7 @@ using PGTypePtr = std::shared_ptr<Form_pg_type>;
 
 struct Form_pg_class
 {
-    NameData relname; /* class name */
+    std::string relname; /* class name */
     Oid relnamespace; /* OID of namespace containing this class */
     Oid reltype; /* OID of entry in pg_type for table's
 								 * implicit row type */
@@ -1072,14 +1072,14 @@ PGTupleDescPtr PGCreateTupleDescCopyConstr(PGTupleDescPtr tupdesc)
     return desc;
 };
 
-int
-namestrcpy(Name name, const char *str)
-{
-	if (!name || !str)
-		return -1;
-	StrNCpy(NameStr(*name), str, NAMEDATALEN);
-	return 0;
-};
+// int
+// namestrcpy(Name name, const char *str)
+// {
+// 	if (!name || !str)
+// 		return -1;
+// 	StrNCpy(NameStr(*name), str, NAMEDATALEN);
+// 	return 0;
+// };
 
 void PGTupleDescInitEntryCollation(PGTupleDescPtr desc, PGAttrNumber attributeNumber, Oid collationid)
 {
@@ -2188,7 +2188,7 @@ struct PGRelation
 using PGRelationPtr = std::shared_ptr<PGRelation>;
 
 #define RelationGetRelationName(relation) \
-	(NameStr((relation)->rd_rel->relname))
+	((relation)->rd_rel->relname.c_str())
 
 duckdb_libpgquery::PGList * stringToQualifiedNameList(const char * string)
 {

@@ -545,7 +545,7 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
             /* add TargetEntry decoration */
             PGTargetEntry * te;
 
-            te = makeTargetEntry((PGExpr *)fselect, (PGAttrNumber)pstate->p_next_resno++, pstrdup(NameStr(att->attname)), false);
+            te = makeTargetEntry((PGExpr *)fselect, (PGAttrNumber)pstate->p_next_resno++, pstrdup(att->attname.c_str()), false);
             result = lappend(result, te);
         }
         else

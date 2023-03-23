@@ -92,7 +92,7 @@ FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, P
     {
         PGAttrPtr att = tupdesc->attrs[i];
 
-        if (strcmp(funcname, NameStr(att->attname)) == 0 && !att->attisdropped)
+        if (strcmp(funcname, att->attname.c_str()) == 0 && !att->attisdropped)
         {
             /* Success, so generate a FieldSelect expression */
             PGFieldSelect * fselect = makeNode(PGFieldSelect);

@@ -204,7 +204,7 @@ RelationParser::buildRelationAliases(PGTupleDescPtr tupdesc, PGAlias *alias, PGA
         }
         else
         {
-            attrname = makeString(pstrdup(NameStr(attr->attname)));
+            attrname = makeString(pstrdup(attr->attname.c_str()));
             /* we're done with the alias if any */
         }
 
@@ -427,7 +427,7 @@ RelationParser::expandTupleDesc(PGTupleDescPtr tupdesc, PGAlias *eref, int count
 
         if (colnames)
         {
-            char * label;
+            const char * label;
 
             if (aliascell)
             {
@@ -437,7 +437,7 @@ RelationParser::expandTupleDesc(PGTupleDescPtr tupdesc, PGAlias *eref, int count
             else
             {
                 /* If we run out of aliases, use the underlying name */
-                label = NameStr(attr->attname);
+                label = attr->attname.c_str();
             }
             *colnames = lappend(*colnames, makeString(pstrdup(label)));
         }
@@ -1806,7 +1806,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
                     ereport(
                         ERROR,
                         (errcode(ERRCODE_UNDEFINED_COLUMN),
-                         errmsg("column \"%s\" of relation \"%s\" does not exist", NameStr(tp->attname), relation_provider->get_rel_name(rte->relid))));
+                         errmsg("column \"%s\" of relation \"%s\" does not exist", tp->attname.c_str(), relation_provider->get_rel_name(rte->relid))));
             *vartype = tp->atttypid;
             *vartypmod = tp->atttypmod;
             *varcollid = tp->attcollation;
@@ -1861,7 +1861,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
                                     (errcode(ERRCODE_UNDEFINED_COLUMN),
                                      errmsg(
                                          "column \"%s\" of relation \"%s\" does not exist",
-                                         NameStr(att_tup->attname),
+                                         att_tup->attname.c_str(),
                                          rte->eref->aliasname)));
                             *vartype = att_tup->atttypid;
                             *vartypmod = att_tup->atttypmod;

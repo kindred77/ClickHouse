@@ -16,8 +16,8 @@ private:
 	using Map = std::map<Oid, PGOperatorPtr>;
 
 	Map oid_oper_map;
-	ContextPtr context;
-	gpos::CMemoryPool *mp;
+	//ContextPtr context;
+	//gpos::CMemoryPool *mp;
 
 	static std::pair<Oid, PGOperatorPtr> OPER_INT2PL;
 	static std::pair<Oid, PGOperatorPtr> OPER_INT4PL;

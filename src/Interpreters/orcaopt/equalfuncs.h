@@ -3636,7 +3636,7 @@ bool equalTupleDescs(PGTupleDescPtr tupdesc1, PGTupleDescPtr tupdesc2, bool stri
 		 * attcacheoff must NOT be checked since it's possibly not set in both
 		 * copies.
 		 */
-        if (strcmp(NameStr(attr1->attname), NameStr(attr2->attname)) != 0)
+        if (strcmp(attr1->attname.c_str(), attr2->attname.c_str()) != 0)
             return false;
         if (attr1->atttypid != attr2->atttypid)
             return false;

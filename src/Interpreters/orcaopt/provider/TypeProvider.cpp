@@ -1863,10 +1863,16 @@ void TypeProvider::PGTupleDescInitEntry(
 	 * fill in valid resname values in targetlists, particularly for resjunk
 	 * attributes. Also, do nothing if caller wants to re-use the old attname.
 	 */
-    if (attributeName == "")
-        MemSet(NameStr(att->attname), 0, NAMEDATALEN);
-    else if (attributeName != std::string(NameStr(att->attname)))
-        namestrcpy(&(att->attname), attributeName.c_str());
+    // if (attributeName == "")
+	// {
+	// 	MemSet(NameStr(att->attname), 0, NAMEDATALEN);
+	// }
+    // else if (attributeName != std::string(NameStr(att->attname)))
+	// {
+	// 	namestrcpy(&(att->attname), attributeName.c_str());
+	// }
+
+	att->attname = attributeName;
 
     att->attstattarget = -1;
     att->attcacheoff = -1;
@@ -2306,15 +2312,15 @@ bool TypeProvider::resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, std::vect
             case ANYELEMENTOID:
             case ANYNONARRAYOID:
             case ANYENUMOID:
-                PGTupleDescInitEntry(tupdesc, i + 1, NameStr(tupdesc->attrs[i]->attname), anyelement_type, -1, 0);
+                PGTupleDescInitEntry(tupdesc, i + 1, tupdesc->attrs[i]->attname, anyelement_type, -1, 0);
                 PGTupleDescInitEntryCollation(tupdesc, i + 1, anycollation);
                 break;
             case ANYARRAYOID:
-                PGTupleDescInitEntry(tupdesc, i + 1, NameStr(tupdesc->attrs[i]->attname), anyarray_type, -1, 0);
+                PGTupleDescInitEntry(tupdesc, i + 1, tupdesc->attrs[i]->attname, anyarray_type, -1, 0);
                 PGTupleDescInitEntryCollation(tupdesc, i + 1, anycollation);
                 break;
             case ANYRANGEOID:
-                PGTupleDescInitEntry(tupdesc, i + 1, NameStr(tupdesc->attrs[i]->attname), anyrange_type, -1, 0);
+                PGTupleDescInitEntry(tupdesc, i + 1, tupdesc->attrs[i]->attname, anyrange_type, -1, 0);
                 /* no collation should be attached to a range type */
                 break;
             default:
@@ -2335,7 +2341,7 @@ std::size_t PGTupleDescHash::operator()(const PGTupleDescPtr & key) const
 	for (int i = 0; i < key->natts; i++)
 	{
 		PGAttrPtr attr = key->attrs[i];
-		hash.update(std::string(attr->attname.data));
+		hash.update(attr->attname);
 		hash.update<Oid>(attr->atttypid);
 		hash.update<int4>(attr->attstattarget);
 		hash.update<int2>(attr->attlen);
