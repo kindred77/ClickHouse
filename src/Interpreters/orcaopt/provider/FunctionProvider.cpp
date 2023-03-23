@@ -377,7 +377,7 @@ Datum FunctionProvider::OidInputFunctionCall(Oid functionId, const char * str, O
     return result;
 };
 
-FuncCandidateList
+FuncCandidateListPtr
 FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argnames,
 		bool expand_variadic, bool expand_defaults, bool missing_ok)
 {
@@ -706,7 +706,7 @@ FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argn
 
     // return resultList;
 
-    return {};
+    return nullptr;
 };
 
 PGList * FunctionProvider::SystemFuncName(const char * name)

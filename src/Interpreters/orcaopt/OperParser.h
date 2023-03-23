@@ -60,7 +60,7 @@ public:
 	FuncDetailCode
 	oper_select_candidate(int nargs,
 					  Oid *input_typeids,
-					  FuncCandidateList candidates,
+					  FuncCandidateListPtr & candidates,
 					  Oid *operOid); /* output argument */
 
 	std::string

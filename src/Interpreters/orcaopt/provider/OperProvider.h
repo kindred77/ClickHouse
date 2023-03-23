@@ -18,13 +18,30 @@ private:
 	Map oid_oper_map;
 	ContextPtr context;
 	gpos::CMemoryPool *mp;
+
+	static std::pair<Oid, PGOperatorPtr> OPER_INT2PL;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT4PL;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT24PL;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT42PL;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT2MI;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT4MI;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT24MI;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT42MI;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT2MUL;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT4MUL;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT24MUL;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT42MUL;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT2DIV;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT4DIV;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT24DIV;
+	static std::pair<Oid, PGOperatorPtr> OPER_INT42DIV;
 public:
 	//explicit OperProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	explicit OperProvider();
 	PGOperatorPtr getOperByOID(Oid oid) const;
 	Oid getOperByName(duckdb_libpgquery::PGList *names, Oid oprleft, Oid oprright) const;
 
-    FuncCandidateList OpernameGetCandidates(duckdb_libpgquery::PGList * names, char oprkind, bool missing_schema_ok);
+    FuncCandidateListPtr OpernameGetCandidates(duckdb_libpgquery::PGList * names, char oprkind, bool missing_schema_ok);
 
 	Oid get_opcode(Oid opno);
 

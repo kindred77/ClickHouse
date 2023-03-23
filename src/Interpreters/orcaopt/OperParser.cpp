@@ -152,10 +152,9 @@ PGOperatorPtr OperParser::right_oper(PGParseState * pstate, PGList * op, Oid arg
         /*
 		 * Otherwise, search for the most suitable candidate.
 		 */
-        FuncCandidateList clist;
 
         /* Get postfix operators of given name */
-        clist = oper_provider->OpernameGetCandidates(op, 'r', false);
+        FuncCandidateListPtr clist = oper_provider->OpernameGetCandidates(op, 'r', false);
 
         /* No operators found? Then fail... */
         if (clist != NULL)
@@ -217,10 +216,8 @@ PGOperatorPtr OperParser::left_oper(PGParseState * pstate, PGList * op, Oid arg,
         /*
 		 * Otherwise, search for the most suitable candidate.
 		 */
-        FuncCandidateList clist;
-
         /* Get prefix operators of given name */
-        clist = oper_provider->OpernameGetCandidates(op, 'l', false);
+        FuncCandidateListPtr clist = oper_provider->OpernameGetCandidates(op, 'l', false);
 
         /* No operators found? Then fail... */
         if (clist != NULL)
@@ -230,9 +227,7 @@ PGOperatorPtr OperParser::left_oper(PGParseState * pstate, PGList * op, Oid arg,
 			 * useful data into args[0] to keep oper_select_candidate simple.
 			 * XXX we are assuming here that we may scribble on the list!
 			 */
-            FuncCandidateList clisti;
-
-            for (clisti = clist; clisti != NULL; clisti = clisti->next)
+            for (FuncCandidateListPtr clisti = clist; clisti != NULL; clisti = clisti->next)
             {
                 clisti->args[0] = clisti->args[1];
             }
@@ -448,7 +443,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
     return (PGExpr *)result;
 };
 
-FuncDetailCode OperParser::oper_select_candidate(int nargs, Oid * input_typeids, FuncCandidateList candidates, Oid * operOid)
+FuncDetailCode OperParser::oper_select_candidate(int nargs, Oid * input_typeids, FuncCandidateListPtr & candidates, Oid * operOid)
 {
     int ncandidates;
 
@@ -456,7 +451,7 @@ FuncDetailCode OperParser::oper_select_candidate(int nargs, Oid * input_typeids,
 	 * Delete any candidates that cannot actually accept the given input
 	 * types, whether directly or by coercion.
 	 */
-    ncandidates = func_parser->func_match_argtypes(nargs, input_typeids, candidates, &candidates);
+    ncandidates = func_parser->func_match_argtypes(nargs, input_typeids, candidates, candidates);
 
     /* Done if no candidate or only one candidate survives */
     if (ncandidates == 0)
@@ -556,10 +551,8 @@ PGOperatorPtr OperParser::oper(PGParseState * pstate, PGList * opname, Oid ltype
         /*
 		 * Otherwise, search for the most suitable candidate.
 		 */
-        FuncCandidateList clist;
-
         /* Get binary operators of given name */
-        clist = oper_provider->OpernameGetCandidates(opname, 'b', false);
+        FuncCandidateListPtr clist = oper_provider->OpernameGetCandidates(opname, 'b', false);
 
         /* No operators found? Then fail... */
         if (clist != NULL)

@@ -114,14 +114,14 @@ FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, P
 int
 FuncParser::func_match_argtypes(int nargs,
 					Oid *input_typeids,
-					FuncCandidateList raw_candidates,
-					FuncCandidateList *candidates)
+					FuncCandidateListPtr raw_candidates,
+					FuncCandidateListPtr & candidates)
 {
-	FuncCandidateList current_candidate;
-	FuncCandidateList next_candidate;
+	FuncCandidateListPtr current_candidate;
+	FuncCandidateListPtr next_candidate;
 	int			ncandidates = 0;
 
-	*candidates = NULL;
+	candidates = nullptr;
 
 	for (current_candidate = raw_candidates;
 		 current_candidate != NULL;
@@ -131,8 +131,8 @@ FuncParser::func_match_argtypes(int nargs,
 		if (coerce_parser->can_coerce_type(nargs, input_typeids, current_candidate->args,
 							PG_COERCION_IMPLICIT))
 		{
-			current_candidate->next = *candidates;
-			*candidates = current_candidate;
+			current_candidate->next = candidates;
+			candidates = current_candidate;
 			ncandidates++;
 		}
 	}
@@ -140,12 +140,12 @@ FuncParser::func_match_argtypes(int nargs,
 	return ncandidates;
 };
 
-FuncCandidateList
+FuncCandidateListPtr
 FuncParser::func_select_candidate(int nargs,
 					  Oid *input_typeids,
-					  FuncCandidateList candidates)
+					  FuncCandidateListPtr & candidates)
 {
-	FuncCandidateList current_candidate,
+	FuncCandidateListPtr current_candidate,
 				first_candidate,
 				last_candidate;
 	Oid		   *current_typeids;
@@ -529,8 +529,8 @@ FuncParser::func_get_detail(PGList *funcname,
 				Oid **true_typeids, /* return value */
 				PGList **argdefaults)
 {
-    FuncCandidateList raw_candidates;
-    FuncCandidateList best_candidate;
+    FuncCandidateListPtr raw_candidates;
+    FuncCandidateListPtr best_candidate;
 
     /* initialize output arguments to silence compiler warnings */
     *funcid = InvalidOid;
@@ -653,10 +653,10 @@ FuncParser::func_get_detail(PGList *funcname,
 		 */
         if (raw_candidates != NULL)
         {
-            FuncCandidateList current_candidates;
+            FuncCandidateListPtr current_candidates;
             int ncandidates;
 
-            ncandidates = func_match_argtypes(nargs, argtypes, raw_candidates, &current_candidates);
+            ncandidates = func_match_argtypes(nargs, argtypes, raw_candidates, current_candidates);
 
             /* one match only? then run with it... */
             if (ncandidates == 1)

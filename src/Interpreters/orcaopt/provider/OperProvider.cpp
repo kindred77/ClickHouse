@@ -11,21 +11,400 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-// OperProvider::OperProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
-// 		: context(std::move(context_)),
-// 		  mp(std::move(mp_))
-// {
-// 	auto operator1= std::make_shared<Form_pg_operator>(Oid(1), "+", Oid(1), Oid(1), 'l', true, Oid(1),
-// 		 Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1), Oid(1));
-// 	oid_oper_map.insert(std::pair<Oid, PGOperatorPtr>(Oid(1), operator1));
-// };
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT2PL = std::pair<Oid, PGOperatorPtr>(
+    Oid(550),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(550),
+        /*oprname*/ .oprname = "+",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(21),
+        /*oprright*/ .oprright = Oid(21),
+        /*oprresult*/ .oprresult = Oid(21),
+        /*oprcom*/ .oprcom = Oid(550),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(176),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT4PL = std::pair<Oid, PGOperatorPtr>(
+    Oid(551),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(551),
+        /*oprname*/ .oprname = "+",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(23),
+        /*oprright*/ .oprright = Oid(23),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(551),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(177),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT24PL = std::pair<Oid, PGOperatorPtr>(
+    Oid(552),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(552),
+        /*oprname*/ .oprname = "+",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(21),
+        /*oprright*/ .oprright = Oid(23),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(553),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(178),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT42PL = std::pair<Oid, PGOperatorPtr>(
+    Oid(553),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(553),
+        /*oprname*/ .oprname = "+",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(23),
+        /*oprright*/ .oprright = Oid(21),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(552),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(179),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT2MI = std::pair<Oid, PGOperatorPtr>(
+    Oid(554),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(554),
+        /*oprname*/ .oprname = "-",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(21),
+        /*oprright*/ .oprright = Oid(21),
+        /*oprresult*/ .oprresult = Oid(21),
+        /*oprcom*/ .oprcom = Oid(0),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(180),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT4MI = std::pair<Oid, PGOperatorPtr>(
+    Oid(555),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(555),
+        /*oprname*/ .oprname = "-",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(23),
+        /*oprright*/ .oprright = Oid(23),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(0),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(181),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT24MI = std::pair<Oid, PGOperatorPtr>(
+    Oid(556),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(556),
+        /*oprname*/ .oprname = "-",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(21),
+        /*oprright*/ .oprright = Oid(23),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(0),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(182),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT42MI = std::pair<Oid, PGOperatorPtr>(
+    Oid(557),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(557),
+        /*oprname*/ .oprname = "-",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(23),
+        /*oprright*/ .oprright = Oid(21),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(0),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(183),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT2MUL = std::pair<Oid, PGOperatorPtr>(
+    Oid(526),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(526),
+        /*oprname*/ .oprname = "*",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(21),
+        /*oprright*/ .oprright = Oid(21),
+        /*oprresult*/ .oprresult = Oid(21),
+        /*oprcom*/ .oprcom = Oid(526),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(152),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT4MUL = std::pair<Oid, PGOperatorPtr>(
+    Oid(514),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(514),
+        /*oprname*/ .oprname = "*",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(23),
+        /*oprright*/ .oprright = Oid(23),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(514),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(141),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT24MUL = std::pair<Oid, PGOperatorPtr>(
+    Oid(544),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(544),
+        /*oprname*/ .oprname = "*",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(21),
+        /*oprright*/ .oprright = Oid(23),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(545),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(170),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT42MUL = std::pair<Oid, PGOperatorPtr>(
+    Oid(545),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(545),
+        /*oprname*/ .oprname = "*",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(23),
+        /*oprright*/ .oprright = Oid(21),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(544),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(171),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT2DIV = std::pair<Oid, PGOperatorPtr>(
+    Oid(527),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(527),
+        /*oprname*/ .oprname = "/",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(21),
+        /*oprright*/ .oprright = Oid(21),
+        /*oprresult*/ .oprresult = Oid(21),
+        /*oprcom*/ .oprcom = Oid(0),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(153),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT4DIV = std::pair<Oid, PGOperatorPtr>(
+    Oid(528),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(528),
+        /*oprname*/ .oprname = "/",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(23),
+        /*oprright*/ .oprright = Oid(23),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(0),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(154),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT24DIV = std::pair<Oid, PGOperatorPtr>(
+    Oid(546),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(546),
+        /*oprname*/ .oprname = "/",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(21),
+        /*oprright*/ .oprright = Oid(23),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(0),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(172),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+std::pair<Oid, PGOperatorPtr> OperProvider::OPER_INT42DIV = std::pair<Oid, PGOperatorPtr>(
+    Oid(547),
+    std::make_shared<Form_pg_operator>(Form_pg_operator{
+        .oid = Oid(547),
+        /*oprname*/ .oprname = "/",
+        /*oprnamespace*/ .oprnamespace = Oid(1),
+        /*oprowner*/ .oprowner = Oid(1),
+        /*oprkind*/ .oprkind = 'b',
+        /*oprcanmerge*/ .oprcanmerge = false,
+        /*oprcanhash*/ .oprcanhash = false,
+        /*oprleft*/ .oprleft = Oid(23),
+        /*oprright*/ .oprright = Oid(21),
+        /*oprresult*/ .oprresult = Oid(23),
+        /*oprcom*/ .oprcom = Oid(0),
+        /*oprnegate*/ .oprnegate = Oid(0),
+        /*oprlsortop*/ .oprlsortop = Oid(0),
+        /*oprrsortop*/ .oprrsortop = Oid(0),
+        /*oprltcmpop*/ .oprltcmpop = Oid(0),
+        /*oprgtcmpop*/ .oprgtcmpop = Oid(0),
+        /*oprcode*/ .oprcode = Oid(173),
+        /*oprrest*/ .oprrest = Oid(0),
+        /*oprjoin*/ .oprjoin = Oid(0)}));
+
+OperProvider::OperProvider()
+{
+	oid_oper_map.insert(OPER_INT2PL);
+	oid_oper_map.insert(OPER_INT4PL);
+	oid_oper_map.insert(OPER_INT24PL);
+	oid_oper_map.insert(OPER_INT42PL);
+    oid_oper_map.insert(OPER_INT2MI);
+    oid_oper_map.insert(OPER_INT4MI);
+    oid_oper_map.insert(OPER_INT24MI);
+    oid_oper_map.insert(OPER_INT42MI);
+    oid_oper_map.insert(OPER_INT2MUL);
+    oid_oper_map.insert(OPER_INT4MUL);
+    oid_oper_map.insert(OPER_INT24MUL);
+    oid_oper_map.insert(OPER_INT42MUL);
+    oid_oper_map.insert(OPER_INT2DIV);
+    oid_oper_map.insert(OPER_INT4DIV);
+    oid_oper_map.insert(OPER_INT24DIV);
+    oid_oper_map.insert(OPER_INT42DIV);
+};
 
 PGOperatorPtr
 OperProvider::getOperByOID(Oid oid) const
 {
 	auto it = oid_oper_map.find(oid);
 	if (it == oid_oper_map.end())
-	    return {};
+	    return nullptr;
 	return it->second;
 };
 
@@ -36,157 +415,76 @@ OperProvider::getOperByName(duckdb_libpgquery::PGList *names, Oid oprleft, Oid o
     char * opername;
 	DeconstructQualifiedName(names, &schemaname, &opername);
 
-	//TODO find oper with oper name
-	return Oid(1);
+	for (auto oper_pair : oid_oper_map)
+    {
+        if (std::string(oper_pair.second->oprname) == std::string(opername)
+            && oper_pair.second->oprleft == oprleft
+            && oper_pair.second->oprright == oprright)
+        {
+            return oper_pair.first;
+        }
+    }
+	return InvalidOid;
 };
 
-FuncCandidateList
+FuncCandidateListPtr
 OperProvider::OpernameGetCandidates(PGList * names, char oprkind, bool missing_schema_ok)
 {
-//     FuncCandidateList resultList = NULL;
-//     char * resultSpace = NULL;
-//     int nextResult = 0;
-//     char * schemaname;
-//     char * opername;
-//     Oid namespaceId;
-//     CatCList * catlist;
-//     int i;
+    char * schemaname;
+    char * opername;
+	DeconstructQualifiedName(names, &schemaname, &opername);
+    
+    FuncCandidateListPtr resultList = nullptr;
+    
+    for (auto oper_pair : oid_oper_map)
+    {
+        if (oprkind && oper_pair.second->oprkind != oprkind)
+			continue;
 
-//     /* deconstruct the name list */
-//     DeconstructQualifiedName(names, &schemaname, &opername);
+        if (std::string(oper_pair.second->oprname) != std::string(opername))
+        {
+            continue;
+        }
 
-//     if (schemaname)
-//     {
-//         /* use exact schema given */
-//         namespaceId = LookupExplicitNamespace(schemaname, missing_schema_ok);
-//         if (missing_schema_ok && !OidIsValid(namespaceId))
-//             return NULL;
-//     }
-//     else
-//     {
-//         /* flag to indicate we need namespace search */
-//         namespaceId = InvalidOid;
-//         recomputeNamespacePath();
-//     }
+        if (resultList)
+        {
+            FuncCandidateListPtr prevResult = nullptr;
 
-//     /* Search syscache by name only */
-//     catlist = SearchSysCacheList1(OPERNAMENSP, CStringGetDatum(opername));
+            for (prevResult = resultList; prevResult; prevResult = prevResult->next)
+            {
+                if (oper_pair.second->oprleft == prevResult->args[0] && oper_pair.second->oprright == prevResult->args[1])
+                    break;
+            }
 
-//     /*
-// 	 * In typical scenarios, most if not all of the operators found by the
-// 	 * catcache search will end up getting returned; and there can be quite a
-// 	 * few, for common operator names such as '=' or '+'.  To reduce the time
-// 	 * spent in palloc, we allocate the result space as an array large enough
-// 	 * to hold all the operators.  The original coding of this routine did a
-// 	 * separate palloc for each operator, but profiling revealed that the
-// 	 * pallocs used an unreasonably large fraction of parsing time.
-// 	 */
-// #define SPACE_PER_OP MAXALIGN(sizeof(struct _FuncCandidateList) + sizeof(Oid))
+            if (prevResult)
+            {
+                /* We have a match with a previous result */
+                // Assert(pathpos != prevResult->pathpos);
+                // if (pathpos > prevResult->pathpos)
+                //     continue; /* keep previous result */
+                /* replace previous result */
+                // prevResult->pathpos = pathpos;
+                prevResult->oid = oper_pair.second->oid;
+                continue; /* args are same, of course */
+            }
+        }
 
-//     if (catlist->n_members > 0)
-//         resultSpace = palloc(catlist->n_members * SPACE_PER_OP);
+        auto newResult = std::make_shared<FuncCandidateList>();
 
-//     for (i = 0; i < catlist->n_members; i++)
-//     {
-//         HeapTuple opertup = &catlist->members[i]->tuple;
-//         Form_pg_operator operform = (Form_pg_operator)GETSTRUCT(opertup);
-//         int pathpos = 0;
-//         FuncCandidateList newResult;
+		newResult->pathpos = 0;
+		newResult->oid = oper_pair.second->oid;
+		newResult->nargs = 2;
+		newResult->nvargs = 0;
+		newResult->ndargs = 0;
+		newResult->argnumbers = NULL;
+        newResult->args = new Oid[2];
+		newResult->args[0] = oper_pair.second->oprleft;
+        newResult->args[1] = oper_pair.second->oprright;
+		newResult->next = resultList;
+		resultList = newResult;
+    }
 
-//         /* Ignore operators of wrong kind, if specific kind requested */
-//         if (oprkind && operform->oprkind != oprkind)
-//             continue;
-
-//         if (OidIsValid(namespaceId))
-//         {
-//             /* Consider only opers in specified namespace */
-//             if (operform->oprnamespace != namespaceId)
-//                 continue;
-//             /* No need to check args, they must all be different */
-//         }
-//         else
-//         {
-//             /*
-// 			 * Consider only opers that are in the search path and are not in
-// 			 * the temp namespace.
-// 			 */
-//             ListCell * nsp;
-
-//             foreach (nsp, activeSearchPath)
-//             {
-//                 if (operform->oprnamespace == lfirst_oid(nsp) && operform->oprnamespace != myTempNamespace)
-//                     break;
-//                 pathpos++;
-//             }
-//             if (nsp == NULL)
-//                 continue; /* oper is not in search path */
-
-//             /*
-// 			 * Okay, it's in the search path, but does it have the same
-// 			 * arguments as something we already accepted?	If so, keep only
-// 			 * the one that appears earlier in the search path.
-// 			 *
-// 			 * If we have an ordered list from SearchSysCacheList (the normal
-// 			 * case), then any conflicting oper must immediately adjoin this
-// 			 * one in the list, so we only need to look at the newest result
-// 			 * item.  If we have an unordered list, we have to scan the whole
-// 			 * result list.
-// 			 */
-//             if (resultList)
-//             {
-//                 FuncCandidateList prevResult;
-
-//                 if (catlist->ordered)
-//                 {
-//                     if (operform->oprleft == resultList->args[0] && operform->oprright == resultList->args[1])
-//                         prevResult = resultList;
-//                     else
-//                         prevResult = NULL;
-//                 }
-//                 else
-//                 {
-//                     for (prevResult = resultList; prevResult; prevResult = prevResult->next)
-//                     {
-//                         if (operform->oprleft == prevResult->args[0] && operform->oprright == prevResult->args[1])
-//                             break;
-//                     }
-//                 }
-//                 if (prevResult)
-//                 {
-//                     /* We have a match with a previous result */
-//                     Assert(pathpos != prevResult->pathpos);
-//                     if (pathpos > prevResult->pathpos)
-//                         continue; /* keep previous result */
-//                     /* replace previous result */
-//                     prevResult->pathpos = pathpos;
-//                     prevResult->oid = HeapTupleGetOid(opertup);
-//                     continue; /* args are same, of course */
-//                 }
-//             }
-//         }
-
-//         /*
-// 		 * Okay to add it to result list
-// 		 */
-//         newResult = (FuncCandidateList)(resultSpace + nextResult);
-//         nextResult += SPACE_PER_OP;
-
-//         newResult->pathpos = pathpos;
-//         newResult->oid = HeapTupleGetOid(opertup);
-//         newResult->nargs = 2;
-//         newResult->nvargs = 0;
-//         newResult->ndargs = 0;
-//         newResult->argnumbers = NULL;
-//         newResult->args[0] = operform->oprleft;
-//         newResult->args[1] = operform->oprright;
-//         newResult->next = resultList;
-//         resultList = newResult;
-//     }
-
-//     ReleaseSysCacheList(catlist);
-
-//     return resultList;
-    return {};
+    return resultList;
 };
 
 /*

@@ -521,6 +521,7 @@ struct Form_pg_operator
     Oid oprnamespace; /* OID of namespace containing this oper */
     Oid oprowner; /* operator owner */
     char oprkind; /* 'l', 'r', or 'b' */
+    bool oprcanmerge;
     bool oprcanhash; /* can be used in hash join? */
     Oid oprleft; /* left arg type, or 0 if 'l' oprkind */
     Oid oprright; /* right arg type, or 0 if 'r' oprkind */
@@ -1151,17 +1152,25 @@ typedef enum
 	FUNCDETAIL_COERCION			/* it's a type coercion request */
 } FuncDetailCode;
 
-typedef struct _FuncCandidateList
+struct FuncCandidateList;
+using FuncCandidateListPtr = std::shared_ptr<FuncCandidateList>;
+
+struct FuncCandidateList
 {
-	struct _FuncCandidateList *next;
-	int			pathpos;		/* for internal use of namespace lookup */
-	Oid			oid;			/* the function or operator's OID */
-	int			nargs;			/* number of arg types returned */
-	int			nvargs;			/* number of args to become variadic array */
-	int			ndargs;			/* number of defaulted args */
-	int		   *argnumbers;		/* args' positional indexes, if named call */
-	Oid			args[1];		/* arg types --- VARIABLE LENGTH ARRAY */
-}	*FuncCandidateList;	/* VARIABLE LENGTH STRUCT */
+    FuncCandidateListPtr next;
+    int pathpos; /* for internal use of namespace lookup */
+    Oid oid; /* the function or operator's OID */
+    int nargs; /* number of arg types returned */
+    int nvargs; /* number of args to become variadic array */
+    int ndargs; /* number of defaulted args */
+    int * argnumbers; /* args' positional indexes, if named call */
+    Oid * args; /* arg types --- VARIABLE LENGTH ARRAY */
+
+    ~FuncCandidateList()
+    {
+        delete [] args;
+    }
+}; /* VARIABLE LENGTH STRUCT */
 
 /*
  * Collation strength (the SQL standard calls this "derivation").  Order is

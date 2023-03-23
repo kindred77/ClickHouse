@@ -42,7 +42,7 @@ public:
     Datum OidInputFunctionCall(Oid functionId, const char * str, Oid typioparam, int32 typmod);
 
 
-    FuncCandidateList FuncnameGetCandidates(
+    FuncCandidateListPtr FuncnameGetCandidates(
         duckdb_libpgquery::PGList * names,
         int nargs,
         duckdb_libpgquery::PGList * argnames,

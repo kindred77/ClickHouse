@@ -59,13 +59,13 @@ public:
     int
     func_match_argtypes(int nargs,
 					Oid *input_typeids,
-					FuncCandidateList raw_candidates,
-					FuncCandidateList *candidates);	/* return value */
+					FuncCandidateListPtr raw_candidates,
+					FuncCandidateListPtr & candidates);	/* return value */
 
-    FuncCandidateList
+    FuncCandidateListPtr
     func_select_candidate(int nargs,
 					  Oid *input_typeids,
-					  FuncCandidateList candidates);
+					  FuncCandidateListPtr & candidates);
 
     Oid
     FuncNameAsType(duckdb_libpgquery::PGList *funcname);
