@@ -31,8 +31,8 @@ private:
 public:
 	explicit OperParser();
 
-	Oid
-	compatible_oper_opid(duckdb_libpgquery::PGList *op, Oid arg1, Oid arg2, bool noError);
+	// Oid
+	// compatible_oper_opid(duckdb_libpgquery::PGList *op, Oid arg1, Oid arg2, bool noError);
 
 	PGOperatorPtr
 	compatible_oper(PGParseState *pstate, duckdb_libpgquery::PGList *op, Oid arg1, Oid arg2,

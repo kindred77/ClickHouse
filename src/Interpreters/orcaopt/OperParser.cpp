@@ -22,20 +22,20 @@ OperParser::OperParser()
 	proc_provider = std::make_shared<ProcProvider>();
 };
 
-Oid OperParser::compatible_oper_opid(PGList * op, Oid arg1, Oid arg2, bool noError)
-{
-    PGOperatorPtr optup;
-    Oid result;
+// Oid OperParser::compatible_oper_opid(PGList * op, Oid arg1, Oid arg2, bool noError)
+// {
+//     PGOperatorPtr optup;
+//     Oid result;
 
-    optup = compatible_oper(NULL, op, arg1, arg2, noError, -1);
-    if (optup != NULL)
-    {
-        result = optup->oid;
-        //ReleaseSysCache(optup);
-        return result;
-    }
-    return InvalidOid;
-};
+//     optup = compatible_oper(NULL, op, arg1, arg2, noError, -1);
+//     if (optup != NULL)
+//     {
+//         result = optup->oid;
+//         //ReleaseSysCache(optup);
+//         return result;
+//     }
+//     return InvalidOid;
+// };
 
 PGOperatorPtr OperParser::compatible_oper(PGParseState * pstate, PGList * op, Oid arg1, Oid arg2, bool noError, int location)
 {
@@ -89,7 +89,7 @@ void OperParser::get_sort_group_operators(
     // else
     //     cache_flags = TYPECACHE_LT_OPR | TYPECACHE_EQ_OPR | TYPECACHE_GT_OPR;
 
-    PGSortGroupOperPtr typentry = oper_provider->get_sort_group_operators(argtype);
+    PGSortGroupOperPtr typentry = oper_provider->get_sort_grp_oper_by_typeid(argtype);
     lt_opr = typentry->lt_opr;
     eq_opr = typentry->eq_opr;
     gt_opr = typentry->gt_opr;

@@ -1363,6 +1363,14 @@ ClauseParser::assignSortGroupRef(PGTargetEntry *tle, PGList *tlist)
 	return tle->ressortgroupref;
 };
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wconditional-uninitialized"
+#pragma clang diagnostic ignored "-Wsometimes-uninitialized"
+#else
+#pragma GCC diagnostic ignored "-Wconditional-uninitialized"
+#pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
+#endif
+
 PGList *
 ClauseParser::addTargetToSortList(PGParseState * pstate, PGTargetEntry * tle,
         PGList * sortlist, PGList * targetlist,
@@ -1410,26 +1418,28 @@ ClauseParser::addTargetToSortList(PGParseState * pstate, PGTargetEntry * tle,
             reverse = true;
             break;
         case SORTBY_USING:
-            Assert(sortby->useOp != NIL)
-            sortop = oper_parser->compatible_oper_opid(sortby->useOp, restype, restype, false);
+            // Assert(sortby->useOp != NIL)
+            // sortop = oper_parser->compatible_oper_opid(sortby->useOp, restype, restype, false);
 
             /*
 			 * Verify it's a valid ordering operator, fetch the corresponding
 			 * equality operator, and determine whether to consider it like
 			 * ASC or DESC.
 			 */
-            eqop = oper_provider->get_equality_op_for_ordering_op(sortop, &reverse);
-            if (!OidIsValid(eqop))
-                ereport(
-                    ERROR,
-                    (errcode(ERRCODE_WRONG_OBJECT_TYPE),
-                     errmsg("operator %s is not a valid ordering operator", strVal(llast(sortby->useOp))),
-                     errhint("Ordering operators must be \"<\" or \">\" members of btree operator families.")));
+            // eqop = oper_provider->get_equality_op_for_ordering_op(sortop, &reverse);
+            // if (!OidIsValid(eqop))
+            //     ereport(
+            //         ERROR,
+            //         (errcode(ERRCODE_WRONG_OBJECT_TYPE),
+            //          errmsg("operator %s is not a valid ordering operator", strVal(llast(sortby->useOp))),
+            //          errhint("Ordering operators must be \"<\" or \">\" members of btree operator families.")));
 
             /*
 			 * Also see if the equality operator is hashable.
 			 */
-            hashable = oper_provider->op_hashjoinable(eqop, restype);
+            // hashable = oper_provider->op_hashjoinable(eqop, restype);
+
+			elog(ERROR, "order by using not supported yet.");
             break;
         default:
             elog(ERROR, "unrecognized sortby_dir: %d", sortby->sortby_dir);

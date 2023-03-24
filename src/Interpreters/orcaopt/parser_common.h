@@ -704,6 +704,11 @@ struct Form_pg_type
 	 * collatable base types, possibly other OID for domains
 	 */
     Oid typcollation;
+
+    Oid lt_opr;
+    Oid eq_opr;
+    Oid gt_opr;
+    Oid hash_proc;
 };
 
 using PGTypePtr = std::shared_ptr<Form_pg_type>;
