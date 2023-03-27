@@ -35,6 +35,33 @@ private:
 	static std::pair<Oid, PGProcPtr> PROC_INT4DIV;
 	static std::pair<Oid, PGProcPtr> PROC_INT24DIV;
 	static std::pair<Oid, PGProcPtr> PROC_INT42DIV;
+
+	static std::pair<Oid, PGProcPtr> PROC_INT64TOINT16;
+	static std::pair<Oid, PGProcPtr> PROC_INT64TOINT32;
+	static std::pair<Oid, PGProcPtr> PROC_INT64TOFLOAT32;
+	static std::pair<Oid, PGProcPtr> PROC_INT64TOFLOAT64;
+	static std::pair<Oid, PGProcPtr> PROC_INT16TOINT64;
+	static std::pair<Oid, PGProcPtr> PROC_INT16TOINT32;
+	static std::pair<Oid, PGProcPtr> PROC_INT16TOFLOAT32;
+	static std::pair<Oid, PGProcPtr> PROC_INT16TOFLOAT64;
+	static std::pair<Oid, PGProcPtr> PROC_BOOLTOINT32;
+	static std::pair<Oid, PGProcPtr> PROC_BOOLTOSTRING;
+	static std::pair<Oid, PGProcPtr> PROC_FLOAT32TOINT64;
+	static std::pair<Oid, PGProcPtr> PROC_FLOAT32TOINT16;
+	static std::pair<Oid, PGProcPtr> PROC_FLOAT32TOINT32;
+	static std::pair<Oid, PGProcPtr> PROC_FLOAT32TOFLOAT64;
+	static std::pair<Oid, PGProcPtr> PROC_FLOAT64TOINT64;
+	static std::pair<Oid, PGProcPtr> PROC_FLOAT64TOINT16;
+	static std::pair<Oid, PGProcPtr> PROC_FLOAT64TOINT32;
+	static std::pair<Oid, PGProcPtr> PROC_FLOAT64TOFLOAT32;
+	static std::pair<Oid, PGProcPtr> PROC_INT32TOINT64;
+	static std::pair<Oid, PGProcPtr> PROC_INT32TOINT16;
+	static std::pair<Oid, PGProcPtr> PROC_INT32TOFLOAT32;
+	static std::pair<Oid, PGProcPtr> PROC_INT32TOFLOAT64;
+	static std::pair<Oid, PGProcPtr> PROC_DECIMAL64TOINT64;
+	static std::pair<Oid, PGProcPtr> PROC_DECIMAL64TOINT16;
+	static std::pair<Oid, PGProcPtr> PROC_DECIMAL64TOINT32;
+	static std::pair<Oid, PGProcPtr> PROC_DECIMAL64TOFLOAT64;
 public:
 	//explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	explicit ProcProvider();

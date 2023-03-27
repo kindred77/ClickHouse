@@ -853,6 +853,7 @@ using PGProcPtr = std::shared_ptr<Form_pg_proc>;
 
 struct Form_pg_cast
 {
+    Oid oid;
     Oid castsource; /* source datatype for cast */
     Oid casttarget; /* destination datatype for cast */
     Oid castfunc; /* cast function; 0 = binary coercible */
