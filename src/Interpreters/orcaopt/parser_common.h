@@ -715,6 +715,7 @@ using PGTypePtr = std::shared_ptr<Form_pg_type>;
 
 struct Form_pg_class
 {
+    Oid oid;
     std::string relname; /* class name */
     Oid relnamespace; /* OID of namespace containing this class */
     Oid reltype; /* OID of entry in pg_type for table's
@@ -982,6 +983,7 @@ PGTupleDescPtr PGCreateTemplateTupleDesc(int natts, bool hasoid)
 
 	auto result = std::make_shared<PGTupleDesc>();
 	result->natts = natts;
+    result->attrs.resize(natts);
 	result->tdtypeid = RECORDOID;
     result->tdtypmod = -1;
     result->tdhasoid = hasoid;
@@ -2065,8 +2067,13 @@ struct PGPolicy
 
 using PGPolicyPtr = std::shared_ptr<PGPolicy>;
 
+class IStorage;
+using StoragePtr = std::shared_ptr<IStorage>;
+
 struct PGRelation
 {
+    Oid oid;
+    StoragePtr storage_ptr;
     RelFileNode rd_node; /* relation physical identifier */
     /* use "struct" here to avoid needing to include smgr.h: */
 	//TODO kindred
@@ -2189,9 +2196,18 @@ struct PGRelation
 
     /* use "struct" here to avoid needing to include pgstat.h: */
     //struct PgStat_TableStatus * pgstat_info; /* statistics collection area */
-} RelationData;
+};
 
 using PGRelationPtr = std::shared_ptr<PGRelation>;
+
+
+struct PGDatabase
+{
+    Oid oid;
+    String name;
+};
+
+using PGDatabasePtr = std::shared_ptr<PGDatabase>;
 
 #define RelationGetRelationName(relation) \
 	((relation)->rd_rel->relname.c_str())

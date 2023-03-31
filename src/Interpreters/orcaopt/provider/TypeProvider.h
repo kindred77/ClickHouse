@@ -77,7 +77,9 @@ public:
 
     Oid get_element_type(Oid typid);
 
-	Oid get_typeoid_by_typename_namespaceoid(const char * type_name, Oid namespace_oid);
+	Oid get_typeoid_by_typename_namespaceoid(const char * type_name, Oid namespace_oid = Oid(0));
+
+	PGTypePtr get_type_by_typename_namespaceoid(const std::string& type_name, Oid namespace_oid = Oid(0));
 
     void getTypeOutputInfo(Oid type, Oid * typOutput, bool * typIsVarlena);
 

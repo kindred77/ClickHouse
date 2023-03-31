@@ -1123,6 +1123,18 @@ PGTypePtr TypeProvider::getTypeByOid(Oid oid) const
 	return it->second;
 };
 
+PGTypePtr TypeProvider::get_type_by_typename_namespaceoid(const std::string& type_name, Oid namespace_oid)
+{
+    for (auto pair : oid_type_map)
+	{
+		if (pair.second->typname == type_name)
+		{
+			return pair.second;
+		}
+	}
+	return InvalidOid;
+}
+
 /*
  * getBaseType
  *		If the given type is a domain, return its base type;

@@ -1,6 +1,17 @@
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 #include <Interpreters/orcaopt/walkers.h>
+
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
+
+#include <Interpreters/Context.h>
+#include <Interpreters/executeQuery.h>
+#include <Databases/IDatabase.h>
 #include <Storages/IStorage.h>
+
+#include <rocksdb/db.h>
+#include <rocksdb/table.h>
+
+#include <filesystem>
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -15,14 +26,186 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-StoragePtr
-RelationProvider::getStorageByOID(Oid oid) const
+namespace ErrorCodes
 {
-	auto it = oid_storageid_map.find(oid);
-	if (it == oid_storageid_map.end())
-	    return {};
-	return it->second;
+    extern const int ROCKSDB_ERROR;
+}
+
+int RelationProvider::RELATION_OID_ID = 0;
+int RelationProvider::DATABASE_OID_ID = 0;
+
+void RelationProvider::initDb()
+{
+    rocksdb_dir = context->getPath() + relative_data_path_;
+
+    rocksdb::Options options;
+    rocksdb::DB * db;
+    options.create_if_missing = true;
+    options.compression = rocksdb::CompressionType::kZSTD;
+    rocksdb::Status status = rocksdb::DB::Open(options, rocksdb_dir, &db);
+
+    if (status != rocksdb::Status::OK())
+        throw Exception("Fail to open rocksdb path at: " +  rocksdb_dir + ": " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+    rocksdb_ptr = std::unique_ptr<rocksdb::DB>(db);
+
+    // get max database oid
+    String max_oid;
+    status = rocksdb_ptr->Get(rocksdb::ReadOptions(), rocksdb::Slice(max_database_oid_rocksdb_key), &max_oid);
+    if (status.ok())
+    {
+        DATABASE_OID_ID = Oid(std::stoi(max_oid));
+    }
+    // get max table oid
+    status = rocksdb_ptr->Get(rocksdb::ReadOptions(), rocksdb::Slice(max_table_oid_rocksdb_key), &max_oid);
+    if (status.ok())
+    {
+        RELATION_OID_ID = Oid(std::stoi(max_oid));
+    }
 };
+
+void RelationProvider::initAttrs(PGRelationPtr & relation)
+{
+    PGAttrNumber attr_num = 1;
+    for (auto name_and_type : relation->storage_ptr->getInMemoryMetadataPtr()->getColumns().getAllPhysical())
+    {
+        auto type_ptr = type_provider->get_type_by_typename_namespaceoid(name_and_type.type->getName());
+        type_provider->PGTupleDescInitEntry(relation->rd_att, attr_num,
+            name_and_type.name, /*oidtypeid*/ type_ptr->oid, /*typmod*/ type_ptr->typtypmod, /*attdim*/ 0);
+        attr_num++;
+    }
+};
+
+RelationProvider::RelationProvider(const ContextPtr& context_)
+    : context(context_)
+{
+    initDb();
+
+    for (const auto & pair : DatabaseCatalog::instance().getDatabases())
+    {
+        const auto & database_name = pair.first;
+
+        String database_oid;
+        auto status = rocksdb_ptr->Get(rocksdb::ReadOptions(), database_name, &database_oid);
+        if (!status.ok())
+        {
+            rocksdb::WriteBatch batch;
+            batch.Put(database_name, std::to_string(++DATABASE_OID_ID));
+            database_oid = std::to_string(DATABASE_OID_ID);
+            batch.Put(max_database_oid_rocksdb_key, database_oid);
+            status = rocksdb_ptr->Write(rocksdb::WriteOptions(), &batch);
+            if (!status.ok())
+                throw Exception("Can not load database "+database_name+" to RocksDB, write error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+        }
+
+        auto db_ptr = std::make_shared<PGDatabase>(PGDatabase{std::stoi(database_oid), database_name});
+        oid_database_map.insert({db_ptr->oid, db_ptr});
+
+        const auto & database = pair.second;
+        for (auto tables_it = database->getTablesIterator(context);
+            tables_it->isValid();
+            tables_it->next())
+        {
+            auto table_name = tables_it->name();
+            String table_oid;
+            auto status = rocksdb_ptr->Get(rocksdb::ReadOptions(), table_name, &table_oid);
+            if (!status.ok())
+            {
+                rocksdb::WriteBatch batch;
+                batch.Put(table_name, std::to_string(++RELATION_OID_ID));
+                table_oid = std::to_string(RELATION_OID_ID);
+                batch.Put(max_table_oid_rocksdb_key, table_oid);
+                status = rocksdb_ptr->Write(rocksdb::WriteOptions(), &batch);
+                if (!status.ok())
+                    throw Exception(
+                        "Can not load table name " + table_name + " to RocksDB, write error: " + status.ToString(),
+                        ErrorCodes::ROCKSDB_ERROR);
+            }
+            
+            auto tab_class = std::make_shared<Form_pg_class>(Form_pg_class{
+                /*oid*/ Oid(std::stoi(table_oid)),
+                /*relname*/ table_name,
+                /*relnamespace*/ db_ptr->oid,
+                /*reltype*/ InvalidOid,
+                /*reloftype*/ InvalidOid,
+                /*relowner*/ InvalidOid,
+                /*relam*/ InvalidOid,
+                /*relfilenode*/ InvalidOid,
+                /*reltablespace*/ InvalidOid,
+                /*relpages*/ 0,
+                /*reltuples*/ 0,
+                /*relallvisible*/ 0,
+                /*reltoastrelid*/ InvalidOid,
+                /*relhasindex*/ false,
+                /*relisshared*/ false,
+                /*relpersistence*/ 'p',
+                /*relkind*/ 'r',
+                /*relstorage*/ 'a',
+                /*relnatts*/ static_cast<int16>(tables_it->table()->getInMemoryMetadataPtr()->getColumns().getAllPhysical().size()),
+                /*relchecks*/ 0,
+                /*relhasoids*/ false,
+                /*relhaspkey*/ false,
+                /*relhasrules*/ false,
+                /*relhastriggers*/ false,
+                /*relhassubclass*/ false,
+                /*relispopulated*/ false,
+                /*relreplident*/ 'd',
+                /*relfrozenxid*/ 0,
+                /*relminmxid*/ 0
+            });
+
+            // oid of class and oid of relation is the same
+            auto tab_rel = std::make_shared<PGRelation>(PGRelation{
+                /*oid*/ .oid = tab_class->oid,
+                // /*rd_node*/ {},
+                // /*rd_refcnt*/ 0,
+                // /*rd_backend*/ 0,
+                // /*rd_islocaltemp*/ false,
+                // /*rd_isnailed*/ false,
+                // /*rd_isvalid*/ false,
+                // /*rd_indexvalid*/ false,
+                // /*rd_createSubid*/ 0,
+                // /*rd_newRelfilenodeSubid*/ 0,
+                /*rd_rel*/ .rd_rel = tab_class,
+                /*rd_att*/ .rd_att = PGCreateTemplateTupleDesc(tab_class->relnatts, tab_class->relhasoids),
+                // /*rd_id*/ InvalidOid,
+                // /*rd_lockInfo*/ {},
+                // /*rd_cdbpolicy*/ {},
+                // /*rd_cdbDefaultStatsWarningIssued*/ false,
+                // /*rd_indexlist*/ NULL,
+                // /*rd_oidindex*/ InvalidOid,
+                // /*rd_replidindex*/ InvalidOid,
+                // /*rd_indexattr*/ NULL,
+                // /*rd_keyattr*/ NULL,
+                // /*rd_idattr*/ NULL,
+                // /*rd_options*/ NULL,
+                // /*rd_opfamily*/ NULL,
+                // /*rd_opcintype*/ NULL,
+                // /*rd_indoption*/ NULL,
+                // /*rd_indexprs*/ NULL,
+                // /*rd_indpred*/ NULL,
+                // /*rd_exclops*/ NULL,
+                // /*rd_exclprocs*/ NULL,
+                // /*rd_exclstrats*/ NULL,
+                // /*rd_amcache*/ NULL,
+                // /*rd_indcollation*/ NULL,
+                // /*rd_toastoid*/ InvalidOid
+            });
+
+            initAttrs(tab_rel);
+
+            oid_relation_map.insert({tab_rel->oid, tab_rel});
+        }
+    }
+};
+
+// StoragePtr
+// RelationProvider::getStorageByOID(Oid oid) const
+// {
+// 	auto it = oid_storageid_map.find(oid);
+// 	if (it == oid_storageid_map.end())
+// 	    return {};
+// 	return it->second;
+// };
 
 // std::optional<std::tuple<Oid, StoragePtr, char> >
 // RelationProvider::getPairByDBAndTableName(const String & database_name, const String & table_name) const
@@ -33,23 +216,32 @@ RelationProvider::getStorageByOID(Oid oid) const
 // 	return {it->first, it->second, 'r'};
 // }
 
-std::string RelationProvider::get_database_name(Oid dbid) const
+PGClassPtr RelationProvider::getClassByRelOid(Oid oid) const
 {
-    // HeapTuple dbtuple;
-    // std::string result = "";
+	auto it = oid_relation_map.find(oid);
+	if (it == oid_relation_map.end())
+	    return nullptr;
+	return it->second->rd_rel;
+};
 
-    // dbtuple = SearchSysCache1(DATABASEOID, ObjectIdGetDatum(dbid));
-    // if (HeapTupleIsValid(dbtuple))
-    // {
-    //     result = pstrdup(NameStr(((Form_pg_database)GETSTRUCT(dbtuple))->datname));
-    //     ReleaseSysCache(dbtuple);
-    // }
-    // else
-    //     result = NULL;
+bool RelationProvider::has_subclass(Oid relationId)
+{
+	PGClassPtr tuple = getClassByRelOid(relationId);
+	if (tuple == nullptr)
+	{
+		elog(ERROR, "cache lookup failed for relation %u", relationId);
+		return false;
+	}
 
-    // return result;
+	return tuple->relhassubclass;
+};
 
-    return "";
+const std::string RelationProvider::get_database_name(Oid dbid) const
+{
+    auto it = oid_database_map.find(dbid);
+	if (it == oid_database_map.end())
+	    return "";
+	return it->second->name;
 };
 
 char RelationProvider::get_rel_relkind(Oid relid) const
@@ -69,19 +261,34 @@ char RelationProvider::get_rel_relkind(Oid relid) const
     // else
     //     return '\0';
 
-    return '\0';
+    auto it = oid_relation_map.find(relid);
+	if (it == oid_relation_map.end())
+	    return '\0';
+	return it->second->rd_rel->relkind;
 };
 
-std::string RelationProvider::get_attname(Oid relid, PGAttrNumber attnum) const
+const std::string RelationProvider::get_attname(Oid relid, PGAttrNumber attnum) const
 {
-    std::string result = "";
+    auto it = oid_relation_map.find(relid);
+	if (it == oid_relation_map.end())
+	    return "";
+	for (const auto& att : it->second->rd_att->attrs)
+    {
+        if (att->attnum == attnum)
+        {
+            return att->attname;
+        }
+    }
 
-    return result;
-};
-
-const char * RelationProvider::get_rel_name(Oid relid)
-{
     return "";
+};
+
+const std::string RelationProvider::get_rel_name(Oid relid)
+{
+    auto it = oid_relation_map.find(relid);
+	if (it == oid_relation_map.end())
+	    return "";
+	return it->second->rd_rel->relname;
 };
 
 PGAttrPtr RelationProvider::get_att_by_reloid_attnum(Oid relid, PGAttrNumber attnum) const
