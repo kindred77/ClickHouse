@@ -5,6 +5,8 @@
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/ExprParser.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wswitch"
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
@@ -129,68 +131,58 @@ check_agg_arguments_walker(PGNode *node,
 								  (void *) context);
 };
 
-AggParser::AggParser()
+AggParser::AggParser(const ContextPtr& context_) : context(context_)
 {
-	clause_parser = std::make_shared<ClauseParser>();
-	node_parser = std::make_shared<NodeParser>();
-	expr_parser = std::make_shared<ExprParser>();
+	clause_parser = std::make_shared<ClauseParser>(context);
+	node_parser = std::make_shared<NodeParser>(context);
+	expr_parser = std::make_shared<ExprParser>(context);
 };
 
-int
-AggParser::check_agg_arguments(PGParseState *pstate,
-					PGList *directargs,
-					PGList *args,
-					PGExpr *filter)
+int AggParser::check_agg_arguments(PGParseState * pstate, PGList * directargs, PGList * args, PGExpr * filter)
 {
-    int			agglevel;
-	check_agg_arguments_context context;
+    int agglevel;
+    check_agg_arguments_context check_agg_context;
 
-	context.pstate = pstate;
-	context.min_varlevel = -1;	/* signifies nothing found yet */
-	context.min_agglevel = -1;
-	context.sublevels_up = 0;
+    check_agg_context.pstate = pstate;
+    check_agg_context.min_varlevel = -1; /* signifies nothing found yet */
+    check_agg_context.min_agglevel = -1;
+    check_agg_context.sublevels_up = 0;
 
-	(void) pg_expression_tree_walker((PGNode *) args,
-								  (walker_func)check_agg_arguments_walker,
-								  (void *) &context);
+    (void)pg_expression_tree_walker((PGNode *)args, (walker_func)check_agg_arguments_walker, (void *)&check_agg_context);
 
-	(void) pg_expression_tree_walker((PGNode *) filter,
-								  (walker_func)check_agg_arguments_walker,
-								  (void *) &context);
+    (void)pg_expression_tree_walker((PGNode *)filter, (walker_func)check_agg_arguments_walker, (void *)&check_agg_context);
 
-	/*
+    /*
 	 * If we found no vars nor aggs at all, it's a level-zero aggregate;
 	 * otherwise, its level is the minimum of vars or aggs.
 	 */
-	if (context.min_varlevel < 0)
-	{
-		if (context.min_agglevel < 0)
-			agglevel = 0;
-		else
-			agglevel = context.min_agglevel;
-	}
-	else if (context.min_agglevel < 0)
-		agglevel = context.min_varlevel;
-	else
-		agglevel = Min(context.min_varlevel, context.min_agglevel);
+    if (check_agg_context.min_varlevel < 0)
+    {
+        if (check_agg_context.min_agglevel < 0)
+            agglevel = 0;
+        else
+            agglevel = check_agg_context.min_agglevel;
+    }
+    else if (check_agg_context.min_agglevel < 0)
+        agglevel = check_agg_context.min_varlevel;
+    else
+        agglevel = Min(check_agg_context.min_varlevel, check_agg_context.min_agglevel);
 
-	/*
+    /*
 	 * If there's a nested aggregate of the same semantic level, complain.
 	 */
-	if (agglevel == context.min_agglevel)
-	{
-		int			aggloc;
+    if (agglevel == check_agg_context.min_agglevel)
+    {
+        int aggloc;
 
-		aggloc = pg_locate_agg_of_level((PGNode *) args, agglevel);
-		if (aggloc < 0)
-			aggloc = pg_locate_agg_of_level((PGNode *) filter, agglevel);
-		parser_errposition(pstate, aggloc);
-		ereport(ERROR,
-				(errcode(ERRCODE_GROUPING_ERROR),
-				 errmsg("aggregate function calls cannot be nested")));
-	}
+        aggloc = pg_locate_agg_of_level((PGNode *)args, agglevel);
+        if (aggloc < 0)
+            aggloc = pg_locate_agg_of_level((PGNode *)filter, agglevel);
+        parser_errposition(pstate, aggloc);
+        ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls cannot be nested")));
+    }
 
-	/*
+    /*
 	 * Now check for vars/aggs in the direct arguments, and throw error if
 	 * needed.  Note that we allow a Var of the agg's semantic level, but not
 	 * an Agg of that level.  In principle such Aggs could probably be
@@ -199,33 +191,26 @@ AggParser::check_agg_arguments(PGParseState *pstate,
 	 * required by spec nor particularly useful, we just treat it as a
 	 * nested-aggregate situation.
 	 */
-	if (directargs)
-	{
-		context.min_varlevel = -1;
-		context.min_agglevel = -1;
-		(void) pg_expression_tree_walker((PGNode *) directargs,
-									  (walker_func)check_agg_arguments_walker,
-									  (void *) &context);
-		if (context.min_varlevel >= 0 && context.min_varlevel < agglevel)
-		{
-			parser_errposition(pstate,
-										pg_locate_var_of_level((PGNode *) directargs,
-															context.min_varlevel));
-			ereport(ERROR,
-					(errcode(ERRCODE_GROUPING_ERROR),
-					 errmsg("outer-level aggregate cannot contain a lower-level variable in its direct arguments")));
-		}
-		if (context.min_agglevel >= 0 && context.min_agglevel <= agglevel)
-		{
-			parser_errposition(pstate,
-										pg_locate_agg_of_level((PGNode *) directargs,
-															context.min_agglevel));
-			ereport(ERROR,
-					(errcode(ERRCODE_GROUPING_ERROR),
-					 errmsg("aggregate function calls cannot be nested")));
-		}
-	}
-	return agglevel;
+    if (directargs)
+    {
+        check_agg_context.min_varlevel = -1;
+        check_agg_context.min_agglevel = -1;
+        (void)pg_expression_tree_walker((PGNode *)directargs, (walker_func)check_agg_arguments_walker, (void *)&check_agg_context);
+        if (check_agg_context.min_varlevel >= 0 && check_agg_context.min_varlevel < agglevel)
+        {
+            parser_errposition(pstate, pg_locate_var_of_level((PGNode *)directargs, check_agg_context.min_varlevel));
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_GROUPING_ERROR),
+                 errmsg("outer-level aggregate cannot contain a lower-level variable in its direct arguments")));
+        }
+        if (check_agg_context.min_agglevel >= 0 && check_agg_context.min_agglevel <= agglevel)
+        {
+            parser_errposition(pstate, pg_locate_agg_of_level((PGNode *)directargs, check_agg_context.min_agglevel));
+            ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls cannot be nested")));
+        }
+    }
+    return agglevel;
 };
 
 void
@@ -1341,28 +1326,28 @@ void AggParser::check_ungrouped_columns(
 		PGList * groupClauses, bool have_non_var_grouping, 
 		PGList ** func_grouped_rels)
 {
-	check_ungrouped_columns_context context;
+	check_ungrouped_columns_context check_ungrouped_context;
 
-	context.pstate = pstate;
-	context.qry = qry;
-	context.groupClauses = groupClauses;
-	context.have_non_var_grouping = have_non_var_grouping;
-	context.func_grouped_rels = func_grouped_rels;
-	context.sublevels_up = 0;
-	context.in_agg_direct_args = false;
-	pg_check_ungrouped_columns_walker(node, &context);
+	check_ungrouped_context.pstate = pstate;
+	check_ungrouped_context.qry = qry;
+	check_ungrouped_context.groupClauses = groupClauses;
+	check_ungrouped_context.have_non_var_grouping = have_non_var_grouping;
+	check_ungrouped_context.func_grouped_rels = func_grouped_rels;
+	check_ungrouped_context.sublevels_up = 0;
+	check_ungrouped_context.in_agg_direct_args = false;
+	pg_check_ungrouped_columns_walker(node, &check_ungrouped_context);
 };
 
 bool AggParser::checkExprHasGroupExtFuncs(PGNode * node)
 {
-    checkHasGroupExtFuncs_context context;
-    context.sublevels_up = 0;
+    checkHasGroupExtFuncs_context check_context;
+    check_context.sublevels_up = 0;
 
     /*
 	 * Must be prepared to start with a Query or a bare expression tree; if
 	 * it's a Query, we don't want to increment sublevels_up.
 	 */
-    return pg_query_or_expression_tree_walker(node, (walker_func)pg_checkExprHasGroupExtFuncs_walker, (void *)&context, 0);
+    return pg_query_or_expression_tree_walker(node, (walker_func)pg_checkExprHasGroupExtFuncs_walker, (void *)&check_context, 0);
 };
 
 void

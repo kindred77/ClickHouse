@@ -6,6 +6,8 @@
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 #include <Interpreters/orcaopt/provider/FunctionProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wsometimes-uninitialized"
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -21,13 +23,13 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-TypeParser::TypeParser()
+TypeParser::TypeParser(const ContextPtr& context_) : context(context_)
 {
-    relation_parser = std::make_shared<RelationParser>();
-    node_parser = std::make_shared<NodeParser>();
-    type_provider = std::make_shared<TypeProvider>();
-    relation_provider = std::make_shared<RelationProvider>();
-    function_provider = std::make_shared<FunctionProvider>();
+    relation_parser = std::make_shared<RelationParser>(context);
+    node_parser = std::make_shared<NodeParser>(context);
+    type_provider = std::make_shared<TypeProvider>(context);
+    relation_provider = std::make_shared<RelationProvider>(context);
+    function_provider = std::make_shared<FunctionProvider>(context);
 };
 
 void

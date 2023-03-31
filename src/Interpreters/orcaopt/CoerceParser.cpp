@@ -10,24 +10,26 @@
 #include <Interpreters/orcaopt/provider/CastProvider.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 
+#include <Interpreters/Context.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
 {
 
-CoerceParser::CoerceParser()
+CoerceParser::CoerceParser(ContextPtr& context_) : context(context_)
 {
-	relation_parser = std::make_shared<RelationParser>();
-	node_parser = std::make_shared<NodeParser>();
-	type_parser = std::make_shared<TypeParser>();
-	type_provider = std::make_shared<TypeProvider>();
-	proc_provider = std::make_shared<ProcProvider>();
-	cast_provider = std::make_shared<CastProvider>();
-	cast_provider = std::make_shared<RelationProvider>();
+	relation_parser = std::make_shared<RelationParser>(context);
+	node_parser = std::make_shared<NodeParser>(context);
+	type_parser = std::make_shared<TypeParser>(context);
+	type_provider = std::make_shared<TypeProvider>(context);
+	proc_provider = std::make_shared<ProcProvider>(context);
+	cast_provider = std::make_shared<CastProvider>(context);
+	relation_provider = std::make_shared<RelationProvider>(context);
 };
 
 Oid
-CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char *context,
+CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char* context_str,
 				   PGNode **which_expr)
 {
     PGNode	   *pexpr;
@@ -97,7 +99,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 				/*
 				 * both types in different categories? then not much hope...
 				 */
-				if (context == NULL)
+				if (context_str == NULL)
 					return InvalidOid;
 				parser_errposition(pstate, exprLocation(nexpr));
 				ereport(ERROR,
@@ -105,7 +107,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 				/*------
 				  translator: first %s is name of a SQL construct, eg CASE */
 						 errmsg("%s types %s and %s cannot be matched",
-								context,
+								context_str,
 								type_provider->format_type_be(ptype).c_str(),
 								type_provider->format_type_be(ntype).c_str())));
 			}
@@ -1433,8 +1435,8 @@ PGNode * CoerceParser::build_coercion_expression(
         nargs = tp->pronargs;
         Assert(nargs >= 1 && nargs <= 3)
         /* Assert(procstruct->proargtypes.values[0] == exprType(node)); */
-        Assert(nargs < 2 || tp->proargtypes.values[1] == INT4OID)
-        Assert(nargs < 3 || tp->proargtypes.values[2] == BOOLOID)
+        Assert(nargs < 2 || tp->proargtypes[1] == INT4OID)
+        Assert(nargs < 3 || tp->proargtypes[2] == BOOLOID)
     }
 
     if (pathtype == COERCION_PATH_FUNC)
@@ -1514,7 +1516,7 @@ PGNode * CoerceParser::build_coercion_expression(
 
 PGNode *
 CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
-					  Oid targetTypeId, const char *context)
+					  Oid targetTypeId, const char* context_str)
 {
 	Oid			inputTypeId = exprType(node);
 
@@ -1530,7 +1532,7 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 				(errcode(ERRCODE_CANNOT_COERCE),
 		/* translator: first %s is name of a SQL construct, eg CASE */
 				 errmsg("%s could not convert type %s to %s",
-						context,
+						context_str,
 						type_provider->format_type_be(inputTypeId).c_str(),
 						type_provider->format_type_be(targetTypeId).c_str())));
 	}

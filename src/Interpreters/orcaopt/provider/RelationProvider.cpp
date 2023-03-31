@@ -4,7 +4,6 @@
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 
 #include <Interpreters/Context.h>
-#include <Interpreters/executeQuery.h>
 #include <Databases/IDatabase.h>
 #include <Storages/IStorage.h>
 
@@ -46,7 +45,7 @@ void RelationProvider::initDb()
 
     if (status != rocksdb::Status::OK())
         throw Exception("Fail to open rocksdb path at: " +  rocksdb_dir + ": " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
-    rocksdb_ptr = std::unique_ptr<rocksdb::DB>(db);
+    rocksdb_ptr = std::shared_ptr<rocksdb::DB>(db);
 
     // get max database oid
     String max_oid;
@@ -75,7 +74,7 @@ void RelationProvider::initAttrs(PGRelationPtr & relation)
     }
 };
 
-RelationProvider::RelationProvider(const ContextPtr& context_)
+RelationProvider::RelationProvider(ContextPtr& context_)
     : context(context_)
 {
     initDb();
@@ -97,7 +96,7 @@ RelationProvider::RelationProvider(const ContextPtr& context_)
                 throw Exception("Can not load database "+database_name+" to RocksDB, write error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
         }
 
-        auto db_ptr = std::make_shared<PGDatabase>(PGDatabase{std::stoi(database_oid), database_name});
+        auto db_ptr = std::make_shared<PGDatabase>(PGDatabase{static_cast<Oid>(std::stoi(database_oid)), database_name});
         oid_database_map.insert({db_ptr->oid, db_ptr});
 
         const auto & database = pair.second;
@@ -107,7 +106,7 @@ RelationProvider::RelationProvider(const ContextPtr& context_)
         {
             auto table_name = tables_it->name();
             String table_oid;
-            auto status = rocksdb_ptr->Get(rocksdb::ReadOptions(), table_name, &table_oid);
+            status = rocksdb_ptr->Get(rocksdb::ReadOptions(), table_name, &table_oid);
             if (!status.ok())
             {
                 rocksdb::WriteBatch batch;

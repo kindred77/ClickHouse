@@ -1,5 +1,7 @@
 #include <Interpreters/orcaopt/provider/CastProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-variable"
 #else
@@ -313,7 +315,7 @@ std::pair<Oid, PGCastPtr> CastProvider::DECIMAL64_TO_FLOAT64
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-CastProvider::CastProvider()
+CastProvider::CastProvider(const ContextPtr& context_) : context(context_)
 {
 	oid_cast_map.insert(INT64_TO_INT16);
 	oid_cast_map.insert(INT64_TO_INT32);

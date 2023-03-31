@@ -20,12 +20,17 @@ castmethod
 from pg_cast pc
 */
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class CastProvider
 {
 private:
 	using Map = std::map<Oid, PGCastPtr>;
 
 	Map oid_cast_map;
+
+	ContextPtr context;
 
 	static std::pair<Oid, PGCastPtr> INT64_TO_INT16;
 	static std::pair<Oid, PGCastPtr> INT64_TO_INT32;
@@ -56,7 +61,7 @@ private:
 	static std::pair<Oid, PGCastPtr> DECIMAL64_TO_FLOAT64;
 public:
 	//explicit CastProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit CastProvider();
+	explicit CastProvider(const ContextPtr& context_);
 	
 	PGCastPtr getCastBySourceTypeAndTargetTypeOid(Oid sourceTypeId, Oid targetTypeId) const;
 

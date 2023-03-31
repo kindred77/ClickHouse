@@ -14,6 +14,9 @@ using ExprParserPtr = std::shared_ptr<ExprParser>;
 using RelationParserPtr = std::shared_ptr<RelationParser>;
 using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class NodeParser
 {
 private:
@@ -21,8 +24,10 @@ private:
 	ExprParserPtr expr_parser;
 	RelationParserPtr relation_parser;
 	TypeProviderPtr type_provider;
+
+	ContextPtr context;
 public:
-	explicit NodeParser();
+	explicit NodeParser(const ContextPtr& context_);
 
 	//Oid
 	//transformContainerType(Oid *containerType, int32 *containerTypmod);

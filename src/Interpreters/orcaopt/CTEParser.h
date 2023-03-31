@@ -15,6 +15,9 @@ using NodeParserPtr = std::shared_ptr<NodeParser>;
 using SelectParserPtr = std::shared_ptr<SelectParser>;
 using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class CTEParser
 {
 private:
@@ -22,8 +25,9 @@ private:
 	NodeParserPtr node_parser;
 	SelectParserPtr select_parser;
 	TypeProviderPtr type_provider;
+	ContextPtr context;
 public:
-	explicit CTEParser();
+	explicit CTEParser(const ContextPtr& context_);
 
 	duckdb_libpgquery::PGList *
 	transformWithClause(PGParseState *pstate, duckdb_libpgquery::PGWithClause *withClause);

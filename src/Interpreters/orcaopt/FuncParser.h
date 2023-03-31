@@ -31,6 +31,9 @@ using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 using AggProviderPtr = std::shared_ptr<AggProvider>;
 using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class FuncParser
 {
 private:
@@ -46,8 +49,10 @@ private:
 	ProcProviderPtr proc_provider;
 	AggProviderPtr agg_provider;
 	FunctionProviderPtr func_provider;
+
+	ContextPtr context;
 public:
-	explicit FuncParser();
+	explicit FuncParser(const ContextPtr& context_);
 
     duckdb_libpgquery::PGNode * ParseFuncOrColumn(PGParseState * pstate, duckdb_libpgquery::PGList * funcname, 
 		duckdb_libpgquery::PGList * fargs, duckdb_libpgquery::PGFuncCall * fn, int location);

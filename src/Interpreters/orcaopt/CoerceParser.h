@@ -50,6 +50,9 @@ using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 using CastProviderPtr = std::shared_ptr<CastProvider>;
 using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class CoerceParser
 {
 private:
@@ -60,8 +63,10 @@ private:
 	ProcProviderPtr proc_provider;
 	CastProviderPtr cast_provider;
 	RelationProviderPtr relation_provider;
+
+	ContextPtr context;
 public:
-	explicit CoerceParser();
+	explicit CoerceParser(ContextPtr& context_);
 
 	Oid
 	select_common_type(PGParseState *pstate, duckdb_libpgquery::PGList *exprs, const char *context,

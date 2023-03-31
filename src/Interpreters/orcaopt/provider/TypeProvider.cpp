@@ -12,6 +12,8 @@
 
 #include "naucrates/dxl/CDXLUtils.h"
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #else
@@ -1017,7 +1019,7 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DECIMAL64
 // 	return mdname;
 // }
 
-TypeProvider::TypeProvider()
+TypeProvider::TypeProvider(const ContextPtr& context_) : context(context_)
 {
 	oid_type_map.insert(TYPE_FLOAT32);
 	oid_type_map.insert(TYPE_FLOAT64);
@@ -1131,7 +1133,7 @@ PGTypePtr TypeProvider::get_type_by_typename_namespaceoid(const std::string& typ
 			return pair.second;
 		}
 	}
-	return InvalidOid;
+	return nullptr;
 }
 
 /*

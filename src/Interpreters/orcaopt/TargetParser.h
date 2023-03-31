@@ -18,6 +18,9 @@ using CoerceParserPtr = std::shared_ptr<CoerceParser>;
 using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class TargetParser
 {
 private:
@@ -27,8 +30,10 @@ private:
     CoerceParserPtr coerce_parser;
     TypeProviderPtr type_provider;
     RelationProviderPtr relation_provider;
+
+    ContextPtr context;
 public:
-	explicit TargetParser();
+	explicit TargetParser(const ContextPtr& context_);
 
     duckdb_libpgquery::PGList *
     transformTargetList(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist,

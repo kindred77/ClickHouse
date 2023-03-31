@@ -28,6 +28,9 @@ using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 using OperProviderPtr = std::shared_ptr<OperProvider>;
 using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 struct PGTupleDescHash
 {
     std::size_t operator()(const PGTupleDescPtr & key) const;
@@ -43,7 +46,7 @@ class TypeProvider
 {
 public:
 	//explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit TypeProvider();
+	explicit TypeProvider(const ContextPtr& context_);
 	//static void Init();
 	//IMDTypePtr getTypeByOID(Oid oid);
 	PGTypePtr getTypeByOid(Oid oid) const;
@@ -176,7 +179,7 @@ private:
 	using Map = std::map<Oid, PGTypePtr>;
 
 	Map oid_type_map;
-	//ContextPtr context;
+	ContextPtr context;
 	//gpos::CMemoryPool *mp;
 
 	gpmd::CMDName *

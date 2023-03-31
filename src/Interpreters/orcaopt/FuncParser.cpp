@@ -13,6 +13,8 @@
 #include <Interpreters/orcaopt/provider/AggProvider.h>
 #include <Interpreters/orcaopt/provider/FunctionProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wswitch"
 #else
@@ -24,20 +26,20 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-FuncParser::FuncParser()
+FuncParser::FuncParser(const ContextPtr& context_) : context(context_)
 {
-    coerce_parser = std::make_shared<CoerceParser>();
-    agg_parser = std::make_shared<AggParser>();
-    clause_parser = std::make_shared<ClauseParser>();
-    node_parser = std::make_shared<NodeParser>();
-    type_parser = std::make_shared<TypeParser>();
-    relation_parser = std::make_shared<RelationParser>();
-	target_parser = std::make_shared<TargetParser>();
-    expr_parser = std::make_shared<ExprParser>();
-	type_provider = std::make_shared<TypeProvider>();
-	proc_provider = std::make_shared<ProcProvider>();
-	agg_provider = std::make_shared<AggProvider>();
-	func_provider = std::make_shared<FunctionProvider>();
+    coerce_parser = std::make_shared<CoerceParser>(context);
+    agg_parser = std::make_shared<AggParser>(context);
+    clause_parser = std::make_shared<ClauseParser>(context);
+    node_parser = std::make_shared<NodeParser>(context);
+    type_parser = std::make_shared<TypeParser>(context);
+    relation_parser = std::make_shared<RelationParser>(context);
+	target_parser = std::make_shared<TargetParser>(context);
+    expr_parser = std::make_shared<ExprParser>(context);
+	type_provider = std::make_shared<TypeProvider>(context);
+	proc_provider = std::make_shared<ProcProvider>(context);
+	agg_provider = std::make_shared<AggProvider>(context);
+	func_provider = std::make_shared<FunctionProvider>(context);
 };
 
 PGNode *

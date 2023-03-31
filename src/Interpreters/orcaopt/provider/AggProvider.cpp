@@ -1,9 +1,16 @@
 #include <Interpreters/orcaopt/provider/AggProvider.h>
 
+#include <Interpreters/Context.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
 {
+
+AggProvider::AggProvider(const ContextPtr& context_) : context(context_)
+{
+
+};
 
 PGAggPtr AggProvider::getAggByFuncOid(Oid func_oid) const
 {

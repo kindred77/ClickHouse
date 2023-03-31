@@ -17,6 +17,9 @@ using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class TypeParser
 {
 private:
@@ -25,8 +28,10 @@ private:
     TypeProviderPtr type_provider;
     RelationProviderPtr relation_provider;
     FunctionProviderPtr function_provider;
+
+    ContextPtr context;
 public:
-	explicit TypeParser();
+	explicit TypeParser(const ContextPtr& context_);
 
     Oid typenameTypeId(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName);
 

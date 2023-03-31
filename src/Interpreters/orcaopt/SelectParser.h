@@ -23,6 +23,9 @@ using FuncParserPtr = std::shared_ptr<FuncParser>;
 using AggParserPtr = std::shared_ptr<AggParser>;
 using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class SelectParser
 {
 private:
@@ -36,8 +39,10 @@ private:
     AggParserPtr agg_parser;
     FuncParserPtr func_parser;
     RelationProviderPtr relation_provider;
+
+    ContextPtr context;
 public:
-	explicit SelectParser();
+	explicit SelectParser(const ContextPtr& context_);
 
     void
     markTargetListOrigin(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,

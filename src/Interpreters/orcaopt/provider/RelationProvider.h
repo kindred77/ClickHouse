@@ -46,7 +46,7 @@ private:
     const String max_database_oid_rocksdb_key = "max_database_oid";
     const String max_table_oid_rocksdb_key = "max_table_oid";
 
-    using RocksDBPtr = std::unique_ptr<rocksdb::DB>;
+    using RocksDBPtr = std::shared_ptr<rocksdb::DB>;
     RocksDBPtr rocksdb_ptr;
 
     String rocksdb_dir;
@@ -57,7 +57,7 @@ private:
     void initAttrs(PGRelationPtr & relation);
 public:
 	//explicit RelationProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-    explicit RelationProvider(const ContextPtr& context_);
+    explicit RelationProvider(ContextPtr& context_);
 	//StoragePtr getStorageByOID(Oid oid) const;
 
 	//std::optional<std::tuple<Oid, StoragePtr, char> >

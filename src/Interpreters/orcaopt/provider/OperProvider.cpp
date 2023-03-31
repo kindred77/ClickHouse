@@ -2,6 +2,8 @@
 
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #else
@@ -2037,7 +2039,7 @@ std::pair<Oid, PGOperatorPtr> OperProvider::OPER_DECIMAL64GE = std::pair<Oid, PG
         /*oprrest*/ .oprrest = Oid(0),
         /*oprjoin*/ .oprjoin = Oid(0)}));
 
-OperProvider::OperProvider()
+OperProvider::OperProvider(const ContextPtr& context_) : context(context_)
 {
 	oid_oper_map.insert(OPER_INT2PL);
 	oid_oper_map.insert(OPER_INT4PL);

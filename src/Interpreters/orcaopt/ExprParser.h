@@ -31,6 +31,9 @@ using AggParserPtr = std::shared_ptr<AggParser>;
 using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class ExprParser
 {
 private:
@@ -49,8 +52,10 @@ private:
 
     bool		operator_precedence_warning = false;
     bool		Transform_null_equals = false;
+
+    ContextPtr context;
 public:
-	explicit ExprParser();
+	explicit ExprParser(const ContextPtr& context_);
 
     bool
     exprIsNullConstant(duckdb_libpgquery::PGNode *arg);

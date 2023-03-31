@@ -7,6 +7,8 @@
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wswitch"
 #else
@@ -18,14 +20,14 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-TargetParser::TargetParser()
+TargetParser::TargetParser(const ContextPtr& context_) : context(context_)
 {
-	relation_parser = std::make_shared<RelationParser>();
-    expr_parser = std::make_shared<ExprParser>();
-    node_parser = std::make_shared<NodeParser>();
-    coerce_parser = std::make_shared<CoerceParser>();
-    type_provider = std::make_shared<TypeProvider>();
-    relation_provider = std::make_shared<RelationProvider>();
+	relation_parser = std::make_shared<RelationParser>(context);
+    expr_parser = std::make_shared<ExprParser>(context);
+    node_parser = std::make_shared<NodeParser>(context);
+    coerce_parser = std::make_shared<CoerceParser>(context);
+    type_provider = std::make_shared<TypeProvider>(context);
+    relation_provider = std::make_shared<RelationProvider>(context);
 };
 
 int

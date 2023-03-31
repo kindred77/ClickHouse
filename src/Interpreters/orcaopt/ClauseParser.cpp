@@ -12,6 +12,8 @@
 #include <Interpreters/orcaopt/provider/OperProvider.h>
 #include <Interpreters/orcaopt/provider/FunctionProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -29,18 +31,18 @@ using PGOperatorPtr = std::shared_ptr<Form_pg_operator>;
 namespace DB
 {
 
-ClauseParser::ClauseParser()
+ClauseParser::ClauseParser(const ContextPtr& context_) : context(context_)
 {
-	relation_parser = std::make_shared<RelationParser>();
-	select_parser = std::make_shared<SelectParser>();
-	coerce_parser = std::make_shared<CoerceParser>();
-	expr_parser = std::make_shared<ExprParser>();
-	target_parser = std::make_shared<TargetParser>();
-	oper_parser = std::make_shared<OperParser>();
-	node_parser = std::make_shared<NodeParser>();
-	type_parser = std::make_shared<TypeParser>();
-	oper_provider = std::make_shared<OperProvider>();
-	function_provider = std::make_shared<FunctionProvider>();
+	relation_parser = std::make_shared<RelationParser>(context);
+	select_parser = std::make_shared<SelectParser>(context);
+	coerce_parser = std::make_shared<CoerceParser>(context);
+	expr_parser = std::make_shared<ExprParser>(context);
+	target_parser = std::make_shared<TargetParser>(context);
+	oper_parser = std::make_shared<OperParser>(context);
+	node_parser = std::make_shared<NodeParser>(context);
+	type_parser = std::make_shared<TypeParser>(context);
+	oper_provider = std::make_shared<OperProvider>(context);
+	function_provider = std::make_shared<FunctionProvider>(context);
 }
 
 PGRangeTblEntry *

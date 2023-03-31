@@ -30,14 +30,18 @@ using ClauseParserPtr = std::shared_ptr<ClauseParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
 using ExprParserPtr = std::shared_ptr<ExprParser>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class AggParser
 {
 private:
     ClauseParserPtr clause_parser;
 	NodeParserPtr node_parser;
 	ExprParserPtr expr_parser;
+	ContextPtr context;
 public:
-	explicit AggParser();
+	explicit AggParser(const ContextPtr& context_);
 
 	duckdb_libpgquery::PGNode *
 	transformGroupingFunc(PGParseState *pstate, duckdb_libpgquery::PGGroupingFunc *p);

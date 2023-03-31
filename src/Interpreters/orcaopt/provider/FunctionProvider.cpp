@@ -17,6 +17,8 @@
 
 #include "naucrates/dxl/CDXLUtils.h"
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #else
@@ -38,7 +40,12 @@ FunctionProvider::CreateMDName(const char *name_str)
 	// cleanup
 	GPOS_DELETE(str_name);
 	return mdname;
-}
+};
+
+FunctionProvider::FunctionProvider(const ContextPtr& context_) : context(context_)
+{
+
+};
 
 // FunctionProvider::FunctionProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
 // 		: context(std::move(context_)),

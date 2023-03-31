@@ -8,6 +8,8 @@
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 #include <Interpreters/orcaopt/provider/FunctionProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -21,15 +23,15 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-RelationParser::RelationParser()
+RelationParser::RelationParser(const ContextPtr& context_) : context(context_)
 {
-	coerce_parser = std::make_shared<CoerceParser>();
-	node_parser = std::make_shared<NodeParser>();
-	type_parser = std::make_shared<TypeParser>();
+	coerce_parser = std::make_shared<CoerceParser>(context);
+	node_parser = std::make_shared<NodeParser>(context);
+	type_parser = std::make_shared<TypeParser>(context);
 
-	relation_provider = std::make_shared<RelationProvider>();
-	type_provider = std::make_shared<TypeProvider>();
-	function_provider = std::make_shared<FunctionProvider>();
+	relation_provider = std::make_shared<RelationProvider>(context);
+	type_provider = std::make_shared<TypeProvider>(context);
+	function_provider = std::make_shared<FunctionProvider>(context);
 };
 
 PGCommonTableExpr *
@@ -1806,7 +1808,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
                     ereport(
                         ERROR,
                         (errcode(ERRCODE_UNDEFINED_COLUMN),
-                         errmsg("column \"%s\" of relation \"%s\" does not exist", tp->attname.c_str(), relation_provider->get_rel_name(rte->relid))));
+                         errmsg("column \"%s\" of relation \"%s\" does not exist", tp->attname.c_str(), relation_provider->get_rel_name(rte->relid).c_str())));
             *vartype = tp->atttypid;
             *vartypmod = tp->atttypmod;
             *varcollid = tp->attcollation;

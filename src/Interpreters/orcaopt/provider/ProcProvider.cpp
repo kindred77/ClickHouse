@@ -1,5 +1,7 @@
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #else
@@ -1090,7 +1092,7 @@ std::pair<Oid, PGProcPtr> ProcProvider::PROC_DECIMAL64TOFLOAT64 = std::pair<Oid,
         /*prorettype*/ .prorettype = Oid(701),
         /*proargtypes*/ .proargtypes = {Oid(1700)}}));
 
-ProcProvider::ProcProvider()
+ProcProvider::ProcProvider(const ContextPtr& context_) : context(context_)
 {
 	oid_proc_map.insert(PROC_INT2PL);
 	oid_proc_map.insert(PROC_INT4PL);

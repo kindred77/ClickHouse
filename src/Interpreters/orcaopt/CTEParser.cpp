@@ -4,17 +4,19 @@
 #include <Interpreters/orcaopt/SelectParser.h>
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 
+#include <Interpreters/Context.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
 {
 
-CTEParser::CTEParser()
+CTEParser::CTEParser(const ContextPtr& context_) : context(context_)
 {
-	relation_parser = std::make_shared<RelationParser>();
-	node_parser = std::make_shared<NodeParser>();
-	select_parser = std::make_shared<SelectParser>();
-	type_provider = std::make_shared<TypeProvider>();
+	relation_parser = std::make_shared<RelationParser>(context);
+	node_parser = std::make_shared<NodeParser>(context);
+	select_parser = std::make_shared<SelectParser>(context);
+	type_provider = std::make_shared<TypeProvider>(context);
 };
 
 void CTEParser::analyzeCTETargetList(PGParseState * pstate, PGCommonTableExpr * cte, PGList * tlist)

@@ -22,6 +22,9 @@ using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class RelationParser
 {
 private:
@@ -37,8 +40,10 @@ private:
 
     int specialAttNum(const char * attname);
 
+	ContextPtr context;
+
 public:
-	explicit RelationParser();
+	explicit RelationParser(const ContextPtr& context_);
 
 	void
 	expandRTE(duckdb_libpgquery::PGRangeTblEntry *rte, int rtindex, int sublevels_up,

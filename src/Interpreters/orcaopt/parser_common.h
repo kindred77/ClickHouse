@@ -2067,13 +2067,17 @@ struct PGPolicy
 
 using PGPolicyPtr = std::shared_ptr<PGPolicy>;
 
-class IStorage;
-using StoragePtr = std::shared_ptr<IStorage>;
+namespace DB
+{
+    class IStorage;
+    using StoragePtr = std::shared_ptr<IStorage>;
+};
+
 
 struct PGRelation
 {
     Oid oid;
-    StoragePtr storage_ptr;
+    DB::StoragePtr storage_ptr;
     RelFileNode rd_node; /* relation physical identifier */
     /* use "struct" here to avoid needing to include smgr.h: */
 	//TODO kindred

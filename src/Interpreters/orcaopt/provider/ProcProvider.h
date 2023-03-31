@@ -12,6 +12,10 @@ namespace DB
 /*
 pg_proc  -> CMDFunctionGPDB
 */
+
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class ProcProvider
 {
 private:
@@ -62,9 +66,11 @@ private:
 	static std::pair<Oid, PGProcPtr> PROC_DECIMAL64TOINT16;
 	static std::pair<Oid, PGProcPtr> PROC_DECIMAL64TOINT32;
 	static std::pair<Oid, PGProcPtr> PROC_DECIMAL64TOFLOAT64;
+
+	ContextPtr context;
 public:
 	//explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit ProcProvider();
+	explicit ProcProvider(const ContextPtr& context_);
 	
 	PGProcPtr getProcByOid(Oid oid) const;
 

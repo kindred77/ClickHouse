@@ -18,6 +18,9 @@ using OperProviderPtr = std::shared_ptr<OperProvider>;
 using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class OperParser
 {
 private:
@@ -28,8 +31,10 @@ private:
 	OperProviderPtr oper_provider;
 	TypeProviderPtr type_provider;
 	ProcProviderPtr proc_provider;
+
+	ContextPtr context;
 public:
-	explicit OperParser();
+	explicit OperParser(const ContextPtr& context_);
 
 	// Oid
 	// compatible_oper_opid(duckdb_libpgquery::PGList *op, Oid arg1, Oid arg2, bool noError);

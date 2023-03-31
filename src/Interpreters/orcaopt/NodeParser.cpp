@@ -6,6 +6,8 @@
 
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -21,12 +23,12 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-NodeParser::NodeParser()
+NodeParser::NodeParser(const ContextPtr& context_) : context(context_)
 {
-	coerce_parser = std::make_shared<CoerceParser>();
-	expr_parser = std::make_shared<ExprParser>();
-	relation_parser = std::make_shared<RelationParser>();
-	type_provider = std::make_shared<TypeProvider>();
+	coerce_parser = std::make_shared<CoerceParser>(context);
+	expr_parser = std::make_shared<ExprParser>(context);
+	relation_parser = std::make_shared<RelationParser>(context);
+	type_provider = std::make_shared<TypeProvider>(context);
 };
 
 Oid NodeParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)

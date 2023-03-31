@@ -7,19 +7,21 @@
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
 
+#include <Interpreters/Context.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
 {
 
-OperParser::OperParser()
+OperParser::OperParser(const ContextPtr& context_) : context(context_)
 {
-    func_parser = std::make_shared<FuncParser>();
-	node_parser = std::make_shared<NodeParser>();
-	coerce_parser = std::make_shared<CoerceParser>();
-	oper_provider = std::make_shared<OperProvider>();
-	type_provider = std::make_shared<TypeProvider>();
-	proc_provider = std::make_shared<ProcProvider>();
+    func_parser = std::make_shared<FuncParser>(context);
+	node_parser = std::make_shared<NodeParser>(context);
+	coerce_parser = std::make_shared<CoerceParser>(context);
+	oper_provider = std::make_shared<OperProvider>(context);
+	type_provider = std::make_shared<TypeProvider>(context);
+	proc_provider = std::make_shared<ProcProvider>(context);
 };
 
 // Oid OperParser::compatible_oper_opid(PGList * op, Oid arg1, Oid arg2, bool noError)

@@ -13,6 +13,9 @@ namespace DB
 class TypeProvider;
 using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class OperProvider
 {
 private:
@@ -112,9 +115,11 @@ private:
     static std::pair<Oid, PGOperatorPtr> OPER_DECIMAL64GE;
 
 	TypeProviderPtr type_provider;
+
+    ContextPtr context;
 public:
 	//explicit OperProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit OperProvider();
+	explicit OperProvider(const ContextPtr& context_);
 	PGOperatorPtr getOperByOID(Oid oid) const;
 	Oid getOperByName(duckdb_libpgquery::PGList *names, Oid oprleft, Oid oprright) const;
 

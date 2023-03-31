@@ -27,6 +27,9 @@ using TypeParserPtr = std::shared_ptr<TypeParser>;
 using OperProviderPtr = std::shared_ptr<OperProvider>;
 using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
+
 class ClauseParser
 {
 private:
@@ -42,8 +45,9 @@ private:
     OperProviderPtr oper_provider;
     FunctionProviderPtr function_provider;
     //std::shared_ptr<ScalarOperatorProvider> scalar_operator_provider = nullptr;
+    ContextPtr context;
 public:
-	explicit ClauseParser();
+	explicit ClauseParser(const ContextPtr& context_);
     
     void
     transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGList *frmList);

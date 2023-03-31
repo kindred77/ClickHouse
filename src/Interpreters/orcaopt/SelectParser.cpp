@@ -12,6 +12,8 @@
 #include <Interpreters/orcaopt/FuncParser.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 
+#include <Interpreters/Context.h>
+
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wswitch"
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -27,17 +29,17 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-SelectParser::SelectParser()
+SelectParser::SelectParser(const ContextPtr& context_) : context(context_)
 {
-    clause_parser = std::make_shared<ClauseParser>();
-    target_parser = std::make_shared<TargetParser>();
-    coerce_parser = std::make_shared<CoerceParser>();
-    node_parser = std::make_shared<NodeParser>();
-    relation_parser = std::make_shared<RelationParser>();
-    cte_parser = std::make_shared<CTEParser>();
-    agg_parser = std::make_shared<AggParser>();
-    func_parser = std::make_shared<FuncParser>();
-    relation_provider = std::make_shared<RelationProvider>();
+    clause_parser = std::make_shared<ClauseParser>(context);
+    target_parser = std::make_shared<TargetParser>(context);
+    coerce_parser = std::make_shared<CoerceParser>(context);
+    node_parser = std::make_shared<NodeParser>(context);
+    relation_parser = std::make_shared<RelationParser>(context);
+    cte_parser = std::make_shared<CTEParser>(context);
+    agg_parser = std::make_shared<AggParser>(context);
+    func_parser = std::make_shared<FuncParser>(context);
+    relation_provider = std::make_shared<RelationProvider>(context);
 };
 
 void
@@ -135,9 +137,9 @@ SelectParser::markTargetListOrigins(PGParseState *pstate, PGList *targetlist)
 	}
 };
 
-PGNode * SelectParser::map_sgr_mutator(PGNode * node, void * context)
+PGNode * SelectParser::map_sgr_mutator(PGNode * node, void * context_grouped_window)
 {
-    grouped_window_ctx * ctx = (grouped_window_ctx *)context;
+    grouped_window_ctx * ctx = (grouped_window_ctx *)context_grouped_window;
 
     if (!node)
         return NULL;

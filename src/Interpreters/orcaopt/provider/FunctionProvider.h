@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Interpreters/Context.h>
 #include <Interpreters/orcaopt/parser_common.h>
 
 #include <naucrates/md/CMDName.h>
@@ -14,6 +13,8 @@ namespace DB
 {
 using IMDFunctionPtr = std::shared_ptr<const gpmd::IMDFunction>;
 
+class Context;
+using ContextPtr = std::shared_ptr<const Context>;
 
 class FunctionProvider
 {
@@ -28,7 +29,7 @@ private:
 
 public:
     //explicit FunctionProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-    explicit FunctionProvider();
+    explicit FunctionProvider(const ContextPtr& context_);
     IMDFunctionPtr getFunctionByOID(OID oid) const;
 
     Datum OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2);
