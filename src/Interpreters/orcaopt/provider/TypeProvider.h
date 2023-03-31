@@ -135,7 +135,6 @@ private:
 	FunctionProviderPtr function_provider;
 	TypeParserPtr type_parser;
 	RelationProviderPtr relation_provider;
-	ClassProviderPtr class_provider;
 	OperProviderPtr oper_provider;
 	ProcProviderPtr proc_provider;
 
