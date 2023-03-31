@@ -18,7 +18,6 @@ namespace DB
 class TypeParser;
 class FunctionProvider;
 class RelationProvider;
-class ClassProvider;
 class OperProvider;
 class ProcProvider;
 
@@ -26,7 +25,6 @@ using IMDTypePtr = std::shared_ptr<const gpmd::IMDType>;
 using TypeParserPtr = std::shared_ptr<TypeParser>;
 using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 using RelationProviderPtr = std::shared_ptr<RelationProvider>;
-using ClassProviderPtr = std::shared_ptr<ClassProvider>;
 using OperProviderPtr = std::shared_ptr<OperProvider>;
 using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 

@@ -5,7 +5,6 @@
 #include <Interpreters/orcaopt/TypeParser.h>
 #include <Interpreters/orcaopt/provider/FunctionProvider.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
-#include <Interpreters/orcaopt/provider/ClassProvider.h>
 #include <Interpreters/orcaopt/provider/OperProvider.h>
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
 
@@ -1708,7 +1707,7 @@ bool TypeProvider::typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId)
 	// }
 
     // /* No point in searching if the superclass has no subclasses */
-    // if (!class_provider->has_subclass(superclassRelid))
+    // if (!relation_provider->has_subclass(superclassRelid))
     //     return false;
 
     // /*

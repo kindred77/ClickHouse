@@ -6,9 +6,9 @@
 #include <Interpreters/orcaopt/TypeParser.h>
 
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
-#include <Interpreters/orcaopt/provider/ClassProvider.h>
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
 #include <Interpreters/orcaopt/provider/CastProvider.h>
+#include <Interpreters/orcaopt/provider/RelationProvider.h>
 
 using namespace duckdb_libpgquery;
 
@@ -21,9 +21,9 @@ CoerceParser::CoerceParser()
 	node_parser = std::make_shared<NodeParser>();
 	type_parser = std::make_shared<TypeParser>();
 	type_provider = std::make_shared<TypeProvider>();
-	class_provider = std::make_shared<ClassProvider>();
 	proc_provider = std::make_shared<ProcProvider>();
 	cast_provider = std::make_shared<CastProvider>();
+	cast_provider = std::make_shared<RelationProvider>();
 };
 
 Oid
@@ -336,7 +336,7 @@ bool CoerceParser::typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId)
 
     if (relid)
     {
-		PGClassPtr tp = class_provider->getClassByRelOid(relid);
+		PGClassPtr tp = relation_provider->getClassByRelOid(relid);
         if (tp == NULL)
             elog(ERROR, "cache lookup failed for relation %u", relid);
 
