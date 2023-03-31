@@ -919,6 +919,70 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 	}
 };
 
+bool RelationParser::isFutureCTE(PGParseState * pstate, const char * refname)
+{
+    for (; pstate != NULL; pstate = pstate->parentParseState)
+    {
+        PGListCell * lc;
+
+        foreach (lc, pstate->p_future_ctes)
+        {
+            PGCommonTableExpr * cte = (PGCommonTableExpr *)lfirst(lc);
+
+            if (strcmp(cte->ctename, refname) == 0)
+                    return true;
+        }
+    }
+    return false;
+};
+
+PGRelationPtr RelationParser::parserOpenTable(PGParseState * pstate, const PGRangeVar * relation, int lockmode, bool * lockUpgraded)
+{
+    //ParseCallbackState pcbstate;
+
+    //setup_parser_errposition_callback(&pcbstate, pstate, relation->location);
+
+    /* Look up the appropriate relation using namespace search */
+    Oid relid = relation_provider->RangeVarGetRelidExtended(relation, NoLock, true, false, NULL, NULL);
+    
+    /*
+	 * CdbTryOpenRelation might return NULL (for example, if the table
+	 * is dropped by another transaction). Every time we invoke function
+	 * CdbTryOpenRelation, we should check if the return value is NULL.
+	 */
+    auto rel = relation_provider->heap_open(relid, lockmode);
+
+    if (!rel)
+    {
+        if (relation->schemaname)
+            ereport(
+                ERROR,
+                (errcode(ERRCODE_UNDEFINED_TABLE), errmsg("relation \"%s.%s\" does not exist", relation->schemaname, relation->relname)));
+        else
+        {
+            /*
+			 * An unqualified name might have been meant as a reference to
+			 * some not-yet-in-scope CTE.  The bare "does not exist" message
+			 * has proven remarkably unhelpful for figuring out such problems,
+			 * so we take pains to offer a specific hint.
+			 */
+            if (isFutureCTE(pstate, relation->relname))
+                ereport(
+                    ERROR,
+                    (errcode(ERRCODE_UNDEFINED_TABLE),
+                     errmsg("relation \"%s\" does not exist", relation->relname),
+                     errdetail(
+                         "There is a WITH item named \"%s\", but it cannot be referenced from this part of the query.", relation->relname),
+                     errhint("Use WITH RECURSIVE, or re-order the WITH items to remove forward references.")));
+            else
+                ereport(ERROR, (errcode(ERRCODE_UNDEFINED_TABLE), errmsg("relation \"%s\" does not exist", relation->relname)));
+        }
+    }
+
+    //cancel_parser_errposition_callback(&pcbstate);
+    return rel;
+};
+
 PGRangeTblEntry *
 RelationParser::addRangeTableEntry(PGParseState *pstate,
 				   PGRangeVar *relation,
@@ -977,7 +1041,7 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
 	 * depending on whether we're doing SELECT FOR UPDATE/SHARE.
 	 */
     setup_parser_errposition_callback(&pcbstate, pstate, relation->location);
-    rel = relation_provider->parserOpenTable(pstate, relation, lockmode, NULL);
+    rel = parserOpenTable(pstate, relation, lockmode, NULL);
     cancel_parser_errposition_callback(&pcbstate);
     rte->relid = rel->rd_id;
     rte->relkind = rel->rd_rel->relkind;

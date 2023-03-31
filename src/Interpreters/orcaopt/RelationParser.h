@@ -186,6 +186,10 @@ public:
 
     char * chooseScalarFunctionAlias(duckdb_libpgquery::PGNode * funcexpr, char * funcname,
 		duckdb_libpgquery::PGAlias * alias, int nfuncs);
+
+    bool isFutureCTE(PGParseState * pstate, const char * refname);
+
+    PGRelationPtr parserOpenTable(PGParseState * pstate, const duckdb_libpgquery::PGRangeVar * relation, int lockmode, bool * lockUpgraded);
 };
 
 }

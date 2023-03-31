@@ -245,21 +245,6 @@ const std::string RelationProvider::get_database_name(Oid dbid) const
 
 char RelationProvider::get_rel_relkind(Oid relid) const
 {
-    // HeapTuple tp;
-
-    // tp = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
-    // if (HeapTupleIsValid(tp))
-    // {
-    //     Form_pg_class reltup = (Form_pg_class)GETSTRUCT(tp);
-    //     char result;
-
-    //     result = reltup->relkind;
-    //     ReleaseSysCache(tp);
-    //     return result;
-    // }
-    // else
-    //     return '\0';
-
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
 	    return '\0';
@@ -292,9 +277,10 @@ const std::string RelationProvider::get_rel_name(Oid relid)
 
 PGAttrPtr RelationProvider::get_att_by_reloid_attnum(Oid relid, PGAttrNumber attnum) const
 {
-    PGAttrPtr attr = nullptr;
-
-    return attr;
+    auto it = oid_relation_map.find(relid);
+	if (it == oid_relation_map.end())
+	    return nullptr;
+	return it->second->rd_att->attrs[attnum - 1];
 };
 
 std::string RelationProvider::get_rte_attribute_name(PGRangeTblEntry * rte, PGAttrNumber attnum)
@@ -543,24 +529,57 @@ Oid RelationProvider::RangeVarGetRelidExtended(
     // }
     // return relId;
 
-    return InvalidOid;
+    Oid relId = InvalidOid;
+    if (relation->schemaname)
+    {
+        Oid namespaceId;
+
+        /* use exact schema given */
+        namespaceId = LookupExplicitNamespace(relation->schemaname, missing_ok);
+        if (missing_ok && !OidIsValid(namespaceId))
+            relId = InvalidOid;
+        else
+            relId = get_relname_relid(relation->relname, namespaceId);
+    }
+    else
+    {
+        /* search the namespace path */
+        relId = get_relname_relid(relation->relname, InvalidOid);
+    }
+
+    return relId;
 };
 
 PGRelationPtr RelationProvider::relation_open(Oid relationId, LOCKMODE lockmode)
 {
-    PGRelationPtr r = nullptr;
-
-	return r;
+    if (lockmode == RowShareLock
+        || lockmode == RowExclusiveLock
+        || lockmode == ShareUpdateExclusiveLock
+        || lockmode == ShareRowExclusiveLock
+        || lockmode == AccessExclusiveLock)
+    {
+        elog(ERROR, "LockMode do not supported yet %u", lockmode);
+        return nullptr;
+    }
+    auto it = oid_relation_map.find(relationId);
+	if (it == oid_relation_map.end())
+    {
+	    return nullptr;
+    }
+    // TODO kindred
+    // AccessShareLock, ShareLock, ExclusiveLock
+    // it->second->storage_ptr->lockForShare()
+	return it->second;
 };
 
 void RelationProvider::relation_close(PGRelationPtr relation, LOCKMODE lockmode)
 {
-
+    return;
 };
 
 PGRelationPtr RelationProvider::try_heap_open(Oid relationId, LOCKMODE lockmode, bool noWait)
 {
-    return nullptr;
+    return relation_open(relationId, lockmode);
 };
 
 bool RelationProvider::IsSystemRelation(PGRelationPtr relation)
@@ -568,17 +587,17 @@ bool RelationProvider::IsSystemRelation(PGRelationPtr relation)
     return false;
 };
 
-PGRelationPtr RelationProvider::parserOpenTable(PGParseState * pstate, const PGRangeVar * relation, int lockmode, bool * lockUpgraded)
-{
-    PGRelationPtr r = nullptr;
-
-	return r;
-};
-
 Oid RelationProvider::get_relname_relid(const char * relname, Oid relnamespace)
 {
-    // return GetSysCacheOid2(RELNAMENSP, PointerGetDatum(relname), ObjectIdGetDatum(relnamespace));
-
+    for (auto pair : oid_relation_map)
+    {
+        if (pair.second->rd_rel->relname == std::string(relname)
+            && pair.second->rd_rel->relnamespace == relnamespace)
+        {
+            return pair.second->oid;
+        }
+    }
+    
     return InvalidOid;
 };
 
@@ -603,6 +622,14 @@ Oid RelationProvider::LookupNamespaceNoError(const char * nspname)
 
     // return get_namespace_oid(nspname, true);
 
+    for (auto pair : oid_database_map)
+    {
+        if (pair.second->name == std::string(nspname))
+        {
+            return pair.second->oid;
+        }
+    }
+    
     return InvalidOid;
 };
 

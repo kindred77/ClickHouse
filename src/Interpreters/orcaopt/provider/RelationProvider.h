@@ -93,8 +93,6 @@ public:
 
     bool IsSystemRelation(PGRelationPtr relation);
 
-    PGRelationPtr parserOpenTable(PGParseState * pstate, const duckdb_libpgquery::PGRangeVar * relation, int lockmode, bool * lockUpgraded);
-
     Oid get_relname_relid(const char * relname, Oid relnamespace);
 
     Oid LookupNamespaceNoError(const char * nspname);
