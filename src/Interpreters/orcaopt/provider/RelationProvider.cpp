@@ -65,7 +65,10 @@ void RelationProvider::initDb()
 void RelationProvider::initAttrs(PGRelationPtr & relation)
 {
     PGAttrNumber attr_num = 1;
-    for (auto name_and_type : relation->storage_ptr->getInMemoryMetadataPtr()->getColumns().getAllPhysical())
+    auto all_cols = relation->storage_ptr->getInMemoryMetadataPtr()->getColumns().getAll();
+    auto virtual_cols = relation->storage_ptr->getVirtuals();
+    all_cols.merge(virtual_cols);
+    for (auto name_and_type : all_cols)
     {
         auto type_ptr = type_provider->get_type_by_typename_namespaceoid(name_and_type.type->getName());
         type_provider->PGTupleDescInitEntry(relation->rd_att, attr_num,
@@ -633,32 +636,37 @@ Oid RelationProvider::LookupNamespaceNoError(const char * nspname)
     return InvalidOid;
 };
 
-PGAttrPtr RelationProvider::SystemAttributeByName(const char * attname, bool relhasoids)
-{
-    // int j;
+// PGAttrPtr RelationProvider::SystemAttributeByName(const char * attname, bool relhasoids)
+// {
+//     // int j;
 
-    // for (j = 0; j < (int)lengthof(SysAtt); j++)
-    // {
-    //     Form_pg_attribute att = SysAtt[j];
+//     // for (j = 0; j < (int)lengthof(SysAtt); j++)
+//     // {
+//     //     Form_pg_attribute att = SysAtt[j];
 
-    //     if (relhasoids || att->attnum != ObjectIdAttributeNumber)
-    //     {
-    //         if (strcmp(NameStr(att->attname), attname) == 0)
-    //             return att;
-    //     }
-    // }
+//     //     if (relhasoids || att->attnum != ObjectIdAttributeNumber)
+//     //     {
+//     //         if (strcmp(NameStr(att->attname), attname) == 0)
+//     //             return att;
+//     //     }
+//     // }
 
-    // return NULL;
+//     // return NULL;
 
-    return nullptr;
-};
+//     for (auto virtual_col : getVirtuals)
+//     {
 
-PGPolicyPtr RelationProvider::PGPolicyFetch(Oid tbloid)
-{
-    PGPolicyPtr r = nullptr;
+//     }
 
-	return r;
-};
+//     return nullptr;
+// };
+
+// PGPolicyPtr RelationProvider::PGPolicyFetch(Oid tbloid)
+// {
+//     PGPolicyPtr r = nullptr;
+
+// 	return r;
+// };
 
 bool RelationProvider::PGPolicyIsReplicated(const PGPolicyPtr policy)
 {
@@ -668,27 +676,23 @@ bool RelationProvider::PGPolicyIsReplicated(const PGPolicyPtr policy)
     return policy->ptype == POLICYTYPE_REPLICATED;
 };
 
-bool RelationProvider::AttrExistsInRel(Oid rel_oid, int attr_no)
-{
-    return true;
-};
+// bool RelationProvider::AttrExistsInRel(Oid rel_oid, int attr_no)
+// {
+//     return true;
+// };
 
 PGAttrNumber RelationProvider::get_attnum(Oid relid, const char * attname)
 {
-    // HeapTuple tp;
-
-    // tp = SearchSysCacheAttName(relid, attname);
-    // if (HeapTupleIsValid(tp))
-    // {
-    //     Form_pg_attribute att_tup = (Form_pg_attribute)GETSTRUCT(tp);
-    //     AttrNumber result;
-
-    //     result = att_tup->attnum;
-    //     ReleaseSysCache(tp);
-    //     return result;
-    // }
-    // else
-    //     return InvalidAttrNumber;
+    auto it = oid_relation_map.find(relid);
+	if (it == oid_relation_map.end())
+	    return InvalidAttrNumber;
+	for (const auto& att : it->second->rd_att->attrs)
+    {
+        if (att->attname == std::string(attname))
+        {
+            return att->attnum;
+        }
+    }
 
     return InvalidAttrNumber;
 };
@@ -709,6 +713,17 @@ Oid RelationProvider::get_atttype(Oid relid, PGAttrNumber attnum)
     // }
     // else
     //     return InvalidOid;
+
+    auto it = oid_relation_map.find(relid);
+	if (it == oid_relation_map.end())
+	    return InvalidOid;
+	for (const auto& att : it->second->rd_att->attrs)
+    {
+        if (att->attnum == attnum)
+        {
+            return att->atttypid;
+        }
+    }
 
     return InvalidOid;
 };
@@ -743,7 +758,21 @@ Oid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missing
 
     // return namespaceId;
 
-    return InvalidOid;
+    Oid namespaceId = InvalidOid;
+    for (auto pair : oid_database_map)
+    {
+        if (pair.second->name == std::string(nspname))
+        {
+            namespaceId = pair.second->oid;
+        }
+    }
+
+    if (missing_ok && !OidIsValid(namespaceId))
+    {
+        return InvalidOid;
+    }
+
+    return namespaceId;
 };
 
 std::string RelationProvider::get_namespace_name(Oid nspid)
@@ -763,7 +792,15 @@ std::string RelationProvider::get_namespace_name(Oid nspid)
     // else
     //     return NULL;
 
-    return pstrdup("");
+    for (auto pair : oid_database_map)
+    {
+        if (pair.second->oid == nspid)
+        {
+            return pair.second->name;
+        }
+    }
+
+    return "";
 };
 
 PGRelationPtr RelationProvider::heap_open(Oid relationId, LOCKMODE lockmode)

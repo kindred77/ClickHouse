@@ -38,7 +38,7 @@ private:
 	FunctionProviderPtr function_provider;
 	//ENRParser enr_parser;
 
-    int specialAttNum(const char * attname);
+    //int specialAttNum(const char * attname);
 
 	ContextPtr context;
 

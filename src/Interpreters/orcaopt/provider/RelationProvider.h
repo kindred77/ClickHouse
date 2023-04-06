@@ -97,13 +97,13 @@ public:
 
     Oid LookupNamespaceNoError(const char * nspname);
 
-    PGAttrPtr SystemAttributeByName(const char * attname, bool relhasoids);
+    //PGAttrPtr SystemAttributeByName(const char * attname, bool relhasoids);
 
-    PGPolicyPtr PGPolicyFetch(Oid tbloid);
+    //PGPolicyPtr PGPolicyFetch(Oid tbloid);
 
     bool PGPolicyIsReplicated(const PGPolicyPtr policy);
 
-	bool AttrExistsInRel(Oid rel_oid, int attr_no);
+	// bool AttrExistsInRel(Oid rel_oid, int attr_no);
 
     PGAttrNumber get_attnum(Oid relid, const char * attname);
 

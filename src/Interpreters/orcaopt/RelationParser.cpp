@@ -1563,15 +1563,15 @@ RelationParser::markVarForSelectPriv(PGParseState *pstate, PGVar *var, PGRangeTb
 	markRTEForSelectPriv(pstate, rte, var->varno, var->varattno);
 };
 
-int RelationParser::specialAttNum(const char * attname)
-{
-    PGAttrPtr sysatt;
+// int RelationParser::specialAttNum(const char * attname)
+// {
+//     PGAttrPtr sysatt;
 
-    sysatt = relation_provider->SystemAttributeByName(attname, true /* "oid" will be accepted */);
-    if (sysatt != NULL)
-        return sysatt->attnum;
-    return InvalidAttrNumber;
-};
+//     sysatt = relation_provider->SystemAttributeByName(attname, true /* "oid" will be accepted */);
+//     if (sysatt != NULL)
+//         return sysatt->attnum;
+//     return InvalidAttrNumber;
+// };
 
 PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate,
 		PGRangeTblEntry * rte, const char * colname, int location)
@@ -1622,55 +1622,56 @@ PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate,
     /*
 	 * If the RTE represents a real table, consider system column names.
 	 */
-    if (rte->rtekind == PG_RTE_RELATION)
-    {
-        /* In GPDB, system columns like gp_segment_id, ctid, xmin/xmax seem to be
-		 * ambiguous for replicated table, replica in each segment has different
-		 * value of those columns, between sessions, different replicas are choosen
-		 * to provide data, so it's weird for users to see different system columns
-		 * between sessions. So for replicated table, we don't expose system columns
-		 * unless it's GP_ROLE_UTILITY for debug purpose.
-		 */
-		//TODO kindred
-        if (relation_provider->PGPolicyIsReplicated(relation_provider->PGPolicyFetch(rte->relid)) /* && Gp_role != GP_ROLE_UTILITY */)
-            return result;
+	// TODO kindred
+    // if (rte->rtekind == PG_RTE_RELATION)
+    // {
+    //     /* In GPDB, system columns like gp_segment_id, ctid, xmin/xmax seem to be
+	// 	 * ambiguous for replicated table, replica in each segment has different
+	// 	 * value of those columns, between sessions, different replicas are choosen
+	// 	 * to provide data, so it's weird for users to see different system columns
+	// 	 * between sessions. So for replicated table, we don't expose system columns
+	// 	 * unless it's GP_ROLE_UTILITY for debug purpose.
+	// 	 */
+	// 	//TODO kindred
+    //     if (relation_provider->PGPolicyIsReplicated(relation_provider->PGPolicyFetch(rte->relid)) /* && Gp_role != GP_ROLE_UTILITY */)
+    //         return result;
 
-        /* quick check to see if name could be a system column */
-        attnum = specialAttNum(colname);
+    //     /* quick check to see if name could be a system column */
+    //     attnum = specialAttNum(colname);
 
-        /* In constraint check, no system column is allowed except tableOid */
-        /*
-		 * In GPDB, tableoid is not allowed either, because we've removed
-		 * HeapTupleData.t_tableOid field.
-		 * GPDB_94_MERGE_FIXME: Could we make that work somehow? Resurrect
-		 * t_tableOid, maybe? I think we'd need it for logical decoding as well.
-		 */
-        if (pstate->p_expr_kind == EXPR_KIND_CHECK_CONSTRAINT && attnum < InvalidAttrNumber /* && attnum != TableOidAttributeNumber */)
-            ereport(
-                ERROR,
-                (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-                 errmsg("system column \"%s\" reference in check constraint is invalid", colname),
-                 parser_errposition(pstate, location)));
+    //     /* In constraint check, no system column is allowed except tableOid */
+    //     /*
+	// 	 * In GPDB, tableoid is not allowed either, because we've removed
+	// 	 * HeapTupleData.t_tableOid field.
+	// 	 * GPDB_94_MERGE_FIXME: Could we make that work somehow? Resurrect
+	// 	 * t_tableOid, maybe? I think we'd need it for logical decoding as well.
+	// 	 */
+    //     if (pstate->p_expr_kind == EXPR_KIND_CHECK_CONSTRAINT && attnum < InvalidAttrNumber /* && attnum != TableOidAttributeNumber */)
+    //         ereport(
+    //             ERROR,
+    //             (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+    //              errmsg("system column \"%s\" reference in check constraint is invalid", colname),
+    //              parser_errposition(pstate, location)));
 
-        if (attnum != InvalidAttrNumber)
-        {
-            /*
-			 * Now check to see if column actually is defined.  Because of
-			 * an ancient oversight in DefineQueryRewrite, it's possible that
-			 * pg_attribute contains entries for system columns for a view,
-			 * even though views should not have such --- so we also check
-			 * the relkind.  This kluge will not be needed in 9.3 and later.
-			 */
-            if (relation_provider->AttrExistsInRel(rte->relid, attnum)
-                && relation_provider->get_rel_relkind(rte->relid) != PG_RELKIND_VIEW)
-            {
-                var = node_parser->make_var(pstate, rte, attnum, location);
-                /* Require read access to the column */
-                markVarForSelectPriv(pstate, var, rte);
-                result = (PGNode *)var;
-            }
-        }
-    }
+    //     if (attnum != InvalidAttrNumber)
+    //     {
+    //         /*
+	// 		 * Now check to see if column actually is defined.  Because of
+	// 		 * an ancient oversight in DefineQueryRewrite, it's possible that
+	// 		 * pg_attribute contains entries for system columns for a view,
+	// 		 * even though views should not have such --- so we also check
+	// 		 * the relkind.  This kluge will not be needed in 9.3 and later.
+	// 		 */
+    //         if (relation_provider->AttrExistsInRel(rte->relid, attnum)
+    //             && relation_provider->get_rel_relkind(rte->relid) != PG_RELKIND_VIEW)
+    //         {
+    //             var = node_parser->make_var(pstate, rte, attnum, location);
+    //             /* Require read access to the column */
+    //             markVarForSelectPriv(pstate, var, rte);
+    //             result = (PGNode *)var;
+    //         }
+    //     }
+    // }
 
     return result;
 };
