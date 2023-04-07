@@ -2593,36 +2593,36 @@ PGNode * ClauseParser::transformFrameOffset(
 			 * case that the parameter is not a Const. Make sure it uses
 			 * the same logic!
 			 */
-            PGConst * con = (PGConst *)node;
-            Oid sortop;
+            // PGConst * con = (PGConst *)node;
+            // Oid sortop;
 
-            oper_parser->get_sort_group_operators(newrtype, false, false, false, &sortop, NULL, NULL, NULL);
+            // oper_parser->get_sort_group_operators(newrtype, false, false, false, &sortop, NULL, NULL, NULL);
 
-            if (OidIsValid(sortop))
-            {
-                PGTypePtr typ = type_parser->typeidType(newrtype);
-                Oid funcoid = oper_provider->get_opcode(sortop);
-                Datum zero;
-                Datum result;
+            // if (OidIsValid(sortop))
+            // {
+            //     PGTypePtr typ = type_parser->typeidType(newrtype);
+            //     Oid funcoid = oper_provider->get_opcode(sortop);
+            //     Datum zero;
+            //     Datum result;
 
-                zero = type_parser->stringTypeDatum(typ, "0", exprTypmod(node));
+            //     zero = type_parser->stringTypeDatum(typ, "0", exprTypmod(node));
 
-                /*
-				 * As we know the value is a const and since transformExpr()
-				 * will have parsed the type into its internal format, we can
-				 * just poke directly into the Const structure.
-				 */
-                result = function_provider->OidFunctionCall2(funcoid, con->constvalue, zero);
+            //     /*
+			// 	 * As we know the value is a const and since transformExpr()
+			// 	 * will have parsed the type into its internal format, we can
+			// 	 * just poke directly into the Const structure.
+			// 	 */
+            //     result = function_provider->OidFunctionCall2(funcoid, con->constvalue, zero);
 
-                if (result)
-                    ereport(
-                        ERROR,
-                        (errcode(ERRCODE_WINDOWING_ERROR),
-                         errmsg("RANGE parameter cannot be negative"),
-                         parser_errposition(pstate, con->location)));
+            //     if (result)
+            //         ereport(
+            //             ERROR,
+            //             (errcode(ERRCODE_WINDOWING_ERROR),
+            //              errmsg("RANGE parameter cannot be negative"),
+            //              parser_errposition(pstate, con->location)));
 
-                //ReleaseSysCache(typ);
-            }
+            //     //ReleaseSysCache(typ);
+            // }
         }
     }
     else

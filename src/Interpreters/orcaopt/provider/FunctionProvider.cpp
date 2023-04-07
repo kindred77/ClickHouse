@@ -276,102 +276,102 @@ FunctionProvider::getFunctionByOID(OID oid) const
 	return it->second;
 };
 
-Datum FunctionProvider::OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2)
-{
-    // FmgrInfo flinfo;
-    // FunctionCallInfoData fcinfo;
-    // Datum result;
+// Datum FunctionProvider::OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2)
+// {
+//     // FmgrInfo flinfo;
+//     // FunctionCallInfoData fcinfo;
+//     // Datum result;
 
-    // fmgr_info(functionId, &flinfo);
+//     // fmgr_info(functionId, &flinfo);
 
-    // InitFunctionCallInfoData(fcinfo, &flinfo, 2, InvalidOid, NULL, NULL);
+//     // InitFunctionCallInfoData(fcinfo, &flinfo, 2, InvalidOid, NULL, NULL);
 
-    // fcinfo.arg[0] = arg1;
-    // fcinfo.arg[1] = arg2;
-    // fcinfo.argnull[0] = false;
-    // fcinfo.argnull[1] = false;
+//     // fcinfo.arg[0] = arg1;
+//     // fcinfo.arg[1] = arg2;
+//     // fcinfo.argnull[0] = false;
+//     // fcinfo.argnull[1] = false;
 
-    // result = FunctionCallInvoke(&fcinfo);
+//     // result = FunctionCallInvoke(&fcinfo);
 
-    // /* Check for null result, since caller is clearly not expecting one */
-    // if (fcinfo.isnull)
-    //     elog(ERROR, "function %u returned NULL", flinfo.fn_oid);
+//     // /* Check for null result, since caller is clearly not expecting one */
+//     // if (fcinfo.isnull)
+//     //     elog(ERROR, "function %u returned NULL", flinfo.fn_oid);
 
-    // return result;
+//     // return result;
 
-    Datum result = 0;
-    return result;
-};
+//     Datum result = 0;
+//     return result;
+// };
 
-Datum FunctionProvider::OidFunctionCall1Coll(Oid functionId, Datum arg1)
-{
-    // FmgrInfo flinfo;
-    // FunctionCallInfoData fcinfo;
-    // Datum result;
+// Datum FunctionProvider::OidFunctionCall1Coll(Oid functionId, Datum arg1)
+// {
+//     // FmgrInfo flinfo;
+//     // FunctionCallInfoData fcinfo;
+//     // Datum result;
 
-    // fmgr_info(functionId, &flinfo);
+//     // fmgr_info(functionId, &flinfo);
 
-    // InitFunctionCallInfoData(fcinfo, &flinfo, 1, InvalidOid, NULL, NULL);
+//     // InitFunctionCallInfoData(fcinfo, &flinfo, 1, InvalidOid, NULL, NULL);
 
-    // fcinfo.arg[0] = arg1;
-    // fcinfo.argnull[0] = false;
+//     // fcinfo.arg[0] = arg1;
+//     // fcinfo.argnull[0] = false;
 
-    // result = FunctionCallInvoke(&fcinfo);
+//     // result = FunctionCallInvoke(&fcinfo);
 
-    // /* Check for null result, since caller is clearly not expecting one */
-    // if (fcinfo.isnull)
-    //     elog(ERROR, "function %u returned NULL", flinfo.fn_oid);
+//     // /* Check for null result, since caller is clearly not expecting one */
+//     // if (fcinfo.isnull)
+//     //     elog(ERROR, "function %u returned NULL", flinfo.fn_oid);
 
-    // return result;
+//     // return result;
 
-    Datum result = 0;
-    return result;
-};
+//     Datum result = 0;
+//     return result;
+// };
 
-Datum FunctionProvider::OidFunctionCall1Coll(Oid functionId, Oid collation, Datum arg1)
-{
-    // FmgrInfo flinfo;
-    // FunctionCallInfoData fcinfo;
-    // Datum result;
+// Datum FunctionProvider::OidFunctionCall1Coll(Oid functionId, Oid collation, Datum arg1)
+// {
+//     // FmgrInfo flinfo;
+//     // FunctionCallInfoData fcinfo;
+//     // Datum result;
 
-    // fmgr_info(functionId, &flinfo);
+//     // fmgr_info(functionId, &flinfo);
 
-    // InitFunctionCallInfoData(fcinfo, &flinfo, 1, collation, NULL, NULL);
+//     // InitFunctionCallInfoData(fcinfo, &flinfo, 1, collation, NULL, NULL);
 
-    // fcinfo.arg[0] = arg1;
-    // fcinfo.argnull[0] = false;
+//     // fcinfo.arg[0] = arg1;
+//     // fcinfo.argnull[0] = false;
 
-    // result = FunctionCallInvoke(&fcinfo);
+//     // result = FunctionCallInvoke(&fcinfo);
 
-    // /* Check for null result, since caller is clearly not expecting one */
-    // if (fcinfo.isnull)
-    //     elog(ERROR, "function %u returned NULL", flinfo.fn_oid);
+//     // /* Check for null result, since caller is clearly not expecting one */
+//     // if (fcinfo.isnull)
+//     //     elog(ERROR, "function %u returned NULL", flinfo.fn_oid);
 
-    // return result;
+//     // return result;
 
-    Datum result = 0;
-    return result;
-};
+//     Datum result = 0;
+//     return result;
+// };
 
-Datum FunctionProvider::OidFunctionCall1_DatumArr(Oid functionId, Datum * datums)
-{
-    /* hardwired knowledge about cstring's representation details here */
-    // ArrayType * arrtypmod = construct_array(datums, n, CSTRINGOID, -2, false, 'c');
+// Datum FunctionProvider::OidFunctionCall1_DatumArr(Oid functionId, Datum * datums)
+// {
+//     /* hardwired knowledge about cstring's representation details here */
+//     // ArrayType * arrtypmod = construct_array(datums, n, CSTRINGOID, -2, false, 'c');
 
-    // /* arrange to report location if type's typmodin function fails */
-    // setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
+//     // /* arrange to report location if type's typmodin function fails */
+//     // setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
 
-    // result = DatumGetInt32(OidFunctionCall1(typmodin, PointerGetDatum(arrtypmod)));
+//     // result = DatumGetInt32(OidFunctionCall1(typmodin, PointerGetDatum(arrtypmod)));
 
-    // cancel_parser_errposition_callback(&pcbstate);
+//     // cancel_parser_errposition_callback(&pcbstate);
 
-    // pfree(arrtypmod);
+//     // pfree(arrtypmod);
 
-    // return result;
+//     // return result;
 
-    Datum result = 0;
-    return result;
-};
+//     Datum result = 0;
+//     return result;
+// };
 
 Datum FunctionProvider::OidInputFunctionCall(Oid functionId, const char * str, Oid typioparam, int32 typmod)
 {

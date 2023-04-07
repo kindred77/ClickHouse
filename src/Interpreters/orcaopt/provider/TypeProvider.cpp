@@ -1224,11 +1224,13 @@ std::string TypeProvider::printTypmod(const char * typname, int32 typmod, Oid ty
     else
     {
         /* Use the type-specific typmodout procedure */
-        char * tmstr;
+        // char * tmstr;
 
-        tmstr = DatumGetCString(function_provider->OidFunctionCall1Coll(typmodout, InvalidOid, Int32GetDatum(typmod)));
-        //res = psprintf("%s%s", typname, tmstr);
-        res = std::string(typname) + std::string(tmstr);
+        // tmstr = DatumGetCString(function_provider->OidFunctionCall1Coll(typmodout, InvalidOid, Int32GetDatum(typmod)));
+        // //res = psprintf("%s%s", typname, tmstr);
+        // res = std::string(typname) + std::string(tmstr);
+
+        res = std::string(typname) + "(typmodout: " + std::to_string(typmodout) + ")";
     }
 
     return res;

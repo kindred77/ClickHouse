@@ -32,13 +32,13 @@ public:
     explicit FunctionProvider(const ContextPtr& context_);
     IMDFunctionPtr getFunctionByOID(OID oid) const;
 
-    Datum OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2);
+    // Datum OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2);
 
-    Datum OidFunctionCall1Coll(Oid functionId, Datum arg1);
+    // Datum OidFunctionCall1Coll(Oid functionId, Datum arg1);
 
-    Datum OidFunctionCall1Coll(Oid functionId, Oid collation, Datum arg1);
+    // Datum OidFunctionCall1Coll(Oid functionId, Oid collation, Datum arg1);
 
-    Datum OidFunctionCall1_DatumArr(Oid functionId, Datum * datums);
+    // Datum OidFunctionCall1_DatumArr(Oid functionId, Datum * datums);
 
     Datum OidInputFunctionCall(Oid functionId, const char * str, Oid typioparam, int32 typmod);
 

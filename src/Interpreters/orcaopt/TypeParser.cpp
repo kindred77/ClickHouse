@@ -245,7 +245,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PG
     Datum * datums;
     int n;
     PGListCell * l;
-    //ArrayType * arrtypmod;
+    ArrayType * arrtypmod;
     PGParseCallbackState pcbstate;
 
     /* Return prespecified typmod if no typmod expressions */
@@ -258,80 +258,90 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PG
 	 * typmodin function.
 	 */
     if (!typ->typisdefined)
+    {
         ereport(
             ERROR,
             (errcode(ERRCODE_SYNTAX_ERROR),
              errmsg("type modifier cannot be specified for shell type \"%s\"", TypeNameToString(typeName).c_str()),
              parser_errposition(pstate, typeName->location)));
+        
+        return InvalidOid;
+    }
 
     typmodin = typ->typmodin;
 
     if (typmodin == InvalidOid)
+    {
         ereport(
             ERROR,
             (errcode(ERRCODE_SYNTAX_ERROR),
              errmsg("type modifier is not allowed for type \"%s\"", TypeNameToString(typeName).c_str()),
              parser_errposition(pstate, typeName->location)));
+        
+        return InvalidOid;
+    }
+
+    //TODO kindred
+    elog(ERROR, "extracting type modifier from typmods not supported yet!");
 
     /*
 	 * Convert the list of raw-grammar-output expressions to a cstring array.
 	 * Currently, we allow simple numeric constants, string literals, and
 	 * identifiers; possibly this list could be extended.
 	 */
-    datums = (Datum *)palloc(list_length(typeName->typmods) * sizeof(Datum));
-    n = 0;
-    foreach (l, typeName->typmods)
-    {
-        PGNode * tm = (PGNode *)lfirst(l);
-        char * cstr = NULL;
+    // datums = (Datum *)palloc(list_length(typeName->typmods) * sizeof(Datum));
+    // n = 0;
+    // foreach (l, typeName->typmods)
+    // {
+    //     PGNode * tm = (PGNode *)lfirst(l);
+    //     char * cstr = NULL;
 
-        if (IsA(tm, PGAConst))
-        {
-            PGAConst * ac = (PGAConst *)tm;
+    //     if (IsA(tm, PGAConst))
+    //     {
+    //         PGAConst * ac = (PGAConst *)tm;
 
-            if (IsA(&ac->val, PGInteger))
-            {
-                cstr = psprintf("%ld", (long)ac->val.val.ival);
-            }
-            else if (IsA(&ac->val, PGFloat) || IsA(&ac->val, PGString))
-            {
-                /* we can just use the str field directly. */
-                cstr = ac->val.val.str;
-            }
-        }
-        else if (IsA(tm, PGColumnRef))
-        {
-            PGColumnRef * cr = (PGColumnRef *)tm;
+    //         if (IsA(&ac->val, PGInteger))
+    //         {
+    //             cstr = psprintf("%ld", (long)ac->val.val.ival);
+    //         }
+    //         else if (IsA(&ac->val, PGFloat) || IsA(&ac->val, PGString))
+    //         {
+    //             /* we can just use the str field directly. */
+    //             cstr = ac->val.val.str;
+    //         }
+    //     }
+    //     else if (IsA(tm, PGColumnRef))
+    //     {
+    //         PGColumnRef * cr = (PGColumnRef *)tm;
 
-            if (list_length(cr->fields) == 1 && IsA(linitial(cr->fields), PGString))
-                cstr = strVal(linitial(cr->fields));
-        }
-        if (!cstr)
-            ereport(
-                ERROR,
-                (errcode(ERRCODE_SYNTAX_ERROR),
-                 errmsg("type modifiers must be simple constants or identifiers"),
-                 parser_errposition(pstate, typeName->location)));
-        datums[n++] = CStringGetDatum(cstr);
-    }
+    //         if (list_length(cr->fields) == 1 && IsA(linitial(cr->fields), PGString))
+    //             cstr = strVal(linitial(cr->fields));
+    //     }
+    //     if (!cstr)
+    //         ereport(
+    //             ERROR,
+    //             (errcode(ERRCODE_SYNTAX_ERROR),
+    //              errmsg("type modifiers must be simple constants or identifiers"),
+    //              parser_errposition(pstate, typeName->location)));
+    //     datums[n++] = CStringGetDatum(cstr);
+    // }
 
-    //TODO kindred
     // /* hardwired knowledge about cstring's representation details here */
-    // arrtypmod = construct_array(datums, n, CSTRINGOID, -2, false, 'c');
+	// arrtypmod = construct_array(datums, n, CSTRINGOID,
+	// 							-2, false, 'c');
 
-    // /* arrange to report location if type's typmodin function fails */
-    // setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
+	// /* arrange to report location if type's typmodin function fails */
+	// setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
 
-    // result = DatumGetInt32(OidFunctionCall1(typmodin, PointerGetDatum(arrtypmod)));
+	// result = DatumGetInt32(function_provider->OidFunctionCall1Coll(typmodin,InvalidOid,
+	// 										PointerGetDatum(arrtypmod)));
 
-    // cancel_parser_errposition_callback(&pcbstate);
+	// cancel_parser_errposition_callback(&pcbstate);
 
-    result = DatumGetInt32(function_provider->OidFunctionCall1_DatumArr(typmodin, datums));
+	// pfree(datums);
+	// pfree(arrtypmod);
 
-    pfree(datums);
-    //pfree(arrtypmod);
-
-    return result;
+	return result;
 };
 
 PGTypePtr
