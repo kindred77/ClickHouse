@@ -268,14 +268,14 @@ FunctionProvider::FunctionProvider(const ContextPtr& context_) : context(context
 // 			/*is_ndv_preserving*/ false, /*is_allowed_for_PS*/ false)));
 // };
 
-IMDFunctionPtr
-FunctionProvider::getFunctionByOID(OID oid) const
-{
-	auto it = oid_fun_map.find(oid);
-	if (it == oid_fun_map.end())
-	    return {};
-	return it->second;
-};
+// IMDFunctionPtr
+// FunctionProvider::getFunctionByOID(OID oid) const
+// {
+// 	auto it = oid_fun_map.find(oid);
+// 	if (it == oid_fun_map.end())
+// 	    return {};
+// 	return it->second;
+// };
 
 // Datum FunctionProvider::OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2)
 // {

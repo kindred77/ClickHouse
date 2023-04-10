@@ -22,9 +22,9 @@ using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 class FunctionProvider
 {
 private:
-    using Map = std::map<OID, IMDFunctionPtr>;
+    //using Map = std::map<OID, IMDFunctionPtr>;
 
-    Map oid_fun_map;
+    //Map oid_fun_map;
     ContextPtr context;
     gpos::CMemoryPool * mp;
     ProcProviderPtr proc_provider;
@@ -33,7 +33,7 @@ private:
 public:
     //explicit FunctionProvider(gpos::CMemoryPool *mp_, ContextPtr context);
     explicit FunctionProvider(const ContextPtr& context_);
-    IMDFunctionPtr getFunctionByOID(OID oid) const;
+    //IMDFunctionPtr getFunctionByOID(OID oid) const;
 
     // Datum OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2);
 
