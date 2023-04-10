@@ -915,18 +915,19 @@ FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argn
 
 PGList * FunctionProvider::SystemFuncName(const char * name)
 {
-	return list_make2(makeString("pg_catalog"), makeString(name));
+	//return list_make2(makeString("pg_catalog"), makeString(name));
+    return list_make1(makeString(name));
 };
 
-char * FunctionProvider::get_func_result_name(Oid functionId)
+String FunctionProvider::get_func_result_name(Oid functionId)
 {
-    // char * result;
+    String result;
     // HeapTuple procTuple;
     // Datum proargmodes;
     // Datum proargnames;
     // bool isnull;
     // ArrayType * arr;
-    // int numargs;
+    size_t numargs;
     // char * argmodes;
     // Datum * argnames;
     // int numoutargs;
@@ -935,66 +936,82 @@ char * FunctionProvider::get_func_result_name(Oid functionId)
 
     // /* First fetch the function's pg_proc row */
     // procTuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(functionId));
-    // if (!HeapTupleIsValid(procTuple))
-    //     elog(ERROR, "cache lookup failed for function %u", functionId);
+    PGProcPtr procTuple = proc_provider->getProcByOid(functionId);
+    if (!procTuple)
+    {
+        elog(ERROR, "can not find function: %u", functionId);
+        return "";
+    }
 
     // /* If there are no named OUT parameters, return NULL */
-    // if (heap_attisnull(procTuple, Anum_pg_proc_proargmodes) || heap_attisnull(procTuple, Anum_pg_proc_proargnames))
-    //     result = NULL;
-    // else
-    // {
-    //     /* Get the data out of the tuple */
-    //     proargmodes = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargmodes, &isnull);
-    //     Assert(!isnull)
-    //     proargnames = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargnames, &isnull);
-    //     Assert(!isnull)
+    //if (heap_attisnull(procTuple, Anum_pg_proc_proargmodes) || heap_attisnull(procTuple, Anum_pg_proc_proargnames))
+    if (procTuple->proargmodes.size() <= 0
+        || procTuple->proargnames.size() <= 0)
+    {
+        result = "";
+    }
+    else
+    {
+        /* Get the data out of the tuple */
+        // proargmodes = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargmodes, &isnull);
+        // Assert(!isnull)
+        // proargnames = SysCacheGetAttr(PROCOID, procTuple, Anum_pg_proc_proargnames, &isnull);
+        // Assert(!isnull)
 
-    //     /*
-	// 	 * We expect the arrays to be 1-D arrays of the right types; verify
-	// 	 * that.  For the char array, we don't need to use deconstruct_array()
-	// 	 * since the array data is just going to look like a C array of
-	// 	 * values.
-	// 	 */
-    //     arr = DatumGetArrayTypeP(proargmodes); /* ensure not toasted */
-    //     numargs = ARR_DIMS(arr)[0];
-    //     if (ARR_NDIM(arr) != 1 || numargs < 0 || ARR_HASNULL(arr) || ARR_ELEMTYPE(arr) != CHAROID)
-    //         elog(ERROR, "proargmodes is not a 1-D char array");
-    //     argmodes = (char *)ARR_DATA_PTR(arr);
-    //     arr = DatumGetArrayTypeP(proargnames); /* ensure not toasted */
-    //     if (ARR_NDIM(arr) != 1 || ARR_DIMS(arr)[0] != numargs || ARR_HASNULL(arr) || ARR_ELEMTYPE(arr) != TEXTOID)
-    //         elog(ERROR, "proargnames is not a 1-D text array");
-    //     deconstruct_array(arr, TEXTOID, -1, false, 'i', &argnames, NULL, &nargnames);
-    //     Assert(nargnames == numargs)
+        /*
+		 * We expect the arrays to be 1-D arrays of the right types; verify
+		 * that.  For the char array, we don't need to use deconstruct_array()
+		 * since the array data is just going to look like a C array of
+		 * values.
+		 */
+        // arr = DatumGetArrayTypeP(proargmodes); /* ensure not toasted */
+        // numargs = ARR_DIMS(arr)[0];
+        // if (ARR_NDIM(arr) != 1 || numargs < 0 || ARR_HASNULL(arr) || ARR_ELEMTYPE(arr) != CHAROID)
+        //     elog(ERROR, "proargmodes is not a 1-D char array");
+        // argmodes = (char *)ARR_DATA_PTR(arr);
+        // arr = DatumGetArrayTypeP(proargnames); /* ensure not toasted */
+        // if (ARR_NDIM(arr) != 1 || ARR_DIMS(arr)[0] != numargs || ARR_HASNULL(arr) || ARR_ELEMTYPE(arr) != TEXTOID)
+        //     elog(ERROR, "proargnames is not a 1-D text array");
+        // deconstruct_array(arr, TEXTOID, -1, false, 'i', &argnames, NULL, &nargnames);
+        // Assert(nargnames == numargs)
 
-    //     /* scan for output argument(s) */
-    //     result = NULL;
-    //     numoutargs = 0;
-    //     for (i = 0; i < numargs; i++)
-    //     {
-    //         if (argmodes[i] == PROARGMODE_IN || argmodes[i] == PROARGMODE_VARIADIC)
-    //             continue;
-    //         Assert(argmodes[i] == PROARGMODE_OUT || argmodes[i] == PROARGMODE_INOUT || argmodes[i] == PROARGMODE_TABLE)
-    //         if (++numoutargs > 1)
-    //         {
-    //             /* multiple out args, so forget it */
-    //             result = NULL;
-    //             break;
-    //         }
-    //         result = TextDatumGetCString(argnames[i]);
-    //         if (result == NULL || result[0] == '\0')
-    //         {
-    //             /* Parameter is not named, so forget it */
-    //             result = NULL;
-    //             break;
-    //         }
-    //     }
-    // }
+        numargs = procTuple->proargmodes.size();
+
+        /* scan for output argument(s) */
+        result = "";
+        int numoutargs = 0;
+        const auto& argmodes = procTuple->proargmodes;
+        const auto& argnames = procTuple->proargnames;
+        for (size_t i = 0; i < numargs; i++)
+        {
+            if (argmodes[i] == PG_PROARGMODE_IN || argmodes[i] == PG_PROARGMODE_VARIADIC)
+            {
+                continue;
+            }
+
+            Assert(argmodes[i] == PG_PROARGMODE_OUT
+                || argmodes[i] == PG_PROARGMODE_INOUT
+                || argmodes[i] == PG_PROARGMODE_TABLE)
+
+            if (++numoutargs > 1)
+            {
+                /* multiple out args, so forget it */
+                result = "";
+                break;
+            }
+            result = argnames[i];
+            if (result == "")
+            {
+                /* Parameter is not named, so forget it */
+                //result = "";
+                break;
+            }
+        }
+    }
 
     // ReleaseSysCache(procTuple);
 
-    // return result;
-
-    return pstrdup("");
+    return result;
 };
 
 }

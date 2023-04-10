@@ -184,7 +184,7 @@ public:
 	check_lateral_ref_ok(PGParseState *pstate, PGParseNamespaceItem *nsitem,
 					 int location);
 
-    char * chooseScalarFunctionAlias(duckdb_libpgquery::PGNode * funcexpr, char * funcname,
+    String chooseScalarFunctionAlias(duckdb_libpgquery::PGNode * funcexpr, char * funcname,
 		duckdb_libpgquery::PGAlias * alias, int nfuncs);
 
     bool isFutureCTE(PGParseState * pstate, const char * refname);

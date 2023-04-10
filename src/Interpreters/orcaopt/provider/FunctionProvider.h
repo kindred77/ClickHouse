@@ -59,7 +59,7 @@ public:
 
     duckdb_libpgquery::PGList * SystemFuncName(const char * name);
 
-    char * get_func_result_name(Oid functionId);
+    String get_func_result_name(Oid functionId);
 };
 
 }

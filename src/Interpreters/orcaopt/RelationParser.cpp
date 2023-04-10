@@ -2025,18 +2025,16 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
     }
 };
 
-char * RelationParser::chooseScalarFunctionAlias(PGNode * funcexpr, char * funcname, PGAlias * alias, int nfuncs)
+String RelationParser::chooseScalarFunctionAlias(PGNode * funcexpr, char * funcname, PGAlias * alias, int nfuncs)
 {
-    char * pname;
-
     /*
 	 * If the expression is a simple function call, and the function has a
 	 * single OUT parameter that is named, use the parameter's name.
 	 */
     if (funcexpr && IsA(funcexpr, PGFuncExpr))
     {
-        pname = function_provider->get_func_result_name(((PGFuncExpr *)funcexpr)->funcid);
-        if (pname)
+        auto pname = function_provider->get_func_result_name(((PGFuncExpr *)funcexpr)->funcid);
+        if (pname != "")
             return pname;
     }
 
@@ -2051,7 +2049,7 @@ char * RelationParser::chooseScalarFunctionAlias(PGNode * funcexpr, char * funcn
     /*
 	 * Otherwise use the function name.
 	 */
-    return funcname;
+    return String(funcname);
 };
 
 PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
