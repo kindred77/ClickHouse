@@ -1139,6 +1139,20 @@ ProcProvider::ProcProvider(const ContextPtr& context_) : context(context_)
 	oid_proc_map.insert(PROC_DECIMAL64TOFLOAT64);
 };
 
+std::unique_ptr<std::vector<PGProcPtr>> ProcProvider::search_procs_by_name(const std::string & func_name)
+{
+    auto procs = std::make_unique<std::vector<PGProcPtr>>();
+    for (auto pair : oid_proc_map)
+    {
+        if (pair.second->proname == func_name)
+        {
+            procs->push_back(pair.second);
+        }
+    }
+
+    return procs;
+};
+
 PGProcPtr ProcProvider::getProcByOid(Oid oid) const
 {
 	auto it = oid_proc_map.find(oid);

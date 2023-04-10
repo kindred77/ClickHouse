@@ -2209,7 +2209,7 @@ OperProvider::OpernameGetCandidates(PGList * names, char oprkind, bool missing_s
 		newResult->nvargs = 0;
 		newResult->ndargs = 0;
 		newResult->argnumbers = NULL;
-        newResult->args = new Oid[2];
+        newResult->args = new Oid[newResult->nargs];
 		newResult->args[0] = oper_pair.second->oprleft;
         newResult->args[1] = oper_pair.second->oprright;
 		newResult->next = resultList;

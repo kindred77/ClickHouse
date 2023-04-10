@@ -240,7 +240,7 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
 int32
 TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PGTypePtr typ)
 {
-    int32 result;
+    int32 result = -1;
     Oid typmodin;
     Datum * datums;
     int n;
@@ -407,12 +407,15 @@ TypeParser::typeByVal(PGTypePtr t)
 };
 
 Datum
-TypeParser::stringTypeDatum(PGTypePtr tp, const char *string, int32 atttypmod)
+TypeParser::stringTypeDatum(PGTypePtr tp, const char *str, int32 atttypmod)
 {
+    //TODO kindred
+    elog(ERROR, "OidInputFunctionCall is not implemented yet!");
+
 	Oid			typinput = tp->typinput;
 	Oid			typioparam = type_provider->getTypeIOParam(tp);
 
-	return function_provider->OidInputFunctionCall(typinput, string, typioparam, atttypmod);
+	return function_provider->OidInputFunctionCall(typinput, str, typioparam, atttypmod);
 };
 
 Oid

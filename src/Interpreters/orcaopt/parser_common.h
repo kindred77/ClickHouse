@@ -1177,6 +1177,7 @@ struct FuncCandidateList
     ~FuncCandidateList()
     {
         delete [] args;
+        delete [] argnumbers;
     }
 }; /* VARIABLE LENGTH STRUCT */
 
@@ -2044,6 +2045,16 @@ typedef enum
     POLICYTYPE_ENTRY, /* Tuples stored on entry database. */
     POLICYTYPE_REPLICATED /* Tuples stored a copy on all segment database. */
 } PGPolicyType;
+
+typedef enum
+{
+    /* the assigned enum values appear in pg_proc, don't change 'em! */
+    PG_FUNC_PARAM_IN = 'i', /* input only */
+    PG_FUNC_PARAM_OUT = 'o', /* output only */
+    PG_FUNC_PARAM_INOUT = 'b', /* both */
+    PG_FUNC_PARAM_VARIADIC = 'v', /* variadic (always input) */
+    PG_FUNC_PARAM_TABLE = 't' /* table function output column */
+} PGFunctionParameterMode;
 
 /*
  * GpPolicy represents a Greenplum DB data distribution policy. The ptype field

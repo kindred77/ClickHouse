@@ -67,7 +67,7 @@ public:
     typeByVal(PGTypePtr t);
 
     Datum
-    stringTypeDatum(PGTypePtr tp, const char *string, int32 atttypmod);
+    stringTypeDatum(PGTypePtr tp, const char *str, int32 atttypmod);
 
     Oid
     typeOrDomainTypeRelid(Oid type_id);

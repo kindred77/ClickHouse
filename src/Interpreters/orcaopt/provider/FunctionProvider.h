@@ -16,6 +16,9 @@ using IMDFunctionPtr = std::shared_ptr<const gpmd::IMDFunction>;
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
 
+class ProcProvider;
+using ProcProviderPtr = std::shared_ptr<ProcProvider>;
+
 class FunctionProvider
 {
 private:
@@ -24,7 +27,7 @@ private:
     Map oid_fun_map;
     ContextPtr context;
     gpos::CMemoryPool * mp;
-
+    ProcProviderPtr proc_provider;
     gpmd::CMDName * CreateMDName(const char * name_str);
 
 public:
@@ -42,6 +45,9 @@ public:
 
     Datum OidInputFunctionCall(Oid functionId, const char * str, Oid typioparam, int32 typmod);
 
+    int get_func_arg_info(const PGProcPtr& procTup, std::vector<Oid>& p_argtypes, std::vector<String>& p_argnames, std::vector<char>& p_argmodes);
+
+    bool MatchNamedCall(const PGProcPtr& proctup, int nargs, duckdb_libpgquery::PGList * argnames, int ** argnumbers);
 
     FuncCandidateListPtr FuncnameGetCandidates(
         duckdb_libpgquery::PGList * names,

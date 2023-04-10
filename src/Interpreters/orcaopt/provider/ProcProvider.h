@@ -74,6 +74,8 @@ public:
 	
 	PGProcPtr getProcByOid(Oid oid) const;
 
+	std::unique_ptr<std::vector<PGProcPtr>> search_procs_by_name(const std::string & func_name);
+
     bool get_func_retset(Oid funcid);
 };
 
