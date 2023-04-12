@@ -49,12 +49,12 @@ public:
 	CGPDBAttOptCol(CGPDBAttInfo *gpdb_att_info, COptColInfo *opt_col_info)
 		: m_gpdb_att_info(gpdb_att_info), m_opt_col_info(opt_col_info)
 	{
-		GPOS_ASSERT(NULL != m_gpdb_att_info);
-		GPOS_ASSERT(NULL != m_opt_col_info);
+		GPOS_ASSERT(NULL != m_gpdb_att_info)
+		GPOS_ASSERT(NULL != m_opt_col_info)
 	}
 
 	// d'tor
-	virtual ~CGPDBAttOptCol()
+	virtual ~CGPDBAttOptCol() override
 	{
 		m_gpdb_att_info->Release();
 		m_opt_col_info->Release();

@@ -25,12 +25,15 @@
 // #include "nodes/parsenodes.h"
 // }
 
+#include <Interpreters/orcaopt/parser_common.h>
+
 #include "gpos/base.h"
 #include "gpos/common/CBitSet.h"
 
 #include "Interpreters/orcaopt/translator/CMappingVarColId.h"
 #include "naucrates/dxl/CIdGenerator.h"
 #include "naucrates/dxl/operators/dxlops.h"
+#include "naucrates/dxl/operators/CDXLScalarAggref.h"
 #include "naucrates/md/CMDRelationGPDB.h"
 #include "naucrates/md/IMDType.h"
 #include "naucrates/statistics/IStatistics.h"
@@ -60,6 +63,15 @@ enum DistributionHashOpsKind
 	DistrUseLegacyHashOps
 };
 
+typedef uint16 PGStrategyNumber;
+
+typedef enum PGScanDirection
+{
+	BackwardScanDirection = -1,
+	NoMovementScanDirection = 0,
+	ForwardScanDirection = 1
+} PGScanDirection;
+
 //---------------------------------------------------------------------------
 //	@class:
 //		CTranslatorUtils
@@ -74,15 +86,15 @@ class CTranslatorUtils
 private:
 	// construct a set of column attnos corresponding to a single grouping set
 	static CBitSet *CreateAttnoSetForGroupingSet(CMemoryPool *mp,
-												 List *group_elems,
+												 duckdb_libpgquery::PGList *group_elems,
 												 ULONG num_cols,
 												 UlongToUlongMap *group_col_pos,
 												 CBitSet *group_cols);
 
 	// create a set of grouping sets for a rollup
-	static CBitSetArray *CreateGroupingSetsForRollup(
-		CMemoryPool *mp, GroupingClause *grouping_clause, ULONG num_cols,
-		UlongToUlongMap *grouping_col_to_pos_map, CBitSet *group_cols);
+	// static CBitSetArray *CreateGroupingSetsForRollup(
+	// 	CMemoryPool *mp, GroupingClause *grouping_clause, ULONG num_cols,
+	// 	UlongToUlongMap *grouping_col_to_pos_map, CBitSet *group_cols);
 
 	// check if the given mdid array contains any of the polymorphic
 	// types (ANYELEMENT, ANYARRAY)
@@ -92,8 +104,8 @@ private:
 	// them with the actual types obtained from the query
 	static IMdIdArray *ResolvePolymorphicTypes(CMemoryPool *mp,
 											   IMdIdArray *return_arg_mdids,
-											   List *input_arg_types,
-											   FuncExpr *funcexpr);
+											   duckdb_libpgquery::PGList *input_arg_types,
+											   duckdb_libpgquery::PGFuncExpr *funcexpr);
 
 	// update grouping col position mappings
 	static void UpdateGrpColMapping(CMemoryPool *mp,
@@ -104,38 +116,38 @@ public:
 	struct SCmptypeStrategy
 	{
 		IMDType::ECmpType comptype;
-		StrategyNumber strategy_no;
+		PGStrategyNumber strategy_no;
 	};
 
 	// get the GPDB scan direction from its corresponding DXL representation
-	static ScanDirection GetScanDirection(
+	static PGScanDirection GetScanDirection(
 		EdxlIndexScanDirection idx_scan_direction);
 
 	// get the oid of comparison operator
-	static OID OidCmpOperator(Expr *expr);
+	static OID OidCmpOperator(duckdb_libpgquery::PGExpr *expr);
 
 	// get the opfamily for index key
 	static OID GetOpFamilyForIndexQual(INT attno, OID oid_index);
 
 	// return the type for the system column with the given number
-	static CMDIdGPDB *GetSystemColType(CMemoryPool *mp, AttrNumber attno);
+	static CMDIdGPDB *GetSystemColType(CMemoryPool *mp, PGAttrNumber attno);
 
 	// find the n-th column descriptor in the table descriptor
 	static const CDXLColDescr *GetColumnDescrAt(
 		const CDXLTableDescr *table_descr, ULONG pos);
 
 	// return the name for the system column with given number
-	static const CWStringConst *GetSystemColName(AttrNumber attno);
+	static const CWStringConst *GetSystemColName(PGAttrNumber attno);
 
 	// returns the length for the system column with given attno number
-	static const ULONG GetSystemColLength(AttrNumber attno);
+	static ULONG GetSystemColLength(PGAttrNumber attno);
 
 	// translate the join type from its GPDB representation into the DXL one
-	static EdxlJoinType ConvertToDXLJoinType(JoinType jt);
+	static EdxlJoinType ConvertToDXLJoinType(duckdb_libpgquery::PGJoinType jt);
 
 	// translate the index scan direction from its GPDB representation into the DXL one
 	static EdxlIndexScanDirection ConvertToDXLIndexScanDirection(
-		ScanDirection sd);
+		PGScanDirection sd);
 
 	// create a DXL index descriptor from an index MD id
 	static CDXLIndexDescr *GetIndexDescr(CMemoryPool *mp,
@@ -145,23 +157,23 @@ public:
 	static CDXLTableDescr *GetTableDescr(CMemoryPool *mp,
 										 CMDAccessor *md_accessor,
 										 CIdGenerator *id_generator,
-										 const RangeTblEntry *rte,
+										 const duckdb_libpgquery::PGRangeTblEntry *rte,
 										 BOOL *is_distributed_table = NULL);
 
 	// translate a RangeTableEntry into a CDXLLogicalTVF
 	static CDXLLogicalTVF *ConvertToCDXLLogicalTVF(CMemoryPool *mp,
 												   CMDAccessor *md_accessor,
 												   CIdGenerator *id_generator,
-												   const RangeTblEntry *rte);
+												   const duckdb_libpgquery::PGRangeTblEntry *rte);
 
 	// get column descriptors from a record type
 	static CDXLColDescrArray *GetColumnDescriptorsFromRecord(
-		CMemoryPool *mp, CIdGenerator *id_generator, List *col_names,
-		List *col_types, List *col_type_modifiers);
+		CMemoryPool *mp, CIdGenerator *id_generator, duckdb_libpgquery::PGList *col_names,
+		duckdb_libpgquery::PGList *col_types, duckdb_libpgquery::PGList *col_type_modifiers);
 
 	// get column descriptors from a record type
 	static CDXLColDescrArray *GetColumnDescriptorsFromRecord(
-		CMemoryPool *mp, CIdGenerator *id_generator, List *col_names,
+		CMemoryPool *mp, CIdGenerator *id_generator, duckdb_libpgquery::PGList *col_names,
 		IMdIdArray *out_arg_types);
 
 	// get column descriptor from a base type
@@ -180,23 +192,23 @@ public:
 											   const IMDType *md_type);
 
 	// return the dxl representation of the set operation
-	static EdxlSetOpType GetSetOpType(SetOperation setop, BOOL is_all);
+	static EdxlSetOpType GetSetOpType(duckdb_libpgquery::PGSetOperation setop, BOOL is_all);
 
 	// construct a dynamic array of sets of column attnos corresponding
 	// to the group by clause
 	static CBitSetArray *GetColumnAttnosForGroupBy(
-		CMemoryPool *mp, List *group_clause, ULONG num_cols,
+		CMemoryPool *mp, duckdb_libpgquery::PGList *group_clause, ULONG num_cols,
 		UlongToUlongMap *group_col_pos, CBitSet *group_cold);
 
 	// return a copy of the query with constant of unknown type being coerced
 	// to the common data type of the output target list
-	static Query *FixUnknownTypeConstant(Query *query, List *target_list);
+	static duckdb_libpgquery::PGQuery *FixUnknownTypeConstant(duckdb_libpgquery::PGQuery *query, duckdb_libpgquery::PGList *target_list);
 
 	// return the type of the nth non-resjunked target list entry
-	static OID GetTargetListReturnTypeOid(List *target_list, ULONG col_pos);
+	static OID GetTargetListReturnTypeOid(duckdb_libpgquery::PGList *target_list, ULONG col_pos);
 
 	// construct an array of DXL column identifiers for a target list
-	static ULongPtrArray *GenerateColIds(CMemoryPool *mp, List *target_list,
+	static ULongPtrArray *GenerateColIds(CMemoryPool *mp, duckdb_libpgquery::PGList *target_list,
 										 IMdIdArray *input_mdids,
 										 ULongPtrArray *input_nums,
 										 BOOL *is_outer_ref,
@@ -205,17 +217,17 @@ public:
 	// construct an array of DXL column descriptors for a target list
 	// using the column ids in the given array
 	static CDXLColDescrArray *GetDXLColumnDescrArray(CMemoryPool *mp,
-													 List *target_list,
+													 duckdb_libpgquery::PGList *target_list,
 													 ULongPtrArray *colids,
 													 BOOL keep_res_junked);
 
 	// return the positions of the target list entries included in the output
-	static ULongPtrArray *GetPosInTargetList(CMemoryPool *mp, List *target_list,
+	static ULongPtrArray *GetPosInTargetList(CMemoryPool *mp, duckdb_libpgquery::PGList *target_list,
 											 BOOL keep_res_junked);
 
 	// construct a column descriptor from the given target entry, column identifier and position in the output
 	static CDXLColDescr *GetColumnDescrAt(CMemoryPool *mp,
-										  TargetEntry *target_entry,
+										  duckdb_libpgquery::PGTargetEntry *target_entry,
 										  ULONG colid, ULONG pos);
 
 	// create a dummy project element to rename the input column identifier
@@ -226,7 +238,7 @@ public:
 	// construct a list of colids corresponding to the given target list
 	// using the given attno->colid map
 	static ULongPtrArray *GetOutputColIdsArray(
-		CMemoryPool *mp, List *target_list, IntToUlongMap *attno_to_colid_map);
+		CMemoryPool *mp, duckdb_libpgquery::PGList *target_list, IntToUlongMap *attno_to_colid_map);
 
 	// construct an array of column ids for the given group by set
 	static ULongPtrArray *GetGroupingColidArray(
@@ -241,16 +253,16 @@ public:
 						  IMDId *mdid, CMappingVarColId *var_colid_mapping);
 
 	// check to see if the target list entry is a sorting column
-	static BOOL IsSortingColumn(const TargetEntry *target_entry,
-								List *sort_clause_list);
+	static BOOL IsSortingColumn(const duckdb_libpgquery::PGTargetEntry *target_entry,
+								duckdb_libpgquery::PGList *sort_clause_list);
 	// check to see if the target list entry is used in the window reference
-	static BOOL IsReferencedInWindowSpec(const TargetEntry *target_entry,
-										 List *window_clause_list);
+	static BOOL IsReferencedInWindowSpec(const duckdb_libpgquery::PGTargetEntry *target_entry,
+										 duckdb_libpgquery::PGList *window_clause_list);
 
 	// extract a matching target entry that is a window spec
-	static TargetEntry *GetWindowSpecTargetEntry(Node *node,
-												 List *window_clause_list,
-												 List *target_list);
+	static duckdb_libpgquery::PGTargetEntry *GetWindowSpecTargetEntry(duckdb_libpgquery::PGNode *node,
+												 duckdb_libpgquery::PGList *window_clause_list,
+												 duckdb_libpgquery::PGList *target_list);
 
 	// create a scalar const value expression for the given int8 value
 	static CDXLNode *CreateDXLProjElemFromInt8Const(CMemoryPool *mp,
@@ -258,25 +270,25 @@ public:
 													INT val);
 
 	// check to see if the target list entry is a grouping column
-	static BOOL IsGroupingColumn(const TargetEntry *target_entry,
-								 List *group_clause_list);
+	static BOOL IsGroupingColumn(const duckdb_libpgquery::PGTargetEntry *target_entry,
+								 duckdb_libpgquery::PGList *group_clause_list);
 
 	// check to see if the target list entry is a grouping column
-	static BOOL IsGroupingColumn(const TargetEntry *target_entry,
-								 const SortGroupClause *sort_group_clause);
+	static BOOL IsGroupingColumn(const duckdb_libpgquery::PGTargetEntry *target_entry,
+								 const duckdb_libpgquery::PGSortGroupClause *sort_group_clause);
 
 	// check if the expression has a matching target entry that is a grouping column
-	static BOOL IsGroupingColumn(Node *node, List *group_clause_list,
-								 List *target_list);
+	static BOOL IsGroupingColumn(duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList *group_clause_list,
+								 duckdb_libpgquery::PGList *target_list);
 
 	// extract a matching target entry that is a grouping column
-	static TargetEntry *GetGroupingColumnTargetEntry(Node *node,
-													 List *group_clause_list,
-													 List *target_list);
+	static duckdb_libpgquery::PGTargetEntry *GetGroupingColumnTargetEntry(duckdb_libpgquery::PGNode *node,
+													 duckdb_libpgquery::PGList *group_clause_list,
+													 duckdb_libpgquery::PGList *target_list);
 
 	// convert a list of column ids to a list of attribute numbers using
 	// the provided context with mappings
-	static List *ConvertColidToAttnos(ULongPtrArray *pdrgpul,
+	static duckdb_libpgquery::PGList *ConvertColidToAttnos(ULongPtrArray *pdrgpul,
 									  CDXLTranslateContext *dxl_translate_ctxt);
 
 	// parse string value into a Long Integer
@@ -297,7 +309,7 @@ public:
 												   ULongPtrArray *new_colids);
 
 	// check if the given tree contains a subquery
-	static BOOL HasSubquery(Node *node);
+	static BOOL HasSubquery(duckdb_libpgquery::PGNode *node);
 
 	// check if the given function is a SIRV (single row volatile) that reads
 	// or modifies SQL data
@@ -327,18 +339,18 @@ public:
 												const IMDColumn *col);
 
 	// check required permissions for the range table
-	static void CheckRTEPermissions(List *range_table_list);
+	static void CheckRTEPermissions(duckdb_libpgquery::PGList *range_table_list);
 
 	// check if given column ids are outer references in the tree rooted by given node
 	static void MarkOuterRefs(ULONG *colid, BOOL *is_outer_ref,
 							  ULONG num_columns, CDXLNode *node);
 
 	// map DXL Subplan type to GPDB SubLinkType
-	static SubLinkType MapDXLSubplanToSublinkType(
+	static duckdb_libpgquery::PGSubLinkType MapDXLSubplanToSublinkType(
 		EdxlSubPlanType dxl_subplan_type);
 
 	// map GPDB SubLinkType to DXL Subplan type
-	static EdxlSubPlanType MapSublinkTypeToDXLSubplan(SubLinkType slink);
+	static EdxlSubPlanType MapSublinkTypeToDXLSubplan(duckdb_libpgquery::PGSubLinkType slink);
 
 	// check whether there are triggers for the given operation on
 	// the given relation
@@ -355,7 +367,7 @@ public:
 	static BOOL RelHasConstraints(const IMDRelation *rel);
 
 	// translate the list of error messages from an assert constraint list
-	static List *GetAssertErrorMsgs(CDXLNode *assert_constraint_list);
+	static duckdb_libpgquery::PGList *GetAssertErrorMsgs(CDXLNode *assert_constraint_list);
 
 	// return the count of non-system columns in the relation
 	static ULONG GetNumNonSystemColumns(const IMDRelation *mdrel);
@@ -368,7 +380,7 @@ public:
 
 	// check if const func returns composite type
 	static BOOL IsCompositeConst(CMemoryPool *mp, CMDAccessor *md_accessor,
-								 const RangeTblFunction *rtfunc);
+								 const duckdb_libpgquery::PGRangeTblFunction *rtfunc);
 };
 }  // namespace gpdxl
 

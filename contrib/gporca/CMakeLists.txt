@@ -5,8 +5,8 @@ project(gpopt_6X LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 98)
 
-# Default to shared libraries.
-option(BUILD_SHARED_LIBS "build shared libraries" ON)
+# Default to static libraries.
+option(BUILD_SHARED_LIBS "build shared libraries" OFF)
 
 # Configure CCache if available
 find_program(CCACHE_FOUND ccache)
@@ -50,6 +50,23 @@ check_cxx_compiler_flag("-Wno-variadic-macros" COMPILER_HAS_WNO_VARIADIC_MACROS)
 if (COMPILER_HAS_WNO_VARIADIC_MACROS)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-variadic-macros")
 endif()
+
+# ignore some known warnings
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(KNOWN_COMPILER_SPECIFIC_WARNINGS
+    "-Wno-unused-but-set-variable \
+    -Wno-nullability-completeness")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(KNOWN_COMPILER_SPECIFIC_WARNINGS
+    "-Wno-unused-but-set-variable \
+    -Wno-stringop-overflow")
+endif()
+
+set(KNOWN_WARNINGS
+  "-Wno-unused \
+  ${KNOWN_COMPILER_SPECIFIC_WARNINGS}")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra ${KNOWN_WARNINGS}")
 
 # Generate maximum detail for DEBUG information with -g3 if available.
 check_cxx_compiler_flag("-g3" COMPILER_HAS_G3)

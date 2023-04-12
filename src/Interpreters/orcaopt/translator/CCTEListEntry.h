@@ -28,7 +28,7 @@
 // struct CommonTableExpr;
 
 
-using namespace gpos;
+//using namespace gpos;
 
 namespace gpdxl
 {
@@ -36,7 +36,7 @@ namespace gpdxl
 inline ULONG
 HashStr(const CHAR *str)
 {
-	return gpos::HashByteArray((BYTE *) str, clib::Strlen(str));
+	return gpos::HashByteArray((const BYTE *) str, clib::Strlen(str));
 }
 
 // equality on character arrays
@@ -93,10 +93,10 @@ public:
 				  CDXLNodeArray *dxlnodes);
 
 	// dtor
-	virtual ~CCTEListEntry()
+	virtual ~CCTEListEntry() override
 	{
 		m_cte_info->Release();
-	};
+	}
 
 	// the query level
 	ULONG

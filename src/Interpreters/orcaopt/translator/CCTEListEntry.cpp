@@ -22,7 +22,9 @@
 #include "gpos/base.h"
 
 // #include "gpopt/gpdbwrappers.h"
-#include "Interpreters/orcaopt/translator/CCTEListEntry.h"
+#include <Interpreters/orcaopt/translator/CCTEListEntry.h>
+#include <Interpreters/orcaopt/translator/wrappers.h>
+
 using namespace gpdxl;
 using namespace duckdb_libpgquery;
 
@@ -38,7 +40,7 @@ CCTEListEntry::CCTEListEntry(CMemoryPool *mp, ULONG query_level,
 							 PGCommonTableExpr *cte, CDXLNode *cte_producer)
 	: m_query_level(query_level), m_cte_info(NULL)
 {
-	GPOS_ASSERT(NULL != cte && NULL != cte_producer);
+	GPOS_ASSERT(NULL != cte && NULL != cte_producer)
 
 	m_cte_info = GPOS_NEW(mp) HMSzCTEInfo(mp);
 	PGQuery *cte_query = (PGQuery *) cte->ctequery;
@@ -50,7 +52,7 @@ CCTEListEntry::CCTEListEntry(CMemoryPool *mp, ULONG query_level,
 			cte->ctename,
 			GPOS_NEW(mp) SCTEProducerInfo(cte_producer, cte_query->targetList));
 
-	GPOS_ASSERT(result);
+	GPOS_ASSERT(result)
 }
 
 //---------------------------------------------------------------------------
@@ -65,8 +67,8 @@ CCTEListEntry::CCTEListEntry(CMemoryPool *mp, ULONG query_level, PGList *cte_lis
 							 CDXLNodeArray *cte_dxl_arr)
 	: m_query_level(query_level), m_cte_info(NULL)
 {
-	GPOS_ASSERT(NULL != cte_dxl_arr);
-	GPOS_ASSERT(cte_dxl_arr->Size() == gpdb::ListLength(cte_list));
+	GPOS_ASSERT(NULL != cte_dxl_arr)
+	GPOS_ASSERT(cte_dxl_arr->Size() == ListLength(cte_list))
 
 	m_cte_info = GPOS_NEW(mp) HMSzCTEInfo(mp);
 	const ULONG num_cte = cte_dxl_arr->Size();
@@ -74,7 +76,7 @@ CCTEListEntry::CCTEListEntry(CMemoryPool *mp, ULONG query_level, PGList *cte_lis
 	for (ULONG ul = 0; ul < num_cte; ul++)
 	{
 		CDXLNode *cte_producer = (*cte_dxl_arr)[ul];
-		PGCommonTableExpr *cte = (PGCommonTableExpr *) gpdb::ListNth(cte_list, ul);
+		PGCommonTableExpr *cte = (PGCommonTableExpr *) ListNth(cte_list, ul);
 
 		PGQuery *cte_query = (PGQuery *) cte->ctequery;
 
@@ -85,8 +87,8 @@ CCTEListEntry::CCTEListEntry(CMemoryPool *mp, ULONG query_level, PGList *cte_lis
 							   GPOS_NEW(mp) SCTEProducerInfo(
 								   cte_producer, cte_query->targetList));
 
-		GPOS_ASSERT(result);
-		GPOS_ASSERT(NULL != m_cte_info->Find(cte->ctename));
+		GPOS_ASSERT(result)
+		GPOS_ASSERT(NULL != m_cte_info->Find(cte->ctename))
 	}
 }
 
@@ -143,7 +145,7 @@ CCTEListEntry::AddCTEProducer(CMemoryPool *mp, PGCommonTableExpr *cte,
 							  const CDXLNode *cte_producer)
 {
 	GPOS_ASSERT(NULL == m_cte_info->Find(cte->ctename) &&
-				"CTE entry already exists");
+				"CTE entry already exists")
 	PGQuery *cte_query = (PGQuery *) cte->ctequery;
 
 #ifdef GPOS_DEBUG
@@ -153,7 +155,7 @@ CCTEListEntry::AddCTEProducer(CMemoryPool *mp, PGCommonTableExpr *cte,
 			cte->ctename,
 			GPOS_NEW(mp) SCTEProducerInfo(cte_producer, cte_query->targetList));
 
-	GPOS_ASSERT(result);
+	GPOS_ASSERT(result)
 }
 
 // EOF
