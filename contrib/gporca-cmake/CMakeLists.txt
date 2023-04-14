@@ -936,7 +936,7 @@ add_library(gporca ${SRCS})
 
 #message(STATUS "gpxerces include: ${GPXERCES_INCLUDE_DIR}, lib: ${GPXERCES_LIBRARY}")
 
-message(STATUS "gpxerces include: ${GPXERCES_INCLUDE_DIR}, lib: ${GPXERCES_LIBRARY}")
+message(STATUS "using external gpxerces include: ${GPXERCES_INCLUDE_DIR}, lib: ${GPXERCES_LIBRARY}")
 target_link_libraries(gporca PUBLIC ${GPXERCES_LIBRARY})
 target_include_directories (gporca SYSTEM PUBLIC "${GPXERCES_INCLUDE_DIR}")
 
