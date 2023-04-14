@@ -18,6 +18,8 @@
 //
 //---------------------------------------------------------------------------
 
+#include <Interpreters/orcaopt/parser_common.h>
+
 #include "gpos/common/CHashMap.h"
 #include "gpos/common/CHashMapIter.h"
 
@@ -27,8 +29,8 @@
 #include "naucrates/dxl/operators/dxlops.h"
 
 //fwd decl
-struct Var;
-struct List;
+// struct Var;
+// struct List;
 
 namespace gpmd
 {
@@ -96,7 +98,7 @@ private:
 
 	// helper function to access mapping
 	const CGPDBAttOptCol *GetGPDBAttOptColMapping(
-		ULONG current_query_level, const Var *var,
+		ULONG current_query_level, const duckdb_libpgquery::PGVar *var,
 		EPlStmtPhysicalOpType plstmt_physical_op_type) const;
 
 public:
@@ -111,11 +113,11 @@ public:
 
 	// given a gpdb attribute, return a column name in optimizer world
 	virtual const CWStringBase *GetOptColName(
-		ULONG current_query_level, const Var *var,
+		ULONG current_query_level, const duckdb_libpgquery::PGVar *var,
 		EPlStmtPhysicalOpType plstmt_physical_op_type) const;
 
 	// given a gpdb attribute, return column id
-	virtual ULONG GetColId(ULONG current_query_level, const Var *var,
+	virtual ULONG GetColId(ULONG current_query_level, const duckdb_libpgquery::PGVar *var,
 						   EPlStmtPhysicalOpType plstmt_physical_op_type) const;
 
 	// load up mapping information from an index
@@ -134,11 +136,11 @@ public:
 	// load up mapping information from derived table columns
 	void LoadDerivedTblColumns(ULONG query_level, ULONG RTE_index,
 							   const CDXLNodeArray *derived_columns_dxl,
-							   List *target_list);
+							   duckdb_libpgquery::PGList *target_list);
 
 	// load information from CTE columns
 	void LoadCTEColumns(ULONG query_level, ULONG RTE_index,
-						const ULongPtrArray *pdrgpulCTE, List *target_list);
+						const ULongPtrArray *pdrgpulCTE, duckdb_libpgquery::PGList *target_list);
 
 	// load up mapping information from scalar projection list
 	void LoadProjectElements(ULONG query_level, ULONG RTE_index,
@@ -146,7 +148,7 @@ public:
 
 	// load up mapping information from list of column names
 	void Load(ULONG query_level, ULONG RTE_index, CIdGenerator *id_generator,
-			  List *col_names);
+			  duckdb_libpgquery::PGList *col_names);
 
 	// create a deep copy
 	CMappingVarColId *CopyMapColId(CMemoryPool *mp) const;

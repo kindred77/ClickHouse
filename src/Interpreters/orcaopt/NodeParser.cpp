@@ -280,7 +280,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 
 					typeoid = INT8OID;
 					typelen = sizeof(int64);
-					typebyval = FLOAT8PASSBYVAL;	/* int8 and float8 alike */
+					typebyval = PGFLOAT8PASSBYVAL;	/* int8 and float8 alike */
 				}
 			}
 			else

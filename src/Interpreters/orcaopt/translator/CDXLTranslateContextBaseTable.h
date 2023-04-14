@@ -21,6 +21,8 @@
 // #include "postgres.h"  // Index
 // }
 
+#include <Interpreters/orcaopt/parser_common.h>
+
 #include "gpos/base.h"
 #include "gpos/common/CHashMap.h"
 
@@ -55,7 +57,7 @@ private:
 	OID m_oid;
 
 	// index of the relation in the rtable
-	Index m_rel_index;
+	PGIndex m_rel_index;
 
 	// maps a colid of a column to the attribute number of that column in the schema of the underlying relation
 	UlongToIntMap *m_colid_to_attno_map;
@@ -73,7 +75,7 @@ public:
 	// accessors
 	OID GetOid() const;
 
-	Index GetRelIndex() const;
+	PGIndex GetRelIndex() const;
 
 	// return the index of the column in the base relation for the given DXL ColId
 	INT GetAttnoForColId(ULONG dxl_colid) const;
@@ -81,7 +83,7 @@ public:
 	// setters
 	void SetOID(OID oid);
 
-	void SetRelIndex(Index rel_index);
+	void SetRelIndex(PGIndex rel_index);
 
 	// store the mapping of the given DXL column id and index in the base relation schema
 	BOOL InsertMapping(ULONG dxl_colid, INT att_no);

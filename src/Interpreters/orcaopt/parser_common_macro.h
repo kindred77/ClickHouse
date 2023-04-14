@@ -1,6 +1,6 @@
 #pragma once
 
-#define FLOAT8PASSBYVAL true
+#define PGFLOAT8PASSBYVAL true
 
 #define MAX_FUZZY_DISTANCE				3
 #define MaxTupleAttributeNumber 1664	/* 8 * 208 */

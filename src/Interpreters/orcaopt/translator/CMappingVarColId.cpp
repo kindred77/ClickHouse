@@ -28,6 +28,7 @@
 
 using namespace gpdxl;
 using namespace gpmd;
+using namespace duckdb_libpgquery;
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -55,7 +56,7 @@ CMappingVarColId::CMappingVarColId(CMemoryPool *mp) : m_mp(mp)
 //---------------------------------------------------------------------------
 const CGPDBAttOptCol *
 CMappingVarColId::GetGPDBAttOptColMapping(
-	ULONG current_query_level, const Var *var,
+	ULONG current_query_level, const PGVar *var,
 	EPlStmtPhysicalOpType plstmt_physical_op_type) const
 {
 	GPOS_ASSERT(NULL != var);
@@ -101,7 +102,7 @@ CMappingVarColId::GetGPDBAttOptColMapping(
 //---------------------------------------------------------------------------
 const CWStringBase *
 CMappingVarColId::GetOptColName(
-	ULONG current_query_level, const Var *var,
+	ULONG current_query_level, const PGVar *var,
 	EPlStmtPhysicalOpType plstmt_physical_op_type) const
 {
 	return GetGPDBAttOptColMapping(current_query_level, var,
@@ -119,7 +120,7 @@ CMappingVarColId::GetOptColName(
 //
 //---------------------------------------------------------------------------
 ULONG
-CMappingVarColId::GetColId(ULONG current_query_level, const Var *var,
+CMappingVarColId::GetColId(ULONG current_query_level, const PGVar *var,
 						   EPlStmtPhysicalOpType plstmt_physical_op_type) const
 {
 	return GetGPDBAttOptColMapping(current_query_level, var,
@@ -229,15 +230,15 @@ CMappingVarColId::LoadIndexColumns(ULONG query_level, ULONG RTE_index,
 //---------------------------------------------------------------------------
 void
 CMappingVarColId::Load(ULONG query_level, ULONG RTE_index,
-					   CIdGenerator *id_generator, List *col_names)
+					   CIdGenerator *id_generator, PGList *col_names)
 {
-	ListCell *col_name = NULL;
+	PGListCell *col_name = NULL;
 	ULONG i = 0;
 
 	// add mapping information for columns
-	ForEach(col_name, col_names)
+	foreach(col_name, col_names)
 	{
-		Value *value = (Value *) lfirst(col_name);
+		PGValue *value = (PGValue *) lfirst(col_name);
 		CHAR *col_name_char_array = strVal(value);
 
 		CWStringDynamic *column_name =
@@ -288,7 +289,7 @@ CMappingVarColId::LoadColumns(ULONG query_level, ULONG RTE_index,
 void
 CMappingVarColId::LoadDerivedTblColumns(
 	ULONG query_level, ULONG RTE_index,
-	const CDXLNodeArray *derived_columns_dxl, List *target_list)
+	const CDXLNodeArray *derived_columns_dxl, PGList *target_list)
 {
 	GPOS_ASSERT(NULL != derived_columns_dxl);
 	GPOS_ASSERT((ULONG) gpdb::ListLength(target_list) >=
@@ -296,10 +297,10 @@ CMappingVarColId::LoadDerivedTblColumns(
 
 	ULONG drvd_tbl_col_counter =
 		0;	// counter for the dynamic array of DXL nodes
-	ListCell *lc = NULL;
-	ForEach(lc, target_list)
+	PGListCell *lc = NULL;
+	foreach(lc, target_list)
 	{
-		TargetEntry *target_entry = (TargetEntry *) lfirst(lc);
+		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		if (!target_entry->resjunk)
 		{
 			GPOS_ASSERT(0 < target_entry->resno);
@@ -327,16 +328,16 @@ CMappingVarColId::LoadDerivedTblColumns(
 void
 CMappingVarColId::LoadCTEColumns(ULONG query_level, ULONG RTE_index,
 								 const ULongPtrArray *CTE_columns,
-								 List *target_list)
+								 PGList *target_list)
 {
 	GPOS_ASSERT(NULL != CTE_columns);
 	GPOS_ASSERT((ULONG) gpdb::ListLength(target_list) >= CTE_columns->Size());
 
 	ULONG idx = 0;
-	ListCell *lc = NULL;
-	ForEach(lc, target_list)
+	PGListCell *lc = NULL;
+	foreach(lc, target_list)
 	{
-		TargetEntry *target_entry = (TargetEntry *) lfirst(lc);
+		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		if (!target_entry->resjunk)
 		{
 			GPOS_ASSERT(0 < target_entry->resno);

@@ -202,7 +202,7 @@ private:
 												CDXLNode *dxl_offset) const;
 
 	// translate the child of a set operation
-	CDXLNode *TranslateSetOpChild(Node *child_node, ULongPtrArray *pdrgpul,
+	CDXLNode *TranslateSetOpChild(duckdb_libpgquery::PGNode *child_node, ULongPtrArray *pdrgpul,
 								  IMdIdArray *input_col_mdids,
 								  duckdb_libpgquery::PGList *target_list);
 
@@ -383,7 +383,7 @@ private:
 	CDXLNode *TranslateCTASToDXL();
 	// translate CTAS storage options
 	CDXLCtasStorageOptions::CDXLCtasOptionArray *GetDXLCtasOptionArray(
-		List *options, IMDRelation::Erelstoragetype *storage_type);
+		duckdb_libpgquery::PGList *options, IMDRelation::Erelstoragetype *storage_type);
 
 	// extract storage option value from defelem
 	CWStringDynamic *ExtractStorageOptionStr(duckdb_libpgquery::PGDefElem *def_elem);

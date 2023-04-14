@@ -71,7 +71,7 @@ CDXLTranslateContextBaseTable::SetOID(OID oid)
 //
 //---------------------------------------------------------------------------
 void
-CDXLTranslateContextBaseTable::SetRelIndex(Index rel_index)
+CDXLTranslateContextBaseTable::SetRelIndex(PGIndex rel_index)
 {
 	GPOS_ASSERT(0 < rel_index);
 	m_rel_index = rel_index;
@@ -99,7 +99,7 @@ CDXLTranslateContextBaseTable::GetOid() const
 //		Returns the index of the relation in the rable table
 //
 //---------------------------------------------------------------------------
-Index
+PGIndex
 CDXLTranslateContextBaseTable::GetRelIndex() const
 {
 	GPOS_ASSERT(0 < m_rel_index);

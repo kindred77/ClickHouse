@@ -27,7 +27,7 @@
 #include "gpopt/mdcache/CMDAccessor.h"
 #include "gpopt/mdcache/CMDAccessorUtils.h"
 #include "Interpreters/orcaopt/translator/CQueryMutators.h"
-#include "Interpreters/orcaopt/translator/CTranslatorDXLToPlStmt.h"
+//#include "Interpreters/orcaopt/translator/CTranslatorDXLToPlStmt.h"
 #include "naucrates/md/IMDAggregate.h"
 #include "naucrates/md/IMDScalarOp.h"
 #include "naucrates/md/IMDTypeBool.h"

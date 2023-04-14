@@ -8,41 +8,43 @@
 
 using namespace duckdb_libpgquery;
 
-#define GP_WRAP_START                                            \
-	sigjmp_buf local_sigjmp_buf;                                 \
-	{                                                            \
-		CAutoExceptionStack aes((void **) &PG_exception_stack,   \
-								(void **) &error_context_stack); \
-		if (0 == sigsetjmp(local_sigjmp_buf, 0))                 \
-		{                                                        \
-			aes.SetLocalJmp(&local_sigjmp_buf)
+// #define GP_WRAP_START                                            \
+// 	sigjmp_buf local_sigjmp_buf;                                 \
+// 	{                                                            \
+// 		CAutoExceptionStack aes((void **) &PG_exception_stack,   \
+// 								(void **) &error_context_stack); \
+// 		if (0 == sigsetjmp(local_sigjmp_buf, 0))                 \
+// 		{                                                        \
+// 			aes.SetLocalJmp(&local_sigjmp_buf)
 
-#define GP_WRAP_END                                        \
-	}                                                      \
-	else                                                   \
-	{                                                      \
-		GPOS_RAISE(gpdxl::ExmaGPDB, gpdxl::ExmiGPDBError); \
-	}                                                      \
-	}
+// #define GP_WRAP_END                                        \
+// 	}                                                      \
+// 	else                                                   \
+// 	{                                                      \
+// 		GPOS_RAISE(gpdxl::ExmaGPDB, gpdxl::ExmiGPDBError); \
+// 	}                                                      \
+// 	}
 
 uint32
-ListLength(duckdb_libpgquery::PGList *l)
+ListLength(PGList *l)
 {
-    GP_WRAP_START;
-	{
-		return list_length(l);
-	}
-	GP_WRAP_END;
-	return 0;
+    return list_length(l);
 };
 
 void *
 ListNth(PGList *list, int n)
 {
-	GP_WRAP_START;
-	{
-		return list_nth(list, n);
-	}
-	GP_WRAP_END;
-	return NULL;
+	return list_nth(list, n);
+};
+
+PGList *
+LAppend(PGList *list, void *datum)
+{
+	return lappend(list, datum);
+};
+
+void
+ListFree(PGList *list)
+{
+	list_free(list);
 };

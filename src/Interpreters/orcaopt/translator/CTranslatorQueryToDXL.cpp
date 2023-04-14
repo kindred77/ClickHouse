@@ -309,7 +309,7 @@ CTranslatorQueryToDXL::CheckSirvFuncsWithoutFromClause(PGQuery *query)
 {
 	// if there is a FROM clause or if target list is empty, look no further
 	if ((NULL != query->jointree &&
-		 0 < gpdb::ListLength(query->jointree->fromlist)) ||
+		 0 < ListLength(query->jointree->fromlist)) ||
 		NIL == query->targetList)
 	{
 		return;
@@ -341,7 +341,7 @@ CTranslatorQueryToDXL::HasSirvFunctions(PGNode *node) const
 	PGListCell *lc = NULL;
 
 	BOOL has_sirv = false;
-	ForEach(lc, function_list)
+	foreach(lc, function_list)
 	{
 		PGFuncExpr *func_expr = (PGFuncExpr *) lfirst(lc);
 		if (CTranslatorUtils::IsSirvFunc(m_mp, m_md_accessor,
@@ -432,7 +432,7 @@ void
 CTranslatorQueryToDXL::CheckRangeTable(PGQuery *query)
 {
 	ListCell *lc;
-	ForEach(lc, query->rtable)
+	foreach(lc, query->rtable)
 	{
 		PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(lc);
 
@@ -514,10 +514,10 @@ CTranslatorQueryToDXL::TranslateSelectQueryToDXL()
 		NULL != dxl_cte_anchor_top && NULL != dxl_cte_anchor_bottom);
 
 	GPOS_ASSERT_IMP(NULL != m_query->setOperations,
-					0 == gpdb::ListLength(m_query->windowClause));
+					0 == ListLength(m_query->windowClause));
 	if (NULL != m_query->setOperations)
 	{
-		List *target_list = m_query->targetList;
+		PGList *target_list = m_query->targetList;
 		// translate set operations
 		child_dxlnode = TranslateSetOpToDXL(m_query->setOperations, target_list,
 											output_attno_to_colid_mapping);
@@ -528,7 +528,7 @@ CTranslatorQueryToDXL::TranslateSelectQueryToDXL()
 			dxlop->GetDXLColumnDescrArray();
 		PGListCell *lc = NULL;
 		ULONG resno = 1;
-		ForEach(lc, target_list)
+		foreach(lc, target_list)
 		{
 			PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 			if (0 < target_entry->ressortgroupref)
@@ -540,7 +540,7 @@ CTranslatorQueryToDXL::TranslateSelectQueryToDXL()
 			resno++;
 		}
 	}
-	else if (0 != gpdb::ListLength(
+	else if (0 != ListLength(
 					  m_query->windowClause))  // translate window clauses
 	{
 		CDXLNode *dxlnode = TranslateFromExprToDXL(m_query->jointree);
@@ -700,7 +700,7 @@ CTranslatorQueryToDXL::TranslateInsertQueryToDXL()
 	}
 
 	CDXLNode *query_dxlnode = TranslateSelectQueryToDXL();
-	const RangeTblEntry *rte = (RangeTblEntry *) gpdb::ListNth(
+	const RangeTblEntry *rte = (RangeTblEntry *) ListNth(
 		m_query->rtable, m_query->resultRelation - 1);
 
 	CDXLTableDescr *table_descr = CTranslatorUtils::GetTableDescr(
@@ -727,7 +727,7 @@ CTranslatorQueryToDXL::TranslateInsertQueryToDXL()
 
 	const ULONG num_table_columns =
 		CTranslatorUtils::GetNumNonSystemColumns(md_rel);
-	const ULONG target_list_length = gpdb::ListLength(m_query->targetList);
+	const ULONG target_list_length = ListLength(m_query->targetList);
 	GPOS_ASSERT(num_table_columns >= target_list_length);
 	GPOS_ASSERT(target_list_length == m_dxl_query_output_cols->Size());
 
@@ -760,7 +760,7 @@ CTranslatorQueryToDXL::TranslateInsertQueryToDXL()
 		{
 			INT attno = mdcol->AttrNum();
 
-			PGTargetEntry *target_entry = (PGTargetEntry *) gpdb::ListNth(
+			PGTargetEntry *target_entry = (PGTargetEntry *) ListNth(
 				m_query->targetList, target_list_pos);
 			PGAttrNumber resno = target_entry->resno;
 
@@ -833,7 +833,7 @@ CTranslatorQueryToDXL::TranslateCTASToDXL()
 	CDXLColDescrArray *dxl_col_descr_array =
 		GPOS_NEW(m_mp) CDXLColDescrArray(m_mp);
 
-	const ULONG num_columns = gpdb::ListLength(m_query->targetList);
+	const ULONG num_columns = ListLength(m_query->targetList);
 
 	ULongPtrArray *source_array = GPOS_NEW(m_mp) ULongPtrArray(m_mp);
 	IntPtrArray *var_typmods = GPOS_NEW(m_mp) IntPtrArray(m_mp);
@@ -843,7 +843,7 @@ CTranslatorQueryToDXL::TranslateCTASToDXL()
 	for (ULONG ul = 0; ul < num_columns; ul++)
 	{
 		PGTargetEntry *target_entry =
-			(PGTargetEntry *) gpdb::ListNth(m_query->targetList, ul);
+			(PGTargetEntry *) ListNth(m_query->targetList, ul);
 		if (target_entry->resjunk)
 		{
 			continue;
@@ -859,9 +859,9 @@ CTranslatorQueryToDXL::TranslateCTASToDXL()
 								 ULONG(dxl_ident->GetDXLColRef()->Id()));
 
 		CMDName *md_colname = NULL;
-		if (NULL != col_names && ul < gpdb::ListLength(col_names))
+		if (NULL != col_names && ul < ListLength(col_names))
 		{
-			PGColumnDef *col_def = (PGColumnDef *) gpdb::ListNth(col_names, ul);
+			PGColumnDef *col_def = (PGColumnDef *) ListNth(col_names, ul);
 			md_colname =
 				CDXLUtils::CreateMDNameFromCharArray(m_mp, col_def->colname);
 		}
@@ -1005,7 +1005,7 @@ CTranslatorQueryToDXL::GetDXLCtasOptionArray(
 	CWStringConst str_orientation_parquet(GPOS_WSZ_LIT("parquet"));
 	CWStringConst str_orientation_column(GPOS_WSZ_LIT("column"));
 
-	ForEach(lc, options)
+	foreach(lc, options)
 	{
 		PGDefElem *def_elem = (PGDefElem *) lfirst(lc);
 		CWStringDynamic *name_str = CDXLUtils::CreateDynamicStringFromCharArray(
@@ -1163,7 +1163,7 @@ CTranslatorQueryToDXL::TranslateDeleteQueryToDXL()
 	}
 
 	CDXLNode *query_dxlnode = TranslateSelectQueryToDXL();
-	const PGRangeTblEntry *rte = (PGRangeTblEntry *) gpdb::ListNth(
+	const PGRangeTblEntry *rte = (PGRangeTblEntry *) ListNth(
 		m_query->rtable, m_query->resultRelation - 1);
 
 	CDXLTableDescr *table_descr = CTranslatorUtils::GetTableDescr(
@@ -1230,7 +1230,7 @@ CTranslatorQueryToDXL::TranslateUpdateQueryToDXL()
 	}
 
 	CDXLNode *query_dxlnode = TranslateSelectQueryToDXL();
-	const PGRangeTblEntry *rte = (PGRangeTblEntry *) gpdb::ListNth(
+	const PGRangeTblEntry *rte = (PGRangeTblEntry *) ListNth(
 		m_query->rtable, m_query->resultRelation - 1);
 
 	CDXLTableDescr *table_descr = CTranslatorUtils::GetTableDescr(
@@ -1328,7 +1328,7 @@ CTranslatorQueryToDXL::UpdatedColumnMapping()
 	PGListCell *lc = NULL;
 	ULONG ul = 0;
 	ULONG output_columns = 0;
-	ForEach(lc, m_query->targetList)
+	foreach(lc, m_query->targetList)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(IsA(target_entry, PGTargetEntry));
@@ -1597,7 +1597,7 @@ CTranslatorQueryToDXL::TranslateWindowSpecToDXL(
 
 	// translate window specification
 	PGListCell *lc;
-	ForEach(lc, window_clause)
+	foreach(lc, window_clause)
 	{
 		PGWindowClause *wc = (PGWindowClause *) lfirst(lc);
 		ULongPtrArray *part_columns = TranslatePartColumns(
@@ -1615,7 +1615,7 @@ CTranslatorQueryToDXL::TranslateWindowSpecToDXL(
 			GPOS_DELETE(alias_str);
 		}
 
-		if (0 < gpdb::ListLength(wc->orderClause))
+		if (0 < ListLength(wc->orderClause))
 		{
 			// create a sorting col list
 			sort_col_list_dxl = GPOS_NEW(m_mp)
@@ -1660,7 +1660,7 @@ CTranslatorQueryToDXL::TranslateWindowToDXL(
 	PGList *sort_clause, IntToUlongMap *sort_col_attno_to_colid_mapping,
 	IntToUlongMap *output_attno_to_colid_mapping)
 {
-	if (0 == gpdb::ListLength(window_clause))
+	if (0 == ListLength(window_clause))
 	{
 		return child_dxlnode;
 	}
@@ -1679,7 +1679,7 @@ CTranslatorQueryToDXL::TranslateWindowToDXL(
 	PGList *omitted_target_entries = NIL;
 	PGList *resno_list = NIL;
 
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		BOOL insert_sort_info = true;
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
@@ -1861,7 +1861,7 @@ CTranslatorQueryToDXL::TranslatePartColumns(
 	ULongPtrArray *part_cols = GPOS_NEW(m_mp) ULongPtrArray(m_mp);
 
 	PGListCell *lc = NULL;
-	ForEach(lc, partition_by_clause)
+	foreach(lc, partition_by_clause)
 	{
 		PGNode *partition_clause = (PGNode *) lfirst(lc);
 		GPOS_ASSERT(NULL != partition_clause);
@@ -1895,7 +1895,7 @@ CTranslatorQueryToDXL::TranslateSortColumsToDXL(
 	CDXLNodeArray *dxlnodes = GPOS_NEW(m_mp) CDXLNodeArray(m_mp);
 
 	PGListCell *lc = NULL;
-	ForEach(lc, sort_clause)
+	foreach(lc, sort_clause)
 	{
 		PGNode *node_sort_clause = (PGNode *) lfirst(lc);
 		GPOS_ASSERT(NULL != node_sort_clause);
@@ -1947,7 +1947,7 @@ CTranslatorQueryToDXL::TranslateLimitToDXLGroupBy(
 	PGList *sort_clause, PGNode *limit_count, PGNode *limit_offset_node,
 	CDXLNode *child_dxlnode, IntToUlongMap *grpcols_to_colid_mapping)
 {
-	if (0 == gpdb::ListLength(sort_clause) && NULL == limit_count &&
+	if (0 == ListLength(sort_clause) && NULL == limit_count &&
 		NULL == limit_offset_node)
 	{
 		return child_dxlnode;
@@ -2040,7 +2040,7 @@ ExpressionContainsMissingVars(const PGExpr *expr, CBitSet *grpby_cols_bitset)
 	if (IsA(expr, PGSubLink) && IsA(((PGSubLink *) expr)->subselect, PGQuery))
 	{
 		PGListCell *lc = NULL;
-		ForEach(lc, ((PGQuery *) ((PGSubLink *) expr)->subselect)->targetList)
+		foreach(lc, ((PGQuery *) ((PGSubLink *) expr)->subselect)->targetList)
 		{
 			if (ExpressionContainsMissingVars(
 					((PGTargetEntry *) lfirst(lc))->expr, grpby_cols_bitset))
@@ -2052,7 +2052,7 @@ ExpressionContainsMissingVars(const PGExpr *expr, CBitSet *grpby_cols_bitset)
 	else if (IsA(expr, PGOpExpr))
 	{
 		PGListCell *lc = NULL;
-		ForEach(lc, ((PGOpExpr *) expr)->args)
+		foreach(lc, ((PGOpExpr *) expr)->args)
 		{
 			if (ExpressionContainsMissingVars((PGExpr *) lfirst(lc),
 											  grpby_cols_bitset))
@@ -2115,7 +2115,7 @@ CTranslatorQueryToDXL::CreateSimpleGroupBy(
 
 	PGListCell *lc = NULL;
 	ULONG num_dqa = 0;
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(IsA(target_entry, PGTargetEntry));
@@ -2169,7 +2169,7 @@ CTranslatorQueryToDXL::CreateSimpleGroupBy(
 				// arg "a" as NULL. Whereas (1) and (3) will fetch "a" off of
 				// any tuple in their respective sets.
 				PGListCell *ilc = NULL;
-				ForEach(ilc, ((PGAggref *) target_entry->expr)->aggdirectargs)
+				foreach(ilc, ((PGAggref *) target_entry->expr)->aggdirectargs)
 				{
 					if (ExpressionContainsMissingVars((PGExpr *) lfirst(ilc),
 													  grpby_cols_bitset))
@@ -2239,13 +2239,13 @@ CTranslatorQueryToDXL::IsDuplicateDqaArg(PGList *dqa_list, PGAggref *aggref)
 {
 	GPOS_ASSERT(NULL != aggref);
 
-	if (NIL == dqa_list || 0 == gpdb::ListLength(dqa_list))
+	if (NIL == dqa_list || 0 == ListLength(dqa_list))
 	{
 		return false;
 	}
 
 	PGListCell *lc = NULL;
-	ForEach(lc, dqa_list)
+	foreach(lc, dqa_list)
 	{
 		PGNode *node = (PGNode *) lfirst(lc);
 		GPOS_ASSERT(IsA(node, PGAggref));
@@ -2273,7 +2273,7 @@ CTranslatorQueryToDXL::TranslateGroupingSets(
 	IntToUlongMap *sort_grpref_to_colid_mapping,
 	IntToUlongMap *output_attno_to_colid_mapping)
 {
-	const ULONG num_of_cols = gpdb::ListLength(target_list) + 1;
+	const ULONG num_of_cols = ListLength(target_list) + 1;
 
 	if (NULL == group_clause)
 	{
@@ -2485,7 +2485,7 @@ CTranslatorQueryToDXL::CreateDXLUnionAllForGroupingSets(
 			// add the sortgroup columns to output map of the last column
 			ULONG te_pos = 0;
 			PGListCell *lc = NULL;
-			ForEach(lc, target_list_copy)
+			foreach(lc, target_list_copy)
 			{
 				PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 
@@ -2522,7 +2522,7 @@ CTranslatorQueryToDXL::CreateDXLUnionAllForGroupingSets(
 
 	PGListCell *lc = NULL;
 	ULONG output_col_idx = 0;
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(IsA(target_entry, PGTargetEntry));
@@ -2676,7 +2676,7 @@ CTranslatorQueryToDXL::TranslateSetOpToDXL(
 
 	ULONG output_col_idx = 0;
 	PGListCell *lc = NULL;
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(IsA(target_entry, PGTargetEntry));
@@ -2751,7 +2751,7 @@ CTranslatorQueryToDXL::CreateDXLSetOpFromColumns(
 
 		ULONG target_list_pos = *(*output_col_pos)[ul];
 		PGTargetEntry *target_entry =
-			(PGTargetEntry *) gpdb::ListNth(output_target_list, target_list_pos);
+			(PGTargetEntry *) ListNth(output_target_list, target_list_pos);
 		GPOS_ASSERT(NULL != target_entry);
 
 		CDXLColDescr *output_col_descr = NULL;
@@ -2836,11 +2836,11 @@ CTranslatorQueryToDXL::SetOpNeedsCast(PGList *target_list,
 	GPOS_ASSERT(NULL != target_list);
 	GPOS_ASSERT(
 		input_col_mdids->Size() <=
-		gpdb::ListLength(target_list));	 // there may be resjunked columns
+		ListLength(target_list));	 // there may be resjunked columns
 
 	ULONG col_pos_idx = 0;
 	PGListCell *lc = NULL;
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		OID expr_type_oid = gpdb::ExprType((Node *) target_entry->expr);
@@ -2912,11 +2912,11 @@ CTranslatorQueryToDXL::TranslateSetOpChild(PGNode *child_node,
 		PGRangeTblRef *range_tbl_ref = (PGRangeTblRef *) child_node;
 		const ULONG rt_index = range_tbl_ref->rtindex;
 		const PGRangeTblEntry *rte =
-			(PGRangeTblEntry *) gpdb::ListNth(m_query->rtable, rt_index - 1);
+			(PGRangeTblEntry *) ListNth(m_query->rtable, rt_index - 1);
 
 		if (PG_RTE_SUBQUERY == rte->rtekind)
 		{
-			Query *query_derived_tbl = CTranslatorUtils::FixUnknownTypeConstant(
+			PGQuery *query_derived_tbl = CTranslatorUtils::FixUnknownTypeConstant(
 				rte->subquery, target_list);
 			GPOS_ASSERT(NULL != query_derived_tbl);
 
@@ -3010,15 +3010,15 @@ CTranslatorQueryToDXL::TranslateFromExprToDXL(PGFromExpr *from_expr)
 {
 	CDXLNode *dxlnode = NULL;
 
-	if (0 == gpdb::ListLength(from_expr->fromlist))
+	if (0 == ListLength(from_expr->fromlist))
 	{
 		dxlnode = DXLDummyConstTableGet();
 	}
 	else
 	{
-		if (1 == gpdb::ListLength(from_expr->fromlist))
+		if (1 == ListLength(from_expr->fromlist))
 		{
-			PGNode *node = (PGNode *) gpdb::ListNth(from_expr->fromlist, 0);
+			PGNode *node = (PGNode *) ListNth(from_expr->fromlist, 0);
 			GPOS_ASSERT(NULL != node);
 			dxlnode = TranslateFromClauseToDXL(node);
 		}
@@ -3032,7 +3032,7 @@ CTranslatorQueryToDXL::TranslateFromExprToDXL(PGFromExpr *from_expr)
 				m_mp, GPOS_NEW(m_mp) CDXLLogicalJoin(m_mp, EdxljtInner));
 
 			PGListCell *lc = NULL;
-			ForEach(lc, from_expr->fromlist)
+			foreach(lc, from_expr->fromlist)
 			{
 				PGNode *node = (PGNode *) lfirst(lc);
 				CDXLNode *child_dxlnode = TranslateFromClauseToDXL(node);
@@ -3049,7 +3049,7 @@ CTranslatorQueryToDXL::TranslateFromExprToDXL(PGFromExpr *from_expr)
 		condition_dxlnode = TranslateExprToDXL((PGExpr *) qual_node);
 	}
 
-	if (1 >= gpdb::ListLength(from_expr->fromlist))
+	if (1 >= ListLength(from_expr->fromlist))
 	{
 		if (NULL != condition_dxlnode)
 		{
@@ -3094,7 +3094,7 @@ CTranslatorQueryToDXL::TranslateFromClauseToDXL(PGNode *node)
 		PGRangeTblRef *range_tbl_ref = (PGRangeTblRef *) node;
 		ULONG rt_index = range_tbl_ref->rtindex;
 		const PGRangeTblEntry *rte =
-			(PGRangeTblEntry *) gpdb::ListNth(m_query->rtable, rt_index - 1);
+			(PGRangeTblEntry *) ListNth(m_query->rtable, rt_index - 1);
 		GPOS_ASSERT(NULL != rte);
 
 		if (rte->forceDistRandom)
@@ -3374,7 +3374,7 @@ CTranslatorQueryToDXL::TranslateValueScanRTEToDXL(const PGRangeTblEntry *rte,
 	PGList *tuples_list = rte->values_lists;
 	GPOS_ASSERT(NULL != tuples_list);
 
-	const ULONG num_of_tuples = gpdb::ListLength(tuples_list);
+	const ULONG num_of_tuples = ListLength(tuples_list);
 	GPOS_ASSERT(0 < num_of_tuples);
 
 	// children of the UNION ALL
@@ -3398,7 +3398,7 @@ CTranslatorQueryToDXL::TranslateValueScanRTEToDXL(const PGRangeTblEntry *rte,
 
 	// flag for checking value list has only constants. For all constants --> VALUESCAN operator else retain UnionAll
 	BOOL fAllConstant = true;
-	ForEach(lc_tuple, tuples_list)
+	foreach(lc_tuple, tuples_list)
 	{
 		PGList *tuple_list = (PGList *) lfirst(lc_tuple);
 		GPOS_ASSERT(IsA(tuple_list, PGList));
@@ -3419,18 +3419,18 @@ CTranslatorQueryToDXL::TranslateValueScanRTEToDXL(const PGRangeTblEntry *rte,
 
 		PGList *col_names = rte->eref->colnames;
 		GPOS_ASSERT(NULL != col_names);
-		GPOS_ASSERT(gpdb::ListLength(tuple_list) ==
-					gpdb::ListLength(col_names));
+		GPOS_ASSERT(ListLength(tuple_list) ==
+					ListLength(col_names));
 
 		// translate the columns
 		ULONG col_pos_idx = 0;
 		PGListCell *lc_column = NULL;
-		ForEach(lc_column, tuple_list)
+		foreach(lc_column, tuple_list)
 		{
 			PGExpr *expr = (PGExpr *) lfirst(lc_column);
 
 			CHAR *col_name_char_array =
-				(CHAR *) strVal(gpdb::ListNth(col_names, col_pos_idx));
+				(CHAR *) strVal(ListNth(col_names, col_pos_idx));
 			ULONG colid = gpos::ulong_max;
 			if (IsA(expr, PGConst))
 			{
@@ -3704,7 +3704,7 @@ CTranslatorQueryToDXL::TranslateTVFToDXL(const PGRangeTblEntry *rte,
 	}
 
 	PGListCell *lc = NULL;
-	ForEach(lc, funcexpr->args)
+	foreach(lc, funcexpr->args)
 	{
 		PGNode *arg_node = (PGNode *) lfirst(lc);
 		is_subquery_in_args =
@@ -3892,15 +3892,15 @@ CTranslatorQueryToDXL::TranslateJoinExprInFromToDXL(PGJoinExpr *join_expr)
 
 	const ULONG rtindex = join_expr->rtindex;
 	PGRangeTblEntry *rte =
-		(PGRangeTblEntry *) gpdb::ListNth(m_query->rtable, rtindex - 1);
+		(PGRangeTblEntry *) ListNth(m_query->rtable, rtindex - 1);
 	GPOS_ASSERT(NULL != rte);
 
 	PGAlias *alias = rte->eref;
 	GPOS_ASSERT(NULL != alias);
 	GPOS_ASSERT(NULL != alias->colnames &&
-				0 < gpdb::ListLength(alias->colnames));
-	GPOS_ASSERT(gpdb::ListLength(rte->joinaliasvars) ==
-				gpdb::ListLength(alias->colnames));
+				0 < ListLength(alias->colnames));
+	GPOS_ASSERT(ListLength(rte->joinaliasvars) ==
+				ListLength(alias->colnames));
 
 	CDXLNode *project_list_computed_cols_dxlnode =
 		GPOS_NEW(m_mp) CDXLNode(m_mp, GPOS_NEW(m_mp) CDXLScalarProjList(m_mp));
@@ -3968,7 +3968,7 @@ CTranslatorQueryToDXL::TranslateTargetListToDXLProject(
 	BOOL is_expand_aggref_expr)
 {
 	BOOL is_groupby =
-		(0 != gpdb::ListLength(m_query->groupClause) || m_query->hasAggs);
+		(0 != ListLength(m_query->groupClause) || m_query->hasAggs);
 
 	CDXLNode *project_list_dxlnode =
 		GPOS_NEW(m_mp) CDXLNode(m_mp, GPOS_NEW(m_mp) CDXLScalarProjList(m_mp));
@@ -3983,7 +3983,7 @@ CTranslatorQueryToDXL::TranslateTargetListToDXLProject(
 	// list for all vars used in aggref expressions
 	PGList *vars_list = NULL;
 	ULONG resno = 0;
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(IsA(target_entry, PGTargetEntry));
@@ -4041,7 +4041,7 @@ CTranslatorQueryToDXL::TranslateTargetListToDXLProject(
 
 	// process target entries that are a result of flattening join alias
 	lc = NULL;
-	ForEach(lc, omitted_te_list)
+	foreach(lc, omitted_te_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		INT sort_group_ref = (INT) target_entry->ressortgroupref;
@@ -4073,7 +4073,7 @@ CTranslatorQueryToDXL::TranslateTargetListToDXLProject(
 
 	// process all additional vars in aggref expressions
 	PGListCell *lc_var = NULL;
-	ForEach(lc_var, vars_list)
+	foreach(lc_var, vars_list)
 	{
 		resno++;
 		PGVar *var = (PGVar *) lfirst(lc_var);
@@ -4133,7 +4133,7 @@ CTranslatorQueryToDXL::CreateDXLProjectNullsForGroupingSets(
 	// construct a proj element node for those non-aggregate entries in the target list which
 	// are not included in the grouping set
 	PGListCell *lc = NULL;
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(IsA(target_entry, PGTargetEntry));
@@ -4235,7 +4235,7 @@ CTranslatorQueryToDXL::CreateDXLProjectGroupingFuncs(
 	// construct a proj element node for those non-aggregate entries in the target list which
 	// are not included in the grouping set
 	PGListCell *lc = NULL;
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(IsA(target_entry, PGTargetEntry));
@@ -4328,7 +4328,7 @@ CTranslatorQueryToDXL::CreateDXLOutputCols(
 	CDXLNodeArray *dxlnodes = GPOS_NEW(m_mp) CDXLNodeArray(m_mp);
 
 	PGListCell *lc = NULL;
-	ForEach(lc, target_list)
+	foreach(lc, target_list)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(0 < target_entry->resno);
@@ -4472,13 +4472,13 @@ CTranslatorQueryToDXL::TranslateGroupingFuncToDXL(
 
 	const PGGroupingFunc *grouping_func = (PGGroupingFunc *) expr;
 
-	if (1 < gpdb::ListLength(grouping_func->args))
+	if (1 < ListLength(grouping_func->args))
 	{
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature,
 				   GPOS_WSZ_LIT("Grouping function with multiple arguments"));
 	}
 
-	PGNode *node = (PGNode *) gpdb::ListNth(grouping_func->args, 0);
+	PGNode *node = (PGNode *) ListNth(grouping_func->args, 0);
 	ULONG grouping_idx = gpdb::GetIntFromValue(node);
 
 	// generate a constant value for the result of the grouping function as follows:
@@ -4528,7 +4528,7 @@ CTranslatorQueryToDXL::ConstructCTEProducerList(PGList *cte_list,
 
 	PGListCell *lc = NULL;
 
-	ForEach(lc, cte_list)
+	foreach(lc, cte_list)
 	{
 		PGCommonTableExpr *cte = (PGCommonTableExpr *) lfirst(lc);
 		GPOS_ASSERT(IsA(cte->ctequery, PGQuery));

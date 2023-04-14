@@ -102,7 +102,7 @@ private:
 	// list of CTE producers shared among the logical and scalar translators
 	CDXLNodeArray *m_cte_producers;
 
-	EdxlBoolExprType EdxlbooltypeFromGPDBBoolType(BoolExprType) const;
+	EdxlBoolExprType EdxlbooltypeFromGPDBBoolType(duckdb_libpgquery::PGBoolExprType) const;
 
 	CTranslatorQueryToDXL *CreateSubqueryTranslator(
 		duckdb_libpgquery::PGQuery *subquery, const CMappingVarColId *var_colid_mapping);
@@ -173,7 +173,7 @@ private:
 
 	// create a DXL scalar coalesce node from a GPDB expression
 	CDXLNode *TranslateCoalesceExprToDXL(
-		const Expr *expr, const CMappingVarColId *var_colid_mapping);
+		const duckdb_libpgquery::PGExpr *expr, const CMappingVarColId *var_colid_mapping);
 
 	// create a DXL scalar minmax node from a GPDB expression
 	CDXLNode *TranslateMinMaxExprToDXL(

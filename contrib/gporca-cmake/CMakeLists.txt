@@ -930,22 +930,91 @@ set(SRCS
 "${GPORCA_GPOPT_SOURCE_DIR}/src/xforms/CxformSelect2DynamicBitmapBoolOp.cpp"
 )
 
+add_compile_options(-DUSE_CMAKE)
+
 add_library(gporca ${SRCS})
 
+#message(STATUS "gpxerces include: ${GPXERCES_INCLUDE_DIR}, lib: ${GPXERCES_LIBRARY}")
+
+message(STATUS "gpxerces include: ${GPXERCES_INCLUDE_DIR}, lib: ${GPXERCES_LIBRARY}")
 target_link_libraries(gporca PUBLIC ${GPXERCES_LIBRARY})
-target_include_directories (gporca SYSTEM PRIVATE "${GPXERCES_INCLUDE_DIR}")
+target_include_directories (gporca SYSTEM PUBLIC "${GPXERCES_INCLUDE_DIR}")
+
+target_link_libraries(gporca PUBLIC duckdb_pg_query)
 
 set(GPORCA_GPOS_INCLUDE "${GPORCA_GPOS_SOURCE_DIR}/include")
 set(GPORCA_NAUCRATES_INCLUDE "${GPORCA_NAUCRATES_SOURCE_DIR}/include")
 set(GPORCA_GPDBCOST_INCLUDE "${GPORCA_GPDBCOST_SOURCE_DIR}/include")
 set(GPORCA_GPOPT_INCLUDE "${GPORCA_GPOPT_SOURCE_DIR}/include")
 
-target_include_directories(gporca PUBLIC
+target_include_directories(gporca SYSTEM PUBLIC
 "${GPORCA_GPOS_INCLUDE}"
 "${GPORCA_NAUCRATES_INCLUDE}"
 "${GPORCA_GPDBCOST_INCLUDE}"
 "${GPORCA_GPOPT_INCLUDE}"
 )
+
+
+# add from gporca original -------------------------------------
+# Turn on compiler flags for all warnings if available.
+include(CheckCXXCompilerFlag)
+
+check_cxx_compiler_flag("-Wall" COMPILER_HAS_WALL)
+if (COMPILER_HAS_WALL)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+endif()
+
+check_cxx_compiler_flag("-Werror" COMPILER_HAS_WERROR)
+if (COMPILER_HAS_WERROR)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+endif()
+
+check_cxx_compiler_flag("-Wextra" COMPILER_HAS_WEXTRA)
+if (COMPILER_HAS_WEXTRA)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
+endif()
+
+check_cxx_compiler_flag("-pedantic-errors" COMPILER_HAS_PEDANTIC_ERRORS)
+if (COMPILER_HAS_PEDANTIC_ERRORS)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic-errors")
+endif()
+
+# Turn off warnings about variadic macros if for some reason the C++ dialect is
+# not compatible with C99.
+check_cxx_compiler_flag("-Wno-variadic-macros" COMPILER_HAS_WNO_VARIADIC_MACROS)
+if (COMPILER_HAS_WNO_VARIADIC_MACROS)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-variadic-macros")
+endif()
+
+
+
+# Generate maximum detail for DEBUG information with -g3 if available.
+check_cxx_compiler_flag("-g3" COMPILER_HAS_G3)
+if (COMPILER_HAS_G3)
+  SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3")
+  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -g3")
+endif()
+
+# Do not omit frame pointer. Even with RELEASE builds, it is used for
+# backtracing.
+check_cxx_compiler_flag("-fno-omit-frame-pointer"
+                        COMPILER_HAS_FNO_OMIT_FRAME_POINTER)
+if (COMPILER_HAS_FNO_OMIT_FRAME_POINTER)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
+endif()
+
+# Turn on GPOS_DEBUG define for DEBUG builds.
+cmake_policy(SET CMP0043 NEW)
+
+SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DGPOS_DEBUG")
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  add_compile_options(-DGPOS_Darwin)
+endif()
+
+# Turn on platform-specific defines.
+set(GPOS_${CMAKE_SYSTEM_NAME} 1)
+set(GPOS_${CMAKE_SYSTEM_PROCESSOR} 1)
 
 #if(M_LIBRARY)
 #    target_link_libraries(gporca PRIVATE ${M_LIBRARY})

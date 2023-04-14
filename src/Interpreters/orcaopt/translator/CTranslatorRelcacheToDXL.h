@@ -22,6 +22,8 @@
 // #include "catalog/gp_policy.h"
 // }
 
+#include <Interpreters/orcaopt/parser_common.h>
+
 #include "gpos/base.h"
 
 #include "naucrates/dxl/gpdb_types.h"

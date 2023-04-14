@@ -26,6 +26,7 @@
 // #include "gpopt/gpdbwrappers.h"
 #include "Interpreters/orcaopt/translator/CDXLTranslateContextBaseTable.h"
 #include "Interpreters/orcaopt/translator/CMappingColIdVarPlStmt.h"
+#include <Interpreters/orcaopt/provider/TypeProvider.h>
 #include "naucrates/dxl/operators/CDXLScalarIdent.h"
 #include "naucrates/exception.h"
 #include "naucrates/md/CMDIdGPDB.h"
@@ -33,6 +34,7 @@
 using namespace gpdxl;
 using namespace gpos;
 using namespace gpmd;
+using namespace duckdb_libpgquery;
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -91,12 +93,12 @@ CMappingColIdVarPlStmt::GetOutputContext()
 //		Translates a DXL scalar identifier operator into a GPDB Param node
 //
 //---------------------------------------------------------------------------
-Param *
+PGParam *
 CMappingColIdVarPlStmt::ParamFromDXLNodeScId(const CDXLScalarIdent *dxlop)
 {
 	GPOS_ASSERT(NULL != m_output_context);
 
-	Param *param = NULL;
+	PGParam *param = NULL;
 
 	const ULONG colid = dxlop->GetDXLColRef()->Id();
 	const CMappingElementColIdParamId *elem =
@@ -104,12 +106,12 @@ CMappingColIdVarPlStmt::ParamFromDXLNodeScId(const CDXLScalarIdent *dxlop)
 
 	if (NULL != elem)
 	{
-		param = MakeNode(Param);
-		param->paramkind = PARAM_EXEC;
+		param = makeNode(PGParam);
+		param->paramkind = PG_PARAM_EXEC;
 		param->paramid = elem->ParamId();
 		param->paramtype = CMDIdGPDB::CastMdid(elem->MdidType())->Oid();
 		param->paramtypmod = elem->TypeModifier();
-		param->paramcollid = gpdb::TypeCollation(param->paramtype);
+		param->paramcollid = type_provider->type_is_collatable(param->paramtype);
 	}
 
 	return param;
@@ -123,21 +125,21 @@ CMappingColIdVarPlStmt::ParamFromDXLNodeScId(const CDXLScalarIdent *dxlop)
 //		Translates a DXL scalar identifier operator into a GPDB Var node
 //
 //---------------------------------------------------------------------------
-Var *
+PGVar *
 CMappingColIdVarPlStmt::VarFromDXLNodeScId(const CDXLScalarIdent *dxlop)
 {
-	Index varno = 0;
-	AttrNumber attno = 0;
+	PGIndex varno = 0;
+	PGAttrNumber attno = 0;
 
-	Index varno_old = 0;
-	AttrNumber attno_old = 0;
+	PGIndex varno_old = 0;
+	PGAttrNumber attno_old = 0;
 
 	const ULONG colid = dxlop->GetDXLColRef()->Id();
 	if (NULL != m_base_table_context)
 	{
 		// scalar id is used in a base table operator node
 		varno = m_base_table_context->GetRelIndex();
-		attno = (AttrNumber) m_base_table_context->GetAttnoForColId(colid);
+		attno = (PGAttrNumber) m_base_table_context->GetAttnoForColId(colid);
 
 		varno_old = varno;
 		attno_old = attno;
@@ -154,7 +156,7 @@ CMappingColIdVarPlStmt::VarFromDXLNodeScId(const CDXLScalarIdent *dxlop)
 		GPOS_ASSERT(NULL != left_context);
 
 		// lookup column in the left child translation context
-		const TargetEntry *target_entry = left_context->GetTargetEntry(colid);
+		const PGTargetEntry *target_entry = left_context->GetTargetEntry(colid);
 
 		if (NULL != target_entry)
 		{
@@ -192,7 +194,7 @@ CMappingColIdVarPlStmt::VarFromDXLNodeScId(const CDXLScalarIdent *dxlop)
 					continue;
 				}
 
-				Var *var = (Var *) target_entry->expr;
+				PGVar *var = (PGVar *) target_entry->expr;
 				varno = var->varno;
 			}
 		}
@@ -206,9 +208,9 @@ CMappingColIdVarPlStmt::VarFromDXLNodeScId(const CDXLScalarIdent *dxlop)
 		attno = target_entry->resno;
 
 		// find the original varno and attno for this column
-		if (IsA(target_entry->expr, Var))
+		if (IsA(target_entry->expr, PGVar))
 		{
-			Var *var = (Var *) target_entry->expr;
+			PGVar *var = (PGVar *) target_entry->expr;
 			varno_old = var->varnoold;
 			attno_old = var->varoattno;
 		}
@@ -219,9 +221,11 @@ CMappingColIdVarPlStmt::VarFromDXLNodeScId(const CDXLScalarIdent *dxlop)
 		}
 	}
 
-	Var *var = gpdb::MakeVar(varno, attno,
-							 CMDIdGPDB::CastMdid(dxlop->MdidType())->Oid(),
+	auto md_oid = CMDIdGPDB::CastMdid(dxlop->MdidType())->Oid();
+	PGVar *var = makeVar(varno, attno,
+							 md_oid,
 							 dxlop->TypeModifier(),
+							 type_provider->get_typcollation(md_oid),
 							 0	// varlevelsup
 	);
 

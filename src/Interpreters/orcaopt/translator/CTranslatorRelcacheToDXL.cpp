@@ -68,6 +68,7 @@
 
 using namespace gpdxl;
 using namespace gpopt;
+using namespace duckdb_libpgquery;
 
 
 static const ULONG cmp_type_mappings[][2] = {
@@ -284,7 +285,7 @@ CTranslatorRelcacheToDXL::RetrieveRelIndexInfoForPartTable(CMemoryPool *mp,
 
 	ListCell *lc = NULL;
 
-	ForEach(lc, plLogicalIndexInfo)
+	foreach(lc, plLogicalIndexInfo)
 	{
 		LogicalIndexInfo *logicalIndexInfo = (LogicalIndexInfo *) lfirst(lc);
 		OID index_oid = logicalIndexInfo->logicalIndexOid;
@@ -336,11 +337,11 @@ CTranslatorRelcacheToDXL::RetrieveRelIndexInfoForNonPartTable(CMemoryPool *mp,
 	CMDIndexInfoArray *md_index_info_array = GPOS_NEW(mp) CMDIndexInfoArray(mp);
 
 	// not a partitioned table: obtain indexes directly from the catalog
-	List *index_oids = gpdb::GetRelationIndexes(rel);
+	PGList *index_oids = gpdb::GetRelationIndexes(rel);
 
-	ListCell *lc = NULL;
+	PGListCell *lc = NULL;
 
-	ForEach(lc, index_oids)
+	foreach(lc, index_oids)
 	{
 		OID index_oid = lfirst_oid(lc);
 
@@ -470,7 +471,7 @@ CTranslatorRelcacheToDXL::RetrieveRelCheckConstraints(CMemoryPool *mp, OID oid)
 	List *check_constraints = gpdb::GetCheckConstraintOids(oid);
 
 	ListCell *lc = NULL;
-	ForEach(lc, check_constraints)
+	foreach(lc, check_constraints)
 	{
 		OID check_constraint_oid = lfirst_oid(lc);
 		GPOS_ASSERT(0 != check_constraint_oid);
@@ -1463,7 +1464,7 @@ CTranslatorRelcacheToDXL::LevelHasDefaultPartition(List *default_levels,
 	}
 
 	ListCell *lc = NULL;
-	ForEach(lc, default_levels)
+	foreach(lc, default_levels)
 	{
 		ULONG default_level = (ULONG) lfirst_int(lc);
 		if (level == default_level)
@@ -1881,7 +1882,7 @@ CTranslatorRelcacheToDXL::RetrieveFunc(CMemoryPool *mp, IMDId *mdid)
 		ListCell *lc = NULL;
 		arg_type_mdids = GPOS_NEW(mp) IMdIdArray(mp);
 
-		ForEach(lc, out_arg_types_list)
+		foreach(lc, out_arg_types_list)
 		{
 			OID oidArgType = lfirst_oid(lc);
 			GPOS_ASSERT(InvalidOid != oidArgType);
@@ -3183,14 +3184,14 @@ CTranslatorRelcacheToDXL::RetrieveRelKeysets(CMemoryPool *mp, OID oid,
 	List *rel_keys = gpdb::GetRelationKeys(oid);
 
 	ListCell *lc_key = NULL;
-	ForEach(lc_key, rel_keys)
+	foreach(lc_key, rel_keys)
 	{
 		List *key_elem_list = (List *) lfirst(lc_key);
 
 		ULongPtrArray *key_set = GPOS_NEW(mp) ULongPtrArray(mp);
 
 		ListCell *lc_key_elem = NULL;
-		ForEach(lc_key_elem, key_elem_list)
+		foreach(lc_key_elem, key_elem_list)
 		{
 			INT key_idx = lfirst_int(lc_key_elem);
 			ULONG pos = GetAttributePosition(key_idx, attno_mapping);
@@ -3568,7 +3569,7 @@ CTranslatorRelcacheToDXL::RetrieveIndexOpFamilies(CMemoryPool *mp,
 
 	ListCell *lc = NULL;
 
-	ForEach(lc, op_families)
+	foreach(lc, op_families)
 	{
 		OID op_family_oid = lfirst_oid(lc);
 		input_col_mdids->Append(GPOS_NEW(mp) CMDIdGPDB(op_family_oid));
@@ -3595,7 +3596,7 @@ CTranslatorRelcacheToDXL::RetrieveScOpOpFamilies(CMemoryPool *mp,
 
 	ListCell *lc = NULL;
 
-	ForEach(lc, op_families)
+	foreach(lc, op_families)
 	{
 		OID op_family_oid = lfirst_oid(lc);
 		input_col_mdids->Append(GPOS_NEW(mp) CMDIdGPDB(op_family_oid));

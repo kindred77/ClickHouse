@@ -332,6 +332,6 @@ add_subdirectory(fast_float)
 #if (USE_GPORCA)
     add_subdirectory (libpg_query-cmake)
 #    add_subdirectory (gpxerces-cmake)
-#    add_subdirectory (gporca-cmake)
+    add_subdirectory (gporca-cmake)
 #endif()
 

@@ -192,7 +192,7 @@ public:
 								  const duckdb_libpgquery::PGQuery *query);
 
 	// traverse the expression and fix the levels up of any outer reference
-	static Node *RunIncrLevelsUpMutator(duckdb_libpgquery::PGNode *node,
+	static duckdb_libpgquery::PGNode *RunIncrLevelsUpMutator(duckdb_libpgquery::PGNode *node,
 										SContextIncLevelsupMutator *context);
 
 	// traverse the expression and fix the levels up of any CTE

@@ -18,13 +18,15 @@
 //
 //---------------------------------------------------------------------------
 
+#include <Interpreters/orcaopt/parser_common.h>
+
 #include "gpos/base.h"
 
 //fwd decl
-struct Var;
-struct Param;
-struct PlannedStmt;
-struct Query;
+// struct Var;
+// struct Param;
+// struct PlannedStmt;
+// struct Query;
 
 namespace gpdxl
 {
@@ -57,7 +59,7 @@ public:
 	}
 
 	// translate DXL ScalarIdent node into GPDB Var node
-	virtual Var *VarFromDXLNodeScId(const CDXLScalarIdent *) = 0;
+	virtual duckdb_libpgquery::PGVar *VarFromDXLNodeScId(const CDXLScalarIdent *) = 0;
 };
 }  // namespace gpdxl
 

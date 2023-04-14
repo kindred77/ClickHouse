@@ -542,7 +542,8 @@ include (cmake/find/nuraft.cmake)
 include (cmake/find/yaml-cpp.cmake)
 
 include (cmake/find/libpgquery.cmake)
-include (cmake/find/gporca.cmake)
+#include (cmake/find/gporca.cmake)
+#include (cmake/find/gpxerces.cmake)
 
 if(NOT USE_INTERNAL_PARQUET_LIBRARY)
     set (ENABLE_ORC OFF CACHE INTERNAL "")

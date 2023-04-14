@@ -193,7 +193,7 @@ add_object_library(clickhouse_interpreters_jit Interpreters/JIT)
 #add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/pgoptnew) #for gpdb 6.21.x
 add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt) #for gpdb 6.21.x
 add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/provider)
-add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/translator)
+#add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/translator)
 
 add_object_library(clickhouse_columns Columns)
 add_object_library(clickhouse_storages Storages)
@@ -471,11 +471,37 @@ if (USE_LIBPQXX)
 endif()
 
 #if (USE_GPORCA)
+
+    # ignore some known warnings
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(KNOWN_COMPILER_SPECIFIC_WARNINGS
+        "-Wno-unused-but-set-variable \
+        -Wno-extra-semi-stmt \
+        -Wno-suggest-destructor-override \
+        -Wno-cast-qual \
+        -Wno-extra-semi \
+        -Wno-header-hygiene \
+        -Wno-deprecated-copy-with-user-provided-copy \
+        -Wno-old-style-cast \
+        -Wno-zero-as-null-pointer-constant \
+        -Wno-suggest-override")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(KNOWN_COMPILER_SPECIFIC_WARNINGS
+        "-Wno-unused-but-set-variable \
+        -Wno-stringop-overflow")
+    endif()
+
+    set(KNOWN_WARNINGS
+    "-Wno-unused \
+    ${KNOWN_COMPILER_SPECIFIC_WARNINGS}")
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra ${KNOWN_WARNINGS}")
+
     #add_object_library(clickhouse_server_gporca Interpreters/orcaopt)
     #Xerces
-    message(STATUS "gpxeres include: ${GPXERCES_INCLUDE_DIR}, lib: ${GPXERCES_LIBRARY}")
-    dbms_target_link_libraries(PRIVATE ${GPXERCES_LIBRARY})
-    dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPXERCES_INCLUDE_DIR})
+    #message(STATUS "gpxeres include: ${GPXERCES_INCLUDE_DIR}, lib: ${GPXERCES_LIBRARY}")
+    #dbms_target_link_libraries(PRIVATE ${GPXERCES_LIBRARY})
+    #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPXERCES_INCLUDE_DIR})
     
     #gporca
     #dbms_target_link_libraries(PRIVATE gporca)
@@ -484,22 +510,28 @@ endif()
     #dbms_target_include_directories(PRIVATE ${GPORCA_GPDBCOST_INCLUDE})
     #dbms_target_include_directories(PRIVATE ${GPORCA_GPOPT_INCLUDE})
 
-    message(STATUS "pg_query include: ${LIBPGQUERY_INCLUDE_DIR}, lib: ${LIBPGQUERY_LIBRARY}")
+    #message(STATUS "pg_query include: ${LIBPGQUERY_INCLUDE_DIR}, lib: ${LIBPGQUERY_LIBRARY}")
 
-    dbms_target_link_libraries(PUBLIC ${LIBPGQUERY_LIBRARY})
-    dbms_target_include_directories(SYSTEM BEFORE PUBLIC ${LIBPGQUERY_INCLUDE_DIR})
+    #dbms_target_link_libraries(PUBLIC ${LIBPGQUERY_LIBRARY})
+    #dbms_target_include_directories(SYSTEM BEFORE PUBLIC ${LIBPGQUERY_INCLUDE_DIR})
     
-    message(STATUS "gpdbcost include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPDBCOST}")
-    message(STATUS "gpopt include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPOPT}")
-    message(STATUS "gpos include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPOS}")
-    message(STATUS "naucrates include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_NAUCRATES}")
+    #message(STATUS "gpdbcost include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPDBCOST}")
+    #message(STATUS "gpopt include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPOPT}")
+    #message(STATUS "gpos include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_GPOS}")
+    #message(STATUS "naucrates include: ${GPORCA_INCLUDE_DIR}, lib: ${GPORCA_LIBRARY_NAUCRATES}")
 
-    dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPDBCOST})
-    dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPOPT})
-    dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPOS})
-    dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_NAUCRATES})
-    dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_INCLUDE_DIR})
+    #dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPDBCOST})
+    #dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPOPT})
+    #dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_GPOS})
+    #dbms_target_link_libraries(PRIVATE ${GPORCA_LIBRARY_NAUCRATES})
+    #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_INCLUDE_DIR})
     
+    dbms_target_link_libraries(PUBLIC gporca)
+    #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_GPOS_INCLUDE})
+    #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_NAUCRATES_INCLUDE})
+    #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_GPDBCOST_INCLUDE})
+    #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_GPOPT_INCLUDE})
+
     #gp
     #message(STATUS "gp include: ${GP_INCLUDE_DIR}, lib: ${GP_LIBRARY_PQ}, ${GP_LIBRARY_PGTYPES}, ${GP_LIBRARY_PGCOMMON}, ${GP_LIBRARY_PGPORT}, ${GP_LIBRARY_GPPC}")
     #dbms_target_link_libraries(PRIVATE ${GP_LIBRARY_PQ})

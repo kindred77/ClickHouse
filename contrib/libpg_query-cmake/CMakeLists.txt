@@ -24,6 +24,8 @@ target_include_directories(
   PUBLIC "${LIBPGQUERY_SOURCE_DIR}/include")
 set_target_properties(duckdb_pg_query PROPERTIES EXPORT_NAME duckdb_duckdb_pg_query)
 
+message (STATUS "Using duckdb_pg_query : ${LIBPGQUERY_SOURCE_DIR}/include")
+
 install(TARGETS duckdb_pg_query
         EXPORT "${DUCKDB_EXPORT_SET}"
         LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
