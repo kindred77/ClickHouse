@@ -27,7 +27,7 @@
 
 #include <string.h>
 #include <boost/algorithm/string.hpp>
-
+#include <optional>
 #include <Interpreters/orcaopt/parser_common_macro.h>
 
 /* class RelationParser;
@@ -301,7 +301,8 @@ typedef enum {
 	ERRCODE_INVALID_TEXT_REPRESENTATION,
 	ERRCODE_INTERNAL_ERROR,
 	ERRCODE_INVALID_NAME,
-	ERRCODE_INVALID_TABLE_DEFINITION
+	ERRCODE_INVALID_TABLE_DEFINITION,
+    ERRCODE_SUCCESSFUL_COMPLETION
 } PGPostgresParserErrors;
 
 typedef struct ErrorContextCallback
@@ -346,6 +347,35 @@ typedef duckdb_libpgquery::PGBitmapset *PGRelids;
 //     char data[NAMEDATALEN];
 // };
 // typedef NameData * Name;
+
+/* Result codes for find_coercion_pathway */
+typedef enum
+{
+	PG_COERCION_PATH_NONE,			/* failed to find any coercion pathway */
+	PG_COERCION_PATH_FUNC,			/* apply the specified coercion function */
+	PG_COERCION_PATH_RELABELTYPE,	/* binary-compatible cast, no function */
+	PG_COERCION_PATH_ARRAYCOERCE,	/* need an ArrayCoerceExpr node */
+	PG_COERCION_PATH_COERCEVIAIO	/* need a CoerceViaIO node */
+} PGCoercionPathType;
+
+typedef enum
+{
+	PG_COERCION_CODE_IMPLICIT = 'i',		/* coercion in context of expression */
+	PG_COERCION_CODE_ASSIGNMENT = 'a',		/* coercion in context of assignment */
+	PG_COERCION_CODE_EXPLICIT = 'e'	/* explicit cast operation */
+} PGCoercionCodes;
+
+/*
+ * The allowable values for pg_cast.castmethod are specified by this enum.
+ * Since castmethod is stored as a "char", we use ASCII codes for human
+ * convenience in reading the table.
+ */
+typedef enum
+{
+	PG_COERCION_METHOD_FUNCTION = 'f',		/* use a function */
+	PG_COERCION_METHOD_BINARY = 'b',		/* types are binary-compatible */
+	PG_COERCION_METHOD_INOUT = 'i' /* use input/output functions */
+} PGCoercionMethod;
 
 struct Form_pg_attribute
 {
@@ -2078,12 +2108,68 @@ struct PGPolicy
 
 using PGPolicyPtr = std::shared_ptr<PGPolicy>;
 
+struct Form_pg_index
+{
+	Oid			indexrelid;		/* OID of the index */
+	Oid			indrelid;		/* OID of the relation it indexes */
+	int16		indnatts;		/* number of columns in index */
+	bool		indisunique;	/* is this a unique index? */
+	bool		indisprimary;	/* is this index for primary key? */
+	bool		indisexclusion; /* is this index for exclusion constraint? */
+	bool		indimmediate;	/* is uniqueness enforced immediately? */
+	bool		indisclustered; /* is this the index last clustered by? */
+	bool		indisvalid;		/* is this index valid for use by queries? */
+	bool		indcheckxmin;	/* must we wait for xmin to be old? */
+	bool		indisready;		/* is this index ready for inserts? */
+	bool		indislive;		/* is this index alive at all? */
+	bool		indisreplident; /* is this index the identity for replication? */
+
+	/* variable-length fields start here, but we allow direct access to indkey */
+	//int2vector	indkey;			/* column numbers of indexed cols, or 0 */
+    std::vector<int2> indkey;
+
+//#ifdef CATALOG_VARLEN
+	//oidvector	indcollation;	/* collation identifiers */
+	//oidvector	indclass;		/* opclass identifiers */
+    std::vector<Oid> indcollation;
+    std::vector<Oid> indclass;
+	//int2vector	indoption;		/* per-column flags (AM-specific meanings) */
+    std::vector<int2> indoption;
+	std::optional<std::string> indexprs;		/* expression trees for index attributes that
+								 * are not simple column references; one for
+								 * each zero entry in indkey[] */
+	std::optional<std::string> indpred;		/* expression tree for predicate, if a partial
+								 * index; else NULL */
+//#endif
+};
+
+using PGIndexPtr = std::shared_ptr<Form_pg_index>;
+
+/* Result struct for get_attstatsslot */
+struct PGAttStatsSlot
+{
+    /* Always filled: */
+    Oid staop; /* Actual staop for the found slot */
+    /* Filled if ATTSTATSSLOT_VALUES is specified: */
+    Oid valuetype; /* Actual datatype of the values */
+    Datum * values; /* slot's "values" array, or NULL if none */
+    int nvalues; /* length of values[], or 0 */
+    /* Filled if ATTSTATSSLOT_NUMBERS is specified: */
+    float4 * numbers; /* slot's "numbers" array, or NULL if none */
+    int nnumbers; /* length of numbers[], or 0 */
+
+    /* Remaining fields are private to get_attstatsslot/free_attstatsslot */
+    void * values_arr; /* palloc'd values array, if any */
+    void * numbers_arr; /* palloc'd numbers array, if any */
+};
+
+using PGAttStatsSlotPtr = std::shared_ptr<PGAttStatsSlot>;
+
 namespace DB
 {
     class IStorage;
     using StoragePtr = std::shared_ptr<IStorage>;
 };
-
 
 struct PGRelation
 {
@@ -2146,7 +2232,7 @@ struct PGRelation
     bytea * rd_options; /* parsed pg_class.reloptions */
 
     /* These are non-NULL only for an index relation: */
-    //Form_pg_index rd_index; /* pg_index tuple describing this index */
+    PGIndexPtr rd_index; /* pg_index tuple describing this index */
     /* use "struct" here to avoid needing to include htup.h: */
     //struct HeapTupleData * rd_indextuple; /* all of pg_index tuple */
     //Form_pg_am rd_am; /* pg_am tuple for index's AM */
@@ -2318,3 +2404,175 @@ int pg_strcasecmp(const char * s1, const char * s2)
     }
     return 0;
 };
+
+/* comparison types */
+typedef enum
+{
+    PGCmptEq, // equality
+    PGCmptNEq, // inequality
+    PGCmptLT, // less than
+    PGCmptLEq, // less or equal to
+    PGCmptGT, // greater than
+    PGCmptGEq, // greater or equal to
+    PGCmptOther // other operator
+} PGCmpType;
+
+/* ----------------
+ *		index type information
+ */
+typedef enum
+{
+	PGINDTYPE_BTREE = 0,
+	PGINDTYPE_BITMAP = 1,
+	PGINDTYPE_GIST = 2,
+	PGINDTYPE_GIN = 3
+} PGLogicalIndexType;
+
+struct PGLogicalIndexInfo
+{
+    Oid logicalIndexOid; /* OID of the logical index */
+    int nColumns; /* Number of columns in the index */
+    PGAttrNumber * indexKeys; /* column numbers of index keys */
+    duckdb_libpgquery::PGList * indPred; /* predicate if partial index, or NIL */
+    duckdb_libpgquery::PGList * indExprs; /* index on expressions */
+    bool indIsUnique; /* unique index */
+    PGLogicalIndexType indType; /* index type: btree or bitmap */
+    duckdb_libpgquery::PGNode * partCons; /* concatenated list of check constraints
+					 * of each partition on which this index is defined */
+    duckdb_libpgquery::PGList * defaultLevels; /* Used to identify a default partition */
+};
+
+struct PGLogicalIndexes
+{
+    int numLogicalIndexes;
+    PGLogicalIndexInfo ** logicalIndexInfo;
+};
+
+/* AggStage enumeration indicates how the executor should handle an
+ * Aggref node.
+ */
+typedef enum
+{
+    PG_AGGSTAGE_NORMAL = 0,
+    PG_AGGSTAGE_PARTIAL, /* First (lower, earlier) stage of 2-stage aggregation. */
+    PG_AGGSTAGE_INTERMEDIATE, /* The intermediate stage between AGGSTAGE_PARTIAL and
+							* AGGSTAGE_FINAL that handles the higher aggregation
+							* level in a (partial) ROLLUP grouping extension
+							* query.
+							*/
+    PG_AGGSTAGE_FINAL /* Second (upper, later) stage of 2-stage aggregation. */
+} PGAggStage;
+
+bool optimizer_multilevel_partitioning = false;
+
+/*
+ * Descriptor of a single AO relation.
+ * For now very similar to the catalog row itself but may change in time.
+ */
+struct PGExtTableEntry
+{
+    duckdb_libpgquery::PGList * urilocations;
+    duckdb_libpgquery::PGList * execlocations;
+    char fmtcode;
+    char * fmtopts;
+    duckdb_libpgquery::PGList * options;
+    char * command;
+    int rejectlimit;
+    char rejectlimittype;
+    bool logerrors;
+    int encoding;
+    bool iswritable;
+    bool isweb; /* extra state, not cataloged */
+};
+
+struct Form_pg_statistic
+{
+    /* These fields form the unique key for the entry: */
+    Oid starelid; /* relation containing attribute */
+    int16 staattnum; /* attribute (column) stats are for */
+    bool stainherit; /* true if inheritance children are included */
+
+    /* the fraction of the column's entries that are NULL: */
+    float4 stanullfrac;
+
+    /*
+	 * stawidth is the average width in bytes of non-null entries.  For
+	 * fixed-width datatypes this is of course the same as the typlen, but for
+	 * var-width types it is more useful.  Note that this is the average width
+	 * of the data as actually stored, post-TOASTing (eg, for a
+	 * moved-out-of-line value, only the size of the pointer object is
+	 * counted).  This is the appropriate definition for the primary use of
+	 * the statistic, which is to estimate sizes of in-memory hash tables of
+	 * tuples.
+	 */
+    int32 stawidth;
+
+    /* ----------------
+	 * stadistinct indicates the (approximate) number of distinct non-null
+	 * data values in the column.  The interpretation is:
+	 *		0		unknown or not computed
+	 *		> 0		actual number of distinct values
+	 *		< 0		negative of multiplier for number of rows
+	 * The special negative case allows us to cope with columns that are
+	 * unique (stadistinct = -1) or nearly so (for example, a column in which
+	 * non-null values appear about twice on the average could be represented
+	 * by stadistinct = -0.5 if there are no nulls, or -0.4 if 20% of the
+	 * column is nulls).  Because the number-of-rows statistic in pg_class may
+	 * be updated more frequently than pg_statistic is, it's important to be
+	 * able to describe such situations as a multiple of the number of rows,
+	 * rather than a fixed number of distinct values.  But in other cases a
+	 * fixed number is correct (eg, a boolean column).
+	 * ----------------
+	 */
+    float4 stadistinct;
+
+    /* ----------------
+	 * To allow keeping statistics on different kinds of datatypes,
+	 * we do not hard-wire any particular meaning for the remaining
+	 * statistical fields.  Instead, we provide several "slots" in which
+	 * statistical data can be placed.  Each slot includes:
+	 *		kind			integer code identifying kind of data (see below)
+	 *		op				OID of associated operator, if needed
+	 *		numbers			float4 array (for statistical values)
+	 *		values			anyarray (for representations of data values)
+	 * The ID and operator fields are never NULL; they are zeroes in an
+	 * unused slot.  The numbers and values fields are NULL in an unused
+	 * slot, and might also be NULL in a used slot if the slot kind has
+	 * no need for one or the other.
+	 * ----------------
+	 */
+
+    int16 stakind1;
+    int16 stakind2;
+    int16 stakind3;
+    int16 stakind4;
+    int16 stakind5;
+
+    Oid staop1;
+    Oid staop2;
+    Oid staop3;
+    Oid staop4;
+    Oid staop5;
+
+#ifdef CATALOG_VARLEN /* variable-length fields start here */
+    float4 stanumbers1[1];
+    float4 stanumbers2[1];
+    float4 stanumbers3[1];
+    float4 stanumbers4[1];
+    float4 stanumbers5[1];
+
+    /*
+	 * Values in these arrays are values of the column's data type, or of some
+	 * related type such as an array element type.  We presently have to cheat
+	 * quite a bit to allow polymorphic arrays of this kind, but perhaps
+	 * someday it'll be a less bogus facility.
+	 */
+    anyarray stavalues1;
+    anyarray stavalues2;
+    anyarray stavalues3;
+    anyarray stavalues4;
+    anyarray stavalues5;
+#endif
+};
+
+using PGStatisticPtr = std::shared_ptr<Form_pg_statistic>;

@@ -615,16 +615,16 @@ FuncParser::func_get_detail(PGList *funcname,
                 }
                 else
                 {
-                    CoercionPathType cpathtype;
+                    PGCoercionPathType cpathtype;
                     Oid cfuncid;
 
                     cpathtype = coerce_parser->find_coercion_pathway(targetType, sourceType, PG_COERCION_EXPLICIT, &cfuncid);
                     switch (cpathtype)
                     {
-                        case COERCION_PATH_RELABELTYPE:
+                        case PG_COERCION_PATH_RELABELTYPE:
                             iscoercion = true;
                             break;
-                        case COERCION_PATH_COERCEVIAIO:
+                        case PG_COERCION_PATH_COERCEVIAIO:
                             if ((sourceType == RECORDOID || type_parser->typeidTypeRelid(sourceType) != InvalidOid) && coerce_parser->TypeCategory(targetType) == TYPCATEGORY_STRING)
                                 iscoercion = false;
                             else

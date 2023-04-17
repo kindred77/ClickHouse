@@ -50,8 +50,8 @@ namespace gpdxl
 //---------------------------------------------------------------------------
 class CQueryMutators
 {
-	typedef duckdb_libpgquery::PGNode *(*MutatorWalkerFn)();
-	typedef BOOL (*ExprWalkerFn)();
+	typedef duckdb_libpgquery::PGNode *(*MutatorWalkerFn)(duckdb_libpgquery::PGNode *node, void *context);
+	typedef BOOL (*ExprWalkerFn)(duckdb_libpgquery::PGNode *node, void *context);
 
 	typedef struct SContextGrpbyPlMutator
 	{

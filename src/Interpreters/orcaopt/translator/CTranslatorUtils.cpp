@@ -87,16 +87,16 @@ extern bool optimizer_multilevel_partitioning;
 //		Create a DXL index descriptor from an index MD id
 //
 //---------------------------------------------------------------------------
-CDXLIndexDescr *
-CTranslatorUtils::GetIndexDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
-								IMDId *mdid)
-{
-	const IMDIndex *index = md_accessor->RetrieveIndex(mdid);
-	const CWStringConst *index_name = index->Mdname().GetMDName();
-	CMDName *index_mdname = GPOS_NEW(mp) CMDName(mp, index_name);
+// CDXLIndexDescr *
+// CTranslatorUtils::GetIndexDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
+// 								IMDId *mdid)
+// {
+// 	const IMDIndex *index = md_accessor->RetrieveIndex(mdid);
+// 	const CWStringConst *index_name = index->Mdname().GetMDName();
+// 	CMDName *index_mdname = GPOS_NEW(mp) CMDName(mp, index_name);
 
-	return GPOS_NEW(mp) CDXLIndexDescr(mp, mdid, index_mdname);
-}
+// 	return GPOS_NEW(mp) CDXLIndexDescr(mp, mdid, index_mdname);
+// }
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -2461,27 +2461,27 @@ CTranslatorUtils::IsApplicableTrigger(CMDAccessor *md_accessor,
 //		Check whether there are constraints for the given relation
 //
 //---------------------------------------------------------------------------
-BOOL
-CTranslatorUtils::RelHasConstraints(const IMDRelation *rel)
-{
-	if (0 < rel->CheckConstraintCount())
-	{
-		return true;
-	}
+// BOOL
+// CTranslatorUtils::RelHasConstraints(const IMDRelation *rel)
+// {
+// 	if (0 < rel->CheckConstraintCount())
+// 	{
+// 		return true;
+// 	}
 
-	const ULONG num_cols = rel->ColumnCount();
+// 	const ULONG num_cols = rel->ColumnCount();
 
-	for (ULONG ul = 0; ul < num_cols; ul++)
-	{
-		const IMDColumn *md_col = rel->GetMdCol(ul);
-		if (!md_col->IsSystemColumn() && !md_col->IsNullable())
-		{
-			return true;
-		}
-	}
+// 	for (ULONG ul = 0; ul < num_cols; ul++)
+// 	{
+// 		const IMDColumn *md_col = rel->GetMdCol(ul);
+// 		if (!md_col->IsSystemColumn() && !md_col->IsNullable())
+// 		{
+// 			return true;
+// 		}
+// 	}
 
-	return false;
-}
+// 	return false;
+// }
 
 //---------------------------------------------------------------------------
 //	@function:

@@ -167,8 +167,8 @@ private:
 	CDXLNode *TranslateFromExprToDXL(duckdb_libpgquery::PGFromExpr *from_expr);
 
 	// translate set operations
-	CDXLNode *TranslateSetOpToDXL(duckdb_libpgquery::PGNode *setop_node, duckdb_libpgquery::PGList *target_list,
-								  IntToUlongMap *output_attno_to_colid_mapping);
+	// CDXLNode *TranslateSetOpToDXL(duckdb_libpgquery::PGNode *setop_node, duckdb_libpgquery::PGList *target_list,
+	// 							  IntToUlongMap *output_attno_to_colid_mapping);
 
 	// create the set operation given its children, input and output columns
 	CDXLNode *CreateDXLSetOpFromColumns(EdxlSetOpType setop_type,
@@ -370,34 +370,34 @@ private:
 	// check if given operator is lag() window function
 	static BOOL IsLagWindowFunc(CDXLOperator *dxlop);
 
-	// translate an insert query
-	CDXLNode *TranslateInsertQueryToDXL();
+	// // translate an insert query
+	// CDXLNode *TranslateInsertQueryToDXL();
 
-	// translate a delete query
-	CDXLNode *TranslateDeleteQueryToDXL();
+	// // translate a delete query
+	// CDXLNode *TranslateDeleteQueryToDXL();
 
-	// translate an update query
-	CDXLNode *TranslateUpdateQueryToDXL();
+	// // translate an update query
+	// CDXLNode *TranslateUpdateQueryToDXL();
 
 	// translate a CTAS query
-	CDXLNode *TranslateCTASToDXL();
+	// CDXLNode *TranslateCTASToDXL();
 	// translate CTAS storage options
-	CDXLCtasStorageOptions::CDXLCtasOptionArray *GetDXLCtasOptionArray(
-		duckdb_libpgquery::PGList *options, IMDRelation::Erelstoragetype *storage_type);
+	// CDXLCtasStorageOptions::CDXLCtasOptionArray *GetDXLCtasOptionArray(
+	// 	duckdb_libpgquery::PGList *options, IMDRelation::Erelstoragetype *storage_type);
 
 	// extract storage option value from defelem
-	CWStringDynamic *ExtractStorageOptionStr(duckdb_libpgquery::PGDefElem *def_elem);
+	// CWStringDynamic *ExtractStorageOptionStr(duckdb_libpgquery::PGDefElem *def_elem);
 
 	// return resno -> colId mapping of columns to be updated
-	IntToUlongMap *UpdatedColumnMapping();
+	// IntToUlongMap *UpdatedColumnMapping();
 
 	// obtain the ids of the ctid and segmentid columns for the target
 	// table of a DML query
-	void GetCtidAndSegmentId(ULONG *ctid, ULONG *segment_id);
+	// void GetCtidAndSegmentId(ULONG *ctid, ULONG *segment_id);
 
 	// obtain the column id for the tuple oid column of the target table
 	// of a DML statement
-	ULONG GetTupleOidColId();
+	// ULONG GetTupleOidColId();
 
 	// translate a grouping func expression
 	CDXLNode *TranslateGroupingFuncToDXL(

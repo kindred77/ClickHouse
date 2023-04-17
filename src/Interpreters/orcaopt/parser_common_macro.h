@@ -233,6 +233,10 @@
 #define PG_RELKIND_AOBLOCKDIR 'b' /* AO block directory */
 #define PG_RELKIND_AOVISIMAP 'M' /* AO visibility map */
 
+#define PG_RELPERSISTENCE_PERMANENT 'p' /* regular table */
+#define PG_RELPERSISTENCE_UNLOGGED 'u' /* unlogged permanent table */
+#define PG_RELPERSISTENCE_TEMP 't' /* temporary table */
+
 /*
  * relstorage describes how a relkind is physically stored in the database.
  *
@@ -266,3 +270,40 @@
 #define PG_PROARGMODE_INOUT 'b'
 #define PG_PROARGMODE_VARIADIC 'v'
 #define PG_PROARGMODE_TABLE 't'
+
+#define PG_PARENTSTMTTYPE_NONE	0
+#define PG_PARENTSTMTTYPE_CTAS	1
+#define PG_PARENTSTMTTYPE_COPY	2
+#define PG_PARENTSTMTTYPE_REFRESH_MATVIEW	3
+
+#define PGVARHDRSZ ((int32)sizeof(int32))
+
+/*
+ * Attribute numbers for the system-defined attributes
+ */
+#define SelfItemPointerAttributeNumber (-1)
+#define ObjectIdAttributeNumber (-2)
+#define MinTransactionIdAttributeNumber (-3)
+#define MinCommandIdAttributeNumber (-4)
+#define MaxTransactionIdAttributeNumber (-5)
+#define MaxCommandIdAttributeNumber (-6)
+#define TableOidAttributeNumber (-7)
+#define GpSegmentIdAttributeNumber (-8) /*CDB*/
+#define FirstLowInvalidHeapAttributeNumber (-9)
+
+#define PG_PROEXECLOCATION_ANY 'a'
+#define PG_PROEXECLOCATION_MASTER 'm'
+#define PG_PROEXECLOCATION_INITPLAN 'i'
+#define PG_PROEXECLOCATION_ALL_SEGMENTS 's'
+
+#define PG_STATISTIC_KIND_MCV 1
+#define PG_STATISTIC_KIND_HISTOGRAM 2
+
+/* Flag bits for get_attstatsslot */
+#define PG_ATTSTATSSLOT_VALUES		0x01
+#define PG_ATTSTATSSLOT_NUMBERS	0x02
+
+#define PG_BTREE_AM_OID 403
+#define PG_BITMAP_AM_OID 7013
+#define PG_GIST_AM_OID 783
+#define PG_GIN_AM_OID 2742

@@ -150,8 +150,8 @@ public:
 		PGScanDirection sd);
 
 	// create a DXL index descriptor from an index MD id
-	static CDXLIndexDescr *GetIndexDescr(CMemoryPool *mp,
-										 CMDAccessor *md_accessor, IMDId *mdid);
+	// static CDXLIndexDescr *GetIndexDescr(CMemoryPool *mp,
+	// 									 CMDAccessor *md_accessor, IMDId *mdid);
 
 	// translate a RangeTableEntry into a CDXLTableDescr
 	static CDXLTableDescr *GetTableDescr(CMemoryPool *mp,
@@ -364,7 +364,7 @@ public:
 									const EdxlDmlType dml_type_dxl);
 
 	// check whether there are NOT NULL or CHECK constraints for the given relation
-	static BOOL RelHasConstraints(const IMDRelation *rel);
+	// static BOOL RelHasConstraints(const IMDRelation *rel);
 
 	// translate the list of error messages from an assert constraint list
 	static duckdb_libpgquery::PGList *GetAssertErrorMsgs(CDXLNode *assert_constraint_list);

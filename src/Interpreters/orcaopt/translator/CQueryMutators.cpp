@@ -26,11 +26,21 @@
 // #include "gpopt/gpdbwrappers.h"
 #include "gpopt/mdcache/CMDAccessor.h"
 #include "gpopt/mdcache/CMDAccessorUtils.h"
-#include "Interpreters/orcaopt/translator/CQueryMutators.h"
+#include <Interpreters/orcaopt/translator/CQueryMutators.h>
+#include <Interpreters/orcaopt/translator/wrappers.h>
+#include <Interpreters/orcaopt/walkers.h>
 //#include "Interpreters/orcaopt/translator/CTranslatorDXLToPlStmt.h"
 #include "naucrates/md/IMDAggregate.h"
 #include "naucrates/md/IMDScalarOp.h"
 #include "naucrates/md/IMDTypeBool.h"
+
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wcast-function-type"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#else
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
 
 using namespace gpdxl;
 using namespace gpmd;
@@ -55,7 +65,7 @@ CQueryMutators::NeedsProjListNormalization(const PGQuery *query)
 	SContextTLWalker context(query->targetList, query->groupClause);
 
 	PGListCell *lc = NULL;
-	ForEach(lc, query->targetList)
+	foreach(lc, query->targetList)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 
@@ -104,7 +114,7 @@ CQueryMutators::ShouldFallback(PGNode *node, SContextTLWalker *context)
 		return false;
 	}
 
-	PGTargetEntry *entry = gpdb::FindFirstMatchingMemberInTargetList(
+	PGTargetEntry *entry = FindFirstMatchingMemberInTargetList(
 		node, context->m_target_entries);
 	if (NULL != entry && CTranslatorUtils::IsGroupingColumn(
 							 (PGNode *) entry->expr, context->m_group_clause,
@@ -137,7 +147,7 @@ CQueryMutators::ShouldFallback(PGNode *node, SContextTLWalker *context)
 		return false;
 	}
 
-	return gpdb::WalkExpressionTree(
+	return WalkExpressionTree(
 		node, (ExprWalkerFn) CQueryMutators::ShouldFallback, context);
 }
 
@@ -161,7 +171,7 @@ CQueryMutators::NormalizeGroupByProjList(CMemoryPool *mp,
 										 CMDAccessor *md_accessor,
 										 const PGQuery *query)
 {
-	PGQuery *query_copy = (PGQuery *) gpdb::CopyObject(const_cast<Query *>(query));
+	PGQuery *query_copy = (PGQuery *) CopyObject(const_cast<PGQuery *>(query));
 
 	if (!NeedsProjListNormalization(query_copy))
 	{
@@ -171,19 +181,19 @@ CQueryMutators::NormalizeGroupByProjList(CMemoryPool *mp,
 	PGQuery *new_query =
 		ConvertToDerivedTable(query_copy, false /*should_fix_target_list*/,
 							  true /*should_fix_having_qual*/);
-	gpdb::GPDBFree(query_copy);
+	GPDBFree(query_copy);
 
-	GPOS_ASSERT(1 == gpdb::ListLength(new_query->rtable));
+	GPOS_ASSERT(1 == ListLength(new_query->rtable));
 	PGQuery *derived_table_query =
-		(PGQuery *) ((RangeTblEntry *) gpdb::ListNth(new_query->rtable, 0))
+		(PGQuery *) ((PGRangeTblEntry *) ListNth(new_query->rtable, 0))
 			->subquery;
 	SContextGrpbyPlMutator context(mp, md_accessor, derived_table_query, NULL);
 	PGList *target_list_copy =
-		(PGList *) gpdb::CopyObject(derived_table_query->targetList);
+		(PGList *) CopyObject(derived_table_query->targetList);
 	PGListCell *lc = NULL;
 
 	// first normalize grouping columns
-	ForEach(lc, target_list_copy)
+	foreach(lc, target_list_copy)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(NULL != target_entry);
@@ -198,7 +208,7 @@ CQueryMutators::NormalizeGroupByProjList(CMemoryPool *mp,
 
 	lc = NULL;
 	// normalize remaining project elements
-	ForEach(lc, target_list_copy)
+	foreach(lc, target_list_copy)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(NULL != target_entry);
@@ -241,7 +251,7 @@ CQueryMutators::RunIncrLevelsUpMutator(PGNode *node,
 
 	if (IsA(node, PGVar))
 	{
-		PGVar *var = (PGVar *) gpdb::CopyObject(node);
+		PGVar *var = (PGVar *) CopyObject(node);
 
 		// Consider the following use case:
 		//	ORGINAL QUERY:
@@ -266,14 +276,14 @@ CQueryMutators::RunIncrLevelsUpMutator(PGNode *node,
 	if (IsA(node, PGTargetEntry) && 0 == context->m_current_query_level &&
 		!context->m_should_fix_top_level_target_list)
 	{
-		return (PGNode *) gpdb::CopyObject(node);
+		return (PGNode *) CopyObject(node);
 	}
 
 	// recurse into query structure
 	if (IsA(node, PGQuery))
 	{
 		context->m_current_query_level++;
-		PGQuery *query = query_tree_mutator(
+		PGQuery *query = pg_query_tree_mutator(
 			(PGQuery *) node,
 			(MutatorWalkerFn) CQueryMutators::RunIncrLevelsUpMutator, context,
 			0  // flags
@@ -283,7 +293,7 @@ CQueryMutators::RunIncrLevelsUpMutator(PGNode *node,
 		return (PGNode *) query;
 	}
 
-	return expression_tree_mutator(
+	return pg_expression_tree_mutator(
 		node, (MutatorWalkerFn) CQueryMutators::RunIncrLevelsUpMutator,
 		context);
 }
@@ -323,7 +333,7 @@ CQueryMutators::RunFixCTELevelsUpWalker(PGNode *node,
 	if (IsA(node, PGQuery))
 	{
 		context->m_current_query_level++;
-		BOOL result = query_tree_walker(
+		BOOL result = pg_query_tree_walker(
 			(PGQuery *) node,
 			(ExprWalkerFn) CQueryMutators::RunFixCTELevelsUpWalker, context,
 			QTW_EXAMINE_RTES  // flags - visit RTEs
@@ -341,7 +351,7 @@ CQueryMutators::RunFixCTELevelsUpWalker(PGNode *node,
 		return false;
 	}
 
-	return expression_tree_walker(
+	return pg_expression_tree_walker(
 		node, (ExprWalkerFn) CQueryMutators::RunFixCTELevelsUpWalker, context);
 }
 
@@ -364,12 +374,12 @@ CQueryMutators::RunGroupingColMutator(PGNode *node,
 
 	if (IsA(node, PGConst))
 	{
-		return (PGNode *) gpdb::CopyObject(node);
+		return (PGNode *) CopyObject(node);
 	}
 
 	if (IsA(node, PGVar))
 	{
-		PGVar *var_copy = (PGVar *) gpdb::CopyObject(node);
+		PGVar *var_copy = (PGVar *) CopyObject(node);
 
 		if (var_copy->varlevelsup > context->m_current_query_level)
 		{
@@ -392,14 +402,14 @@ CQueryMutators::RunGroupingColMutator(PGNode *node,
 		BOOL is_agg = context->m_is_mutating_agg_arg;
 		context->m_is_mutating_agg_arg = true;
 
-		ForEach(lc, old_aggref->args)
+		foreach(lc, old_aggref->args)
 		{
-			PGNode *arg = (PGNode *) gpdb::CopyObject((PGNode *) lfirst(lc));
+			PGNode *arg = (PGNode *) CopyObject((PGNode *) lfirst(lc));
 			GPOS_ASSERT(NULL != arg);
 			// traverse each argument and fix levels up when needed
-			new_args = gpdb::LAppend(
+			new_args = LAppend(
 				new_args,
-				gpdb::MutateQueryOrExpressionTree(
+				MutateQueryOrExpressionTree(
 					arg,
 					(MutatorWalkerFn) CQueryMutators::RunGroupingColMutator,
 					(void *) context,
@@ -414,20 +424,20 @@ CQueryMutators::RunGroupingColMutator(PGNode *node,
 
 	if (IsA(node, PGGroupingFunc))
 	{
-		return (PGNode *) gpdb::CopyObject(node);
+		return (PGNode *) CopyObject(node);
 	}
 
 	if (IsA(node, PGSubLink))
 	{
 		PGSubLink *old_sublink = (PGSubLink *) node;
 
-		PGSubLink *new_sublink = MakeNode(PGSubLink);
+		PGSubLink *new_sublink = makeNode(PGSubLink);
 		new_sublink->subLinkType = old_sublink->subLinkType;
 		new_sublink->location = old_sublink->location;
 		new_sublink->operName =
-			(PGList *) gpdb::CopyObject(old_sublink->operName);
+			(PGList *) CopyObject(old_sublink->operName);
 
-		new_sublink->testexpr = gpdb::MutateQueryOrExpressionTree(
+		new_sublink->testexpr = MutateQueryOrExpressionTree(
 			old_sublink->testexpr,
 			(MutatorWalkerFn) CQueryMutators::RunGroupingColMutator,
 			(void *) context,
@@ -437,7 +447,7 @@ CQueryMutators::RunGroupingColMutator(PGNode *node,
 
 		GPOS_ASSERT(IsA(old_sublink->subselect, PGQuery));
 
-		new_sublink->subselect = gpdb::MutateQueryOrExpressionTree(
+		new_sublink->subselect = MutateQueryOrExpressionTree(
 			old_sublink->subselect,
 			(MutatorWalkerFn) CQueryMutators::RunGroupingColMutator, context,
 			0  // flags -- mutate into cte-lists
@@ -450,12 +460,12 @@ CQueryMutators::RunGroupingColMutator(PGNode *node,
 
 	if (IsA(node, PGCommonTableExpr))
 	{
-		PGCommonTableExpr *cte = (PGCommonTableExpr *) gpdb::CopyObject(node);
+		PGCommonTableExpr *cte = (PGCommonTableExpr *) CopyObject(node);
 		context->m_current_query_level++;
 
 		GPOS_ASSERT(IsA(cte->ctequery, PGQuery));
 
-		cte->ctequery = gpdb::MutateQueryOrExpressionTree(
+		cte->ctequery = MutateQueryOrExpressionTree(
 			cte->ctequery,
 			(MutatorWalkerFn) CQueryMutators::RunGroupingColMutator,
 			(void *) context,
@@ -469,7 +479,7 @@ CQueryMutators::RunGroupingColMutator(PGNode *node,
 	// recurse into query structure
 	if (IsA(node, PGQuery))
 	{
-		PGQuery *query = gpdb::MutateQueryTree(
+		PGQuery *query = MutateQueryTree(
 			(PGQuery *) node,
 			(MutatorWalkerFn) CQueryMutators::RunGroupingColMutator, context,
 			1  // flag -- do not mutate range table entries
@@ -478,7 +488,7 @@ CQueryMutators::RunGroupingColMutator(PGNode *node,
 		// fix the outer reference in derived table entries
 		PGList *rtable = query->rtable;
 		PGListCell *lc = NULL;
-		ForEach(lc, rtable)
+		foreach(lc, rtable)
 		{
 			PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(lc);
 
@@ -490,14 +500,14 @@ CQueryMutators::RunGroupingColMutator(PGNode *node,
 				rte->subquery =
 					(PGQuery *) RunGroupingColMutator((PGNode *) subquery, context);
 				context->m_current_query_level--;
-				gpdb::GPDBFree(subquery);
+				GPDBFree(subquery);
 			}
 		}
 
 		return (PGNode *) query;
 	}
 
-	return gpdb::MutateExpressionTree(
+	return MutateExpressionTree(
 		node, (MutatorWalkerFn) CQueryMutators::RunGroupingColMutator, context);
 }
 
@@ -515,26 +525,26 @@ CQueryMutators::FixGroupingCols(PGNode *node, PGTargetEntry *orginal_target_entr
 {
 	GPOS_ASSERT(NULL != node);
 
-	ULONG arity = gpdb::ListLength(context->m_lower_table_tlist) + 1;
+	ULONG arity = ListLength(context->m_lower_table_tlist) + 1;
 
 	// fix any outer references in the grouping column expression
 	PGNode *expr = (PGNode *) RunGroupingColMutator(node, context);
 
 	CHAR *name = CQueryMutators::GetTargetEntryColName(orginal_target_entry,
 													   context->m_query);
-	PGTargetEntry *new_target_entry = gpdb::MakeTargetEntry(
+	PGTargetEntry *new_target_entry = MakeTargetEntry(
 		(PGExpr *) expr, (PGAttrNumber) arity, name, false /*resjunk */);
 
 	new_target_entry->ressortgroupref = orginal_target_entry->ressortgroupref;
 	new_target_entry->resjunk = false;
 
 	context->m_lower_table_tlist =
-		gpdb::LAppend(context->m_lower_table_tlist, new_target_entry);
+		LAppend(context->m_lower_table_tlist, new_target_entry);
 
-	PGVar *new_var = gpdb::MakeVar(
+	PGVar *new_var = MakeVar(
 		1,	// varno
-		(PGAttrNumber) arity, gpdb::ExprType((PGNode *) orginal_target_entry->expr),
-		gpdb::ExprTypeMod((PGNode *) orginal_target_entry->expr),
+		(PGAttrNumber) arity, ExprType((PGNode *) orginal_target_entry->expr),
+		ExprTypeMod((PGNode *) orginal_target_entry->expr),
 		0  // query levelsup
 	);
 
@@ -577,7 +587,7 @@ CQueryMutators::GetTargetEntryForAggExpr(CMemoryPool *mp,
 	}
 	GPOS_ASSERT(NULL != name);
 
-	return gpdb::MakeTargetEntry((PGExpr *) node, (PGAttrNumber) attno, name,
+	return MakeTargetEntry((PGExpr *) node, (PGAttrNumber) attno, name,
 								 false);
 }
 
@@ -600,7 +610,7 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 
 	if (IsA(node, PGConst))
 	{
-		return (PGNode *) gpdb::CopyObject(node);
+		return (PGNode *) CopyObject(node);
 	}
 
 	if (IsA(node, PGAggref))
@@ -613,7 +623,7 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 		// derived table's target list.
 		if (old_aggref->agglevelsup == context->m_current_query_level)
 		{
-			Aggref *new_aggref = FlatCopyAggref(old_aggref);
+			PGAggref *new_aggref = FlatCopyAggref(old_aggref);
 
 			BOOL is_agg_old = context->m_is_mutating_agg_arg;
 			ULONG agg_levels_up = context->m_agg_levels_up;
@@ -624,14 +634,14 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 			PGList *new_args = NIL;
 			PGListCell *lc = NULL;
 
-			ForEach(lc, old_aggref->args)
+			foreach(lc, old_aggref->args)
 			{
 				PGNode *arg = (PGNode *) lfirst(lc);
 				GPOS_ASSERT(NULL != arg);
 				// traverse each argument and fix levels up when needed
-				new_args = gpdb::LAppend(
+				new_args = LAppend(
 					new_args,
-					gpdb::MutateQueryOrExpressionTree(
+					MutateQueryOrExpressionTree(
 						arg, (MutatorWalkerFn) RunExtractAggregatesMutator,
 						(void *) context,
 						0  // mutate into cte-lists
@@ -664,7 +674,7 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 		if (IsA(node, PGGroupingFunc))
 		{
 			// create a new entry in the derived table and return its corresponding var
-			PGNode *node_copy = (PGNode *) gpdb::CopyObject(node);
+			PGNode *node_copy = (PGNode *) CopyObject(node);
 			return (PGNode *) MakeVarInDerivedTable(node_copy, context);
 		}
 
@@ -681,7 +691,7 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 
 	if (IsA(node, PGVar))
 	{
-		PGVar *var = (PGVar *) gpdb::CopyObject(node);
+		PGVar *var = (PGVar *) CopyObject(node);
 
 		// Handle other top-level outer references in the project element.
 		if (var->varlevelsup == context->m_current_query_level)
@@ -732,7 +742,7 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 
 			// Set varlevelsup to 0 temporarily while searching in the target list
 			var->varlevelsup = 0;
-			PGTargetEntry *found_tle = gpdb::FindFirstMatchingMemberInTargetList(
+			PGTargetEntry *found_tle = FindFirstMatchingMemberInTargetList(
 				(PGNode *) var, context->m_lower_table_tlist);
 
 			if (NULL == found_tle)
@@ -764,12 +774,12 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 
 	if (IsA(node, PGCommonTableExpr))
 	{
-		PGCommonTableExpr *cte = (PGCommonTableExpr *) gpdb::CopyObject(node);
+		PGCommonTableExpr *cte = (PGCommonTableExpr *) CopyObject(node);
 		context->m_current_query_level++;
 
 		GPOS_ASSERT(IsA(cte->ctequery, PGQuery));
 
-		cte->ctequery = gpdb::MutateQueryOrExpressionTree(
+		cte->ctequery = MutateQueryOrExpressionTree(
 			cte->ctequery, (MutatorWalkerFn) RunExtractAggregatesMutator,
 			(void *) context,
 			0  // mutate into cte-lists
@@ -783,13 +793,13 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 	{
 		PGSubLink *old_sublink = (PGSubLink *) node;
 
-		PGSubLink *new_sublink = MakeNode(PGSubLink);
+		PGSubLink *new_sublink = makeNode(PGSubLink);
 		new_sublink->subLinkType = old_sublink->subLinkType;
 		new_sublink->location = old_sublink->location;
 		new_sublink->operName =
-			(PGList *) gpdb::CopyObject(old_sublink->operName);
+			(PGList *) CopyObject(old_sublink->operName);
 
-		new_sublink->testexpr = gpdb::MutateQueryOrExpressionTree(
+		new_sublink->testexpr = MutateQueryOrExpressionTree(
 			old_sublink->testexpr,
 			(MutatorWalkerFn) RunExtractAggregatesMutator, (void *) context,
 			0  // mutate into cte-lists
@@ -798,7 +808,7 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 
 		GPOS_ASSERT(IsA(old_sublink->subselect, PGQuery));
 
-		new_sublink->subselect = gpdb::MutateQueryOrExpressionTree(
+		new_sublink->subselect = MutateQueryOrExpressionTree(
 			old_sublink->subselect,
 			(MutatorWalkerFn) RunExtractAggregatesMutator, (void *) context,
 			0  // mutate into cte-lists
@@ -809,14 +819,14 @@ CQueryMutators::RunExtractAggregatesMutator(PGNode *node,
 		return (PGNode *) new_sublink;
 	}
 
-	return gpdb::MutateExpressionTree(
+	return MutateExpressionTree(
 		node, (MutatorWalkerFn) RunExtractAggregatesMutator, context);
 }
 
 
 // Create a new entry in the derived table and return its corresponding var
-Var *
-CQueryMutators::MakeVarInDerivedTable(Node *node,
+PGVar *
+CQueryMutators::MakeVarInDerivedTable(PGNode *node,
 									  SContextGrpbyPlMutator *context)
 {
 	GPOS_ASSERT(NULL != node);
@@ -824,25 +834,25 @@ CQueryMutators::MakeVarInDerivedTable(Node *node,
 	GPOS_ASSERT(IsA(node, PGAggref) || IsA(node, PGGroupingFunc) || IsA(node, PGVar));
 
 	// Append a new target entry for the node to the derived target list ...
-	const ULONG attno = gpdb::ListLength(context->m_lower_table_tlist) + 1;
+	const ULONG attno = ListLength(context->m_lower_table_tlist) + 1;
 	PGTargetEntry *tle = NULL;
 	if (IsA(node, PGAggref) || IsA(node, PGGroupingFunc))
 		tle = GetTargetEntryForAggExpr(context->m_mp, context->m_mda, node,
 									   attno);
 	else if (IsA(node, PGVar))
-		tle = gpdb::MakeTargetEntry((PGExpr *) node, (PGAttrNumber) attno, NULL,
+		tle = MakeTargetEntry((PGExpr *) node, (PGAttrNumber) attno, NULL,
 									false);
 
 	context->m_lower_table_tlist =
-		gpdb::LAppend(context->m_lower_table_tlist, tle);
+		LAppend(context->m_lower_table_tlist, tle);
 
 	// ... and return a Var referring to it in its stead
 	// NB: Since the new tle is appended at the top query level, Var::varlevelsup
 	// should equal the current nested level. This will take care of any outer references
 	// to the original tlist.
 	PGVar *new_var =
-		gpdb::MakeVar(1 /* varno */, attno, gpdb::ExprType((PGNode *) node),
-					  gpdb::ExprTypeMod((PGNode *) node),
+		MakeVar(1 /* varno */, attno, ExprType((PGNode *) node),
+					  ExprTypeMod((PGNode *) node),
 					  context->m_current_query_level /* varlevelsup */);
 
 	return new_var;
@@ -858,18 +868,18 @@ CQueryMutators::FindNodeInGroupByTargetList(PGNode *node,
 	GPOS_ASSERT(NULL != node);
 	GPOS_ASSERT(NULL != context);
 
-	PGTargetEntry *found_tle = gpdb::FindFirstMatchingMemberInTargetList(
+	PGTargetEntry *found_tle = FindFirstMatchingMemberInTargetList(
 		node, context->m_lower_table_tlist);
 
 	if (NULL != found_tle)
 	{
-		gpdb::GPDBFree(node);
+		GPDBFree(node);
 		// NB: Var::varlevelsup is set to the current query level since the created
 		// Var must reference the group by targetlist at the top level.
 		PGVar *new_var =
-			gpdb::MakeVar(1 /* varno */, found_tle->resno,
-						  gpdb::ExprType((PGNode *) found_tle->expr),
-						  gpdb::ExprTypeMod((PGNode *) found_tle->expr),
+			MakeVar(1 /* varno */, found_tle->resno,
+						  ExprType((PGNode *) found_tle->expr),
+						  ExprTypeMod((PGNode *) found_tle->expr),
 						  context->m_current_query_level /* varlevelsup */);
 
 		found_tle->resjunk = false;
@@ -889,7 +899,7 @@ CQueryMutators::FindNodeInGroupByTargetList(PGNode *node,
 PGAggref *
 CQueryMutators::FlatCopyAggref(PGAggref *old_aggref)
 {
-	PGAggref *new_aggref = MakeNode(PGAggref);
+	PGAggref *new_aggref = makeNode(PGAggref);
 
 	*new_aggref = *old_aggref;
 
@@ -909,7 +919,7 @@ CQueryMutators::IncrLevelsUpIfOuterRef(PGVar *var)
 {
 	GPOS_ASSERT(NULL != var);
 
-	PGVar *var_copy = (PGVar *) gpdb::CopyObject(var);
+	PGVar *var_copy = (PGVar *) CopyObject(var);
 	if (0 != var_copy->varlevelsup)
 	{
 		var_copy->varlevelsup++;
@@ -930,7 +940,7 @@ PGQuery *
 CQueryMutators::NormalizeHaving(CMemoryPool *mp, CMDAccessor *md_accessor,
 								const PGQuery *query)
 {
-	PGQuery *query_copy = (PGQuery *) gpdb::CopyObject(const_cast<PGQuery *>(query));
+	PGQuery *query_copy = (PGQuery *) CopyObject(const_cast<PGQuery *>(query));
 
 	if (NULL == query->havingQual)
 	{
@@ -940,17 +950,17 @@ CQueryMutators::NormalizeHaving(CMemoryPool *mp, CMDAccessor *md_accessor,
 	PGQuery *new_query =
 		ConvertToDerivedTable(query_copy, true /*should_fix_target_list*/,
 							  false /*should_fix_having_qual*/);
-	gpdb::GPDBFree(query_copy);
+	GPDBFree(query_copy);
 
 	PGRangeTblEntry *rte =
-		((PGRangeTblEntry *) gpdb::ListNth(new_query->rtable, 0));
+		((PGRangeTblEntry *) ListNth(new_query->rtable, 0));
 	PGQuery *derived_table_query = (PGQuery *) rte->subquery;
 
 	// Add all necessary target list entries of subquery
 	// into the target list of the RTE as well as the new top most query
 	PGListCell *lc = NULL;
 	ULONG num_target_entries = 1;
-	ForEach(lc, derived_table_query->targetList)
+	foreach(lc, derived_table_query->targetList)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(NULL != target_entry);
@@ -967,7 +977,7 @@ CQueryMutators::NormalizeHaving(CMemoryPool *mp, CMDAccessor *md_accessor,
 			PGTargetEntry *new_target_entry =
 				MakeTopLevelTargetEntry(target_entry, num_target_entries);
 			new_query->targetList =
-				gpdb::LAppend(new_query->targetList, new_target_entry);
+				LAppend(new_query->targetList, new_target_entry);
 			// Ensure that such target entries is not suppressed in the target list of the RTE
 			// and has a name
 			target_entry->resname =
@@ -995,7 +1005,7 @@ CQueryMutators::NormalizeHaving(CMemoryPool *mp, CMDAccessor *md_accessor,
 		// subquery is equivalent to select XXXX FROM CONST-TABLE
 		// (where XXXX is the original subquery's target list)
 
-		PGQuery *new_subquery = MakeNode(PGQuery);
+		PGQuery *new_subquery = makeNode(PGQuery);
 
 		new_subquery->commandType = PG_CMD_SELECT;
 		new_subquery->targetList = NIL;
@@ -1004,24 +1014,24 @@ CQueryMutators::NormalizeHaving(CMemoryPool *mp, CMDAccessor *md_accessor,
 		new_subquery->hasWindowFuncs = false;
 		new_subquery->hasSubLinks = false;
 
-		PGListCell *lc = NULL;
-		ForEach(lc, rte->subquery->targetList)
+		PGListCell *lc_target = NULL;
+		foreach(lc_target, rte->subquery->targetList)
 		{
-			PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
+			PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc_target);
 			GPOS_ASSERT(NULL != target_entry);
 
 			GPOS_ASSERT(!target_entry->resjunk);
 
 			new_subquery->targetList =
-				gpdb::LAppend(new_subquery->targetList,
-							  (PGTargetEntry *) gpdb::CopyObject(
+				LAppend(new_subquery->targetList,
+							  (PGTargetEntry *) CopyObject(
 								  const_cast<PGTargetEntry *>(target_entry)));
 		}
 
-		gpdb::GPDBFree(rte->subquery);
+		GPDBFree(rte->subquery);
 
 		rte->subquery = new_subquery;
-		rte->subquery->jointree = MakeNode(PGFromExpr);
+		rte->subquery->jointree = makeNode(PGFromExpr);
 		rte->subquery->groupClause = NIL;
 		rte->subquery->sortClause = NIL;
 		rte->subquery->windowClause = NIL;
@@ -1043,29 +1053,29 @@ CQueryMutators::NormalizeQuery(CMemoryPool *mp, CMDAccessor *md_accessor,
 {
 	// flatten join alias vars defined at the current level of the query
 	PGQuery *pqueryResolveJoinVarReferences =
-		gpdb::FlattenJoinAliasVar(const_cast<PGQuery *>(query), query_level);
+		FlattenJoinAliasVar(const_cast<PGQuery *>(query), query_level);
 
 	// eliminate distinct clause
 	PGQuery *pqueryEliminateDistinct =
 		CQueryMutators::EliminateDistinctClause(pqueryResolveJoinVarReferences);
 	GPOS_ASSERT(NULL == pqueryEliminateDistinct->distinctClause);
-	gpdb::GPDBFree(pqueryResolveJoinVarReferences);
+	GPDBFree(pqueryResolveJoinVarReferences);
 
 	// normalize window operator's project list
-	Query *pqueryWindowPlNormalized = CQueryMutators::NormalizeWindowProjList(
+	PGQuery *pqueryWindowPlNormalized = CQueryMutators::NormalizeWindowProjList(
 		mp, md_accessor, pqueryEliminateDistinct);
-	gpdb::GPDBFree(pqueryEliminateDistinct);
+	GPDBFree(pqueryEliminateDistinct);
 
 	// pull-up having quals into a select
 	PGQuery *pqueryHavingNormalized = CQueryMutators::NormalizeHaving(
 		mp, md_accessor, pqueryWindowPlNormalized);
 	GPOS_ASSERT(NULL == pqueryHavingNormalized->havingQual);
-	gpdb::GPDBFree(pqueryWindowPlNormalized);
+	GPDBFree(pqueryWindowPlNormalized);
 
 	// normalize the group by project list
 	PGQuery *new_query = CQueryMutators::NormalizeGroupByProjList(
 		mp, md_accessor, pqueryHavingNormalized);
-	gpdb::GPDBFree(pqueryHavingNormalized);
+	GPDBFree(pqueryHavingNormalized);
 
 	return new_query;
 }
@@ -1083,13 +1093,13 @@ PGTargetEntry *
 CQueryMutators::MakeTopLevelTargetEntry(PGTargetEntry *old_target_entry,
 										ULONG attno)
 {
-	PGVar *new_var = gpdb::MakeVar(
-		1, (PGAttrNumber) attno, gpdb::ExprType((PGNode *) old_target_entry->expr),
-		gpdb::ExprTypeMod((PGNode *) old_target_entry->expr),
+	PGVar *new_var = MakeVar(
+		1, (PGAttrNumber) attno, ExprType((PGNode *) old_target_entry->expr),
+		ExprTypeMod((PGNode *) old_target_entry->expr),
 		0  // query levelsup
 	);
 
-	PGTargetEntry *new_target_entry = gpdb::MakeTargetEntry(
+	PGTargetEntry *new_target_entry = MakeTargetEntry(
 		(PGExpr *) new_var, (PGAttrNumber) attno, old_target_entry->resname,
 		old_target_entry->resjunk);
 
@@ -1151,7 +1161,7 @@ CQueryMutators::ConvertToDerivedTable(const PGQuery *original_query,
 	// Step 1: Make a copy of the original Query, this will become the lower query
 
 	PGQuery *query_copy =
-		(PGQuery *) gpdb::CopyObject(const_cast<PGQuery *>(original_query));
+		(PGQuery *) CopyObject(const_cast<PGQuery *>(original_query));
 
 	// Step 2: Remove things from the query copy that will go in the new, upper Query object
 	//         or won't be modified
@@ -1167,8 +1177,8 @@ CQueryMutators::ConvertToDerivedTable(const PGQuery *original_query,
 	query_copy->cteList = NIL;
 
 	// intoPolicy, if not null, must be set on the top query, not on the derived table
-	struct GpPolicy *into_policy = query_copy->intoPolicy;
-	query_copy->intoPolicy = NULL;
+	//struct GpPolicy *into_policy = query_copy->intoPolicy;
+	//query_copy->intoPolicy = NULL;
 
 	// Step 3: fix outer references and CTE levels
 
@@ -1178,7 +1188,7 @@ CQueryMutators::ConvertToDerivedTable(const PGQuery *original_query,
 	{
 		SContextIncLevelsupMutator context1(0, should_fix_target_list);
 
-		lower_query = gpdb::MutateQueryTree(
+		lower_query = MutateQueryTree(
 			query_copy, (MutatorWalkerFn) RunIncrLevelsUpMutator, &context1,
 			0  // flags
 		);
@@ -1192,7 +1202,7 @@ CQueryMutators::ConvertToDerivedTable(const PGQuery *original_query,
 		SContextIncLevelsupMutator context2(0 /*starting level */,
 											should_fix_target_list);
 
-		(void) gpdb::WalkQueryOrExpressionTree(
+		(void) WalkQueryOrExpressionTree(
 			(PGNode *) lower_query, (ExprWalkerFn) RunFixCTELevelsUpWalker,
 			&context2, QTW_EXAMINE_RTES);
 	}
@@ -1204,35 +1214,35 @@ CQueryMutators::ConvertToDerivedTable(const PGQuery *original_query,
 
 	// Step 4: Create a new, single range table entry for the upper query
 
-	PGRangeTblEntry *rte = MakeNode(PGRangeTblEntry);
-	rte->rtekind = RTE_SUBQUERY;
+	PGRangeTblEntry *rte = makeNode(PGRangeTblEntry);
+	rte->rtekind = PG_RTE_SUBQUERY;
 
 	rte->subquery = lower_query;
 	rte->inFromCl = true;
 	rte->subquery->cteList = NIL;
 
 	// create a new range table reference for the new RTE
-	PGRangeTblRef *rtref = MakeNode(PGRangeTblRef);
+	PGRangeTblRef *rtref = makeNode(PGRangeTblRef);
 	rtref->rtindex = 1;
 
 	// Step 5: Create a new upper query with the new RTE in its from clause
 
-	PGQuery *upper_query = MakeNode(PGQuery);
+	PGQuery *upper_query = makeNode(PGQuery);
 
 	upper_query->cteList = original_cte_list;
-	upper_query->rtable = gpdb::LAppend(upper_query->rtable, rte);
-	upper_query->intoPolicy = into_policy;
-	upper_query->parentStmtType = lower_query->parentStmtType;
-	lower_query->parentStmtType = PARENTSTMTTYPE_NONE;
+	upper_query->rtable = LAppend(upper_query->rtable, rte);
+	//upper_query->intoPolicy = into_policy;
+	//upper_query->parentStmtType = lower_query->parentStmtType;
+	//lower_query->parentStmtType = PG_PARENTSTMTTYPE_NONE;
 
-	PGFromExpr *fromexpr = MakeNode(PGFromExpr);
+	PGFromExpr *fromexpr = makeNode(PGFromExpr);
 	fromexpr->quals = NULL;
-	fromexpr->fromlist = gpdb::LAppend(fromexpr->fromlist, rtref);
+	fromexpr->fromlist = LAppend(fromexpr->fromlist, rtref);
 
 	upper_query->jointree = fromexpr;
 	upper_query->commandType = PG_CMD_SELECT;
 
-	GPOS_ASSERT(1 == gpdb::ListLength(upper_query->rtable));
+	GPOS_ASSERT(1 == ListLength(upper_query->rtable));
 	GPOS_ASSERT(false == upper_query->hasWindowFuncs);
 
 	return upper_query;
@@ -1248,9 +1258,9 @@ CQueryMutators::ConvertToDerivedTable(const PGQuery *original_query,
 PGQuery *
 CQueryMutators::EliminateDistinctClause(const PGQuery *query)
 {
-	if (0 == gpdb::ListLength(query->distinctClause))
+	if (0 == ListLength(query->distinctClause))
 	{
-		return (PGQuery *) gpdb::CopyObject(const_cast<PGQuery *>(query));
+		return (PGQuery *) CopyObject(const_cast<PGQuery *>(query));
 	}
 
 	// create a derived table out of the previous query
@@ -1258,9 +1268,9 @@ CQueryMutators::EliminateDistinctClause(const PGQuery *query)
 		ConvertToDerivedTable(query, true /*should_fix_target_list*/,
 							  true /*should_fix_having_qual*/);
 
-	GPOS_ASSERT(1 == gpdb::ListLength(new_query->rtable));
+	GPOS_ASSERT(1 == ListLength(new_query->rtable));
 	PGQuery *derived_table_query =
-		(PGQuery *) ((PGRangeTblEntry *) gpdb::ListNth(new_query->rtable, 0))
+		(PGQuery *) ((PGRangeTblEntry *) ListNth(new_query->rtable, 0))
 			->subquery;
 
 	ReassignSortClause(new_query, derived_table_query);
@@ -1270,9 +1280,9 @@ CQueryMutators::EliminateDistinctClause(const PGQuery *query)
 	PGListCell *lc = NULL;
 
 	// build the project list of the new top-level query
-	ForEach(lc, target_entries)
+	foreach(lc, target_entries)
 	{
-		ULONG resno = gpdb::ListLength(new_query->targetList) + 1;
+		ULONG resno = ListLength(new_query->targetList) + 1;
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 		GPOS_ASSERT(NULL != target_entry);
 
@@ -1280,18 +1290,18 @@ CQueryMutators::EliminateDistinctClause(const PGQuery *query)
 		{
 			// create a new target entry that points to the corresponding entry in the derived table
 			PGVar *new_var =
-				gpdb::MakeVar(1, target_entry->resno,
-							  gpdb::ExprType((PGNode *) target_entry->expr),
-							  gpdb::ExprTypeMod((PGNode *) target_entry->expr),
+				MakeVar(1, target_entry->resno,
+							  ExprType((PGNode *) target_entry->expr),
+							  ExprTypeMod((PGNode *) target_entry->expr),
 							  0	 // query levels up
 				);
 			PGTargetEntry *new_target_entry =
-				gpdb::MakeTargetEntry((PGExpr *) new_var, (PGAttrNumber) resno,
+				MakeTargetEntry((PGExpr *) new_var, (PGAttrNumber) resno,
 									  target_entry->resname, false);
 
 			new_target_entry->ressortgroupref = target_entry->ressortgroupref;
 			new_query->targetList =
-				gpdb::LAppend(new_query->targetList, new_target_entry);
+				LAppend(new_query->targetList, new_target_entry);
 		}
 
 		if (0 < target_entry->ressortgroupref &&
@@ -1305,8 +1315,8 @@ CQueryMutators::EliminateDistinctClause(const PGQuery *query)
 		}
 	}
 
-	if (gpdb::ListLength(new_query->targetList) !=
-		gpdb::ListLength(query->distinctClause))
+	if (ListLength(new_query->targetList) !=
+		ListLength(query->distinctClause))
 	{
 		GPOS_RAISE(
 			gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature,
@@ -1315,19 +1325,19 @@ CQueryMutators::EliminateDistinctClause(const PGQuery *query)
 	}
 
 	PGListCell *pl = NULL;
-	ForEach(pl, query->distinctClause)
+	foreach(pl, query->distinctClause)
 	{
 		PGSortGroupClause *sort_group_clause = (PGSortGroupClause *) lfirst(pl);
 		GPOS_ASSERT(NULL != sort_group_clause);
 
-		PGSortGroupClause *new_sort_group_clause = MakeNode(PGSortGroupClause);
+		PGSortGroupClause *new_sort_group_clause = makeNode(PGSortGroupClause);
 		new_sort_group_clause->tleSortGroupRef =
 			sort_group_clause->tleSortGroupRef;
 		new_sort_group_clause->eqop = sort_group_clause->eqop;
 		new_sort_group_clause->sortop = sort_group_clause->sortop;
 		new_sort_group_clause->nulls_first = sort_group_clause->nulls_first;
 		new_query->groupClause =
-			gpdb::LAppend(new_query->groupClause, new_sort_group_clause);
+			LAppend(new_query->groupClause, new_sort_group_clause);
 	}
 	new_query->distinctClause = NIL;
 	derived_table_query->distinctClause = NIL;
@@ -1355,7 +1365,7 @@ CQueryMutators::NeedsProjListWindowNormalization(const PGQuery *query)
 	}
 
 	PGListCell *lc = NULL;
-	ForEach(lc, query->targetList)
+	foreach(lc, query->targetList)
 	{
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
 
@@ -1393,7 +1403,7 @@ CQueryMutators::NormalizeWindowProjList(CMemoryPool *mp,
 										const PGQuery *original_query)
 {
 	PGQuery *query_copy =
-		(PGQuery *) gpdb::CopyObject(const_cast<PGQuery *>(original_query));
+		(PGQuery *) CopyObject(const_cast<PGQuery *>(original_query));
 
 	if (!NeedsProjListWindowNormalization(original_query))
 	{
@@ -1410,17 +1420,17 @@ CQueryMutators::NormalizeWindowProjList(CMemoryPool *mp,
 	PGQuery *upper_query =
 		ConvertToDerivedTable(query_copy, false /*should_fix_target_list*/,
 							  true /*should_fix_having_qual*/);
-	gpdb::GPDBFree(query_copy);
+	GPDBFree(query_copy);
 
-	GPOS_ASSERT(1 == gpdb::ListLength(upper_query->rtable));
+	GPOS_ASSERT(1 == ListLength(upper_query->rtable));
 	PGQuery *lower_query =
-		(PGQuery *) ((PGRangeTblEntry *) gpdb::ListNth(upper_query->rtable, 0))
+		(PGQuery *) ((PGRangeTblEntry *) ListNth(upper_query->rtable, 0))
 			->subquery;
 
 	SContextGrpbyPlMutator projlist_context(mp, md_accessor, lower_query, NULL);
 	PGListCell *lc = NULL;
 	PGList *target_entries = lower_query->targetList;
-	ForEach(lc, target_entries)
+	foreach(lc, target_entries)
 	{
 		// If this target entry is referenced in a window spec, is a var or is a window function,
 		// add it to the lower target list. Adjust the outer refs to ancestors of the orginal
@@ -1431,7 +1441,7 @@ CQueryMutators::NormalizeWindowProjList(CMemoryPool *mp,
 		// they reference in the current scope are produced by the lower query and are adjusted
 		// to refer to the new, single RTE of the upper query.
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(lc);
-		const ULONG ulResNoNew = gpdb::ListLength(upper_query->targetList) + 1;
+		const ULONG ulResNoNew = ListLength(upper_query->targetList) + 1;
 
 		if (CTranslatorUtils::IsReferencedInWindowSpec(
 				target_entry, original_query->windowClause))
@@ -1443,13 +1453,13 @@ CQueryMutators::NormalizeWindowProjList(CMemoryPool *mp,
 			SContextIncLevelsupMutator level_context(
 				0, true /* should_fix_top_level_target_list */);
 			PGTargetEntry *lower_target_entry =
-				(PGTargetEntry *) gpdb::MutateExpressionTree(
+				(PGTargetEntry *) MutateExpressionTree(
 					(PGNode *) target_entry,
 					(MutatorWalkerFn) RunIncrLevelsUpMutator, &level_context);
 
 			lower_target_entry->resno =
-				gpdb::ListLength(projlist_context.m_lower_table_tlist) + 1;
-			projlist_context.m_lower_table_tlist = gpdb::LAppend(
+				ListLength(projlist_context.m_lower_table_tlist) + 1;
+			projlist_context.m_lower_table_tlist = LAppend(
 				projlist_context.m_lower_table_tlist, lower_target_entry);
 
 			BOOL is_sorting_col = CTranslatorUtils::IsSortingColumn(
@@ -1459,13 +1469,13 @@ CQueryMutators::NormalizeWindowProjList(CMemoryPool *mp,
 			{
 				// the target list entry is present in the query output or it is used in the ORDER BY,
 				// so also add it to the target list of the new upper Query
-				PGVar *new_var = gpdb::MakeVar(
+				PGVar *new_var = MakeVar(
 					1, lower_target_entry->resno,
-					gpdb::ExprType((PGNode *) target_entry->expr),
-					gpdb::ExprTypeMod((PGNode *) target_entry->expr),
+					ExprType((PGNode *) target_entry->expr),
+					ExprTypeMod((PGNode *) target_entry->expr),
 					0  // query levels up
 				);
-				PGTargetEntry *upper_target_entry = gpdb::MakeTargetEntry(
+				PGTargetEntry *upper_target_entry = MakeTargetEntry(
 					(PGExpr *) new_var, ulResNoNew, target_entry->resname,
 					target_entry->resjunk);
 
@@ -1480,7 +1490,7 @@ CQueryMutators::NormalizeWindowProjList(CMemoryPool *mp,
 				lower_target_entry->resjunk = false;
 
 				upper_query->targetList =
-					gpdb::LAppend(upper_query->targetList, upper_target_entry);
+					LAppend(upper_query->targetList, upper_target_entry);
 			}
 		}
 		else
@@ -1489,12 +1499,12 @@ CQueryMutators::NormalizeWindowProjList(CMemoryPool *mp,
 			// and also add any needed vars to the lower target list
 			target_entry->resno = ulResNoNew;
 			PGTargetEntry *upper_target_entry =
-				(PGTargetEntry *) gpdb::MutateExpressionTree(
+				(PGTargetEntry *) MutateExpressionTree(
 					(PGNode *) target_entry,
 					(MutatorWalkerFn) RunWindowProjListMutator,
 					&projlist_context);
 			upper_query->targetList =
-				gpdb::LAppend(upper_query->targetList, upper_target_entry);
+				LAppend(upper_query->targetList, upper_target_entry);
 		}
 	}
 
@@ -1502,8 +1512,8 @@ CQueryMutators::NormalizeWindowProjList(CMemoryPool *mp,
 	// window spec expressions and window functions for the lower targer list
 	lower_query->targetList = projlist_context.m_lower_table_tlist;
 
-	GPOS_ASSERT(gpdb::ListLength(upper_query->targetList) <=
-				gpdb::ListLength(original_query->targetList));
+	GPOS_ASSERT(ListLength(upper_query->targetList) <=
+				ListLength(original_query->targetList));
 	ReassignSortClause(upper_query, lower_query);
 
 	return upper_query;
@@ -1526,7 +1536,7 @@ CQueryMutators::RunWindowProjListMutator(PGNode *node,
 		return NULL;
 	}
 
-	const ULONG resno = gpdb::ListLength(context->m_lower_table_tlist) + 1;
+	const ULONG resno = ListLength(context->m_lower_table_tlist) + 1;
 
 	if (IsA(node, PGWindowFunc) && 0 == context->m_current_query_level)
 	{
@@ -1541,7 +1551,7 @@ CQueryMutators::RunWindowProjListMutator(PGNode *node,
 		SContextIncLevelsupMutator levelsUpContext(
 			context->m_current_query_level,
 			true /* should_fix_top_level_target_list */);
-		PGWindowFunc *window_func = (PGWindowFunc *) expression_tree_mutator(
+		PGWindowFunc *window_func = (PGWindowFunc *) pg_expression_tree_mutator(
 			node, (MutatorWalkerFn) RunIncrLevelsUpMutator, &levelsUpContext);
 		GPOS_ASSERT(IsA(window_func, PGWindowFunc));
 
@@ -1552,20 +1562,20 @@ CQueryMutators::RunWindowProjListMutator(PGNode *node,
 			CMDAccessorUtils::PstrWindowFuncName(context->m_mda, mdid_func);
 		mdid_func->Release();
 
-		PGTargetEntry *target_entry = gpdb::MakeTargetEntry(
+		PGTargetEntry *target_entry = MakeTargetEntry(
 			(PGExpr *) window_func, (PGAttrNumber) resno,
 			CTranslatorUtils::CreateMultiByteCharStringFromWCString(
 				str->GetBuffer()),
 			false /* resjunk */
 		);
 		context->m_lower_table_tlist =
-			gpdb::LAppend(context->m_lower_table_tlist, target_entry);
+			LAppend(context->m_lower_table_tlist, target_entry);
 
 		// return a variable referring to the lower table's corresponding target entry,
 		// to be used somewhere in the upper query's target list
-		PGVar *new_var = gpdb::MakeVar(
+		PGVar *new_var = MakeVar(
 			1,	// derived query which is now the only table in FROM expression
-			(PGAttrNumber) resno, gpdb::ExprType(node), gpdb::ExprTypeMod(node),
+			(PGAttrNumber) resno, ExprType(node), ExprTypeMod(node),
 			0  // query levelsup
 		);
 
@@ -1579,18 +1589,18 @@ CQueryMutators::RunWindowProjListMutator(PGNode *node,
 		// the new upper query scope.
 		// Since the rtable of the upper Query is different from that of the original
 		// Query, calculate the new varno (always 1) and varattno to use.
-		PGVar *var = (PGVar *) gpdb::CopyObject(node);
+		PGVar *var = (PGVar *) CopyObject(node);
 
 		// Set varlevelsup to 0 temporarily while searching in the target list
 		var->varlevelsup = 0;
-		PGTargetEntry *found_tle = gpdb::FindFirstMatchingMemberInTargetList(
+		PGTargetEntry *found_tle = FindFirstMatchingMemberInTargetList(
 			(PGNode *) var, context->m_lower_table_tlist);
 
 		if (NULL == found_tle)
 		{
 			// this var is not yet provided by the lower target list, so
 			// create a new TargetEntry for it
-			PGNode *var_copy = (PGNode *) gpdb::CopyObject(var);
+			PGNode *var_copy = (PGNode *) CopyObject(var);
 			return (PGNode *) MakeVarInDerivedTable(var_copy, context);
 		}
 
@@ -1607,7 +1617,7 @@ CQueryMutators::RunWindowProjListMutator(PGNode *node,
 	{
 		// recurse into Query nodes
 		context->m_current_query_level++;
-		PGQuery *result = query_tree_mutator(
+		PGQuery *result = pg_query_tree_mutator(
 			(PGQuery *) node, (MutatorWalkerFn) RunWindowProjListMutator, context,
 			0);
 		context->m_current_query_level--;
@@ -1615,7 +1625,7 @@ CQueryMutators::RunWindowProjListMutator(PGNode *node,
 		return (PGNode *) result;
 	}
 
-	return expression_tree_mutator(
+	return pg_expression_tree_mutator(
 		node, (MutatorWalkerFn) CQueryMutators::RunWindowProjListMutator,
 		context);
 }

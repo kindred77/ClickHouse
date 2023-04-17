@@ -32,11 +32,11 @@
 #include "gpopt/base/CUtils.h"
 // #include "gpopt/gpdbwrappers.h"
 #include "gpopt/mdcache/CMDAccessor.h"
-#include "Interpreters/orcaopt/translator/CCTEListEntry.h"
-#include "Interpreters/orcaopt/translator/CTranslatorQueryToDXL.h"
-#include "Interpreters/orcaopt/translator/CTranslatorScalarToDXL.h"
-#include "Interpreters/orcaopt/translator/CTranslatorUtils.h"
-#include "Interpreters/orcaopt/translator/wrappers.h"
+#include <Interpreters/orcaopt/translator/CCTEListEntry.h>
+#include <Interpreters/orcaopt/translator/CTranslatorQueryToDXL.h>
+#include <Interpreters/orcaopt/translator/CTranslatorScalarToDXL.h>
+#include <Interpreters/orcaopt/translator/CTranslatorUtils.h>
+#include <Interpreters/orcaopt/translator/wrappers.h>
 #include "naucrates/dxl/CDXLUtils.h"
 #include "naucrates/dxl/operators/CDXLDatumBool.h"
 #include "naucrates/dxl/operators/CDXLDatumInt2.h"
@@ -52,6 +52,12 @@
 using namespace gpdxl;
 using namespace gpopt;
 using namespace duckdb_libpgquery;
+
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#else
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -299,7 +305,8 @@ CTranslatorScalarToDXL::TranslateScalarToDXL(
 		}
 		else
 		{
-			CHAR *str = (CHAR *) gpdb::NodeToString(const_cast<PGExpr *>(expr));
+			const auto& node_str = NodeToString(reinterpret_cast<PGNode *>(const_cast<PGExpr *>(expr)));
+			CHAR *str = const_cast<CHAR *>(node_str.c_str());
 			CWStringDynamic *wcstr =
 				CDXLUtils::CreateDynamicStringFromCharArray(m_mp, str);
 			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiPlStmt2DXLConversion,
@@ -522,7 +529,7 @@ CTranslatorScalarToDXL::CreateScalarArrayCompFromExpr(
 	// extract elements of an ArrayExpr, but doesn't currently know how
 	// to do it from an array-typed Const.)
 	if (IsA(right_expr, PGConst))
-		right_expr = gpdb::TransformArrayConstToArrayExpr((PGConst *) right_expr);
+		right_expr = TransformArrayConstToArrayExpr((PGConst *) right_expr);
 
 	CDXLNode *right_node = TranslateScalarToDXL(right_expr, var_colid_mapping);
 
@@ -1170,7 +1177,7 @@ CTranslatorScalarToDXL::TranslateFuncExprToDXL(
 {
 	GPOS_ASSERT(IsA(expr, PGFuncExpr));
 	const PGFuncExpr *func_expr = (PGFuncExpr *) expr;
-	int32 type_modifier = gpdb::ExprTypeMod((PGNode *) expr);
+	int32 type_modifier = ExprTypeMod((PGNode *) expr);
 
 	CMDIdGPDB *mdid_func = GPOS_NEW(m_mp) CMDIdGPDB(func_expr->funcid);
 
@@ -1233,9 +1240,9 @@ CTranslatorScalarToDXL::TranslateAggrefToDXL(
 
 	static ULONG mapping[][2] = {
 		{PG_AGGSTAGE_NORMAL, EdxlaggstageNormal},
-		{AGGSTAGE_PARTIAL, EdxlaggstagePartial},
-		{AGGSTAGE_INTERMEDIATE, EdxlaggstageIntermediate},
-		{AGGSTAGE_FINAL, EdxlaggstageFinal},
+		{PG_AGGSTAGE_PARTIAL, EdxlaggstagePartial},
+		{PG_AGGSTAGE_INTERMEDIATE, EdxlaggstageIntermediate},
+		{PG_AGGSTAGE_FINAL, EdxlaggstageFinal},
 	};
 
 	if (aggref->aggorder != NIL && !GPOS_FTRACE(EopttraceEnableOrderedAgg))
@@ -1251,17 +1258,18 @@ CTranslatorScalarToDXL::TranslateAggrefToDXL(
 		is_distinct = true;
 	}
 
-	EdxlAggrefStage agg_stage = EdxlaggstageSentinel;
-	const ULONG arity = GPOS_ARRAY_SIZE(mapping);
-	for (ULONG ul = 0; ul < arity; ul++)
-	{
-		ULONG *elem = mapping[ul];
-		if ((ULONG) aggref->aggstage == elem[0])
-		{
-			agg_stage = (EdxlAggrefStage) elem[1];
-			break;
-		}
-	}
+	// EdxlAggrefStage agg_stage = EdxlaggstageSentinel;
+	// const ULONG arity = GPOS_ARRAY_SIZE(mapping);
+	// for (ULONG ul = 0; ul < arity; ul++)
+	// {
+	// 	ULONG *elem = mapping[ul];
+	// 	if ((ULONG) aggref->aggstage == elem[0])
+	// 	{
+	// 		agg_stage = (EdxlAggrefStage) elem[1];
+	// 		break;
+	// 	}
+	// }
+	EdxlAggrefStage agg_stage = EdxlaggstageNormal;
 	GPOS_ASSERT(EdxlaggstageSentinel != agg_stage && "Invalid agg stage");
 
 	CMDIdGPDB *agg_mdid = GPOS_NEW(m_mp) CMDIdGPDB(aggref->aggfnoid);
@@ -1296,7 +1304,7 @@ CTranslatorScalarToDXL::TranslateAggrefToDXL(
 	if (aggref->aggkind == 'o' && CUtils::FIsInbuiltOrderedAgg(agg_mdid))
 	{
 		OID gp_percentile_agg_oid =
-			gpdb::GetAggregate(gp_percentile_agg_name,
+			GetAggregate(gp_percentile_agg_name,
 							   CMDIdGPDB::CastMdid(mdid_return_type)->Oid(), 4);
 		if (InvalidOid != gp_percentile_agg_oid)
 			gp_percentile_agg_mdid =
@@ -1347,8 +1355,8 @@ CTranslatorScalarToDXL::TranslateAggrefToDXL(
 		GPOS_NEW(m_mp) CDXLNode(m_mp, dargs_values);
 	foreach(lc, aggref->aggdirectargs)
 	{
-		PGExpr *expr = (PGExpr *) lfirst(lc);
-		CDXLNode *child_node = TranslateScalarToDXL(expr, var_colid_mapping);
+		PGExpr *expr_lc = (PGExpr *) lfirst(lc);
+		CDXLNode *child_node = TranslateScalarToDXL(expr_lc, var_colid_mapping);
 		GPOS_ASSERT(NULL != child_node);
 		dargs_value_list_dxlnode->AddChild(child_node);
 	}
@@ -1361,14 +1369,14 @@ CTranslatorScalarToDXL::TranslateAggrefToDXL(
 		GPOS_NEW(m_mp) CDXLNode(m_mp, sgc_values);
 	foreach(lc, aggref->aggorder)
 	{
-		PGExpr *expr = (PGExpr *) gpdb::CopyObject(lfirst(lc));
+		PGExpr *expr_lc = (PGExpr *) CopyObject(lfirst(lc));
 		// Set SortGroupClause->tleSortGroupRef to corresponding index into
 		// targetlist. This avoids needing a separate structure to store this
 		// mapping.
-		((PGSortGroupClause *) expr)->tleSortGroupRef =
-			indexes[((PGSortGroupClause *) expr)->tleSortGroupRef];
+		((PGSortGroupClause *) expr_lc)->tleSortGroupRef =
+			indexes[((PGSortGroupClause *) expr_lc)->tleSortGroupRef];
 
-		CDXLNode *child_node = TranslateScalarToDXL(expr, var_colid_mapping);
+		CDXLNode *child_node = TranslateScalarToDXL(expr_lc, var_colid_mapping);
 		GPOS_ASSERT(NULL != child_node);
 		sgc_value_list_dxlnode->AddChild(child_node);
 	}
@@ -1381,14 +1389,14 @@ CTranslatorScalarToDXL::TranslateAggrefToDXL(
 		GPOS_NEW(m_mp) CDXLNode(m_mp, aggdistinct_values);
 	foreach(lc, aggref->aggdistinct)
 	{
-		PGExpr *expr = (PGExpr *) gpdb::CopyObject(lfirst(lc));
+		PGExpr *expr_lc = (PGExpr *) CopyObject(lfirst(lc));
 		// Set SortGroupClause->tleSortGroupRef to corresponding index into
 		// targetlist. This avoids needing a separate structure to store this
 		// mapping.
-		((PGSortGroupClause *) expr)->tleSortGroupRef =
-			indexes[((PGSortGroupClause *) expr)->tleSortGroupRef];
+		((PGSortGroupClause *) expr_lc)->tleSortGroupRef =
+			indexes[((PGSortGroupClause *) expr_lc)->tleSortGroupRef];
 
-		CDXLNode *child_node = TranslateScalarToDXL(expr, var_colid_mapping);
+		CDXLNode *child_node = TranslateScalarToDXL(expr_lc, var_colid_mapping);
 		GPOS_ASSERT(NULL != child_node);
 		aggdistinct_value_list_dxlnode->AddChild(child_node);
 	}
@@ -1517,8 +1525,8 @@ CTranslatorScalarToDXL::TranslateWindowFrameEdgeToDXL(
 					  m_mp, GPOS_NEW(m_mp) CMDName(m_mp, &unnamed_col),
 					  project_element_id,
 					  GPOS_NEW(m_mp)
-						  CMDIdGPDB(gpdb::ExprType(const_cast<PGNode *>(node))),
-					  gpdb::ExprTypeMod(const_cast<PGNode *>(node))));
+						  CMDIdGPDB(ExprType(const_cast<PGNode *>(node))),
+					  ExprTypeMod(const_cast<PGNode *>(node))));
 
 		val_node = GPOS_NEW(m_mp) CDXLNode(m_mp, scalar_ident);
 	}
@@ -1571,7 +1579,7 @@ CTranslatorScalarToDXL::TranslateWindowFuncToDXL(
 	CDXLScalarWindowRef *winref_dxlop = GPOS_NEW(m_mp) CDXLScalarWindowRef(
 		m_mp, GPOS_NEW(m_mp) CMDIdGPDB(window_func->winfnoid),
 		GPOS_NEW(m_mp) CMDIdGPDB(window_func->wintype),
-		window_func->windistinct, window_func->winstar, window_func->winagg,
+		/* window_func->windistinct */ false, window_func->winstar, window_func->winagg,
 		EdxlwinstageImmediate, win_spec_pos);
 
 	// create the DXL node holding the scalar aggref
@@ -2067,7 +2075,7 @@ CTranslatorScalarToDXL::TranslateGenericDatumToDXL(CMemoryPool *mp,
 	if (!is_null)
 	{
 		length =
-			(ULONG) gpdb::DatumSize(datum, md_type->IsPassedByValue(), len);
+			(ULONG) DatumSize(datum, md_type->IsPassedByValue(), len);
 	}
 
 	CDouble double_value(0);
@@ -2107,7 +2115,7 @@ CTranslatorScalarToDXL::TranslateBoolDatumToDXL(CMemoryPool *mp,
 	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(*mdid_old);
 
 	return GPOS_NEW(mp)
-		CDXLDatumBool(mp, mdid, is_null, gpdb::BoolFromDatum(datum));
+		CDXLDatumBool(mp, mdid, is_null, BoolFromDatum(datum));
 }
 
 
@@ -2153,7 +2161,7 @@ CTranslatorScalarToDXL::TranslateInt2DatumToDXL(CMemoryPool *mp,
 	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(*mdid_old);
 
 	return GPOS_NEW(mp)
-		CDXLDatumInt2(mp, mdid, is_null, gpdb::Int16FromDatum(datum));
+		CDXLDatumInt2(mp, mdid, is_null, Int16FromDatum(datum));
 }
 
 
@@ -2176,7 +2184,7 @@ CTranslatorScalarToDXL::TranslateInt4DatumToDXL(CMemoryPool *mp,
 	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(*mdid_old);
 
 	return GPOS_NEW(mp)
-		CDXLDatumInt4(mp, mdid, is_null, gpdb::Int32FromDatum(datum));
+		CDXLDatumInt4(mp, mdid, is_null, Int32FromDatum(datum));
 }
 
 
@@ -2199,7 +2207,7 @@ CTranslatorScalarToDXL::TranslateInt8DatumToDXL(CMemoryPool *mp,
 	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(*mdid_old);
 
 	return GPOS_NEW(mp)
-		CDXLDatumInt8(mp, mdid, is_null, gpdb::Int64FromDatum(datum));
+		CDXLDatumInt8(mp, mdid, is_null, Int64FromDatum(datum));
 }
 
 
@@ -2227,7 +2235,7 @@ CTranslatorScalarToDXL::ExtractDoubleValueFromDatum(IMDId *mdid, BOOL is_null,
 	{
 		Numeric num = (Numeric)(bytes);
 
-		if (gpdb::NumericIsNan(num))
+		if (NumericIsNan(num))
 		{
 			// in GPDB NaN is considered the largest numeric number.
 			return CDouble(GPOS_FP_ABS_MAX);
@@ -2293,7 +2301,7 @@ CTranslatorScalarToDXL::ExtractByteArrayFromDatum(CMemoryPool *mp,
 		return bytes;
 	}
 
-	length = (ULONG) gpdb::DatumSize(datum, md_type->IsPassedByValue(), len);
+	length = (ULONG) DatumSize(datum, md_type->IsPassedByValue(), len);
 	GPOS_ASSERT(length > 0);
 
 	bytes = GPOS_NEW_ARRAY(mp, BYTE, length);

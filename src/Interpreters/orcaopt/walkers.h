@@ -166,6 +166,11 @@ pg_expression_tree_mutator(duckdb_libpgquery::PGNode *node,
 						duckdb_libpgquery::PGNode *(*mutator) (duckdb_libpgquery::PGNode *node, void *context),
 						void *context);
 
+extern duckdb_libpgquery::PGNode * pg_query_or_expression_tree_mutator(
+	duckdb_libpgquery::PGNode * node, 
+	duckdb_libpgquery::PGNode * (*mutator)(duckdb_libpgquery::PGNode *node, void *context),
+	void * context, int flags);
+
 extern bool
 checkExprHasSubLink(duckdb_libpgquery::PGNode *node);
 
@@ -175,6 +180,9 @@ checkExprHasSubLink_walker(duckdb_libpgquery::PGNode *node, void *context);
 extern duckdb_libpgquery::PGNode *
 pg_flatten_join_alias_vars_mutator(duckdb_libpgquery::PGNode *node,
 			void *context);
+
+extern duckdb_libpgquery::PGQuery *
+pg_flatten_join_alias_var_optimizer(duckdb_libpgquery::PGQuery *query, int queryLevel);
 
 extern duckdb_libpgquery::PGNode **
 rtable_to_array(duckdb_libpgquery::PGList *rtable);

@@ -45,10 +45,10 @@
 #include "naucrates/statistics/CStatisticsUtils.h"
 
 // fwd decl
-struct RelationData;
-typedef struct RelationData *Relation;
-struct LogicalIndexes;
-struct LogicalIndexInfo;
+// struct RelationData;
+// typedef struct RelationData *Relation;
+// struct LogicalIndexes;
+// struct LogicalIndexInfo;
 
 namespace gpdxl
 {
@@ -220,7 +220,7 @@ private:
 		ULONG num_mcv_values, const Datum *hist_values, ULONG num_hist_values);
 
 	// get partition keys and types for a relation
-	static void RetrievePartKeysAndTypes(CMemoryPool *mp, Relation rel, OID oid,
+	static void RetrievePartKeysAndTypes(CMemoryPool *mp, PGRelationPtr rel, OID oid,
 										 ULongPtrArray **part_keys,
 										 CharPtrArray **part_types);
 
@@ -240,18 +240,18 @@ private:
 
 	// get the relation columns
 	static CMDColumnArray *RetrieveRelColumns(
-		CMemoryPool *mp, CMDAccessor *md_accessor, Relation rel,
+		CMemoryPool *mp, CMDAccessor *md_accessor, PGRelationPtr rel,
 		IMDRelation::Erelstoragetype rel_storage_type);
 
 	// return the dxl representation of the column's default value
 	static CDXLNode *GetDefaultColumnValue(CMemoryPool *mp,
 										   CMDAccessor *md_accessor,
-										   TupleDesc rd_att, AttrNumber attrno);
+										   PGTupleDescPtr rd_att, PGAttrNumber attrno);
 
 
 	// get the distribution columns
 	static ULongPtrArray *RetrieveRelDistributionCols(
-		CMemoryPool *mp, GpPolicy *gp_policy, CMDColumnArray *mdcol_array,
+		CMemoryPool *mp, PGPolicyPtr gp_policy, CMDColumnArray *mdcol_array,
 		ULONG size);
 
 	// construct a mapping GPDB attnos -> position in the column array
@@ -260,22 +260,22 @@ private:
 										ULONG max_cols);
 
 	// check if index is supported
-	static BOOL IsIndexSupported(Relation index_rel);
+	static BOOL IsIndexSupported(PGRelationPtr index_rel);
 
 	// retrieve index info list of partitioned table
-	static List *RetrievePartTableIndexInfo(Relation rel);
+	static duckdb_libpgquery::PGList *RetrievePartTableIndexInfo(PGRelationPtr rel);
 
 	// compute the array of included columns
 	static ULongPtrArray *ComputeIncludedCols(CMemoryPool *mp,
 											  const IMDRelation *md_rel);
 
 	// is given level included in the default partitions
-	static BOOL LevelHasDefaultPartition(List *default_levels, ULONG level);
+	static BOOL LevelHasDefaultPartition(duckdb_libpgquery::PGList *default_levels, ULONG level);
 
 	// retrieve part constraint for index
 	static CMDPartConstraintGPDB *RetrievePartConstraintForIndex(
 		CMemoryPool *mp, CMDAccessor *md_accessor, const IMDRelation *md_rel,
-		Node *part_constraint, ULongPtrArray *level_with_default_part_array,
+		duckdb_libpgquery::PGNode *part_constraint, ULongPtrArray *level_with_default_part_array,
 		BOOL is_unbounded);
 
 	// retrieve part constraint for relation
@@ -286,44 +286,44 @@ private:
 	// retrieve part constraint from a GPDB node
 	static CMDPartConstraintGPDB *RetrievePartConstraintFromNode(
 		CMemoryPool *mp, CMDAccessor *md_accessor,
-		CDXLColDescrArray *dxl_col_descr_array, Node *part_constraint,
+		CDXLColDescrArray *dxl_col_descr_array, duckdb_libpgquery::PGNode *part_constraint,
 		ULongPtrArray *level_with_default_part_array, BOOL is_unbounded);
 
 	// return relation name
-	static CMDName *GetRelName(CMemoryPool *mp, Relation rel);
+	static CMDName *GetRelName(CMemoryPool *mp, PGRelationPtr rel);
 
 	// return the index info list defined on the given relation
 	static CMDIndexInfoArray *RetrieveRelIndexInfo(CMemoryPool *mp,
-												   Relation rel);
+												   PGRelationPtr rel);
 
 	// return index info list of indexes defined on a partitioned table
 	static CMDIndexInfoArray *RetrieveRelIndexInfoForPartTable(
-		CMemoryPool *mp, Relation root_rel);
+		CMemoryPool *mp, PGRelationPtr root_rel);
 
 	// return index info list of indexes defined on regular, external tables or leaf partitions
 	static CMDIndexInfoArray *RetrieveRelIndexInfoForNonPartTable(
-		CMemoryPool *mp, Relation rel);
+		CMemoryPool *mp, PGRelationPtr rel);
 
 	// retrieve an index over a partitioned table from the relcache
 	static IMDIndex *RetrievePartTableIndex(CMemoryPool *mp,
 											CMDAccessor *md_accessor,
 											IMDId *mdid_index,
 											const IMDRelation *md_rel,
-											LogicalIndexes *logical_indexes);
+											PGLogicalIndexes *logical_indexes);
 
 	// lookup an index given its id from the logical indexes structure
-	static LogicalIndexInfo *LookupLogicalIndexById(
-		LogicalIndexes *logical_indexes, OID oid);
+	static PGLogicalIndexInfo *LookupLogicalIndexById(
+		PGLogicalIndexes *logical_indexes, OID oid);
 
 	// construct an MD cache index object given its logical index representation
 	static IMDIndex *RetrievePartTableIndex(CMemoryPool *mp,
 											CMDAccessor *md_accessor,
-											LogicalIndexInfo *index_info,
+											PGLogicalIndexInfo *index_info,
 											IMDId *mdid_index,
 											const IMDRelation *md_rel);
 
 	// return the triggers defined on the given relation
-	static IMdIdArray *RetrieveRelTriggers(CMemoryPool *mp, Relation rel);
+	// static IMdIdArray *RetrieveRelTriggers(CMemoryPool *mp, PGRelationPtr rel);
 
 	// return the check constraints defined on the relation with the given oid
 	static IMdIdArray *RetrieveRelCheckConstraints(CMemoryPool *mp, OID oid);
@@ -346,7 +346,7 @@ private:
 											   IMDId *mdid_index);
 
 	static IMdIdArray *RetrieveRelDistributionOpFamilies(CMemoryPool *mp,
-														 GpPolicy *policy);
+														 PGPolicyPtr policy);
 
 	static IMdIdArray *RetrieveRelExternalPartitions(CMemoryPool *mp,
 													 OID rel_oid);
@@ -358,7 +358,7 @@ private:
 	// generate statistics for the system level columns
 	static CDXLColStats *GenerateStatsForSystemCols(
 		CMemoryPool *mp, OID rel_oid, CMDIdColStats *mdid_col_stats,
-		CMDName *md_colname, OID att_type, AttrNumber attrnum,
+		CMDName *md_colname, OID att_type, PGAttrNumber attrnum,
 		CDXLBucketArray *dxl_stats_bucket_array, CDouble rows);
 
 public:
@@ -373,15 +373,15 @@ public:
 
 	// add system columns (oid, tid, xmin, etc) in table descriptors
 	static void AddSystemColumns(CMemoryPool *mp, CMDColumnArray *mdcol_array,
-								 Relation rel, BOOL is_ao_table);
+								 PGRelationPtr rel, BOOL is_ao_table);
 
 	// retrieve an index from the relcache
-	static IMDIndex *RetrieveIndex(CMemoryPool *mp, CMDAccessor *md_accessor,
-								   IMDId *mdid_index);
+	// static IMDIndex *RetrieveIndex(CMemoryPool *mp, CMDAccessor *md_accessor,
+	// 							   IMDId *mdid_index);
 
 	// retrieve a check constraint from the relcache
-	static CMDCheckConstraintGPDB *RetrieveCheckConstraints(
-		CMemoryPool *mp, CMDAccessor *md_accessor, IMDId *mdid);
+	// static CMDCheckConstraintGPDB *RetrieveCheckConstraints(
+	// 	CMemoryPool *mp, CMDAccessor *md_accessor, IMDId *mdid);
 
 	// populate the attribute number to position mapping
 	static ULONG *PopulateAttnoPositionMap(CMemoryPool *mp,
@@ -404,13 +404,13 @@ public:
 	static CMDAggregateGPDB *RetrieveAgg(CMemoryPool *mp, IMDId *mdid);
 
 	// retrieve a trigger from the relcache
-	static CMDTriggerGPDB *RetrieveTrigger(CMemoryPool *mp, IMDId *mdid);
+	// static CMDTriggerGPDB *RetrieveTrigger(CMemoryPool *mp, IMDId *mdid);
 
 	// translate GPDB comparison type
 	static IMDType::ECmpType ParseCmpType(ULONG cmpt);
 
 	// get the distribution policy of the relation
-	static IMDRelation::Ereldistrpolicy GetRelDistribution(GpPolicy *gp_policy);
+	static IMDRelation::Ereldistrpolicy GetRelDistribution(PGPolicyPtr gp_policy);
 };
 }  // namespace gpdxl
 

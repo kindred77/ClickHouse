@@ -1769,6 +1769,17 @@ pg_expression_tree_mutator(PGNode *node,
 	return NULL;
 };
 
+PGNode * pg_query_or_expression_tree_mutator(
+	PGNode * node, 
+	PGNode * (*mutator)(duckdb_libpgquery::PGNode *node, void *context),
+	void * context, int flags)
+{
+    if (node && IsA(node, PGQuery))
+        return (PGNode *)pg_query_tree_mutator((PGQuery *)node, mutator, context, flags);
+    else
+        return mutator(node, context);
+};
+
 PGList *
 pg_range_table_mutator(PGList *rtable,
 					PGNode *(*mutator) (PGNode *node, void *context),
@@ -2072,6 +2083,147 @@ pg_flatten_join_alias_vars(PGPlannerInfo *root, PGNode *node)
     context.root_parse_rtable_arrray = rtable_to_array(root->parse->rtable);
 
     return pg_flatten_join_alias_vars_mutator(node, &context);
+};
+
+/*
+ * flatten_join_alias_var_optimizer
+ *	  Replace Vars that reference JOIN outputs with references to the original
+ *	  relation variables instead.
+ */
+PGQuery *
+pg_flatten_join_alias_var_optimizer(PGQuery *query, int queryLevel)
+{
+	PGQuery *queryNew = (PGQuery *) copyObject(query);
+
+	/* Create a PlannerInfo data structure for this subquery */
+	PGPlannerInfo *root = makeNode(PGPlannerInfo);
+	root->parse = queryNew;
+	root->query_level = queryLevel;
+
+	root->glob = makeNode(PGPlannerGlobal);
+	//root->glob->boundParams = NULL;
+	root->glob->subplans = NIL;
+	root->glob->subroots = NIL;
+	root->glob->finalrtable = NIL;
+	root->glob->relationOids = NIL;
+	root->glob->invalItems = NIL;
+	root->glob->transientPlan = false;
+	root->glob->nParamExec = 0;
+
+	//root->config = DefaultPlannerConfig();
+	root->config = new PGPlannerConfig;
+
+	root->parent_root = NULL;
+	//root->planner_cxt = CurrentMemoryContext;
+	root->init_plans = NIL;
+
+	root->list_cteplaninfo = NIL;
+	root->join_info_list = NIL;
+	root->append_rel_list = NIL;
+
+	root->hasJoinRTEs = false;
+
+	PGListCell *plc = NULL;
+	foreach(plc, queryNew->rtable)
+	{
+		PGRangeTblEntry *rte = (PGRangeTblEntry *) lfirst(plc);
+
+		if (rte->rtekind == PG_RTE_JOIN)
+		{
+			root->hasJoinRTEs = true;
+			if (IS_OUTER_JOIN(rte->jointype))
+			{
+				break;
+			}
+		}
+	}
+
+	/*
+	 * Flatten join alias for expression in
+	 * 1. targetlist
+	 * 2. returningList
+	 * 3. having qual
+	 * 4. scatterClause
+	 * 5. limit offset
+	 * 6. limit count
+	 * 
+	 * We flatten the above expressions since these entries may be moved during the query 
+	 * normalization step before algebrization. In contrast, the planner flattens alias 
+	 * inside quals to allow predicates involving such vars to be pushed down. 
+	 * 
+	 * Here we ignore the flattening of quals due to the following reasons:
+	 * 1. we assume that the function will be called before Query->DXL translation:
+	 * 2. the quals never gets moved from old query to the new top-level query in the 
+	 * query normalization phase before algebrization. In other words, the quals hang of 
+	 * the same query structure that is now the new derived table.
+	 * 3. the algebrizer can resolve the abiquity of join aliases in quals since we maintain 
+	 * all combinations of <query level, varno, varattno> to DXL-ColId during Query->DXL translation.
+	 * 
+	 */
+
+	PGList *targetList = queryNew->targetList;
+	if (NIL != targetList)
+	{
+		queryNew->targetList = (PGList *) pg_flatten_join_alias_vars(root, (PGNode *) targetList);
+		pfree(targetList);
+	}
+
+	PGList * returningList = queryNew->returningList;
+	if (NIL != returningList)
+	{
+		queryNew->returningList = (PGList *) pg_flatten_join_alias_vars(root, (PGNode *) returningList);
+		pfree(returningList);
+	}
+
+	PGNode *havingQual = queryNew->havingQual;
+	if (NULL != havingQual)
+	{
+		queryNew->havingQual = pg_flatten_join_alias_vars(root, havingQual);
+		pfree(havingQual);
+	}
+
+	// PGList *scatterClause = queryNew->scatterClause;
+	// if (NIL != scatterClause)
+	// {
+	// 	queryNew->scatterClause = (PGList *) pg_flatten_join_alias_vars(root, (PGNode *) scatterClause);
+	// 	pfree(scatterClause);
+	// }
+
+	PGNode *limitOffset = queryNew->limitOffset;
+	if (NULL != limitOffset)
+	{
+		queryNew->limitOffset = pg_flatten_join_alias_vars(root, limitOffset);
+		pfree(limitOffset);
+	}
+
+	PGList *windowClause = queryNew->windowClause;
+	if (NIL != queryNew->windowClause)
+	{
+		PGListCell *l;
+
+		foreach (l, windowClause)
+		{
+			PGWindowClause *wc = (PGWindowClause *) lfirst(l);
+
+			if (wc == NULL)
+				continue;
+
+			if (wc->startOffset)
+				wc->startOffset = pg_flatten_join_alias_vars(root, wc->startOffset);
+
+			if (wc->endOffset)
+				wc->endOffset = pg_flatten_join_alias_vars(root, wc->endOffset);
+		}
+	}
+
+	PGNode *limitCount = queryNew->limitCount;
+	if (NULL != limitCount)
+	{
+		queryNew->limitCount = pg_flatten_join_alias_vars(root, limitCount);
+		pfree(limitCount);
+	}
+
+    return queryNew;
 };
 
 bool cdb_walk_vars_walker(PGNode * node, void * wvwcontext)

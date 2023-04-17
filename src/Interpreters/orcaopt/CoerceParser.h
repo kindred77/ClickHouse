@@ -5,35 +5,6 @@
 namespace DB
 {
 
-/* Result codes for find_coercion_pathway */
-typedef enum
-{
-	COERCION_PATH_NONE,			/* failed to find any coercion pathway */
-	COERCION_PATH_FUNC,			/* apply the specified coercion function */
-	COERCION_PATH_RELABELTYPE,	/* binary-compatible cast, no function */
-	COERCION_PATH_ARRAYCOERCE,	/* need an ArrayCoerceExpr node */
-	COERCION_PATH_COERCEVIAIO	/* need a CoerceViaIO node */
-} CoercionPathType;
-
-typedef enum
-{
-	COERCION_CODE_IMPLICIT = 'i',		/* coercion in context of expression */
-	COERCION_CODE_ASSIGNMENT = 'a',		/* coercion in context of assignment */
-	COERCION_CODE_EXPLICIT = 'e'	/* explicit cast operation */
-} CoercionCodes;
-
-/*
- * The allowable values for pg_cast.castmethod are specified by this enum.
- * Since castmethod is stored as a "char", we use ASCII codes for human
- * convenience in reading the table.
- */
-typedef enum
-{
-	COERCION_METHOD_FUNCTION = 'f',		/* use a function */
-	COERCION_METHOD_BINARY = 'b',		/* types are binary-compatible */
-	COERCION_METHOD_INOUT = 'i' /* use input/output functions */
-} CoercionMethod;
-
 class RelationParser;
 class TypeParser;
 class NodeParser;
@@ -96,12 +67,12 @@ public:
 	can_coerce_type(int nargs, const Oid *input_typeids, const Oid *target_typeids,
 				duckdb_libpgquery::PGCoercionContext ccontext);
 
-	CoercionPathType
+	PGCoercionPathType
 	find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
 					  duckdb_libpgquery::PGCoercionContext ccontext,
 					  Oid *funcid);
 
-	CoercionPathType
+	PGCoercionPathType
 	find_typmod_coercion_function(Oid typeId,
 							  Oid *funcid);
 
@@ -121,7 +92,7 @@ public:
 
     duckdb_libpgquery::PGNode * build_coercion_expression(
         duckdb_libpgquery::PGNode * node,
-        CoercionPathType pathtype,
+        PGCoercionPathType pathtype,
         Oid funcId,
         Oid targetTypeId,
         int32 targetTypMod,
