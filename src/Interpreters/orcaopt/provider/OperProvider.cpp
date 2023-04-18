@@ -2400,6 +2400,7 @@ PGSortGroupOperPtr OperProvider::get_sort_grp_oper_by_typeid(Oid type_id)
     result->eq_opr = type_entry->eq_opr;
     result->gt_opr = type_entry->gt_opr;
     result->hash_proc = type_entry->hash_proc;
+    result->cmp_proc = type_entry->cmp_proc;
 
 
     return result;

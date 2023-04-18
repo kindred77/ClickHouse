@@ -307,3 +307,5 @@
 #define PG_BITMAP_AM_OID 7013
 #define PG_GIST_AM_OID 783
 #define PG_GIN_AM_OID 2742
+
+#define PG_COUNT_ANY_OID 2147

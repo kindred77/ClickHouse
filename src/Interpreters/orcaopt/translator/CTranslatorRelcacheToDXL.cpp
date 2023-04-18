@@ -67,6 +67,16 @@
 #include "naucrates/md/CMDTypeInt8GPDB.h"
 #include "naucrates/md/CMDTypeOidGPDB.h"
 
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunreachable-code-return"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunreachable-code-break"
+#else
+#pragma GCC diagnostic ignored "-Wunreachable-code-return"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunreachable-code-break"
+#endif
+
 using namespace gpdxl;
 using namespace gpopt;
 using namespace duckdb_libpgquery;
@@ -1599,7 +1609,7 @@ CTranslatorRelcacheToDXL::RetrieveType(CMemoryPool *mp, IMDId *mdid)
 	// 			 TYPECACHE_CMP_PROC | TYPECACHE_EQ_OPR_FINFO |
 	// 			 TYPECACHE_CMP_PROC_FINFO | TYPECACHE_TUPDESC;
 
-	auto ptce = LookupTypeCache(oid_type, iFlags);
+	auto ptce = LookupTypeCache(oid_type/* , iFlags */);
 
 	// get type name
 	CMDName *mdname = GetTypeName(mp, mdid);
@@ -1642,7 +1652,7 @@ CTranslatorRelcacheToDXL::RetrieveType(CMemoryPool *mp, IMDId *mdid)
 		GPOS_NEW(mp) CMDIdGPDB(GetAggregate("sum", oid_type, 1));
 
 	// count aggregate is the same for all types
-	CMDIdGPDB *mdid_count = GPOS_NEW(mp) CMDIdGPDB(COUNT_ANY_OID);
+	CMDIdGPDB *mdid_count = GPOS_NEW(mp) CMDIdGPDB(PG_COUNT_ANY_OID);
 
 	// check if type is composite
 	CMDIdGPDB *mdid_type_relid = NULL;
@@ -1730,7 +1740,7 @@ CTranslatorRelcacheToDXL::RetrieveScOp(CMemoryPool *mp, IMDId *mdid)
 	}
 
 	// get comparison type
-	PGCmpType cmpt = (PGCmpType) GetComparisonType(op_oid);
+	PGCmpType cmpt = (PGCmpType) WrapperGetComparisonType(op_oid);
 	IMDType::ECmpType cmp_type = ParseCmpType(cmpt);
 
 	// get func oid
@@ -2108,7 +2118,7 @@ CTranslatorRelcacheToDXL::GetTypeName(CMemoryPool *mp, IMDId *mdid)
 
 	GPOS_ASSERT(InvalidOid != oid_type);
 
-	CHAR *typename_str = GetTypeName(oid_type);
+	CHAR *typename_str = WrapperGetTypeName(oid_type);
 	GPOS_ASSERT(NULL != typename_str);
 
 	CWStringDynamic *str_name =
@@ -2250,9 +2260,9 @@ CTranslatorRelcacheToDXL::RetrieveRelStats(CMemoryPool *mp, IMDId *mdid)
 	GPOS_TRY
 	{
 		// get rel name
-		CHAR *relname = NameStr(rel->rd_rel->relname);
+		//CHAR *relname = NameStr(rel->rd_rel->relname);
 		CWStringDynamic *relname_str =
-			CDXLUtils::CreateDynamicStringFromCharArray(mp, relname);
+			CDXLUtils::CreateDynamicStringFromCharArray(mp, rel->rd_rel->relname.c_str());
 		mdname = GPOS_NEW(mp) CMDName(mp, relname_str);
 		// CMDName ctor created a copy of the string
 		GPOS_DELETE(relname_str);
@@ -2391,12 +2401,12 @@ CTranslatorRelcacheToDXL::RetrieveColStats(CMemoryPool *mp,
 	BOOL is_dummy_stats = false;
 	// most common values and their frequencies extracted from the pg_statistic
 	// tuple for a given column
-	PGAttStatsSlot mcv_slot;
+	PGAttStatsSlotPtr mcv_slot;
 
 	(void) GetAttrStatsSlot(mcv_slot, stats_tup, PG_STATISTIC_KIND_MCV,
 								  InvalidOid,
 								  PG_ATTSTATSSLOT_VALUES | PG_ATTSTATSSLOT_NUMBERS);
-	if (InvalidOid != mcv_slot.valuetype && mcv_slot.valuetype != att_type)
+	if (InvalidOid != mcv_slot->valuetype && mcv_slot->valuetype != att_type)
 	{
 		char msgbuf[NAMEDATALEN * 2 + 100];
 		snprintf(
@@ -2404,14 +2414,14 @@ CTranslatorRelcacheToDXL::RetrieveColStats(CMemoryPool *mp,
 			"Type mismatch between attribute %ls of table %ls having type %d and statistic having type %d, please ANALYZE the table again",
 			md_col->Mdname().GetMDName()->GetBuffer(),
 			md_rel->Mdname().GetMDName()->GetBuffer(), att_type,
-			mcv_slot.valuetype);
+			mcv_slot->valuetype);
 		GpdbEreport(ERRCODE_SUCCESSFUL_COMPLETION, NOTICE, msgbuf, NULL);
 
-		FreeAttrStatsSlot(&mcv_slot);
+		//FreeAttrStatsSlot(mcv_slot);
 		is_dummy_stats = true;
 	}
 
-	else if (mcv_slot.nvalues != mcv_slot.nnumbers)
+	else if (mcv_slot->nvalues != mcv_slot->nnumbers)
 	{
 		char msgbuf[NAMEDATALEN * 2 + 100];
 		snprintf(
@@ -2422,32 +2432,32 @@ CTranslatorRelcacheToDXL::RetrieveColStats(CMemoryPool *mp,
 		GpdbEreport(ERRCODE_SUCCESSFUL_COMPLETION, NOTICE, msgbuf, NULL);
 
 		// if the number of MCVs(nvalues) and number of MCFs(nnumbers) do not match, we discard the MCVs and MCFs
-		FreeAttrStatsSlot(&mcv_slot);
+		//FreeAttrStatsSlot(mcv_slot);
 		is_dummy_stats = true;
 	}
 	else
 	{
 		// fix mcv and null frequencies (sometimes they can add up to more than 1.0)
-		NormalizeFrequencies(mcv_slot.numbers, (ULONG) mcv_slot.nvalues,
+		NormalizeFrequencies(mcv_slot->numbers, (ULONG) mcv_slot->nvalues,
 							 &null_freq);
 
 		// total MCV frequency
 		CDouble sum_mcv_freq = 0.0;
-		for (int i = 0; i < mcv_slot.nvalues; i++)
+		for (int i = 0; i < mcv_slot->nvalues; i++)
 		{
-			sum_mcv_freq = sum_mcv_freq + CDouble(mcv_slot.numbers[i]);
+			sum_mcv_freq = sum_mcv_freq + CDouble(mcv_slot->numbers[i]);
 		}
 	}
 
 	// histogram values extracted from the pg_statistic tuple for a given column
-	PGAttStatsSlot hist_slot;
+	PGAttStatsSlotPtr hist_slot;
 
 	// get histogram datums from pg_statistic entry
 	(void) GetAttrStatsSlot(hist_slot, stats_tup,
 								  PG_STATISTIC_KIND_HISTOGRAM, InvalidOid,
 								  PG_ATTSTATSSLOT_VALUES);
 
-	if (InvalidOid != hist_slot.valuetype && hist_slot.valuetype != att_type)
+	if (InvalidOid != hist_slot->valuetype && hist_slot->valuetype != att_type)
 	{
 		char msgbuf[NAMEDATALEN * 2 + 100];
 		snprintf(
@@ -2455,10 +2465,10 @@ CTranslatorRelcacheToDXL::RetrieveColStats(CMemoryPool *mp,
 			"Type mismatch between attribute %ls of table %ls having type %d and statistic having type %d, please ANALYZE the table again",
 			md_col->Mdname().GetMDName()->GetBuffer(),
 			md_rel->Mdname().GetMDName()->GetBuffer(), att_type,
-			hist_slot.valuetype);
+			hist_slot->valuetype);
 		GpdbEreport(ERRCODE_SUCCESSFUL_COMPLETION, NOTICE, msgbuf, NULL);
 
-		FreeAttrStatsSlot(&hist_slot);
+		//FreeAttrStatsSlot(&hist_slot);
 		is_dummy_stats = true;
 	}
 
@@ -2482,9 +2492,9 @@ CTranslatorRelcacheToDXL::RetrieveColStats(CMemoryPool *mp,
 	// to a single bucket structure
 	CDXLBucketArray *dxl_stats_bucket_array_transformed =
 		TransformStatsToDXLBucketArray(
-			mp, att_type, num_distinct, null_freq, mcv_slot.values,
-			mcv_slot.numbers, ULONG(mcv_slot.nvalues), hist_slot.values,
-			ULONG(hist_slot.nvalues));
+			mp, att_type, num_distinct, null_freq, mcv_slot->values,
+			mcv_slot->numbers, ULONG(mcv_slot->nvalues), hist_slot->values,
+			ULONG(hist_slot->nvalues));
 
 	GPOS_ASSERT(NULL != dxl_stats_bucket_array_transformed);
 
@@ -2512,8 +2522,8 @@ CTranslatorRelcacheToDXL::RetrieveColStats(CMemoryPool *mp,
 	}
 
 	// free up allocated datum and float4 arrays
-	FreeAttrStatsSlot(&mcv_slot);
-	FreeAttrStatsSlot(&hist_slot);
+	//FreeAttrStatsSlot(&mcv_slot);
+	//FreeAttrStatsSlot(&hist_slot);
 
 	//gpdb::FreeHeapTuple(stats_tup);
 
@@ -2674,7 +2684,7 @@ CTranslatorRelcacheToDXL::RetrieveCast(CMemoryPool *mp, IMDId *mdid)
 	else
 	{
 		// no explicit cast function: use the destination type name as the cast name
-		func_name = GetTypeName(dest_oid);
+		func_name = WrapperGetTypeName(dest_oid);
 	}
 
 	if (NULL == func_name)
@@ -3366,14 +3376,14 @@ CTranslatorRelcacheToDXL::RetrievePartConstraintForRel(
 	PGNode *node;
 
 	if (!GPOS_FTRACE(EopttraceEnableExternalPartitionedTables) ||
-		gpdb::RelPartIsRoot(rel_oid))
+		RelPartIsRoot(rel_oid))
 	{
-		node = gpdb::GetRelationPartContraints(rel_oid, &default_levels_rel);
+		node = GetRelationPartContraints(rel_oid, &default_levels_rel);
 	}
-	else if (gpdb::IsLeafPartition(rel_oid))
+	else if (IsLeafPartition(rel_oid))
 	{
 		GPOS_ASSERT(GPOS_FTRACE(EopttraceEnableExternalPartitionedTables));
-		node = gpdb::GetLeafPartContraints(rel_oid, &default_levels_rel);
+		node = GetLeafPartContraints(rel_oid, &default_levels_rel);
 	}
 	else
 	{
@@ -3388,9 +3398,9 @@ CTranslatorRelcacheToDXL::RetrievePartConstraintForRel(
 		return NULL;
 	}
 
-	PGList *part_keys = gpdb::GetPartitionAttrs(rel_oid);
-	const ULONG num_of_levels = gpdb::ListLength(part_keys);
-	gpdb::ListFree(part_keys);
+	PGList *part_keys = GetPartitionAttrs(rel_oid);
+	const ULONG num_of_levels = ListLength(part_keys);
+	ListFree(part_keys);
 
 	BOOL is_unbounded = true;
 	ULongPtrArray *default_levels_derived = GPOS_NEW(mp) ULongPtrArray(mp);
@@ -3409,7 +3419,7 @@ CTranslatorRelcacheToDXL::RetrievePartConstraintForRel(
 	CMDPartConstraintGPDB *mdpart_constraint = NULL;
 
 	// FIXME: Deal with default partitions for external tables
-	if (gpdb::IsLeafPartition(rel_oid))
+	if (IsLeafPartition(rel_oid))
 	{
 		is_unbounded = false;
 	}
@@ -3451,7 +3461,7 @@ CTranslatorRelcacheToDXL::RetrievePartConstraintForRel(
 		dxl_col_descr_array->Release();
 	}
 
-	gpdb::ListFree(default_levels_rel);
+	ListFree(default_levels_rel);
 	default_levels_derived->Release();
 
 	return mdpart_constraint;
@@ -3468,7 +3478,7 @@ CTranslatorRelcacheToDXL::RetrievePartConstraintForRel(
 CMDPartConstraintGPDB *
 CTranslatorRelcacheToDXL::RetrievePartConstraintFromNode(
 	CMemoryPool *mp, CMDAccessor *md_accessor,
-	CDXLColDescrArray *dxl_col_descr_array, Node *part_constraints,
+	CDXLColDescrArray *dxl_col_descr_array, PGNode *part_constraints,
 	ULongPtrArray *level_with_default_part_array, BOOL is_unbounded)
 {
 	if (NULL == part_constraints)
@@ -3485,7 +3495,7 @@ CTranslatorRelcacheToDXL::RetrievePartConstraintFromNode(
 	// translate the check constraint expression
 	CDXLNode *scalar_dxlnode =
 		CTranslatorScalarToDXL::TranslateStandaloneExprToDXL(
-			mp, md_accessor, var_colid_mapping, (Expr *) part_constraints);
+			mp, md_accessor, var_colid_mapping, (PGExpr *) part_constraints);
 
 	// cleanup
 	GPOS_DELETE(var_colid_mapping);
@@ -3571,7 +3581,7 @@ CTranslatorRelcacheToDXL::RetrieveIndexOpFamilies(CMemoryPool *mp,
 												  IMDId *mdid_index)
 {
 	PGList *op_families =
-		gpdb::GetIndexOpFamilies(CMDIdGPDB::CastMdid(mdid_index)->Oid());
+		GetIndexOpFamilies(CMDIdGPDB::CastMdid(mdid_index)->Oid());
 	IMdIdArray *input_col_mdids = GPOS_NEW(mp) IMdIdArray(mp);
 
 	PGListCell *lc = NULL;
@@ -3598,7 +3608,7 @@ CTranslatorRelcacheToDXL::RetrieveScOpOpFamilies(CMemoryPool *mp,
 												 IMDId *mdid_scalar_op)
 {
 	PGList *op_families =
-		gpdb::GetOpFamiliesForScOp(CMDIdGPDB::CastMdid(mdid_scalar_op)->Oid());
+		GetOpFamiliesForScOp(CMDIdGPDB::CastMdid(mdid_scalar_op)->Oid());
 	IMdIdArray *input_col_mdids = GPOS_NEW(mp) IMdIdArray(mp);
 
 	PGListCell *lc = NULL;

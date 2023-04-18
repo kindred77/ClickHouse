@@ -33,6 +33,11 @@ using namespace duckdb_libpgquery;
 // 	}                                                      \
 // 	}
 
+PGList *LPrependInt(int datum, PGList *list)
+{
+	return NULL;
+};
+
 PGListCell *
 ListHead(PGList *l)
 {
@@ -213,6 +218,11 @@ bool
 RelPartIsRoot(Oid relid)
 {
 	return false;
+};
+
+PGNode* GetLeafPartContraints(Oid rel_oid, PGList **default_levels)
+{
+	return NULL;
 };
 
 PGRelationPtr
@@ -412,6 +422,11 @@ MakeVar(PGIndex varno, PGAttrNumber varattno, Oid vartype, int32 vartypmod,
     return makeVar(varno, varattno, vartype, vartypmod, collation, varlevelsup);
 };
 
+PGValue* MakeStringValue(char *str)
+{
+	return NULL;
+};
+
 PGQuery *
 FlattenJoinAliasVar(PGQuery *query, gpos::ULONG query_level)
 {
@@ -461,7 +476,7 @@ bool IsTextRelatedType(Oid typid)
 	return false;
 };
 
-PGTypePtr LookupTypeCache(Oid type_id, int flags)
+PGTypePtr LookupTypeCache(Oid type_id/* , int flags */)
 {
 	return NULL;
 };
@@ -496,7 +511,7 @@ void GetOpInputTypes(Oid opno, Oid *lefttype, Oid *righttype)
 	return;
 };
 
-unsigned int GetComparisonType(Oid op_oid)
+unsigned int WrapperGetComparisonType(Oid op_oid)
 {
 	return 0;
 };
@@ -591,7 +606,7 @@ bool IsAggPartialCapable(Oid aggid)
 	return false;
 };
 
-char * GetTypeName(Oid typid)
+char * WrapperGetTypeName(Oid typid)
 {
 	return NULL;
 };
@@ -606,7 +621,7 @@ double CdbEstimatePartitionedNumTuples(PGRelationPtr rel)
 	return 0.0;
 };
 
-bool GetAttrStatsSlot(PGAttStatsSlot& sslot,
+bool GetAttrStatsSlot(PGAttStatsSlotPtr& sslot,
 	PGStatisticPtr statstuple, int reqkind, Oid reqop, int flags)
 {
 	return false;
@@ -663,7 +678,120 @@ int64 Int64FromDatum(Datum d)
 	return 0;
 };
 
-bool NumericIsNan(Numeric num)
+bool NumericIsNan(PGNumeric* num)
+{
+	return PG_NUMERIC_IS_NAN(num);
+};
+
+float4 Float4FromDatum(Datum d)
+{
+	return 0.0;
+};
+
+float8 Float8FromDatum(Datum d)
+{
+	return 0.0;
+};
+
+Oid OidFromDatum(Datum d)
+{
+	return 0;
+};
+
+double NumericToDoubleNoOverflow(PGNumeric* num)
+{
+	return 0.0;
+};
+
+double ConvertTimeValueToScalar(Datum datum, Oid typid)
+{
+	return 0.0;
+};
+
+double ConvertNetworkToScalar(Datum datum, Oid typid)
+{
+	return 0.0;
+};
+
+void * PointerFromDatum(Datum d)
+{
+	return NULL;
+};
+
+uint32 UUIDHash(Datum d)
+{
+	return 0;
+};
+
+uint32 HashBpChar(Datum d)
+{
+	return 0;
+};
+
+uint32 HashChar(Datum d)
+{
+	return 0;
+};
+
+uint32 HashName(Datum d)
+{
+	return 0;
+};
+
+uint32 HashText(Datum d)
+{
+	return 0;
+};
+
+PGList * GetFuncArgTypes(Oid funcid)
+{
+	return NULL;
+};
+
+bool ResolvePolymorphicArgType(int numargs, Oid *argtypes, char *argmodes,
+								PGFuncExpr *call_expr)
 {
 	return false;
+};
+
+PGNode *
+CoerceToCommonType(PGParseState *pstate, PGNode *node, Oid target_type,
+						 const char *context)
+{
+	return NULL;
+};
+
+PGList *
+FindMatchingMembersInTargetList(PGNode *node, PGList *targetlist)
+{
+	return NULL;
+};
+
+void * GPDBAlloc(size_t size)
+{
+	return NULL;
+};
+
+void CheckRTPermissions(PGList *rtable)
+{
+	return;
+};
+
+void GpdbEreportImpl(int xerrcode, int severitylevel, const char *xerrmsg,
+					 const char *xerrhint, const char *filename, int lineno,
+					 const char *funcname)
+{
+	// if (errstart(severitylevel, filename, lineno, funcname, TEXTDOMAIN))
+	// 		errfinish(errcode(xerrcode), errmsg("%s", xerrmsg),
+	// 				  xerrhint ? errhint("%s", xerrhint) : 0);
+};
+
+PGList *GetIndexOpFamilies(Oid index_oid)
+{
+	return NULL;
+};
+
+PGList *GetOpFamiliesForScOp(Oid opno)
+{
+	return NULL;
 };

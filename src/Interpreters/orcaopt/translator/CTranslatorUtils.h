@@ -354,14 +354,14 @@ public:
 
 	// check whether there are triggers for the given operation on
 	// the given relation
-	static BOOL RelHasTriggers(CMemoryPool *mp, CMDAccessor *md_accessor,
-							   const IMDRelation *mdrel,
-							   const EdxlDmlType dml_type_dxl);
+	// static BOOL RelHasTriggers(CMemoryPool *mp, CMDAccessor *md_accessor,
+	// 						   const IMDRelation *mdrel,
+	// 						   const EdxlDmlType dml_type_dxl);
 
 	// check whether the given trigger is applicable to the given DML operation
-	static BOOL IsApplicableTrigger(CMDAccessor *md_accessor,
-									IMDId *trigger_mdid,
-									const EdxlDmlType dml_type_dxl);
+	// static BOOL IsApplicableTrigger(CMDAccessor *md_accessor,
+	// 								IMDId *trigger_mdid,
+	// 								const EdxlDmlType dml_type_dxl);
 
 	// check whether there are NOT NULL or CHECK constraints for the given relation
 	// static BOOL RelHasConstraints(const IMDRelation *rel);

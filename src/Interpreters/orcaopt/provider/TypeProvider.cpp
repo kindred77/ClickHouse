@@ -61,7 +61,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FLOAT32
 		   /*lt_opr*/ Oid(622),
 		   /*eq_opr*/ Oid(620),
 		   /*gt_opr*/ Oid(623),
-		   /*hash_proc*/ Oid(620)})};
+		   /*hash_proc*/ Oid(620),
+           /*cmp_proc*/ Oid(0)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FLOAT64
     = {Oid(701),
@@ -97,7 +98,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FLOAT64
 		   /*lt_opr*/ Oid(672),
 		   /*eq_opr*/ Oid(670),
 		   /*gt_opr*/ Oid(674),
-		   /*hash_proc*/ Oid(670)})};
+		   /*hash_proc*/ Oid(670),
+           /*cmp_proc*/ Oid(0)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_BOOLEAN
     = {Oid(16),
@@ -133,7 +135,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_BOOLEAN
 		   /*lt_opr*/ Oid(58),
 		   /*eq_opr*/ Oid(91),
 		   /*gt_opr*/ Oid(59),
-		   /*hash_proc*/ Oid(91)})};
+		   /*hash_proc*/ Oid(91),
+           /*cmp_proc*/ Oid(0)})};
 
 // std::pair<Oid, PGTypePtr> TypeProvider::TYPE_UINT8
 //     = {Oid(++TypeProvider::TYPE_OID_ID),
@@ -397,7 +400,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT16
 		   /*lt_opr*/ Oid(95),
 		   /*eq_opr*/ Oid(94),
 		   /*gt_opr*/ Oid(520),
-		   /*hash_proc*/ Oid(94)})};
+		   /*hash_proc*/ Oid(94),
+           /*cmp_proc*/ Oid(0)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT32
     = {Oid(23),
@@ -433,7 +437,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT32
 		   /*lt_opr*/ Oid(97),
 		   /*eq_opr*/ Oid(96),
 		   /*gt_opr*/ Oid(521),
-		   /*hash_proc*/ Oid(96)})};
+		   /*hash_proc*/ Oid(96),
+           /*cmp_proc*/ Oid(0)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT64
     = {Oid(20),
@@ -469,7 +474,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT64
 		   /*lt_opr*/ Oid(412),
 		   /*eq_opr*/ Oid(410),
 		   /*gt_opr*/ Oid(413),
-		   /*hash_proc*/ Oid(410)})};
+		   /*hash_proc*/ Oid(410),
+           /*cmp_proc*/ Oid(0)})};
 
 // std::pair<Oid, PGTypePtr> TypeProvider::TYPE_INT128
 //     = {Oid(++TypeProvider::TYPE_OID_ID),
@@ -569,7 +575,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_STRING
 		   /*lt_opr*/ Oid(664),
 		   /*eq_opr*/ Oid(98),
 		   /*gt_opr*/ Oid(666),
-		   /*hash_proc*/ Oid(98)})};
+		   /*hash_proc*/ Oid(98),
+           /*cmp_proc*/ Oid(0)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FIXEDSTRING
     = {Oid(1042),
@@ -605,7 +612,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_FIXEDSTRING
 		   /*lt_opr*/ Oid(1058),
 		   /*eq_opr*/ Oid(1054),
 		   /*gt_opr*/ Oid(1060),
-		   /*hash_proc*/ Oid(1054)})};
+		   /*hash_proc*/ Oid(1054),
+           /*cmp_proc*/ Oid(0)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATE
     = {Oid(1082),
@@ -641,7 +649,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATE
 		   /*lt_opr*/ Oid(1095),
 		   /*eq_opr*/ Oid(1093),
 		   /*gt_opr*/ Oid(1097),
-		   /*hash_proc*/ Oid(1093)})};
+		   /*hash_proc*/ Oid(1093),
+           /*cmp_proc*/ Oid(0)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATETIME
     = {Oid(1114),
@@ -677,7 +686,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATETIME
 		   /*lt_opr*/ Oid(2062),
 		   /*eq_opr*/ Oid(2060),
 		   /*gt_opr*/ Oid(2064),
-		   /*hash_proc*/ Oid(2060)})};
+		   /*hash_proc*/ Oid(2060),
+           /*cmp_proc*/ Oid(0)})};
 
 std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATETIME64
     = {Oid(1184),
@@ -713,7 +723,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DATETIME64
 		   /*lt_opr*/ Oid(1322),
 		   /*eq_opr*/ Oid(1320),
 		   /*gt_opr*/ Oid(1324),
-		   /*hash_proc*/ Oid(1320)})};
+		   /*hash_proc*/ Oid(1320),
+           /*cmp_proc*/ Oid(0)})};
 
 // std::pair<Oid, PGTypePtr> TypeProvider::TYPE_ARRAY
 //     = {Oid(++TypeProvider::TYPE_OID_ID),
@@ -845,7 +856,8 @@ std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DECIMAL64
 		   /*lt_opr*/ Oid(1754),
 		   /*eq_opr*/ Oid(1752),
 		   /*gt_opr*/ Oid(1756),
-		   /*hash_proc*/ Oid(1752)})};
+		   /*hash_proc*/ Oid(1752),
+           /*cmp_proc*/ Oid(0)})};
 
 // std::pair<Oid, PGTypePtr> TypeProvider::TYPE_DECIMAL128
 //     = {Oid(++TypeProvider::TYPE_OID_ID),

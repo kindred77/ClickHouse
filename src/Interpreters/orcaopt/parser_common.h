@@ -67,6 +67,7 @@ typedef unsigned int uint32;	/* == 32 bits */
 typedef int32 int4;
 typedef int16 int2;
 typedef float float4;
+typedef double float8;
 typedef unsigned long int uint64;
 
 typedef int64 Datum;
@@ -739,6 +740,7 @@ struct Form_pg_type
     Oid eq_opr;
     Oid gt_opr;
     Oid hash_proc;
+    Oid cmp_proc;
 };
 
 using PGTypePtr = std::shared_ptr<Form_pg_type>;
@@ -2576,3 +2578,75 @@ struct Form_pg_statistic
 };
 
 using PGStatisticPtr = std::shared_ptr<Form_pg_statistic>;
+
+/*
+ * The Numeric type as stored on disk.
+ *
+ * If the high bits of the first word of a NumericChoice (n_header, or
+ * n_short.n_header, or n_long.n_sign_dscale) are NUMERIC_SHORT, then the
+ * numeric follows the NumericShort format; if they are NUMERIC_POS or
+ * NUMERIC_NEG, it follows the NumericLong format.  If they are NUMERIC_NAN,
+ * it is a NaN.  We currently always store a NaN using just two bytes (i.e.
+ * only n_header), but previous releases used only the NumericLong format,
+ * so we might find 4-byte NaNs on disk if a database has been migrated using
+ * pg_upgrade.  In either case, when the high bits indicate a NaN, the
+ * remaining bits are never examined.  Currently, we always initialize these
+ * to zero, but it might be possible to use them for some other purpose in
+ * the future.
+ *
+ * In the NumericShort format, the remaining 14 bits of the header word
+ * (n_short.n_header) are allocated as follows: 1 for sign (positive or
+ * negative), 6 for dynamic scale, and 7 for weight.  In practice, most
+ * commonly-encountered values can be represented this way.
+ *
+ * In the NumericLong format, the remaining 14 bits of the header word
+ * (n_long.n_sign_dscale) represent the display scale; and the weight is
+ * stored separately in n_weight.
+ *
+ * NOTE: by convention, values in the packed form have been stripped of
+ * all leading and trailing zero digits (where a "digit" is of base NBASE).
+ * In particular, if the value is zero, there will be no digits at all!
+ * The weight is arbitrary in that case, but we normally set it to zero.
+ */
+
+typedef int16 PGNumericDigit;
+
+struct PGNumericShort
+{
+    uint16 n_header; /* Sign + display scale + weight */
+    PGNumericDigit n_data[1]; /* Digits */
+};
+
+struct PGNumericLong
+{
+    uint16 n_sign_dscale; /* Sign + display scale */
+    int16 n_weight; /* Weight of 1st digit	*/
+    PGNumericDigit n_data[1]; /* Digits */
+};
+
+union PGNumericChoice
+{
+    uint16 n_header; /* Header word */
+    struct PGNumericLong n_long; /* Long form (4-byte header) */
+    struct PGNumericShort n_short; /* Short form (2-byte header) */
+};
+
+struct PGNumeric
+{
+    int32 vl_len_; /* varlena header (do not touch directly!) */
+    union PGNumericChoice choice; /* choice of format */
+};
+
+/*
+ * Interpretation of high bits.
+ */
+
+#define PG_NUMERIC_SIGN_MASK	0xC000
+#define PG_NUMERIC_POS			0x0000
+#define PG_NUMERIC_NEG			0x4000
+#define PG_NUMERIC_SHORT		0x8000
+#define PG_NUMERIC_NAN			0xC000
+
+#define PG_NUMERIC_FLAGBITS(n) ((n)->choice.n_header & PG_NUMERIC_SIGN_MASK)
+#define PG_NUMERIC_IS_NAN(n)		(PG_NUMERIC_FLAGBITS(n) == PG_NUMERIC_NAN)
+#define PG_NUMERIC_IS_SHORT(n)		(PG_NUMERIC_FLAGBITS(n) == PG_NUMERIC_SHORT)

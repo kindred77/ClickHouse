@@ -2138,7 +2138,7 @@ CTranslatorScalarToDXL::TranslateOidDatumToDXL(CMemoryPool *mp,
 	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(*mdid_old);
 
 	return GPOS_NEW(mp)
-		CDXLDatumOid(mp, mdid, is_null, gpdb::OidFromDatum(datum));
+		CDXLDatumOid(mp, mdid, is_null, OidFromDatum(datum));
 }
 
 
@@ -2233,7 +2233,7 @@ CTranslatorScalarToDXL::ExtractDoubleValueFromDatum(IMDId *mdid, BOOL is_null,
 
 	if (mdid->Equals(&CMDIdGPDB::m_mdid_numeric))
 	{
-		Numeric num = (Numeric)(bytes);
+		PGNumeric* num = (PGNumeric*)(bytes);
 
 		if (NumericIsNan(num))
 		{
@@ -2241,11 +2241,11 @@ CTranslatorScalarToDXL::ExtractDoubleValueFromDatum(IMDId *mdid, BOOL is_null,
 			return CDouble(GPOS_FP_ABS_MAX);
 		}
 
-		d = gpdb::NumericToDoubleNoOverflow(num);
+		d = NumericToDoubleNoOverflow(num);
 	}
 	else if (mdid->Equals(&CMDIdGPDB::m_mdid_float4))
 	{
-		float4 f = gpdb::Float4FromDatum(datum);
+		float4 f = Float4FromDatum(datum);
 
 		if (isnan(f))
 		{
@@ -2258,7 +2258,7 @@ CTranslatorScalarToDXL::ExtractDoubleValueFromDatum(IMDId *mdid, BOOL is_null,
 	}
 	else if (mdid->Equals(&CMDIdGPDB::m_mdid_float8))
 	{
-		d = gpdb::Float8FromDatum(datum);
+		d = Float8FromDatum(datum);
 
 		if (isnan(d))
 		{
@@ -2267,12 +2267,12 @@ CTranslatorScalarToDXL::ExtractDoubleValueFromDatum(IMDId *mdid, BOOL is_null,
 	}
 	else if (CMDTypeGenericGPDB::IsTimeRelatedType(mdid))
 	{
-		d = gpdb::ConvertTimeValueToScalar(datum,
+		d = ConvertTimeValueToScalar(datum,
 										   CMDIdGPDB::CastMdid(mdid)->Oid());
 	}
 	else if (CMDTypeGenericGPDB::IsNetworkRelatedType(mdid))
 	{
-		d = gpdb::ConvertNetworkToScalar(datum,
+		d = ConvertNetworkToScalar(datum,
 										 CMDIdGPDB::CastMdid(mdid)->Oid());
 	}
 
@@ -2313,7 +2313,7 @@ CTranslatorScalarToDXL::ExtractByteArrayFromDatum(CMemoryPool *mp,
 	}
 	else
 	{
-		clib::Memcpy(bytes, gpdb::PointerFromDatum(datum), length);
+		clib::Memcpy(bytes, PointerFromDatum(datum), length);
 	}
 
 	return bytes;
@@ -2348,7 +2348,7 @@ CTranslatorScalarToDXL::ExtractLintValueFromDatum(const IMDType *md_type,
 		Datum datumConstVal = (Datum) 0;
 		clib::Memcpy(&datumConstVal, bytes, length);
 		// Date is internally represented as an int32
-		lint_value = (LINT)(gpdb::Int32FromDatum(datumConstVal));
+		lint_value = (LINT)(Int32FromDatum(datumConstVal));
 	}
 	else
 	{
@@ -2362,23 +2362,23 @@ CTranslatorScalarToDXL::ExtractLintValueFromDatum(const IMDType *md_type,
 		{
 			if (mdid->Equals(&CMDIdGPDB::m_mdid_uuid))
 			{
-				hash = gpdb::UUIDHash((Datum) bytes);
+				hash = UUIDHash((Datum) bytes);
 			}
 			else if (mdid->Equals(&CMDIdGPDB::m_mdid_bpchar))
 			{
-				hash = gpdb::HashBpChar((Datum) bytes);
+				hash = HashBpChar((Datum) bytes);
 			}
 			else if (mdid->Equals(&CMDIdGPDB::m_mdid_char))
 			{
-				hash = gpdb::HashChar((Datum) bytes);
+				hash = HashChar((Datum) bytes);
 			}
 			else if (mdid->Equals(&CMDIdGPDB::m_mdid_name))
 			{
-				hash = gpdb::HashName((Datum) bytes);
+				hash = HashName((Datum) bytes);
 			}
 			else
 			{
-				hash = gpdb::HashText((Datum) bytes);
+				hash = HashText((Datum) bytes);
 			}
 		}
 
@@ -2407,7 +2407,7 @@ CTranslatorScalarToDXL::CreateIDatumFromGpdbDatum(CMemoryPool *mp,
 	{
 		INT len =
 			dynamic_cast<const CMDTypeGenericGPDB *>(md_type)->GetGPDBLength();
-		length = (ULONG) gpdb::DatumSize(gpdb_datum, md_type->IsPassedByValue(),
+		length = (ULONG) DatumSize(gpdb_datum, md_type->IsPassedByValue(),
 										 len);
 	}
 	GPOS_ASSERT(is_null || length > 0);
