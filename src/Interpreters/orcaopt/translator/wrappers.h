@@ -8,7 +8,7 @@
 	for ((cell) = ListHead(list), (counter) = 0; (cell) != NULL; \
 		 (cell) = lnext(cell), ++(counter))
 
-#define ListMake1Int(x1) LPrependInt(x1, NIL)
+// #define ListMake1Int(x1) LPrependInt(x1, NIL)
 
 #define LInitial(l) lfirst(ListHead(l))
 #define LInitialOID(l) lfirst_oid(ListHead(l))
@@ -25,7 +25,7 @@ namespace gpos
 namespace gpdxl
 {
 
-duckdb_libpgquery::PGList *LPrependInt(int datum, duckdb_libpgquery::PGList *list);
+// duckdb_libpgquery::PGList *LPrependInt(int datum, duckdb_libpgquery::PGList *list);
 
 duckdb_libpgquery::PGListCell *
 ListHead(duckdb_libpgquery::PGList *l);
@@ -34,7 +34,7 @@ duckdb_libpgquery::PGList *
 LAppendInt(duckdb_libpgquery::PGList *list, int iDatum);
 
 int
-FindNodes(duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList *nodeTags);
+FindNodes(duckdb_libpgquery::PGNode *node, const std::vector<duckdb_libpgquery::PGNodeTag>& nodeTags);
 
 uint32
 ListLength(duckdb_libpgquery::PGList *l);

@@ -276,15 +276,16 @@ CTranslatorQueryToDXL::CheckUnsupportedNodeTypes(PGQuery *query)
 		{T_PGCurrentOfExpr, GPOS_WSZ_LIT("CURRENT OF")},
 	};
 
-	PGList *unsupported_list = NIL;
+	std::vector<PGNodeTag> unsupported_list;
 	for (ULONG ul = 0; ul < GPOS_ARRAY_SIZE(unsupported_features); ul++)
 	{
-		unsupported_list = LAppendInt(unsupported_list,
-											unsupported_features[ul].node_tag);
+		// unsupported_list = LAppendInt(unsupported_list,
+		// 									unsupported_features[ul].node_tag);
+		unsupported_list.push_back(unsupported_features[ul].node_tag);
 	}
 
 	INT unsupported_node = FindNodes((PGNode *) query, unsupported_list);
-	GPDBFree(unsupported_list);
+	//GPDBFree(unsupported_list);
 
 	if (0 <= unsupported_node)
 	{

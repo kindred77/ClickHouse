@@ -244,9 +244,9 @@ CTranslatorUtils::IsSirvFunc(CMemoryPool *mp, CMDAccessor *md_accessor,
 BOOL
 CTranslatorUtils::HasSubquery(PGNode *node)
 {
-	PGList *unsupported_list = ListMake1Int(T_PGSubLink);
+	std::vector<PGNodeTag> unsupported_list = {T_PGSubLink};
 	INT unsupported = FindNodes(node, unsupported_list);
-	GPDBFree(unsupported_list);
+	//GPDBFree(unsupported_list);
 
 	return (0 <= unsupported);
 }

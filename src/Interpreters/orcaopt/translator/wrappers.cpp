@@ -33,10 +33,10 @@ using namespace duckdb_libpgquery;
 // 	}                                                      \
 // 	}
 
-PGList *LPrependInt(int datum, PGList *list)
-{
-	return NULL;
-};
+// PGList *LPrependInt(int datum, PGList *list)
+// {
+// 	return NULL;
+// };
 
 PGListCell *
 ListHead(PGList *l)
@@ -47,13 +47,19 @@ ListHead(PGList *l)
 PGList *
 LAppendInt(PGList *list, int iDatum)
 {
-	return NULL;
+	return lappend_int(list, iDatum);
 };
 
 int
-FindNodes(PGNode *node, PGList *nodeTags)
+FindNodes(PGNode *node, const std::vector<PGNodeTag>& nodeTags)
 {
-	return 0;
+	pg_find_nodes_context context;
+	Assert(NULL != node);
+	context.nodeTags = nodeTags;
+	context.foundNode = -1;
+	pg_find_nodes_walker(node, &context);
+
+	return context.foundNode;
 };
 
 uint32
@@ -83,7 +89,7 @@ ListFree(PGList *list)
 void *
 CopyObject(void *from)
 {
-	return NULL;
+	return copyObject(from);
 };
 
 void

@@ -43,8 +43,8 @@ namespace duckdb_libpgquery {
  * NIL list is considered to be an empty list of any type.
  */
 #define IsPointerList(l)		((l) == NIL || IsA((l), PGList))
-#define IsIntegerList(l)		((l) == NIL || IsA((l), IntList))
-#define IsOidList(l)			((l) == NIL || IsA((l), OidList))
+#define IsIntegerList(l)		((l) == NIL || IsA((l), PGIntList))
+#define IsOidList(l)			((l) == NIL || IsA((l), PGOidList))
 
 #ifdef USE_ASSERT_CHECKING
 /*
@@ -160,14 +160,40 @@ lappend(PGList *list, void *datum)
 }
 
 /*
- * PGAppend an integer to the specified list. See lappend()
+ * Append an integer to the specified list. See lappend()
  */
+PGList *
+lappend_int(PGList * list, int datum)
+{
+    Assert(IsIntegerList(list));
 
+    if (list == NIL)
+        list = new_list(T_PGIntList);
+    else
+        new_tail_cell(list);
+
+    lfirst_int(list->tail) = datum;
+    check_list_invariants(list);
+    return list;
+}
 
 /*
  * PGAppend an OID to the specified list. See lappend()
  */
+PGList *
+lappend_oid(PGList *list, PGOid datum)
+{
+	Assert(IsOidList(list));
 
+	if (list == NIL)
+		list = new_list(T_PGOidList);
+	else
+		new_tail_cell(list);
+
+	lfirst_oid(list->tail) = datum;
+	check_list_invariants(list);
+	return list;
+}
 
 /*
  * Add a new cell to the list, in the position after 'prev_cell'. The

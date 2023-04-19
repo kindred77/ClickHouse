@@ -3138,3 +3138,32 @@ void IncrementVarSublevelsUpInTransformGroupedWindows(PGNode * node, int delta_s
 	 */
     pg_query_or_expression_tree_walker(node, (walker_func)PGIncrementVarSublevelsUp_walker, (void *)&context, QTW_EXAMINE_RTES);
 };
+
+bool
+pg_find_nodes_walker(PGNode *node, pg_find_nodes_context *context)
+{
+    if (NULL == node)
+    {
+        return false;
+    }
+
+    if (IsA(node, PGQuery))
+    {
+        /* Recurse into subselects */
+        return pg_query_tree_walker((PGQuery *)node, (walker_func)pg_find_nodes_walker, (void *)context, 0 /* flags */);
+    }
+
+    int i = 0;
+    for (const auto& node_tag : context->nodeTags)
+    {
+        if (nodeTag(node) == node_tag)
+        {
+            context->foundNode = i;
+            return true;
+        }
+
+        i++;
+    }
+
+    return pg_expression_tree_walker(node, (walker_func)pg_find_nodes_walker, (void *)context);
+};
