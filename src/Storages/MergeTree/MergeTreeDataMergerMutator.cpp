@@ -933,9 +933,9 @@ MergeTreeData::MutableDataPartPtr MergeTreeDataMergerMutator::mergePartsToTempor
             
         case MergeTreeData::MergingParams::PartialReplacing:
             merged_transform = std::make_unique<PartialReplacingSortedTransform>(
-                header, pipes.size(), sort_description, data.merging_params.part_cols_indexes_column,
+                header, pipes.size(), sort_description, data.merging_params.part_cols_names_column,
                 data.merging_params.primary_keys, data.merging_params.all_column_names,
-                merge_block_size);
+                merge_block_size, merging_params.part_cols_delete_flag);
             break;
     }
 

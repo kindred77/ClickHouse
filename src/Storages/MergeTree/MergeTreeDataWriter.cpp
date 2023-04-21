@@ -233,8 +233,9 @@ Block MergeTreeDataWriter::mergeBlock(const Block & block, SortDescription sort_
                     block, 1, sort_description, block_size + 1, data.merging_params.graphite_params, time(nullptr));
             case MergeTreeData::MergingParams::PartialReplacing:
                 return std::make_shared<PartialReplacingSortedAlgorithm>(
-                    block, 1, sort_description, data.merging_params.part_cols_indexes_column, 
-                    data.merging_params.primary_keys, data.merging_params.all_column_names, block_size + 1);
+                    block, 1, sort_description, data.merging_params.part_cols_names_column, 
+                    data.merging_params.primary_keys, data.merging_params.all_column_names, block_size + 1,
+                    data.merging_params.part_cols_delete_flag);
         }
 
         __builtin_unreachable();

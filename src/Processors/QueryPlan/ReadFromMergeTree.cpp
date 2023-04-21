@@ -537,7 +537,8 @@ static void addMergingFinal(
             
             case MergeTreeData::MergingParams::PartialReplacing:
                 return std::make_shared<PartialReplacingSortedTransform>(header, num_outputs,
-                           sort_description, merging_params.part_cols_indexes_column, merging_params.primary_keys, merging_params.all_column_names, max_block_size);
+                           sort_description, merging_params.part_cols_names_column, merging_params.primary_keys,
+                           merging_params.all_column_names, max_block_size, merging_params.part_cols_delete_flag);
 
             case MergeTreeData::MergingParams::Graphite:
                 throw Exception("GraphiteMergeTree doesn't support FINAL", ErrorCodes::LOGICAL_ERROR);

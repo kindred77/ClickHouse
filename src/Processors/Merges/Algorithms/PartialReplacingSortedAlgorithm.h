@@ -1,7 +1,7 @@
 #pragma once
 #include <Processors/Merges/Algorithms/IMergingAlgorithmWithSharedChunks.h>
 #include <Processors/Merges/Algorithms/MergedData.h>
-#include <Columns/ColumnsNumber.h>
+#include <Columns/ColumnLowCardinality.h>
 #include <Columns/ColumnArray.h>
 
 namespace Poco
@@ -21,11 +21,12 @@ class PartialReplacingSortedAlgorithm final : public IMergingAlgorithmWithShared
 {
 public:
     PartialReplacingSortedAlgorithm(
-        const Block & header, size_t num_inputs,
-        SortDescription description_, const String & part_cols_indexes_column,
+        const Block & header_, size_t num_inputs,
+        SortDescription description_, const String & part_replacing_colnames_colname_,
         Names primary_key_columns_,
         Names all_column_names,
         size_t max_block_size,
+        const String& delete_flag_ = "_delete_flag",
         WriteBuffer * out_row_sources_buf_ = nullptr,
         bool use_average_block_sizes = false);
 
@@ -33,21 +34,25 @@ public:
 
 private:
     using RowRef = detail::RowRefWithOwnedChunk;
+    using ReplacingNames = std::vector<String>;
     using Indexes = std::vector<size_t>;
-    using UniqueIndexes = std::set<size_t>;
+    //using ColNameToPosMap = std::unordered_map<String, size_t>;
+    using UniqueString = std::set<String>;
     static constexpr size_t max_row_refs = 2; /// last, current.
 
-    size_t part_cols_indexes_column_pos = 0;
+    std::tuple<String, size_t> part_replacing_col_info;
     Indexes primary_keys_pos;
 
     RowRef base_row;
     ColumnRawPtrs all_columns;
     Indexes row_nums;
     size_t owned_chunk_row_num = 0;
-    //convert user given column index to position in block
-    Indexes index_to_pos;
-    UniqueIndexes merged_unique_indexes;
+    //convert column name to position in block
+    //ColNameToPosMap colname_to_pos;
+    UniqueString merged_unique_colnames;
     bool if_partial_replaced = false;
+    Block header;
+    String delete_flag;
 
     /// Sources of rows with the current primary key.
     //PODArray<RowSourcePart> current_row_sources;
@@ -58,15 +63,25 @@ private:
 
     bool hasEqualPrimaryKeyColumnsWithBaseRow(SortCursor current);
 
-    Indexes extractIndexesFromColumnArray(const IColumn* column_ptr, size_t row);
+    ReplacingNames extractReplacingColunmNames(const IColumn* column_ptr, size_t row);
 
-    void replacePartially(Indexes current_indexes, SortCursor current);
+    void replacePartially(const ReplacingNames& current_indexes, SortCursor current);
 
     void setBaseRow(SortCursor current)
     {
         clear();
         setRowRef(base_row, current);
         owned_chunk_row_num = sources[current->order].chunk->getNumRows();
+    }
+
+    bool invalid(const String& col_name)
+    {
+        return col_name == ""
+                || !header.has(col_name)
+                //do not replace partial indexes column
+                || col_name == std::get<0>(part_replacing_col_info)
+                //do not update primary keys
+                || std::find(primary_keys_pos.begin(), primary_keys_pos.end(), header.getPositionByName(col_name)) != primary_keys_pos.end();
     }
 
     void clear()
@@ -76,18 +91,8 @@ private:
         base_row.clear();
         base_row.owned_chunk = nullptr;
         owned_chunk_row_num = 0;
-        merged_unique_indexes.clear();
+        merged_unique_colnames.clear();
         if_partial_replaced = false;
-    }
-
-    bool invalid(size_t idx)
-    {
-        return idx == 0
-                || idx > index_to_pos.size()
-                //do not replace partial indexes column
-                || index_to_pos[idx - 1] == part_cols_indexes_column_pos
-                //do not update primary keys
-                || std::find(primary_keys_pos.begin(), primary_keys_pos.end(), index_to_pos[idx - 1]) != primary_keys_pos.end();
     }
 
     struct PartialReplacingMergedData : public MergedData
@@ -99,8 +104,8 @@ private:
         }
         void insertRowWithPartial(const ColumnRawPtrs & raw_columns,
                 std::vector<size_t> rows,
-                size_t part_cols_indexes_column_pos,
-                std::set<size_t> merged_unique_indexes,
+                String part_replacing_colnames_colname,
+                UniqueString merged_unique_colnames,
                 size_t block_size);
     };
 

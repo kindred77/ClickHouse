@@ -387,7 +387,7 @@ static StoragePtr create(const StorageFactory::Arguments & args)
             break;
         }
         case MergeTreeData::MergingParams::PartialReplacing:
-            add_mandatory_param("partial columns indexes column");
+            add_mandatory_param("partial columns names column");
             break;
     }
 
@@ -631,13 +631,30 @@ static StoragePtr create(const StorageFactory::Arguments & args)
     }
     else if (merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
     {
-            /// If the last element is not index_granularity or replica_name (a literal), then this is the name of the partial columns indexes column.
+        // If the last element is not index_granularity or replica_name (a literal), then this is the name of the partial columns names column.
         if (arg_cnt && !engine_args[arg_cnt - 1]->as<ASTLiteral>())
         {
-            if (!tryGetIdentifierNameInto(engine_args[arg_cnt - 1], merging_params.part_cols_indexes_column))
+            if (!tryGetIdentifierNameInto(engine_args[arg_cnt - 1], merging_params.part_cols_names_column))
                 throw Exception(
-                    "Partial columns indexes column name must be an unquoted string" + getMergeTreeVerboseHelp(is_extended_storage_def),
+                    "Partial columns names column name must be an unquoted string" + getMergeTreeVerboseHelp(is_extended_storage_def),
                     ErrorCodes::BAD_ARGUMENTS);
+            --arg_cnt;
+        }
+
+        // delete flag
+        if (arg_cnt)
+        {
+            if (auto delete_flag_lit = engine_args[arg_cnt - 1]->as<ASTLiteral>();
+                delete_flag_lit && delete_flag_lit->value.getType() == Field::Types::Which::String)
+            {
+                merging_params.part_cols_delete_flag = delete_flag_lit->value.get<String>();
+            }
+            else
+            {
+                throw Exception(
+                    "Delete flag for Partial Replacing MergeTree must be a string" + getMergeTreeVerboseHelp(is_extended_storage_def),
+                    ErrorCodes::BAD_ARGUMENTS);
+            }
             --arg_cnt;
         }
     }

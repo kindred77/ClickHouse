@@ -603,8 +603,8 @@ void MergeTreeData::MergingParams::check(const StorageInMemoryMetadata & metadat
         throw Exception("List of columns to sum for MergeTree cannot be specified in all modes except Summing.",
                         ErrorCodes::LOGICAL_ERROR);
 
-    if (!part_cols_indexes_column.empty() && mode != MergingParams::PartialReplacing)
-        throw Exception("Partial column indexes column for MergeTree cannot be specified in modes except PartialReplacing.",
+    if (!part_cols_names_column.empty() && mode != MergingParams::PartialReplacing)
+        throw Exception("Partial column names column for MergeTree cannot be specified in modes except PartialReplacing.",
                         ErrorCodes::LOGICAL_ERROR);
 
     /// Check that if the sign column is needed, it exists and is of type Int8.
@@ -663,32 +663,43 @@ void MergeTreeData::MergingParams::check(const StorageInMemoryMetadata & metadat
             throw Exception("Version column " + version_column + " does not exist in table declaration.", ErrorCodes::NO_SUCH_COLUMN_IN_TABLE);
     };
 
-    /// that if the part_col_indexes_column column is needed, it exists and is of Int16 array.
-    auto check_part_col_indexes_column = [this, & columns](bool is_optional, const std::string & storage)
+    /// that if the part_col_names_column column is needed, it exists and is of DataTypeLowCardinality array.
+    auto check_part_col_names_column = [this, & columns](bool is_optional, const std::string & storage)
     {
-        if (part_cols_indexes_column.empty())
+        if (part_cols_names_column.empty())
         {
             if (is_optional)
                 return;
 
-            throw Exception("Logical error: Partial column indexes column for storage " + storage + " is empty", ErrorCodes::LOGICAL_ERROR);
+            throw Exception("Logical error: Partial column names column for storage " + storage + " is empty", ErrorCodes::LOGICAL_ERROR);
         }
 
         bool miss_column = true;
         for (const auto & column : columns)
         {
-            if (column.name == part_cols_indexes_column)
+            if (column.name == part_cols_names_column)
             {
                 if (!typeid_cast<const DataTypeArray *>(column.type.get())
-                        ||!typeid_cast<const DataTypeUInt16 *>(typeid_cast<const DataTypeArray *>(column.type.get())->getNestedType().get()))
-                    throw Exception("Partial column indexes column (" + part_cols_indexes_column + ") for storage " + storage + " must have type Array UInt16."
+                        ||!typeid_cast<const DataTypeLowCardinality *>(typeid_cast<const DataTypeArray *>(column.type.get())->getNestedType().get()))
+                    throw Exception("Partial column names column (" + part_cols_names_column + ") for storage " + storage + " must have type Array(DataTypeLowCardinality)."
                         " Provided column of type " + column.type->getName() + ".", ErrorCodes::BAD_TYPE_OF_FIELD);
                 miss_column = false;
                 break;
             }
         }
         if (miss_column)
-            throw Exception("Partial column indexes column " + part_cols_indexes_column + " does not exist in table declaration.", ErrorCodes::NO_SUCH_COLUMN_IN_TABLE);
+            throw Exception("Partial column names column " + part_cols_names_column + " does not exist in table declaration.", ErrorCodes::NO_SUCH_COLUMN_IN_TABLE);
+    };
+
+    auto check_delete_flag_for_partialrep_mergetree = [this, & columns](bool is_optional, const std::string & storage)
+    {
+        if (part_cols_delete_flag.empty())
+        {
+            if (is_optional)
+                return;
+
+            throw Exception("Logical error: Delete flag for " + storage + " is empty", ErrorCodes::LOGICAL_ERROR);
+        }
     };
 
     if (mode == MergingParams::Collapsing)
@@ -734,7 +745,10 @@ void MergeTreeData::MergingParams::check(const StorageInMemoryMetadata & metadat
     }
 
     if (mode == MergingParams::PartialReplacing)
-        check_part_col_indexes_column(false, "PartialReplacingMergeTree");
+    {
+        check_part_col_names_column(false, "PartialReplacingMergeTree");
+        check_delete_flag_for_partialrep_mergetree(true, "PartialReplacingMergeTree");
+    }
 
     /// TODO Checks for Graphite mode.
 }

@@ -290,15 +290,15 @@ BlockIO InterpreterInsertQuery::execute()
 
             /// Actually we don't know structure of input blocks from query/table,
             /// because some clients break insertion protocol (columns != header)
-            auto partial_replacing_auto_gen = getContext()->getSettingsRef().partial_replacing_merge_tree_auto_gen_col_idxes;
-            String part_cols_indexes_column_name;
+            auto partial_replacing_auto_gen = getContext()->getSettingsRef().partial_replacing_merge_tree_auto_gen_col_names;
+            String part_cols_names_column_name;
             Block partial_mergetree_header = out->getHeader();
             if (partial_replacing_auto_gen)
             {
                 if (auto merge_tree = dynamic_cast<const MergeTreeData *>(table.get());
                     merge_tree && merge_tree->merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
                 {
-                    part_cols_indexes_column_name = merge_tree->merging_params.part_cols_indexes_column;
+                    part_cols_names_column_name = merge_tree->merging_params.part_cols_names_column;
                 }
                 else if (auto distributed_table = dynamic_cast<const StorageDistributed *>(table.get()))
                 {
@@ -310,7 +310,7 @@ BlockIO InterpreterInsertQuery::execute()
                         if (auto local_merge_tree = dynamic_cast<const MergeTreeData *>(local_storage.get());
                             local_merge_tree && local_merge_tree->merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
                         {
-                            part_cols_indexes_column_name = local_merge_tree->merging_params.part_cols_indexes_column;
+                            part_cols_names_column_name = local_merge_tree->merging_params.part_cols_names_column;
                             partial_mergetree_header = local_storage->getInMemoryMetadata().getSampleBlock();
                         }
                         else
@@ -334,7 +334,7 @@ BlockIO InterpreterInsertQuery::execute()
             {
                 out = std::make_shared<AddingDefaultBlockOutputStream>(
                     out, query_sample_block, metadata_snapshot->getColumns(),
-                    getContext(), null_as_default, part_cols_indexes_column_name, partial_mergetree_header);
+                    getContext(), null_as_default, part_cols_names_column_name, partial_mergetree_header);
             }
             else
             {

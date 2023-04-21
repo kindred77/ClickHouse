@@ -328,7 +328,8 @@ public:
         String version_column;
 
         /// For Partial Replacing mode.
-        String part_cols_indexes_column;
+        String part_cols_names_column;
+        String part_cols_delete_flag;
 
         Names primary_keys;
 

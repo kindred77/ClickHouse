@@ -5,16 +5,17 @@ namespace DB
 
 void PartialReplacingSortedAlgorithm::PartialReplacingMergedData::insertRowWithPartial(const ColumnRawPtrs & raw_columns,
         std::vector<size_t> rows,
-        size_t part_cols_indexes_column_pos,
-        std::set<size_t> merged_unique_indexes,
+        String part_replacing_colnames_colname,
+        UniqueString merged_unique_colnames,
         size_t block_size)
 {
     size_t num_columns = raw_columns.size();
     for (size_t i = 0; i < num_columns; ++i)
     {
-        if (!merged_unique_indexes.empty() && part_cols_indexes_column_pos == i)
+        //insert value of partial repacling colunm
+        if (!merged_unique_colnames.empty() && part_replacing_colnames_colname == raw_columns[i]->getName())
         {
-            const Field & res = Array(merged_unique_indexes.begin(), merged_unique_indexes.end());
+            const Field & res = Array(merged_unique_colnames.begin(), merged_unique_colnames.end());
             columns[i]->insert(res);
         }
         else
@@ -30,14 +31,17 @@ void PartialReplacingSortedAlgorithm::PartialReplacingMergedData::insertRowWithP
 }
 
 PartialReplacingSortedAlgorithm::PartialReplacingSortedAlgorithm(
-        const Block & header, size_t num_inputs,
-        SortDescription description_, const String & part_cols_indexes_column,
+        const Block & header_, size_t num_inputs,
+        SortDescription description_, const String & part_replacing_colnames_colname_,
         Names primary_key_columns_,
         Names all_column_names,
         size_t max_block_size,
+        const String& delete_flag_,
         WriteBuffer * out_row_sources_buf_,
         bool use_average_block_sizes)
         : IMergingAlgorithmWithSharedChunks(num_inputs, std::move(description_), out_row_sources_buf_, max_row_refs)
+        , header(header_)
+        , delete_flag(delete_flag_)
         , merged_data(header.cloneEmptyColumns(), use_average_block_sizes, max_block_size)
 {
     for (auto & column_name : primary_key_columns_)
@@ -45,21 +49,24 @@ PartialReplacingSortedAlgorithm::PartialReplacingSortedAlgorithm(
         primary_keys_pos.push_back(header.getPositionByName(column_name));
     }
 
-    part_cols_indexes_column_pos = header.getPositionByName(part_cols_indexes_column);
+    part_replacing_col_info = std::make_tuple(part_replacing_colnames_colname_,
+        header.getPositionByName(part_replacing_colnames_colname_));
 
-    //initialize index to position converter
-    index_to_pos.reserve(all_column_names.size());
-    for (size_t i = 0; i < all_column_names.size(); ++i)
-    {
-        index_to_pos.push_back(header.getPositionByName(all_column_names[i]));
-    }
+    //part_colnames_column_pos = header.getPositionByName(part_replacing_colnames_colname);
+
+    //initialize column name to position converter
+    // colname_to_pos.reserve(all_column_names.size());
+    // for (size_t i = 0; i < all_column_names.size(); ++i)
+    // {
+    //     index_to_pos.push_back(header.getPositionByName(all_column_names[i]));
+    // }
 }
 
 void PartialReplacingSortedAlgorithm::insertRow()
 {
     if (if_partial_replaced)
     {
-        merged_data.insertRowWithPartial(all_columns, row_nums, part_cols_indexes_column_pos, merged_unique_indexes, owned_chunk_row_num);
+        merged_data.insertRowWithPartial(all_columns, row_nums, std::get<0>(part_replacing_col_info), merged_unique_colnames, owned_chunk_row_num);
     }
     else
     {
@@ -92,49 +99,48 @@ bool PartialReplacingSortedAlgorithm::hasEqualPrimaryKeyColumnsWithBaseRow(SortC
     return true;
 }
 
-PartialReplacingSortedAlgorithm::Indexes PartialReplacingSortedAlgorithm::extractIndexesFromColumnArray(const IColumn* column_ptr, size_t row)
+PartialReplacingSortedAlgorithm::ReplacingNames PartialReplacingSortedAlgorithm::extractReplacingColunmNames(const IColumn* column_ptr, size_t row)
 {
-    Indexes result;
+    ReplacingNames result;
     size_t part_col_indexes_size = sizeAt(column_ptr, row);
     if (!part_col_indexes_size)
         return result;
     if (const ColumnArray * column_array = checkAndGetColumn<ColumnArray>(column_ptr))
     {
-        const ColumnUInt16 * col_uint16 = checkAndGetColumn<ColumnUInt16>(column_array->getData());
+        const ColumnLowCardinality * col_lowcard = checkAndGetColumn<ColumnLowCardinality>(column_array->getData());
         auto offset = column_array->getOffsets()[row - 1];
         result.reserve(part_col_indexes_size);
         for (size_t i = 0; i < part_col_indexes_size; ++i)
         {
-            size_t idx = col_uint16->getUInt(offset + i);
-            result.push_back(idx);
+            result.push_back(col_lowcard->getDataAt(offset + i).toString());
         }
     }
 
     return result;
 }
 
-void PartialReplacingSortedAlgorithm::replacePartially(Indexes current_indexes, SortCursor current)
+void PartialReplacingSortedAlgorithm::replacePartially(const ReplacingNames& current_colnames, SortCursor current)
 {
-    Indexes base_row_indexes = extractIndexesFromColumnArray((*base_row.all_columns)[part_cols_indexes_column_pos], base_row.row_num);
-    bool base_row_is_partial = !base_row_indexes.empty();
-    for (auto idx : current_indexes)
+    ReplacingNames base_row_colnames = extractReplacingColunmNames((*base_row.all_columns)[std::get<1>(part_replacing_col_info)], base_row.row_num);
+    bool base_row_is_partial = !base_row_colnames.empty();
+    for (auto col_name : current_colnames)
     {
-        if (invalid(idx))
+        if (invalid(col_name))
             continue;
         //if base row is a partial columns row, we merge all the indexes into base row
         if (base_row_is_partial)
         {
             //initialize
-            if (merged_unique_indexes.empty())
+            if (merged_unique_colnames.empty())
             {
-                for (auto idx_in_base : base_row_indexes)
+                for (auto colname_in_base : base_row_colnames)
                 {
-                    if (invalid(idx_in_base))
+                    if (invalid(colname_in_base))
                         continue;
-                    merged_unique_indexes.insert(idx_in_base);
+                    merged_unique_colnames.insert(colname_in_base);
                 }
             }
-            merged_unique_indexes.insert(idx);
+            merged_unique_colnames.insert(col_name);
         }
         //entering partial column merging mode
         if (all_columns.empty())
@@ -144,7 +150,16 @@ void PartialReplacingSortedAlgorithm::replacePartially(Indexes current_indexes, 
         }
         if_partial_replaced = true;
         //position in block/chunk
-        size_t pos = index_to_pos[idx - 1];
+        size_t pos;
+        try
+        {
+            pos = header.getPositionByName(col_name);
+        }
+        catch(const Exception&)
+        {
+            //colunm has been deleted
+            continue;
+        }
         //replace partially
         all_columns[pos] = current->all_columns[pos];
         row_nums[pos] = current->getRow();
@@ -186,19 +201,18 @@ IMergingAlgorithm::Status PartialReplacingSortedAlgorithm::merge()
         }
         else
         {
-            //size_t part_col_indexes_size=sizeAt(current->all_columns[part_cols_indexes_column_pos], current->getRow());
-            Indexes indexes = extractIndexesFromColumnArray(current->all_columns[part_cols_indexes_column_pos], current->getRow());
+            ReplacingNames col_names = extractReplacingColunmNames(current->all_columns[std::get<1>(part_replacing_col_info)], current->getRow());
             //partial columns row, replace the base row with it.
-            if (!indexes.empty())
+            if (!col_names.empty())
             {
                 //delete
-                if (indexes.size() == 1 && indexes[0] == 0)
+                if (col_names.size() == 1 && col_names[0] == delete_flag)
                 {
                     clear();
                 }
                 else
                 {
-                    replacePartially(indexes, current);
+                    replacePartially(col_names, current);
                 }
             }
             //full columns row, set it as a base row
