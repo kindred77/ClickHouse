@@ -103,9 +103,9 @@ private:
         {
         }
         void insertRowWithPartial(const ColumnRawPtrs & raw_columns,
-                std::vector<size_t> rows,
-                String part_replacing_colnames_colname,
-                UniqueString merged_unique_colnames,
+                const std::vector<size_t>& rows,
+                size_t part_replacing_colnames_col_idx,
+                const UniqueString& merged_unique_colnames,
                 size_t block_size);
     };
 

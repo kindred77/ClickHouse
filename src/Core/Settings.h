@@ -572,8 +572,6 @@ class IColumn;
     \
     M(Bool, output_format_arrow_low_cardinality_as_dictionary, false, "Enable output LowCardinality type as Dictionary Arrow type", 0) \
     \
-    M(String, partial_replacing_merge_tree_delete_flag, "_delete_flag", "Delete flag name for PartialReplacingMergeTree", 0) \
-    \
     M(Bool, partial_replacing_merge_tree_auto_gen_col_names, false, "Enable partial replacing column names data automatically generating for PartialReplacingMergeTree", 0) \
 
 // End of FORMAT_FACTORY_SETTINGS

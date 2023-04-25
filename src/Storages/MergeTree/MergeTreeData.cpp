@@ -680,26 +680,17 @@ void MergeTreeData::MergingParams::check(const StorageInMemoryMetadata & metadat
             if (column.name == part_cols_names_column)
             {
                 if (!typeid_cast<const DataTypeArray *>(column.type.get())
-                        ||!typeid_cast<const DataTypeLowCardinality *>(typeid_cast<const DataTypeArray *>(column.type.get())->getNestedType().get()))
-                    throw Exception("Partial column names column (" + part_cols_names_column + ") for storage " + storage + " must have type Array(DataTypeLowCardinality)."
+                    || typeid_cast<const DataTypeArray *>(column.type.get())->getNestedType()->getName() != "LowCardinality(String)")
+                {
+                    throw Exception("Partial column names column " + part_cols_names_column + " for storage " + storage + " must be type Array(LowCardinality(String))."
                         " Provided column of type " + column.type->getName() + ".", ErrorCodes::BAD_TYPE_OF_FIELD);
+                }
                 miss_column = false;
                 break;
             }
         }
         if (miss_column)
             throw Exception("Partial column names column " + part_cols_names_column + " does not exist in table declaration.", ErrorCodes::NO_SUCH_COLUMN_IN_TABLE);
-    };
-
-    auto check_delete_flag_for_partialrep_mergetree = [this, & columns](bool is_optional, const std::string & storage)
-    {
-        if (part_cols_delete_flag.empty())
-        {
-            if (is_optional)
-                return;
-
-            throw Exception("Logical error: Delete flag for " + storage + " is empty", ErrorCodes::LOGICAL_ERROR);
-        }
     };
 
     if (mode == MergingParams::Collapsing)
@@ -747,7 +738,6 @@ void MergeTreeData::MergingParams::check(const StorageInMemoryMetadata & metadat
     if (mode == MergingParams::PartialReplacing)
     {
         check_part_col_names_column(false, "PartialReplacingMergeTree");
-        check_delete_flag_for_partialrep_mergetree(true, "PartialReplacingMergeTree");
     }
 
     /// TODO Checks for Graphite mode.

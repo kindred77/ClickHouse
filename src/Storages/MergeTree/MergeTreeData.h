@@ -329,7 +329,7 @@ public:
 
         /// For Partial Replacing mode.
         String part_cols_names_column;
-        String part_cols_delete_flag;
+        String part_cols_delete_flag = "_delete_flag";
 
         Names primary_keys;
 

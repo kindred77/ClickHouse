@@ -4,16 +4,16 @@ namespace DB
 {
 
 void PartialReplacingSortedAlgorithm::PartialReplacingMergedData::insertRowWithPartial(const ColumnRawPtrs & raw_columns,
-        std::vector<size_t> rows,
-        String part_replacing_colnames_colname,
-        UniqueString merged_unique_colnames,
+        const std::vector<size_t>& rows,
+        size_t part_replacing_colnames_col_idx,
+        const UniqueString& merged_unique_colnames,
         size_t block_size)
 {
     size_t num_columns = raw_columns.size();
     for (size_t i = 0; i < num_columns; ++i)
     {
         //insert value of partial repacling colunm
-        if (!merged_unique_colnames.empty() && part_replacing_colnames_colname == raw_columns[i]->getName())
+        if (!merged_unique_colnames.empty() && part_replacing_colnames_col_idx == i)
         {
             const Field & res = Array(merged_unique_colnames.begin(), merged_unique_colnames.end());
             columns[i]->insert(res);
@@ -51,22 +51,13 @@ PartialReplacingSortedAlgorithm::PartialReplacingSortedAlgorithm(
 
     part_replacing_col_info = std::make_tuple(part_replacing_colnames_colname_,
         header.getPositionByName(part_replacing_colnames_colname_));
-
-    //part_colnames_column_pos = header.getPositionByName(part_replacing_colnames_colname);
-
-    //initialize column name to position converter
-    // colname_to_pos.reserve(all_column_names.size());
-    // for (size_t i = 0; i < all_column_names.size(); ++i)
-    // {
-    //     index_to_pos.push_back(header.getPositionByName(all_column_names[i]));
-    // }
 }
 
 void PartialReplacingSortedAlgorithm::insertRow()
 {
     if (if_partial_replaced)
     {
-        merged_data.insertRowWithPartial(all_columns, row_nums, std::get<0>(part_replacing_col_info), merged_unique_colnames, owned_chunk_row_num);
+        merged_data.insertRowWithPartial(all_columns, row_nums, std::get<1>(part_replacing_col_info), merged_unique_colnames, owned_chunk_row_num);
     }
     else
     {

@@ -645,9 +645,13 @@ static StoragePtr create(const StorageFactory::Arguments & args)
         if (arg_cnt)
         {
             if (auto delete_flag_lit = engine_args[arg_cnt - 1]->as<ASTLiteral>();
-                delete_flag_lit && delete_flag_lit->value.getType() == Field::Types::Which::String)
+                delete_flag_lit && delete_flag_lit->value.getType() == Field::Types::String)
             {
-                merging_params.part_cols_delete_flag = delete_flag_lit->value.get<String>();
+                auto val = delete_flag_lit->value.get<String>();
+                if (!val.empty())
+                {
+                    merging_params.part_cols_delete_flag = val;
+                }
             }
             else
             {
