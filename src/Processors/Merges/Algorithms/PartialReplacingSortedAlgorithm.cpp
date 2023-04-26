@@ -66,16 +66,6 @@ void PartialReplacingSortedAlgorithm::insertRow()
     clear();
 }
 
-size_t PartialReplacingSortedAlgorithm::sizeAt(const IColumn* column_ptr, size_t i)
-{
-    if (const ColumnArray * column_array = checkAndGetColumn<ColumnArray>(column_ptr))
-    {
-        return column_array->getOffsets()[i] - column_array->getOffsets()[i - 1];
-    }
-
-    return 0;
-}
-
 bool PartialReplacingSortedAlgorithm::hasEqualPrimaryKeyColumnsWithBaseRow(SortCursor current)
 {
     for (auto pos : primary_keys_pos)
@@ -90,41 +80,41 @@ bool PartialReplacingSortedAlgorithm::hasEqualPrimaryKeyColumnsWithBaseRow(SortC
     return true;
 }
 
-PartialReplacingSortedAlgorithm::ReplacingNames PartialReplacingSortedAlgorithm::extractReplacingColunmNames(const IColumn* column_ptr, size_t row)
+void PartialReplacingSortedAlgorithm::extractReplacingColunmNames(ReplacingNames& replacing_names, const IColumn* column_ptr, size_t row)
 {
-    ReplacingNames result;
-    size_t part_col_indexes_size = sizeAt(column_ptr, row);
-    if (!part_col_indexes_size)
-        return result;
+    replacing_names.clear();
     if (const ColumnArray * column_array = checkAndGetColumn<ColumnArray>(column_ptr))
     {
+        const auto len = column_array->getOffsets()[row] - column_array->getOffsets()[row - 1];
+        if (len < 1)
+        {
+            return;
+        }
         const ColumnLowCardinality * col_lowcard = checkAndGetColumn<ColumnLowCardinality>(column_array->getData());
         auto offset = column_array->getOffsets()[row - 1];
-        result.reserve(part_col_indexes_size);
-        for (size_t i = 0; i < part_col_indexes_size; ++i)
+        for (size_t i = 0; i < len; ++i)
         {
-            result.push_back(col_lowcard->getDataAt(offset + i).toString());
+            replacing_names.emplace_back(col_lowcard->getDataAt(offset + i).toString());
         }
     }
 
-    return result;
+    return;
 }
 
 void PartialReplacingSortedAlgorithm::replacePartially(const ReplacingNames& current_colnames, SortCursor current)
 {
-    ReplacingNames base_row_colnames = extractReplacingColunmNames((*base_row.all_columns)[std::get<1>(part_replacing_col_info)], base_row.row_num);
-    bool base_row_is_partial = !base_row_colnames.empty();
+    bool base_row_is_partial = !col_names_base_row.empty();
     for (auto col_name : current_colnames)
     {
         if (invalid(col_name))
             continue;
-        //if base row is a partial columns row, we merge all the indexes into base row
+        //if base row is a partial columns row, merge all the column names into base row
         if (base_row_is_partial)
         {
             //initialize
             if (merged_unique_colnames.empty())
             {
-                for (auto colname_in_base : base_row_colnames)
+                for (auto colname_in_base : col_names_base_row)
                 {
                     if (invalid(colname_in_base))
                         continue;
@@ -141,16 +131,8 @@ void PartialReplacingSortedAlgorithm::replacePartially(const ReplacingNames& cur
         }
         if_partial_replaced = true;
         //position in block/chunk
-        size_t pos;
-        try
-        {
-            pos = header.getPositionByName(col_name);
-        }
-        catch(const Exception&)
-        {
-            //colunm has been deleted
-            continue;
-        }
+        if (!header.has(col_name)) continue;
+        size_t pos = header.getPositionByName(col_name);
         //replace partially
         all_columns[pos] = current->all_columns[pos];
         row_nums[pos] = current->getRow();
@@ -159,6 +141,7 @@ void PartialReplacingSortedAlgorithm::replacePartially(const ReplacingNames& cur
 
 IMergingAlgorithm::Status PartialReplacingSortedAlgorithm::merge()
 {
+    ReplacingNames col_names;
     while (queue.isValid())
     {
         SortCursor current = queue.current();
@@ -185,19 +168,26 @@ IMergingAlgorithm::Status PartialReplacingSortedAlgorithm::merge()
             }
         }
 
-        //got a base row, may be a full columns row or partial columns row.
+        extractReplacingColunmNames(col_names, current->all_columns[std::get<1>(part_replacing_col_info)], current->getRow());
+        const auto del_flag = col_names.size() == 1 && col_names[0] == delete_flag;
+
         if (base_row.empty())
         {
-            setBaseRow(current);
+            setBaseRow(current, col_names);
+            //we pass the delete flag directly when there's no base row
+            //in case of merging on fly
+            if (del_flag)
+            {
+                insertRow();
+            }
         }
         else
         {
-            ReplacingNames col_names = extractReplacingColunmNames(current->all_columns[std::get<1>(part_replacing_col_info)], current->getRow());
-            //partial columns row, replace the base row with it.
+            //partial columns row, replace base row according to partial column names in array.
             if (!col_names.empty())
             {
                 //delete
-                if (col_names.size() == 1 && col_names[0] == delete_flag)
+                if (del_flag)
                 {
                     clear();
                 }
@@ -209,7 +199,7 @@ IMergingAlgorithm::Status PartialReplacingSortedAlgorithm::merge()
             //full columns row, set it as a base row
             else
             {
-                setBaseRow(current);
+                setBaseRow(current, col_names);
             }
         }
 

@@ -36,41 +36,36 @@ private:
     using RowRef = detail::RowRefWithOwnedChunk;
     using ReplacingNames = std::vector<String>;
     using Indexes = std::vector<size_t>;
-    //using ColNameToPosMap = std::unordered_map<String, size_t>;
     using UniqueString = std::set<String>;
-    static constexpr size_t max_row_refs = 2; /// last, current.
+    static constexpr size_t max_row_refs = 2;
 
     std::tuple<String, size_t> part_replacing_col_info;
     Indexes primary_keys_pos;
 
     RowRef base_row;
+    ReplacingNames col_names_base_row;
+
     ColumnRawPtrs all_columns;
     Indexes row_nums;
     size_t owned_chunk_row_num = 0;
-    //convert column name to position in block
-    //ColNameToPosMap colname_to_pos;
     UniqueString merged_unique_colnames;
     bool if_partial_replaced = false;
     Block header;
     String delete_flag;
 
-    /// Sources of rows with the current primary key.
-    //PODArray<RowSourcePart> current_row_sources;
-
     void insertRow();
-
-    size_t sizeAt(const IColumn* column_ptr, size_t i);
 
     bool hasEqualPrimaryKeyColumnsWithBaseRow(SortCursor current);
 
-    ReplacingNames extractReplacingColunmNames(const IColumn* column_ptr, size_t row);
+    void extractReplacingColunmNames(ReplacingNames& replacing_names, const IColumn* column_ptr, size_t row);
 
     void replacePartially(const ReplacingNames& current_indexes, SortCursor current);
 
-    void setBaseRow(SortCursor current)
+    void setBaseRow(SortCursor current, ReplacingNames& col_names_base_row_)
     {
         clear();
         setRowRef(base_row, current);
+        col_names_base_row.swap(col_names_base_row_);
         owned_chunk_row_num = sources[current->order].chunk->getNumRows();
     }
 
@@ -89,6 +84,7 @@ private:
         all_columns.clear();
         row_nums.clear();
         base_row.clear();
+        col_names_base_row.clear();
         base_row.owned_chunk = nullptr;
         owned_chunk_row_num = 0;
         merged_unique_colnames.clear();
