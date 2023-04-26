@@ -387,7 +387,8 @@ static StoragePtr create(const StorageFactory::Arguments & args)
             break;
         }
         case MergeTreeData::MergingParams::PartialReplacing:
-            add_mandatory_param("partial columns names column");
+            add_mandatory_param("column of replacing names array");
+            add_optional_param("delete flag");
             break;
     }
 
@@ -631,36 +632,27 @@ static StoragePtr create(const StorageFactory::Arguments & args)
     }
     else if (merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
     {
-        // If the last element is not index_granularity or replica_name (a literal), then this is the name of the partial columns names column.
-        if (arg_cnt && !engine_args[arg_cnt - 1]->as<ASTLiteral>())
+        // delete flag
+        if (const auto * ast = engine_args[arg_cnt - 1]->as<ASTLiteral>())
         {
-            if (!tryGetIdentifierNameInto(engine_args[arg_cnt - 1], merging_params.part_cols_names_column))
-                throw Exception(
-                    "Partial columns names column name must be an unquoted string" + getMergeTreeVerboseHelp(is_extended_storage_def),
-                    ErrorCodes::BAD_ARGUMENTS);
+            String error_msg = "Delete flag for Partial Replacing MergeTree must be a string";
+            error_msg += getMergeTreeVerboseHelp(is_extended_storage_def);
+
+            if (ast->value.getType() != Field::Types::String)
+                throw Exception(error_msg, ErrorCodes::BAD_ARGUMENTS);
+
+            merging_params.part_cols_delete_flag = ast->value.get<String>();
+
             --arg_cnt;
         }
 
-        // delete flag
-        if (arg_cnt)
-        {
-            if (auto delete_flag_lit = engine_args[arg_cnt - 1]->as<ASTLiteral>();
-                delete_flag_lit && delete_flag_lit->value.getType() == Field::Types::String)
-            {
-                auto val = delete_flag_lit->value.get<String>();
-                if (!val.empty())
-                {
-                    merging_params.part_cols_delete_flag = val;
-                }
-            }
-            else
-            {
-                throw Exception(
-                    "Delete flag for Partial Replacing MergeTree must be a string" + getMergeTreeVerboseHelp(is_extended_storage_def),
-                    ErrorCodes::BAD_ARGUMENTS);
-            }
-            --arg_cnt;
-        }
+        // the name of the partial columns names column.
+        if (!tryGetIdentifierNameInto(engine_args[arg_cnt - 1], merging_params.part_cols_names_column))
+            throw Exception(
+                "column of replacing names array must be an unquoted string" + getMergeTreeVerboseHelp(is_extended_storage_def),
+                ErrorCodes::BAD_ARGUMENTS);
+            
+        --arg_cnt;
     }
 
     String date_column_name;
@@ -821,7 +813,7 @@ static StoragePtr create(const StorageFactory::Arguments & args)
     if (merging_params.mode == MergeTreeData::MergingParams::PartialReplacing)
     {
         merging_params.primary_keys = metadata.primary_key.column_names;
-        for (auto col : metadata.columns.getAllPhysical())
+        for (const auto& col : metadata.columns.getAllPhysical())
         {
             merging_params.all_column_names.push_back(col.name);
         }
