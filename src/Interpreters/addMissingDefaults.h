@@ -29,7 +29,7 @@ ActionsDAGPtr addMissingDefaults(
     const ColumnsDescription & columns, ContextPtr context, bool null_as_default = false);
 
 ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
-    const String & rep_col_idxes_arr_name,
+    const String & rep_colnames_arr_name,
     const Block & in_header, const NamesAndTypesList & required_columns,
     const Block & partial_tree_header,
     const ColumnsDescription & columns, ContextPtr context, bool null_as_default = false);

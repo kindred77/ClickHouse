@@ -92,7 +92,7 @@ ActionsDAGPtr addMissingDefaults(
 };
 
 ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
-    const String & rep_col_idxes_arr_name,
+    const String & rep_colnames_arr_name,
     const Block & in_header, const NamesAndTypesList & required_columns,
     const Block & partial_tree_header,
     const ColumnsDescription & columns, ContextPtr context, bool null_as_default)
@@ -104,13 +104,13 @@ ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
     /// First, remember the offset columns for all arrays in the block.
     std::map<String, ActionsDAG::NodeRawConstPtrs> nested_groups;
 
-    Array col_idxes_arr;
+    Array col_names_arr;
 
     for (size_t i = 0, size = in_header.columns(); i < size; ++i)
     {
         const auto & elem = in_header.getByPosition(i);
 
-        col_idxes_arr.push_back(partial_tree_header.getPositionByName(elem.name) + 1);
+        col_names_arr.emplace_back(elem.name);
 
         if (typeid_cast<const ColumnArray *>(&*elem.column))
         {
@@ -137,9 +137,9 @@ ActionsDAGPtr addMissingDefaultsForPartialReplacingAutoGen(
         if (columns.hasDefault(column.name))
             continue;
 
-        if (column.name == rep_col_idxes_arr_name)
+        if (column.name == rep_colnames_arr_name)
         {
-            auto new_column = column.type->createColumnConst(0, col_idxes_arr);
+            auto new_column = column.type->createColumnConst(0, col_names_arr);
             const auto * col = &actions->addColumn({std::move(new_column), column.type, column.name});
             index.push_back(&actions->materializeNode(*col));
             continue;
