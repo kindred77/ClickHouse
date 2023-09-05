@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 #include <naucrates/md/CMDName.h>
 #include <naucrates/md/IMDFunction.h>
@@ -18,6 +18,8 @@ using ContextPtr = std::shared_ptr<const Context>;
 
 class ProcProvider;
 using ProcProviderPtr = std::shared_ptr<ProcProvider>;
+
+using String = std::string;
 
 class FunctionProvider
 {
@@ -43,13 +45,13 @@ public:
 
     // Datum OidFunctionCall1_DatumArr(Oid functionId, Datum * datums);
 
-    Datum OidInputFunctionCall(Oid functionId, const char * str, Oid typioparam, int32 typmod);
+    duckdb_libpgquery::PGDatum OidInputFunctionCall(duckdb_libpgquery::PGOid functionId, const char * str, duckdb_libpgquery::PGOid typioparam, duckdb_libpgquery::int32 typmod);
 
-    int get_func_arg_info(const PGProcPtr& procTup, std::vector<Oid>& p_argtypes, std::vector<String>& p_argnames, std::vector<char>& p_argmodes);
+    int get_func_arg_info(const duckdb_libpgquery::PGProcPtr& procTup, std::vector<duckdb_libpgquery::PGOid>& p_argtypes, std::vector<String>& p_argnames, std::vector<char>& p_argmodes);
 
-    bool MatchNamedCall(const PGProcPtr& proctup, int nargs, duckdb_libpgquery::PGList * argnames, int ** argnumbers);
+    bool MatchNamedCall(const duckdb_libpgquery::PGProcPtr& proctup, int nargs, duckdb_libpgquery::PGList * argnames, int ** argnumbers);
 
-    FuncCandidateListPtr FuncnameGetCandidates(
+    duckdb_libpgquery::FuncCandidateListPtr FuncnameGetCandidates(
         duckdb_libpgquery::PGList * names,
         int nargs,
         duckdb_libpgquery::PGList * argnames,
@@ -59,7 +61,7 @@ public:
 
     duckdb_libpgquery::PGList * SystemFuncName(const char * name);
 
-    String get_func_result_name(Oid functionId);
+    String get_func_result_name(duckdb_libpgquery::PGOid functionId);
 };
 
 }

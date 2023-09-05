@@ -1,5 +1,5 @@
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
-#include <Interpreters/orcaopt/walkers.h>
+#include <common/parser_common.hpp>
 
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 
@@ -11,14 +11,6 @@
 #include <rocksdb/table.h>
 
 #include <filesystem>
-
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wunused-label"
-#else
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wunused-label"
-#endif
 
 using namespace duckdb_libpgquery;
 
@@ -52,21 +44,22 @@ void RelationProvider::initDb()
     status = rocksdb_ptr->Get(rocksdb::ReadOptions(), rocksdb::Slice(max_database_oid_rocksdb_key), &max_oid);
     if (status.ok())
     {
-        DATABASE_OID_ID = Oid(std::stoi(max_oid));
+        DATABASE_OID_ID = PGOid(std::stoi(max_oid));
     }
     // get max table oid
     status = rocksdb_ptr->Get(rocksdb::ReadOptions(), rocksdb::Slice(max_table_oid_rocksdb_key), &max_oid);
     if (status.ok())
     {
-        RELATION_OID_ID = Oid(std::stoi(max_oid));
+        RELATION_OID_ID = PGOid(std::stoi(max_oid));
     }
 };
 
 void RelationProvider::initAttrs(PGRelationPtr & relation)
 {
     PGAttrNumber attr_num = 1;
-    auto all_cols = relation->storage_ptr->getInMemoryMetadataPtr()->getColumns().getAll();
-    auto virtual_cols = relation->storage_ptr->getVirtuals();
+    IStorage* storage = relation->storage_ptr.get();
+    auto all_cols = storage->getInMemoryMetadataPtr()->getColumns().getAll();
+    auto virtual_cols = storage->getVirtuals();
     all_cols.merge(virtual_cols);
     for (auto name_and_type : all_cols)
     {
@@ -99,7 +92,7 @@ RelationProvider::RelationProvider(ContextPtr& context_)
                 throw Exception("Can not load database "+database_name+" to RocksDB, write error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
         }
 
-        auto db_ptr = std::make_shared<PGDatabase>(PGDatabase{static_cast<Oid>(std::stoi(database_oid)), database_name});
+        auto db_ptr = std::make_shared<PGDatabase>(PGDatabase{static_cast<PGOid>(std::stoi(database_oid)), database_name});
         oid_database_map.insert({db_ptr->oid, db_ptr});
 
         const auto & database = pair.second;
@@ -124,7 +117,7 @@ RelationProvider::RelationProvider(ContextPtr& context_)
             }
             
             auto tab_class = std::make_shared<Form_pg_class>(Form_pg_class{
-                /*oid*/ Oid(std::stoi(table_oid)),
+                /*oid*/ PGOid(std::stoi(table_oid)),
                 /*relname*/ table_name,
                 /*relnamespace*/ db_ptr->oid,
                 /*reltype*/ InvalidOid,
@@ -201,7 +194,7 @@ RelationProvider::RelationProvider(ContextPtr& context_)
 };
 
 // StoragePtr
-// RelationProvider::getStorageByOID(Oid oid) const
+// RelationProvider::getStorageByOID(PGOid oid) const
 // {
 // 	auto it = oid_storageid_map.find(oid);
 // 	if (it == oid_storageid_map.end())
@@ -209,7 +202,7 @@ RelationProvider::RelationProvider(ContextPtr& context_)
 // 	return it->second;
 // };
 
-// std::optional<std::tuple<Oid, StoragePtr, char> >
+// std::optional<std::tuple<PGOid, StoragePtr, char> >
 // RelationProvider::getPairByDBAndTableName(const String & database_name, const String & table_name) const
 // {
 // 	auto it = oid_storageid_map.find(oid);
@@ -218,7 +211,7 @@ RelationProvider::RelationProvider(ContextPtr& context_)
 // 	return {it->first, it->second, 'r'};
 // }
 
-PGClassPtr RelationProvider::getClassByRelOid(Oid oid) const
+PGClassPtr RelationProvider::getClassByRelOid(PGOid oid) const
 {
 	auto it = oid_relation_map.find(oid);
 	if (it == oid_relation_map.end())
@@ -226,7 +219,7 @@ PGClassPtr RelationProvider::getClassByRelOid(Oid oid) const
 	return it->second->rd_rel;
 };
 
-bool RelationProvider::has_subclass(Oid relationId)
+bool RelationProvider::has_subclass(PGOid relationId)
 {
 	PGClassPtr tuple = getClassByRelOid(relationId);
 	if (tuple == nullptr)
@@ -238,7 +231,7 @@ bool RelationProvider::has_subclass(Oid relationId)
 	return tuple->relhassubclass;
 };
 
-const std::string RelationProvider::get_database_name(Oid dbid) const
+const std::string RelationProvider::get_database_name(PGOid dbid) const
 {
     auto it = oid_database_map.find(dbid);
 	if (it == oid_database_map.end())
@@ -246,7 +239,7 @@ const std::string RelationProvider::get_database_name(Oid dbid) const
 	return it->second->name;
 };
 
-char RelationProvider::get_rel_relkind(Oid relid) const
+char RelationProvider::get_rel_relkind(PGOid relid) const
 {
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -254,7 +247,7 @@ char RelationProvider::get_rel_relkind(Oid relid) const
 	return it->second->rd_rel->relkind;
 };
 
-const std::string RelationProvider::get_attname(Oid relid, PGAttrNumber attnum) const
+const std::string RelationProvider::get_attname(PGOid relid, PGAttrNumber attnum) const
 {
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -270,7 +263,7 @@ const std::string RelationProvider::get_attname(Oid relid, PGAttrNumber attnum) 
     return "";
 };
 
-const std::string RelationProvider::get_rel_name(Oid relid)
+const std::string RelationProvider::get_rel_name(PGOid relid)
 {
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -278,7 +271,7 @@ const std::string RelationProvider::get_rel_name(Oid relid)
 	return it->second->rd_rel->relname;
 };
 
-PGAttrPtr RelationProvider::get_att_by_reloid_attnum(Oid relid, PGAttrNumber attnum) const
+PGAttrPtr RelationProvider::get_att_by_reloid_attnum(PGOid relid, PGAttrNumber attnum) const
 {
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -340,11 +333,11 @@ std::string RelationProvider::get_rte_attribute_name(PGRangeTblEntry * rte, PGAt
 bogus:
     /* else caller gave us a bogus attnum */
     name = (rte->eref && rte->eref->aliasname) ? rte->eref->aliasname : "*BOGUS*";
-    ereport(WARNING, (errcode(ERRCODE_INTERNAL_ERROR), errmsg_internal("invalid attnum %d for rangetable entry %s", attnum, name)));
+    ereport(WARNING, (errcode(PG_ERRCODE_INTERNAL_ERROR), errmsg_internal("invalid attnum %d for rangetable entry %s", attnum, name)));
     return "*BOGUS*";
 };
 
-Oid RelationProvider::RangeVarGetRelidExtended(
+PGOid RelationProvider::RangeVarGetRelidExtended(
         const PGRangeVar * relation, LOCKMODE lockmode, bool missing_ok,
 		bool nowait, RangeVarGetRelidCallback callback, void * callback_arg)
 {
@@ -532,10 +525,10 @@ Oid RelationProvider::RangeVarGetRelidExtended(
     // }
     // return relId;
 
-    Oid relId = InvalidOid;
+    PGOid relId = InvalidOid;
     if (relation->schemaname)
     {
-        Oid namespaceId;
+        PGOid namespaceId;
 
         /* use exact schema given */
         namespaceId = LookupExplicitNamespace(relation->schemaname, missing_ok);
@@ -553,7 +546,7 @@ Oid RelationProvider::RangeVarGetRelidExtended(
     return relId;
 };
 
-PGRelationPtr RelationProvider::relation_open(Oid relationId, LOCKMODE lockmode)
+PGRelationPtr RelationProvider::relation_open(PGOid relationId, LOCKMODE lockmode)
 {
     if (lockmode == RowShareLock
         || lockmode == RowExclusiveLock
@@ -580,7 +573,7 @@ void RelationProvider::relation_close(PGRelationPtr relation, LOCKMODE lockmode)
     return;
 };
 
-PGRelationPtr RelationProvider::try_heap_open(Oid relationId, LOCKMODE lockmode, bool noWait)
+PGRelationPtr RelationProvider::try_heap_open(PGOid relationId, LOCKMODE lockmode, bool noWait)
 {
     return relation_open(relationId, lockmode);
 };
@@ -590,7 +583,7 @@ bool RelationProvider::IsSystemRelation(PGRelationPtr relation)
     return false;
 };
 
-Oid RelationProvider::get_relname_relid(const char * relname, Oid relnamespace)
+PGOid RelationProvider::get_relname_relid(const char * relname, PGOid relnamespace)
 {
     for (auto pair : oid_relation_map)
     {
@@ -604,7 +597,7 @@ Oid RelationProvider::get_relname_relid(const char * relname, Oid relnamespace)
     return InvalidOid;
 };
 
-Oid RelationProvider::LookupNamespaceNoError(const char * nspname)
+PGOid RelationProvider::LookupNamespaceNoError(const char * nspname)
 {
     /* check for pg_temp alias */
     // if (strcmp(nspname, "pg_temp") == 0)
@@ -676,12 +669,12 @@ bool RelationProvider::PGPolicyIsReplicated(const PGPolicyPtr policy)
     return policy->ptype == POLICYTYPE_REPLICATED;
 };
 
-// bool RelationProvider::AttrExistsInRel(Oid rel_oid, int attr_no)
+// bool RelationProvider::AttrExistsInRel(PGOid rel_oid, int attr_no)
 // {
 //     return true;
 // };
 
-PGAttrNumber RelationProvider::get_attnum(Oid relid, const char * attname)
+PGAttrNumber RelationProvider::get_attnum(PGOid relid, const char * attname)
 {
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -697,7 +690,7 @@ PGAttrNumber RelationProvider::get_attnum(Oid relid, const char * attname)
     return InvalidAttrNumber;
 };
 
-Oid RelationProvider::get_atttype(Oid relid, PGAttrNumber attnum)
+PGOid RelationProvider::get_atttype(PGOid relid, PGAttrNumber attnum)
 {
     // HeapTuple tp;
 
@@ -705,7 +698,7 @@ Oid RelationProvider::get_atttype(Oid relid, PGAttrNumber attnum)
     // if (HeapTupleIsValid(tp))
     // {
     //     Form_pg_attribute att_tup = (Form_pg_attribute)GETSTRUCT(tp);
-    //     Oid result;
+    //     PGOid result;
 
     //     result = att_tup->atttypid;
     //     ReleaseSysCache(tp);
@@ -728,9 +721,9 @@ Oid RelationProvider::get_atttype(Oid relid, PGAttrNumber attnum)
     return InvalidOid;
 };
 
-Oid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missing_ok)
+PGOid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missing_ok)
 {
-    // Oid namespaceId;
+    // PGOid namespaceId;
     // AclResult aclresult;
 
     // /* check for pg_temp alias */
@@ -758,7 +751,7 @@ Oid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missing
 
     // return namespaceId;
 
-    Oid namespaceId = InvalidOid;
+    PGOid namespaceId = InvalidOid;
     for (auto pair : oid_database_map)
     {
         if (pair.second->name == std::string(nspname))
@@ -775,7 +768,7 @@ Oid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missing
     return namespaceId;
 };
 
-std::string RelationProvider::get_namespace_name(Oid nspid)
+std::string RelationProvider::get_namespace_name(PGOid nspid)
 {
     // HeapTuple tp;
 
@@ -803,18 +796,24 @@ std::string RelationProvider::get_namespace_name(Oid nspid)
     return "";
 };
 
-PGRelationPtr RelationProvider::heap_open(Oid relationId, LOCKMODE lockmode)
+PGRelationPtr RelationProvider::heap_open(PGOid relationId, LOCKMODE lockmode)
 {
     PGRelationPtr r;
 
     r = relation_open(relationId, lockmode);
 
     if (r->rd_rel->relkind == PG_RELKIND_INDEX)
-        ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is an index", RelationGetRelationName(r))));
+        ereport(ERROR, (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is an index", RelationGetRelationName(r))));
     else if (r->rd_rel->relkind == PG_RELKIND_COMPOSITE_TYPE)
-        ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is a composite type", RelationGetRelationName(r))));
+        ereport(ERROR, (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is a composite type", RelationGetRelationName(r))));
 
     return r;
+};
+
+PGOid RelationProvider::get_rel_type_id(PGOid relid)
+{
+    auto rel_class = getClassByRelOid(relid);
+    return rel_class->reltype;
 };
 
 }

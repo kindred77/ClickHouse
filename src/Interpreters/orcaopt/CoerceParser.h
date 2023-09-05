@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -39,127 +39,127 @@ private:
 public:
 	explicit CoerceParser(ContextPtr& context_);
 
-	Oid
-	select_common_type(PGParseState *pstate, duckdb_libpgquery::PGList *exprs, const char *context,
+	duckdb_libpgquery::PGOid
+	select_common_type(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *exprs, const char *context,
 				   duckdb_libpgquery::PGNode **which_expr);
 	
 	duckdb_libpgquery::PGNode *
-	coerce_type(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
-			Oid inputTypeId, Oid targetTypeId, int32 targetTypeMod,
+	coerce_type(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+			duckdb_libpgquery::PGOid inputTypeId, duckdb_libpgquery::PGOid targetTypeId, duckdb_libpgquery::int32 targetTypeMod,
 			duckdb_libpgquery::PGCoercionContext ccontext, duckdb_libpgquery::PGCoercionForm cformat, int location);
 
     duckdb_libpgquery::PGNode *
-	coerce_to_target_type(PGParseState *pstate, duckdb_libpgquery::PGNode *expr, Oid exprtype,
-					  Oid targettype, int32 targettypmod,
+	coerce_to_target_type(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *expr, duckdb_libpgquery::PGOid exprtype,
+					  duckdb_libpgquery::PGOid targettype, duckdb_libpgquery::int32 targettypmod,
 					  duckdb_libpgquery::PGCoercionContext ccontext,
 					  duckdb_libpgquery::PGCoercionForm cformat,
 					  int location);
 	
 	duckdb_libpgquery::PGNode *
-	coerce_to_common_type(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
-					  Oid targetTypeId, const char *context);
+	coerce_to_common_type(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+					  duckdb_libpgquery::PGOid targetTypeId, const char *context);
 
 	duckdb_libpgquery::PGNode *
-	coerce_to_boolean(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+	coerce_to_boolean(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node,
 				  const char *constructName);
 
 	bool
-	can_coerce_type(int nargs, const Oid *input_typeids, const Oid *target_typeids,
+	can_coerce_type(int nargs, const duckdb_libpgquery::PGOid *input_typeids, const duckdb_libpgquery::PGOid *target_typeids,
 				duckdb_libpgquery::PGCoercionContext ccontext);
 
-	PGCoercionPathType
-	find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
+	duckdb_libpgquery::PGCoercionPathType
+	find_coercion_pathway(duckdb_libpgquery::PGOid targetTypeId, duckdb_libpgquery::PGOid sourceTypeId,
 					  duckdb_libpgquery::PGCoercionContext ccontext,
-					  Oid *funcid);
+					  duckdb_libpgquery::PGOid *funcid);
 
-	PGCoercionPathType
-	find_typmod_coercion_function(Oid typeId,
-							  Oid *funcid);
+	duckdb_libpgquery::PGCoercionPathType
+	find_typmod_coercion_function(duckdb_libpgquery::PGOid typeId,
+							  duckdb_libpgquery::PGOid *funcid);
 
     duckdb_libpgquery::PGNode * coerce_type_typmod(
-        duckdb_libpgquery::PGNode * node, Oid targetTypeId, int32 targetTypMod,
+        duckdb_libpgquery::PGNode * node, duckdb_libpgquery::PGOid targetTypeId, duckdb_libpgquery::int32 targetTypMod,
 		duckdb_libpgquery::PGCoercionForm cformat, int location, bool isExplicit, bool hideInputCoercion);
 
     void
 	hide_coercion_node(duckdb_libpgquery::PGNode *node);
 
 	duckdb_libpgquery::PGNode *
-	coerce_record_to_complex(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
-						 Oid targetTypeId,
+	coerce_record_to_complex(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+						 duckdb_libpgquery::PGOid targetTypeId,
 						 duckdb_libpgquery::PGCoercionContext ccontext,
 						 duckdb_libpgquery::PGCoercionForm cformat,
 						 int location);
 
     duckdb_libpgquery::PGNode * build_coercion_expression(
         duckdb_libpgquery::PGNode * node,
-        PGCoercionPathType pathtype,
-        Oid funcId,
-        Oid targetTypeId,
-        int32 targetTypMod,
+        duckdb_libpgquery::PGCoercionPathType pathtype,
+        duckdb_libpgquery::PGOid funcId,
+        duckdb_libpgquery::PGOid targetTypeId,
+        duckdb_libpgquery::int32 targetTypMod,
         duckdb_libpgquery::PGCoercionForm cformat,
         int location,
         bool isExplicit);
 
     int
-	parser_coercion_errposition(PGParseState *pstate,
+	parser_coercion_errposition(duckdb_libpgquery::PGParseState *pstate,
 							int coerce_location,
 							duckdb_libpgquery::PGNode *input_expr);
 
     duckdb_libpgquery::PGNode * coerce_to_domain(
         duckdb_libpgquery::PGNode * arg,
-        Oid baseTypeId,
-        int32 baseTypeMod,
-        Oid typeId,
+        duckdb_libpgquery::PGOid baseTypeId,
+        duckdb_libpgquery::int32 baseTypeMod,
+        duckdb_libpgquery::PGOid typeId,
         duckdb_libpgquery::PGCoercionForm cformat,
         int location,
         bool hideInputCoercion,
         bool lengthCoercionDone);
 
-    TYPCATEGORY
-	TypeCategory(Oid type);
+    duckdb_libpgquery::TYPCATEGORY
+	TypeCategory(duckdb_libpgquery::PGOid type);
 
 	bool
-	is_complex_array(Oid typid);
+	is_complex_array(duckdb_libpgquery::PGOid typid);
 
 	bool
-	IsPreferredType(TYPCATEGORY category, Oid type);
+	IsPreferredType(duckdb_libpgquery::TYPCATEGORY category, duckdb_libpgquery::PGOid type);
 
-	Oid
-	enforce_generic_type_consistency(const Oid *actual_arg_types,
-								 Oid *declared_arg_types,
+	duckdb_libpgquery::PGOid
+	enforce_generic_type_consistency(const duckdb_libpgquery::PGOid *actual_arg_types,
+								 duckdb_libpgquery::PGOid *declared_arg_types,
 								 int nargs,
-								 Oid rettype,
+								 duckdb_libpgquery::PGOid rettype,
 								 bool allow_poly);
 
 	bool
-	check_generic_type_consistency(const Oid *actual_arg_types,
-							   const Oid *declared_arg_types,
+	check_generic_type_consistency(const duckdb_libpgquery::PGOid *actual_arg_types,
+							   const duckdb_libpgquery::PGOid *declared_arg_types,
 							   int nargs);
 
 	duckdb_libpgquery::PGNode *
-	coerce_to_specific_type_typmod(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
-							   Oid targetTypeId, int32 targetTypmod,
+	coerce_to_specific_type_typmod(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+							   duckdb_libpgquery::PGOid targetTypeId, duckdb_libpgquery::int32 targetTypmod,
 							   const char *constructName);
 
 	duckdb_libpgquery::PGNode *
-	coerce_to_specific_type(PGParseState *pstate, duckdb_libpgquery::PGNode *node,
-						Oid targetTypeId,
+	coerce_to_specific_type(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node,
+						duckdb_libpgquery::PGOid targetTypeId,
 						const char *constructName);
 
-    bool IsBinaryCoercible(Oid srctype, Oid targettype);
+    bool IsBinaryCoercible(duckdb_libpgquery::PGOid srctype, duckdb_libpgquery::PGOid targettype);
 
-    bool typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId);
+    bool typeIsOfTypedTable(duckdb_libpgquery::PGOid reltypeId, duckdb_libpgquery::PGOid reloftypeId);
 
     duckdb_libpgquery::PGVar * coerce_unknown_var(
-        PGParseState * pstate,
+        duckdb_libpgquery::PGParseState * pstate,
         duckdb_libpgquery::PGVar * var,
-        Oid targetTypeId,
-        int32 targetTypeMod,
+        duckdb_libpgquery::PGOid targetTypeId,
+        duckdb_libpgquery::int32 targetTypeMod,
         duckdb_libpgquery::PGCoercionContext ccontext,
         duckdb_libpgquery::PGCoercionForm cformat,
         int levelsup);
 
-    void fixup_unknown_vars_in_targetlist(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist);
+    void fixup_unknown_vars_in_targetlist(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGList * targetlist);
 };
 
 }

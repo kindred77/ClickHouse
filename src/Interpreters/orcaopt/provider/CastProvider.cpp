@@ -2,12 +2,6 @@
 
 #include <Interpreters/Context.h>
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wunused-variable"
-#else
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#endif
-
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -15,303 +9,303 @@ namespace DB
 
 int CastProvider::CAST_OID_ID = 1;
 
-std::pair<Oid, PGCastPtr> CastProvider::INT64_TO_INT16
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT64_TO_INT16
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(20),
-		   /*casttarget*/ Oid(21),
-		   /*castfunc*/ Oid(714),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(20),
+		   /*casttarget*/ PGOid(21),
+		   /*castfunc*/ PGOid(714),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT64_TO_INT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT64_TO_INT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(20),
-		   /*casttarget*/ Oid(23),
-		   /*castfunc*/ Oid(480),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(20),
+		   /*casttarget*/ PGOid(23),
+		   /*castfunc*/ PGOid(480),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT64_TO_FLOAT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT64_TO_FLOAT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(20),
-		   /*casttarget*/ Oid(700),
-		   /*castfunc*/ Oid(652),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(20),
+		   /*casttarget*/ PGOid(700),
+		   /*castfunc*/ PGOid(652),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT64_TO_FLOAT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT64_TO_FLOAT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(20),
-		   /*casttarget*/ Oid(701),
-		   /*castfunc*/ Oid(482),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(20),
+		   /*casttarget*/ PGOid(701),
+		   /*castfunc*/ PGOid(482),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT16_TO_INT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT16_TO_INT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(21),
-		   /*casttarget*/ Oid(20),
-		   /*castfunc*/ Oid(754),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(21),
+		   /*casttarget*/ PGOid(20),
+		   /*castfunc*/ PGOid(754),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT16_TO_INT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT16_TO_INT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(21),
-		   /*casttarget*/ Oid(23),
-		   /*castfunc*/ Oid(313),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(21),
+		   /*casttarget*/ PGOid(23),
+		   /*castfunc*/ PGOid(313),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT16_TO_FLOAT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT16_TO_FLOAT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(21),
-		   /*casttarget*/ Oid(700),
-		   /*castfunc*/ Oid(236),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(21),
+		   /*casttarget*/ PGOid(700),
+		   /*castfunc*/ PGOid(236),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT16_TO_FLOAT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT16_TO_FLOAT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(21),
-		   /*casttarget*/ Oid(701),
-		   /*castfunc*/ Oid(235),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(21),
+		   /*casttarget*/ PGOid(701),
+		   /*castfunc*/ PGOid(235),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::BOOL_TO_INT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::BOOL_TO_INT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(16),
-		   /*casttarget*/ Oid(23),
-		   /*castfunc*/ Oid(2558),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(16),
+		   /*casttarget*/ PGOid(23),
+		   /*castfunc*/ PGOid(2558),
 		   /*castcontext*/ 'e',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::BOOL_TO_STRING
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::BOOL_TO_STRING
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(16),
-		   /*casttarget*/ Oid(25),
-		   /*castfunc*/ Oid(2971),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(16),
+		   /*casttarget*/ PGOid(25),
+		   /*castfunc*/ PGOid(2971),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-// std::pair<Oid, PGCastPtr> CastProvider::BOOL_TO_FIXEDSTRING
-//     = {Oid(++CastProvider::CAST_OID_ID),
+// std::pair<PGOid, PGCastPtr> CastProvider::BOOL_TO_FIXEDSTRING
+//     = {PGOid(++CastProvider::CAST_OID_ID),
 //        std::make_shared<Form_pg_cast>(Form_pg_cast{
-//            /*oid*/ Oid(CastProvider::CAST_OID_ID),
-//            /*castsource*/ Oid(16),
-// 		   /*casttarget*/ Oid(1042),
-// 		   /*castfunc*/ Oid(2971),
+//            /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+//            /*castsource*/ PGOid(16),
+// 		   /*casttarget*/ PGOid(1042),
+// 		   /*castfunc*/ PGOid(2971),
 // 		   /*castcontext*/ 'a',
 // 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::FLOAT32_TO_INT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::FLOAT32_TO_INT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(700),
-		   /*casttarget*/ Oid(20),
-		   /*castfunc*/ Oid(653),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(700),
+		   /*casttarget*/ PGOid(20),
+		   /*castfunc*/ PGOid(653),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::FLOAT32_TO_INT16
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::FLOAT32_TO_INT16
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(700),
-		   /*casttarget*/ Oid(21),
-		   /*castfunc*/ Oid(238),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(700),
+		   /*casttarget*/ PGOid(21),
+		   /*castfunc*/ PGOid(238),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::FLOAT32_TO_INT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::FLOAT32_TO_INT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(700),
-		   /*casttarget*/ Oid(23),
-		   /*castfunc*/ Oid(319),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(700),
+		   /*casttarget*/ PGOid(23),
+		   /*castfunc*/ PGOid(319),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::FLOAT32_TO_FLOAT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::FLOAT32_TO_FLOAT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(700),
-		   /*casttarget*/ Oid(701),
-		   /*castfunc*/ Oid(311),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(700),
+		   /*casttarget*/ PGOid(701),
+		   /*castfunc*/ PGOid(311),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::FLOAT64_TO_INT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::FLOAT64_TO_INT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(701),
-		   /*casttarget*/ Oid(20),
-		   /*castfunc*/ Oid(483),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(701),
+		   /*casttarget*/ PGOid(20),
+		   /*castfunc*/ PGOid(483),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::FLOAT64_TO_INT16
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::FLOAT64_TO_INT16
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(701),
-		   /*casttarget*/ Oid(21),
-		   /*castfunc*/ Oid(237),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(701),
+		   /*casttarget*/ PGOid(21),
+		   /*castfunc*/ PGOid(237),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::FLOAT64_TO_INT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::FLOAT64_TO_INT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(701),
-		   /*casttarget*/ Oid(23),
-		   /*castfunc*/ Oid(317),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(701),
+		   /*casttarget*/ PGOid(23),
+		   /*castfunc*/ PGOid(317),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::FLOAT64_TO_FLOAT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::FLOAT64_TO_FLOAT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(701),
-		   /*casttarget*/ Oid(700),
-		   /*castfunc*/ Oid(312),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(701),
+		   /*casttarget*/ PGOid(700),
+		   /*castfunc*/ PGOid(312),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT32_TO_INT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT32_TO_INT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(23),
-		   /*casttarget*/ Oid(20),
-		   /*castfunc*/ Oid(481),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(23),
+		   /*casttarget*/ PGOid(20),
+		   /*castfunc*/ PGOid(481),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT32_TO_INT16
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT32_TO_INT16
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(23),
-		   /*casttarget*/ Oid(21),
-		   /*castfunc*/ Oid(314),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(23),
+		   /*casttarget*/ PGOid(21),
+		   /*castfunc*/ PGOid(314),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT32_TO_FLOAT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT32_TO_FLOAT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(23),
-		   /*casttarget*/ Oid(700),
-		   /*castfunc*/ Oid(318),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(23),
+		   /*casttarget*/ PGOid(700),
+		   /*castfunc*/ PGOid(318),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::INT32_TO_FLOAT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::INT32_TO_FLOAT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(23),
-		   /*casttarget*/ Oid(701),
-		   /*castfunc*/ Oid(316),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(23),
+		   /*casttarget*/ PGOid(701),
+		   /*castfunc*/ PGOid(316),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-// std::pair<Oid, PGCastPtr> CastProvider::DATE_TO_DATETIME
-//     = {Oid(++CastProvider::CAST_OID_ID),
+// std::pair<PGOid, PGCastPtr> CastProvider::DATE_TO_DATETIME
+//     = {PGOid(++CastProvider::CAST_OID_ID),
 //        std::make_shared<Form_pg_cast>(Form_pg_cast{
-//            /*oid*/ Oid(CastProvider::CAST_OID_ID),
-//            /*castsource*/ Oid(1082),
-// 		   /*casttarget*/ Oid(1114),
-// 		   /*castfunc*/ Oid(2024),
+//            /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+//            /*castsource*/ PGOid(1082),
+// 		   /*casttarget*/ PGOid(1114),
+// 		   /*castfunc*/ PGOid(2024),
 // 		   /*castcontext*/ 'i',
 // 		   /*castmethod*/ 'f'})};
 
-// std::pair<Oid, PGCastPtr> CastProvider::DATE_TO_DATETIME64
-//     = {Oid(++CastProvider::CAST_OID_ID),
+// std::pair<PGOid, PGCastPtr> CastProvider::DATE_TO_DATETIME64
+//     = {PGOid(++CastProvider::CAST_OID_ID),
 //        std::make_shared<Form_pg_cast>(Form_pg_cast{
-//            /*oid*/ Oid(CastProvider::CAST_OID_ID),
-//            /*castsource*/ Oid(1082),
-// 		   /*casttarget*/ Oid(1184),
-// 		   /*castfunc*/ Oid(1174),
+//            /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+//            /*castsource*/ PGOid(1082),
+// 		   /*casttarget*/ PGOid(1184),
+// 		   /*castfunc*/ PGOid(1174),
 // 		   /*castcontext*/ 'i',
 // 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::DECIMAL64_TO_INT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::DECIMAL64_TO_INT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(1700),
-		   /*casttarget*/ Oid(20),
-		   /*castfunc*/ Oid(1779),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(1700),
+		   /*casttarget*/ PGOid(20),
+		   /*castfunc*/ PGOid(1779),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::DECIMAL64_TO_INT16
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::DECIMAL64_TO_INT16
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(1700),
-		   /*casttarget*/ Oid(21),
-		   /*castfunc*/ Oid(1783),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(1700),
+		   /*casttarget*/ PGOid(21),
+		   /*castfunc*/ PGOid(1783),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::DECIMAL64_TO_INT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::DECIMAL64_TO_INT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(1700),
-		   /*casttarget*/ Oid(23),
-		   /*castfunc*/ Oid(1744),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(1700),
+		   /*casttarget*/ PGOid(23),
+		   /*castfunc*/ PGOid(1744),
 		   /*castcontext*/ 'a',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::DECIMAL64_TO_FLOAT32
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::DECIMAL64_TO_FLOAT32
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(1700),
-		   /*casttarget*/ Oid(700),
-		   /*castfunc*/ Oid(1745),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(1700),
+		   /*casttarget*/ PGOid(700),
+		   /*castfunc*/ PGOid(1745),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-std::pair<Oid, PGCastPtr> CastProvider::DECIMAL64_TO_FLOAT64
-    = {Oid(++CastProvider::CAST_OID_ID),
+std::pair<PGOid, PGCastPtr> CastProvider::DECIMAL64_TO_FLOAT64
+    = {PGOid(++CastProvider::CAST_OID_ID),
        std::make_shared<Form_pg_cast>(Form_pg_cast{
-           /*oid*/ Oid(CastProvider::CAST_OID_ID),
-           /*castsource*/ Oid(1700),
-		   /*casttarget*/ Oid(701),
-		   /*castfunc*/ Oid(1746),
+           /*oid*/ PGOid(CastProvider::CAST_OID_ID),
+           /*castsource*/ PGOid(1700),
+		   /*casttarget*/ PGOid(701),
+		   /*castfunc*/ PGOid(1746),
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
@@ -346,7 +340,7 @@ CastProvider::CastProvider(const ContextPtr& context_) : context(context_)
 	oid_cast_map.insert(DECIMAL64_TO_FLOAT64);
 };
 
-PGCastPtr CastProvider::getCastBySourceTypeAndTargetTypeOid(Oid sourceTypeId, Oid targetTypeId) const
+PGCastPtr CastProvider::getCastBySourceTypeAndTargetTypeOid(PGOid sourceTypeId, PGOid targetTypeId) const
 {
 	for (auto pair : oid_cast_map)
 	{

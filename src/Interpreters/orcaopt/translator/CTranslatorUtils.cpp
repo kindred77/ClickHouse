@@ -123,7 +123,7 @@ CTranslatorUtils::GetTableDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
 )
 {
 	// generate an MDId for the table desc.
-	OID rel_oid = rte->relid;
+	PGOid rel_oid = rte->relid;
 
 	if (!GPOS_FTRACE(EopttraceEnableExternalPartitionedTables) &&
 		HasExternalPartition(rel_oid))
@@ -212,7 +212,7 @@ CTranslatorUtils::GetTableDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
 //---------------------------------------------------------------------------
 BOOL
 CTranslatorUtils::IsSirvFunc(CMemoryPool *mp, CMDAccessor *md_accessor,
-							 OID func_oid)
+							 PGOid func_oid)
 {
 	// we exempt the following 3 functions to avoid falling back to the planner
 	// for DML on tables with sequences. The same exemption is also in the planner
@@ -399,7 +399,7 @@ CTranslatorUtils::ResolvePolymorphicTypes(CMemoryPool *mp,
 	const ULONG num_args = std::min(num_arg_types, num_args_from_query);
 	const ULONG total_args = num_args + num_return_args;
 
-	OID arg_types[total_args];
+	PGOid arg_types[total_args];
 	char arg_modes[total_args];
 
 	// copy the first 'num_args' function argument types
@@ -497,7 +497,7 @@ CTranslatorUtils::GetColumnDescriptorsFromRecord(CMemoryPool *mp,
 			 col_type_modifiers)
 	{
 		PGValue *value = (PGValue *) lfirst(col_name);
-		Oid coltype = lfirst_oid(col_type);
+		PGOid coltype = lfirst_oid(col_type);
 		INT type_modifier = lfirst_int(col_type_modifier);
 
 		CHAR *col_name_char_array = strVal(value);
@@ -938,7 +938,7 @@ CTranslatorUtils::GetScanDirection(EdxlIndexScanDirection idx_scan_direction)
 //		Extract comparison operator from an OpExpr, ScalarArrayOpExpr or RowCompareExpr
 //
 //---------------------------------------------------------------------------
-OID
+PGOid
 CTranslatorUtils::OidCmpOperator(PGExpr *expr)
 {
 	GPOS_ASSERT(IsA(expr, PGOpExpr) || IsA(expr, PGScalarArrayOpExpr) ||
@@ -970,14 +970,14 @@ CTranslatorUtils::OidCmpOperator(PGExpr *expr)
 //		Extract comparison operator family for the given index column
 //
 //---------------------------------------------------------------------------
-OID
-CTranslatorUtils::GetOpFamilyForIndexQual(INT attno, OID index_oid)
+PGOid
+CTranslatorUtils::GetOpFamilyForIndexQual(INT attno, PGOid index_oid)
 {
 	PGRelationPtr rel = GetRelation(index_oid);
 	GPOS_ASSERT(NULL != rel)
 	GPOS_ASSERT(attno <= rel->rd_index->indnatts)
 
-	OID op_family_oid = rel->rd_opfamily[attno - 1];
+	PGOid op_family_oid = rel->rd_opfamily[attno - 1];
 	CloseRelation(rel);
 
 	return op_family_oid;
@@ -1332,7 +1332,7 @@ CTranslatorUtils::GenerateColIds(
 		PGTargetEntry *target_entry = (PGTargetEntry *) lfirst(target_entry_cell);
 		GPOS_ASSERT(NULL != target_entry->expr)
 
-		OID expr_type_oid = ExprType((PGNode *) target_entry->expr);
+		PGOid expr_type_oid = ExprType((PGNode *) target_entry->expr);
 		if (!target_entry->resjunk)
 		{
 			ULONG colid = gpos::ulong_max;
@@ -1404,7 +1404,7 @@ CTranslatorUtils::FixUnknownTypeConstant(PGQuery *old_query,
 					(PGTargetEntry *) ListNth(new_query->targetList, pos);
 				GPOS_ASSERT(old_target_entry->resno == new_target_entry->resno)
 				// implicitly cast the unknown constants to the target data type
-				OID target_type_oid =
+				PGOid target_type_oid =
 					GetTargetListReturnTypeOid(output_target_list, col_pos);
 				GPOS_ASSERT(InvalidOid != target_type_oid)
 				PGNode *old_node = (PGNode *) new_target_entry->expr;
@@ -1439,7 +1439,7 @@ CTranslatorUtils::FixUnknownTypeConstant(PGQuery *old_query,
 //		Return the type of the nth non-resjunked target list entry
 //
 //---------------------------------------------------------------------------
-OID
+PGOid
 CTranslatorUtils::GetTargetListReturnTypeOid(PGList *target_list, ULONG col_pos)
 {
 	ULONG col_idx = 0;
@@ -1569,7 +1569,7 @@ CTranslatorUtils::GetColumnDescrAt(CMemoryPool *mp, PGTargetEntry *target_entry,
 	}
 
 	// create a column descriptor
-	OID type_oid = ExprType((PGNode *) target_entry->expr);
+	PGOid type_oid = ExprType((PGNode *) target_entry->expr);
 	INT type_modifier = ExprTypeMod((PGNode *) target_entry->expr);
 	CMDIdGPDB *col_type = GPOS_NEW(mp) CMDIdGPDB(type_oid);
 	CDXLColDescr *dxl_col_descr =
@@ -1689,7 +1689,7 @@ ULONG
 CTranslatorUtils::GetColId(ULONG query_level, INT varno, INT var_attno,
 						   IMDId *mdid, CMappingVarColId *var_colid_mapping)
 {
-	OID oid = CMDIdGPDB::CastMdid(mdid)->Oid();
+	PGOid oid = CMDIdGPDB::CastMdid(mdid)->Oid();
 	PGVar *var = MakeVar(varno, var_attno, oid, -1, 0);
 	ULONG colid = var_colid_mapping->GetColId(query_level, var, EpspotNone);
 	GPDBFree(var);

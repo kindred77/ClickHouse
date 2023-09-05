@@ -8,16 +8,6 @@
 
 #include <Interpreters/Context.h>
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wunused-variable"
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wsometimes-uninitialized"
-#else
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
-#endif
-
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -31,10 +21,10 @@ NodeParser::NodeParser(const ContextPtr& context_) : context(context_)
 	type_provider = std::make_shared<TypeProvider>(context);
 };
 
-Oid NodeParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
+PGOid NodeParser::transformArrayType(PGOid *arrayType, int32 *arrayTypmod)
 {
-    Oid origArrayType = *arrayType;
-    Oid elementType;
+    PGOid origArrayType = *arrayType;
+    PGOid elementType;
     
     /*
 	 * If the input is a domain, smash to base type, and extract the actual
@@ -68,7 +58,7 @@ Oid NodeParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
     if (elementType == InvalidOid)
         ereport(
             ERROR,
-            (errcode(ERRCODE_DATATYPE_MISMATCH),
+            (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
              errmsg("cannot subscript type %s because it is not an array", type_provider->format_type_be(origArrayType).c_str())));
 
 
@@ -96,8 +86,8 @@ Oid NodeParser::transformArrayType(Oid *arrayType, int32 *arrayTypmod)
 // };
 
 PGArrayRef * NodeParser::transformArraySubscripts(
-        PGParseState * pstate, PGNode * arrayBase, Oid arrayType,
-		Oid elementType, int32 arrayTypMod, PGList * indirection,
+        PGParseState * pstate, PGNode * arrayBase, PGOid arrayType,
+		PGOid elementType, int32 arrayTypMod, PGList * indirection,
 		PGNode * assignFrom)
 {
     bool isSlice = false;
@@ -153,7 +143,7 @@ PGArrayRef * NodeParser::transformArraySubscripts(
                 if (subexpr == NULL)
                     ereport(
                         ERROR,
-                        (errcode(ERRCODE_DATATYPE_MISMATCH),
+                        (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
                          errmsg("array subscript must have type integer"),
                          parser_errposition(pstate, exprLocation(ai->lidx))));
             }
@@ -170,7 +160,7 @@ PGArrayRef * NodeParser::transformArraySubscripts(
         if (subexpr == NULL)
             ereport(
                 ERROR,
-                (errcode(ERRCODE_DATATYPE_MISMATCH),
+                (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
                  errmsg("array subscript must have type integer"),
                  parser_errposition(pstate, exprLocation(ai->uidx))));
         upperIndexpr = lappend(upperIndexpr, subexpr);
@@ -182,8 +172,8 @@ PGArrayRef * NodeParser::transformArraySubscripts(
 	 */
     if (assignFrom != NULL)
     {
-        Oid typesource = exprType(assignFrom);
-        Oid typeneeded = isSlice ? arrayType : elementType;
+        PGOid typesource = exprType(assignFrom);
+        PGOid typeneeded = isSlice ? arrayType : elementType;
         PGNode * newFrom;
 
         newFrom = coerce_parser->coerce_to_target_type(pstate, assignFrom, typesource, typeneeded, arrayTypMod,
@@ -191,7 +181,7 @@ PGArrayRef * NodeParser::transformArraySubscripts(
         if (newFrom == NULL)
             ereport(
                 ERROR,
-                (errcode(ERRCODE_DATATYPE_MISMATCH),
+                (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
                  errmsg(
                      "array assignment requires type %s"
                      " but expression is of type %s",
@@ -224,9 +214,9 @@ NodeParser::make_var(PGParseState *pstate, PGRangeTblEntry *rte, int attrno, int
 	PGVar		   *result;
 	int			vnum,
 				sublevels_up;
-	Oid			vartypeid;
+	PGOid			vartypeid;
 	int32		type_mod;
-	Oid			varcollid;
+	PGOid			varcollid;
 
 	vnum = relation_parser->RTERangeTablePosn(pstate, rte, &sublevels_up);
 	relation_parser->get_rte_attribute_type(rte, attrno, &vartypeid, &type_mod, &varcollid);
@@ -241,7 +231,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 	PGConst	   *con;
 	Datum		val;
 	int64		val64;
-	Oid			typeoid;
+	PGOid			typeoid;
 	int			typelen;
 	bool		typebyval;
 	PGParseCallbackState pcbstate;
@@ -289,7 +279,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 				//TODO kindred
 				ereport(
                 ERROR,
-                (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
                  errmsg("Do not supported!")));
 
 
@@ -322,7 +312,7 @@ NodeParser::make_const(PGParseState *pstate, PGValue *value, int location)
 		case T_PGBitString:
 
             //TODO kindred
-            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("Do not supported!")));
+            ereport(ERROR, (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("Do not supported!")));
 
             /* arrange to report location if bit_in() fails */
 			// setup_parser_errposition_callback(&pcbstate, pstate, location);

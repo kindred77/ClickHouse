@@ -8,16 +8,6 @@
 
 #include <Interpreters/Context.h>
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wsometimes-uninitialized"
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wunused-variable"
-#else
-#pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#endif
-
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -34,7 +24,7 @@ TypeParser::TypeParser(const ContextPtr& context_) : context(context_)
 
 void
 TypeParser::typenameTypeIdAndMod(PGParseState *pstate, const PGTypeName *typeName,
-					 Oid *typeid_p, int32 *typmod_p)
+					 PGOid *typeid_p, int32 *typmod_p)
 {
     PGTypePtr		tup;
 
@@ -104,7 +94,7 @@ PGTypePtr TypeParser::LookupTypeName(PGParseState * pstate, const duckdb_libpgqu
 PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGTypeName * typeName,
         int32 * typmod_p, bool temp_ok, bool missing_ok)
 {
-    Oid typoid;
+    PGOid typoid;
     int32 typmod;
 
     if (typeName->names == NIL)
@@ -117,7 +107,7 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
         /* Handle %TYPE reference to type of an existing field */
         PGRangeVar * rel = makeRangeVar(NULL, NULL, typeName->location);
         char * field = NULL;
-        Oid relid;
+        PGOid relid;
         PGAttrNumber attnum;
 
         /* deconstruct the name list */
@@ -126,7 +116,7 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
             case 1:
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_SYNTAX_ERROR),
+                    (errcode(PG_ERRCODE_SYNTAX_ERROR),
                      errmsg("improper %%TYPE reference (too few dotted names): %s", NameListToString(typeName->names)),
                      parser_errposition(pstate, typeName->location)));
                 break;
@@ -148,7 +138,7 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
             default:
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_SYNTAX_ERROR),
+                    (errcode(PG_ERRCODE_SYNTAX_ERROR),
                      errmsg("improper %%TYPE reference (too many dotted names): %s", NameListToString(typeName->names)),
                      parser_errposition(pstate, typeName->location)));
                 break;
@@ -170,7 +160,7 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
             else
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_UNDEFINED_COLUMN),
+                    (errcode(PG_ERRCODE_UNDEFINED_COLUMN),
                      errmsg("column \"%s\" of relation \"%s\" does not exist", field, rel->relname),
                      parser_errposition(pstate, typeName->location)));
         }
@@ -197,7 +187,7 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
         if (schemaname)
         {
             /* Look in specific schema only */
-            Oid namespaceId;
+            PGOid namespaceId;
 
             namespaceId = relation_provider->LookupExplicitNamespace(schemaname, missing_ok);
             if (OidIsValid(namespaceId))
@@ -241,7 +231,7 @@ int32
 TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PGTypePtr typ)
 {
     int32 result = -1;
-    Oid typmodin;
+    PGOid typmodin;
     Datum * datums;
     int n;
     PGListCell * l;
@@ -261,7 +251,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PG
     {
         ereport(
             ERROR,
-            (errcode(ERRCODE_SYNTAX_ERROR),
+            (errcode(PG_ERRCODE_SYNTAX_ERROR),
              errmsg("type modifier cannot be specified for shell type \"%s\"", TypeNameToString(typeName).c_str()),
              parser_errposition(pstate, typeName->location)));
         
@@ -274,7 +264,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PG
     {
         ereport(
             ERROR,
-            (errcode(ERRCODE_SYNTAX_ERROR),
+            (errcode(PG_ERRCODE_SYNTAX_ERROR),
              errmsg("type modifier is not allowed for type \"%s\"", TypeNameToString(typeName).c_str()),
              parser_errposition(pstate, typeName->location)));
         
@@ -352,7 +342,7 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 	{
 		parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" does not exist",
 						TypeNameToString(typeName).c_str())));
 	}
@@ -360,7 +350,7 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 	{
 		parser_errposition(pstate, typeName->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" is only a shell",
 						TypeNameToString(typeName).c_str())));
 	}
@@ -368,7 +358,7 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 };
 
 PGTypePtr
-TypeParser::typeidType(Oid id)
+TypeParser::typeidType(PGOid id)
 {
 	PGTypePtr tup = type_provider->getTypeByOid(id);
 	if (tup == NULL)
@@ -376,9 +366,9 @@ TypeParser::typeidType(Oid id)
 	return tup;
 };
 
-Oid TypeParser::typeidTypeRelid(Oid type_id)
+PGOid TypeParser::typeidTypeRelid(PGOid type_id)
 {
-    Oid result;
+    PGOid result;
 
 	PGTypePtr typeTuple = type_provider->getTypeByOid(type_id);
     if (typeTuple == NULL)
@@ -388,7 +378,7 @@ Oid TypeParser::typeidTypeRelid(Oid type_id)
     return result;
 };
 
-Oid
+PGOid
 TypeParser::typeTypeCollation(PGTypePtr typ)
 {
 	return typ->typcollation;
@@ -412,17 +402,17 @@ TypeParser::stringTypeDatum(PGTypePtr tp, const char *str, int32 atttypmod)
     //TODO kindred
     elog(ERROR, "OidInputFunctionCall is not implemented yet!");
 
-	Oid			typinput = tp->typinput;
-	Oid			typioparam = type_provider->getTypeIOParam(tp);
+	PGOid			typinput = tp->typinput;
+	PGOid			typioparam = type_provider->getTypeIOParam(tp);
 
 	return function_provider->OidInputFunctionCall(typinput, str, typioparam, atttypmod);
 };
 
-Oid
-TypeParser::typeOrDomainTypeRelid(Oid type_id)
+PGOid
+TypeParser::typeOrDomainTypeRelid(PGOid type_id)
 {
 	PGTypePtr typeTuple = nullptr;
-	Oid			result;
+	PGOid			result;
 
 	for (;;)
 	{
@@ -441,13 +431,13 @@ TypeParser::typeOrDomainTypeRelid(Oid type_id)
 	return result;
 };
 
-Oid
+PGOid
 TypeParser::typeTypeRelid(PGTypePtr typ)
 {
 	return typ->typrelid;
 };
 
-Oid
+PGOid
 TypeParser::typeTypeId(PGTypePtr tp)
 {
 	if (tp == nullptr)				/* probably useless */
@@ -455,10 +445,10 @@ TypeParser::typeTypeId(PGTypePtr tp)
 	return tp->oid;
 };
 
-Oid
+PGOid
 TypeParser::LookupCollation(PGParseState *pstate, PGList *collnames, int location)
 {
-	Oid			colloid = InvalidOid;
+	PGOid			colloid = InvalidOid;
     //TODO kindred
     elog(ERROR, "Collation lookuping do not supported yet!");
 	// PGParseCallbackState pcbstate;
@@ -474,9 +464,9 @@ TypeParser::LookupCollation(PGParseState *pstate, PGList *collnames, int locatio
 	return colloid;
 };
 
-Oid TypeParser::typenameTypeId(PGParseState *pstate, const PGTypeName *typeName)
+PGOid TypeParser::typenameTypeId(PGParseState *pstate, const PGTypeName *typeName)
 {
-    Oid typoid;
+    PGOid typoid;
 
     PGTypePtr tup = typenameType(pstate, typeName, NULL);
     typoid = tup->oid;

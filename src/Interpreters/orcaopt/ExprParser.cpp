@@ -1,6 +1,5 @@
 #include <Interpreters/orcaopt/ExprParser.h>
 
-#include <Interpreters/orcaopt/walkers.h>
 #include <Interpreters/orcaopt/RelationParser.h>
 #include <Interpreters/orcaopt/CoerceParser.h>
 #include <Interpreters/orcaopt/SelectParser.h>
@@ -15,14 +14,6 @@
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 
 #include <Interpreters/Context.h>
-
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wswitch"
-#pragma clang diagnostic ignored "-Wcovered-switch-default"
-#else
-#pragma GCC diagnostic ignored "-Wswitch"
-#pragma clang diagnostic ignored "-Wcovered-switch-default"
-#endif
 
 using namespace duckdb_libpgquery;
 
@@ -93,7 +84,20 @@ ExprParser::transformWholeRowRef(PGParseState *pstate, PGRangeTblEntry *rte, int
 	 * historically.  One argument for it is that "rel" and "rel.*" mean the
 	 * same thing for composite relations, so why not for scalar functions...
 	 */
-	result = makeWholeRowVar(rte, vnum, sublevels_up, true);
+	PGOid relTypeOid = InvalidOid;
+	bool isRowType = false;
+	if (rte->rtekind == PG_RTE_RELATION)
+	{
+		relTypeOid = relation_provider->get_rel_type_id(rte->relid);
+	}
+	else if (rte->rtekind == PG_RTE_FUNCTION)
+	{
+		PGNode* fexpr = ((PGRangeTblFunction *) linitial(rte->functions))->funcexpr;
+		PGOid toid = exprType(fexpr);
+		isRowType = type_provider->type_is_rowtype(toid);
+	}
+	
+	result = makeWholeRowVar(rte, vnum, sublevels_up, true, relTypeOid, isRowType);
 
 	/* location is not filled in by makeWholeRowVar */
 	result->location = location;
@@ -375,14 +379,14 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             case CRERR_WRONG_DB:
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                    (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
                      errmsg("cross-database references are not implemented: %s", PGNameListToString(cref->fields).c_str()),
                      parser_errposition(pstate, cref->location)));
                 break;
             case CRERR_TOO_MANY:
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_SYNTAX_ERROR),
+                    (errcode(PG_ERRCODE_SYNTAX_ERROR),
                      errmsg("improper qualified name (too many dotted names): %s", PGNameListToString(cref->fields).c_str()),
                      parser_errposition(pstate, cref->location)));
                 break;
@@ -423,7 +427,7 @@ ExprParser::transformParamRef(PGParseState *pstate, PGParamRef *pref)
 
 	parser_errposition(pstate, pref->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_PARAMETER),
+				(errcode(PG_ERRCODE_UNDEFINED_PARAMETER),
 				 errmsg("there is no parameter $%d", pref->number)));
 
 	return result;
@@ -444,20 +448,20 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 									 ((PGVar *) relref)->varlevelsup);
 		parser_errposition(pstate, location);
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_COLUMN),
+				(errcode(PG_ERRCODE_UNDEFINED_COLUMN),
 				 errmsg("column %s.%s does not exist",
 						rte->eref->aliasname, attname)));
 	}
 	else
 	{
 		/* Have to do it by reference to the type of the expression */
-		Oid			relTypeId = exprType(relref);
+		PGOid			relTypeId = exprType(relref);
 
 		if (type_parser->typeOrDomainTypeRelid(relTypeId) != InvalidOid)
 		{
 			parser_errposition(pstate, location);
 			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
+					(errcode(PG_ERRCODE_UNDEFINED_COLUMN),
 					 errmsg("column \"%s\" not found in data type %s",
 							attname, type_provider->format_type_be(relTypeId).c_str())));
 		}
@@ -465,7 +469,7 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 		{
 			parser_errposition(pstate, location);
 			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
+					(errcode(PG_ERRCODE_UNDEFINED_COLUMN),
 					 errmsg("could not identify column \"%s\" in record data type",
 							attname)));
 		}
@@ -473,7 +477,7 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 		{
 			parser_errposition(pstate, location);
 			ereport(ERROR,
-					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					(errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("column notation .%s applied to type %s, "
 							"which is not a composite type",
 							attname, type_provider->format_type_be(relTypeId).c_str())));
@@ -504,7 +508,7 @@ ExprParser::transformIndirection(PGParseState *pstate, PGNode *basenode, PGList 
         {
             ereport(
                 ERROR,
-                (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
                  errmsg("row expansion via \"*\" is not supported here"),
                  parser_errposition(pstate, location)));
         }
@@ -535,13 +539,13 @@ ExprParser::transformIndirection(PGParseState *pstate, PGNode *basenode, PGList 
 
 PGNode *
 ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
-				   Oid array_type, Oid element_type, int32 typmod)
+				   PGOid array_type, PGOid element_type, int32 typmod)
 {
 	PGArrayExpr  *newa = makeNode(PGArrayExpr);
 	PGList	   *newelems = NIL;
 	PGList	   *newcoercedelems = NIL;
-	ListCell   *element;
-	Oid			coerce_type;
+	PGListCell   *element;
+	PGOid			coerce_type;
 	bool		coerce_hard;
 
 	/*
@@ -611,7 +615,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 		{
 			parser_errposition(pstate, a->location);
 			ereport(ERROR,
-					(errcode(ERRCODE_INDETERMINATE_DATATYPE),
+					(errcode(PG_ERRCODE_INDETERMINATE_DATATYPE),
 					 errmsg("cannot determine type of empty array"),
 					 errhint("Explicitly cast to the desired type, "
 							 "for example ARRAY[]::integer[].")));
@@ -628,7 +632,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 			{
 				parser_errposition(pstate, a->location);
 				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
+						(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find element type for data type %s",
 								type_provider->format_type_be(array_type).c_str())));
 			}
@@ -641,7 +645,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 			{
 				parser_errposition(pstate, a->location);
 				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
+						(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find array type for data type %s",
 								type_provider->format_type_be(element_type).c_str())));
 			}
@@ -677,7 +681,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 			{
 				parser_errposition(pstate, exprLocation(e));
 				ereport(ERROR,
-						(errcode(ERRCODE_CANNOT_COERCE),
+						(errcode(PG_ERRCODE_CANNOT_COERCE),
 						 errmsg("cannot cast type %s to %s",
 								type_provider->format_type_be(exprType(e)).c_str(),
 								type_provider->format_type_be(coerce_type).c_str())));
@@ -705,8 +709,8 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 	PGNode	   *result;
 	PGNode	   *arg = tc->arg;
 	PGNode	   *expr;
-	Oid			inputType;
-	Oid			targetType;
+	PGOid			inputType;
+	PGOid			targetType;
 	int32		targetTypmod;
 	int			location;
 
@@ -731,9 +735,9 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 	 */
 	if (IsA(arg, PGAArrayExpr))
 	{
-		Oid			targetBaseType;
+		PGOid			targetBaseType;
 		int32		targetBaseTypmod;
-		Oid			elementType;
+		PGOid			elementType;
 
 		/*
 		 * If target is a domain over array, work with the base array type
@@ -780,7 +784,7 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 	{
 		coerce_parser->parser_coercion_errposition(pstate, location, expr);
 		ereport(ERROR,
-				(errcode(ERRCODE_CANNOT_COERCE),
+				(errcode(PG_ERRCODE_CANNOT_COERCE),
 				 errmsg("cannot cast type %s to %s",
 						type_provider->format_type_be(inputType).c_str(),
 						type_provider->format_type_be(targetType).c_str())));
@@ -793,7 +797,7 @@ PGNode *
 ExprParser::transformCollateClause(PGParseState *pstate, PGCollateClause *c)
 {
 	PGCollateExpr *newc;
-	Oid			argtype;
+	PGOid			argtype;
 
 	newc = makeNode(PGCollateExpr);
 	newc->arg = (PGExpr *) transformExprRecurse(pstate, c->arg);
@@ -808,7 +812,7 @@ ExprParser::transformCollateClause(PGParseState *pstate, PGCollateClause *c)
 	{
 		parser_errposition(pstate, c->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
+				(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("collations are not supported by type %s",
 						type_provider->format_type_be(argtype).c_str())));
 	}
@@ -1249,7 +1253,7 @@ ExprParser::make_distinct_op(PGParseState *pstate, PGList *opname,
     if (((PGOpExpr *)result)->opresulttype != BOOLOID)
         ereport(
             ERROR,
-            (errcode(ERRCODE_DATATYPE_MISMATCH),
+            (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
              errmsg("IS DISTINCT FROM requires = operator to yield boolean"),
              parser_errposition(pstate, location)));
 
@@ -1276,7 +1280,7 @@ ExprParser::make_row_distinct_op(PGParseState *pstate, PGList *opname,
 	{
 		parser_errposition(pstate, location);
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("unequal number of entries in row expressions")));
 	}
 
@@ -1375,7 +1379,7 @@ ExprParser::transformAExprNullIf(PGParseState *pstate, PGAExpr *a)
     if (result->opresulttype != BOOLOID)
         ereport(
             ERROR,
-            (errcode(ERRCODE_DATATYPE_MISMATCH),
+            (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
              errmsg("NULLIF requires = operator to yield boolean"),
              parser_errposition(pstate, a->location)));
 
@@ -1398,7 +1402,7 @@ ExprParser::transformAExprOf(PGParseState *pstate, PGAExpr *a)
 	PGNode	   *lexpr = a->lexpr;
 	PGConst	   *result;
 	PGListCell   *telem;
-	Oid			ltype,
+	PGOid			ltype,
 				rtype;
 	bool		matched = false;
 
@@ -1483,8 +1487,8 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
     if (list_length(rnonvars) > 1)
     {
         PGList * allexprs;
-        Oid scalar_type;
-        Oid array_type;
+        PGOid scalar_type;
+        PGOid array_type;
 
         /*
 		 * Try to select a common type for the array elements.  Note that
@@ -1880,7 +1884,7 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 	}
 	if (err)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg_internal("%s", err),
 				 parser_errposition(pstate, sublink->location)));
 
@@ -1923,14 +1927,14 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 		if (tlist_item == NULL ||
 			((PGTargetEntry *) lfirst(tlist_item))->resjunk)
 			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery must return a column"),
 					 parser_errposition(pstate, sublink->location)));
 		while ((tlist_item = lnext(tlist_item)) != NULL)
 		{
 			if (!((PGTargetEntry *) lfirst(tlist_item))->resjunk)
 				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("subquery must return only one column"),
 						 parser_errposition(pstate, sublink->location)));
 		}
@@ -1990,12 +1994,12 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 		 */
 		if (list_length(left_list) < list_length(right_list))
 			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery has too many columns"),
 					 parser_errposition(pstate, sublink->location)));
 		if (list_length(left_list) > list_length(right_list))
 			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
+					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 					 errmsg("subquery has too few columns"),
 					 parser_errposition(pstate, sublink->location)));
 
@@ -2046,7 +2050,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 	PGList	   *resultexprs;
 	PGListCell   *l;
 	PGNode	   *defresult;
-	Oid			ptype;
+	PGOid			ptype;
 
 	/* transform the test expression, if any */
 	arg = transformExprRecurse(pstate, (PGNode *) c->arg);
@@ -2122,7 +2126,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 			{
 				parser_errposition(pstate, exprLocation((PGNode *) warg));
 				ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
+						(errcode(PG_ERRCODE_SYNTAX_ERROR),
 						 errmsg("syntax error at or near \"NOT\""),
 						 errhint("Missing <operand> for \"CASE <operand> WHEN IS NOT DISTINCT FROM ...\"")));
 			}
@@ -2192,7 +2196,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 		parser_errposition(pstate,
 									exprLocation(pstate->p_last_srf));
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("set-returning functions are not allowed in %s",
 						"CASE"),
@@ -2243,7 +2247,7 @@ ExprParser::transformCoalesceExpr(PGParseState *pstate, PGCoalesceExpr *c)
 		parser_errposition(pstate,
 									exprLocation(pstate->p_last_srf));
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("set-returning functions are not allowed in %s",
 						"COALESCE"),
@@ -2400,7 +2404,7 @@ ExprParser::transformCurrentOfExpr(PGParseState *pstate, PGCurrentOfExpr *cexpr)
 			// }
 			ereport(
                 ERROR,
-                (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
                  errmsg("Do not supported yet!")));
 		}
 	}
@@ -2483,8 +2487,8 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 				 */
             if (IsA(tc->arg, PGAArrayExpr))
             {
-                    Oid targetType;
-                    Oid elementType;
+                    PGOid targetType;
+                    PGOid elementType;
                     int32 targetTypmod;
 
                     type_parser->typenameTypeIdAndMod(pstate, tc->typeName, &targetType, &targetTypmod);

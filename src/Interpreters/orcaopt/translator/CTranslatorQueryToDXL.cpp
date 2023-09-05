@@ -53,12 +53,6 @@
 #include "naucrates/md/IMDTypeInt8.h"
 #include "naucrates/traceflags/traceflags.h"
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#else
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
 using namespace gpdxl;
 using namespace gpos;
 using namespace gpopt;
@@ -1380,7 +1374,7 @@ CTranslatorQueryToDXL::TranslateQueryToDXL()
 //
 //---------------------------------------------------------------------------
 BOOL
-CTranslatorQueryToDXL::OIDFound(Oid oid, const Oid oids[], ULONG size)
+CTranslatorQueryToDXL::OIDFound(PGOid oid, const PGOid oids[], ULONG size)
 {
 	BOOL found = false;
 	for (ULONG ul = 0; !found && ul < size; ul++)
@@ -1409,7 +1403,7 @@ CTranslatorQueryToDXL::IsLeadWindowFunc(CDXLOperator *dxlop)
 		CDXLScalarWindowRef *winref_dxlop = CDXLScalarWindowRef::Cast(dxlop);
 		const CMDIdGPDB *mdid_gpdb =
 			CMDIdGPDB::CastMdid(winref_dxlop->FuncMdId());
-		Oid oid = mdid_gpdb->Oid();
+		PGOid oid = mdid_gpdb->Oid();
 		is_lead_func =
 			OIDFound(oid, lead_func_oids, GPOS_ARRAY_SIZE(lead_func_oids));
 	}
@@ -1435,7 +1429,7 @@ CTranslatorQueryToDXL::IsLagWindowFunc(CDXLOperator *dxlop)
 		CDXLScalarWindowRef *winref_dxlop = CDXLScalarWindowRef::Cast(dxlop);
 		const CMDIdGPDB *mdid_gpdb =
 			CMDIdGPDB::CastMdid(winref_dxlop->FuncMdId());
-		OID oid = mdid_gpdb->Oid();
+		PGOid oid = mdid_gpdb->Oid();
 		is_lag = OIDFound(oid, lag_func_oids, GPOS_ARRAY_SIZE(lag_func_oids));
 	}
 
@@ -3319,14 +3313,14 @@ CTranslatorQueryToDXL::NoteDistributionPolicyOpclasses(const PGRangeTblEntry *rt
 		bool contains_default_hashops = false;
 		bool contains_legacy_hashops = false;
 		bool contains_nondefault_hashops = false;
-		Oid *opclasses = policy->opclasses;
+		PGOid *opclasses = policy->opclasses;
 
 		for (int i = 0; i < policy_nattrs; i++)
 		{
 			PGAttrNumber attnum = policy->attrs[i];
-			Oid typeoid = desc->attrs[attnum - 1]->atttypid;
-			Oid opfamily;
-			Oid hashfunc;
+			PGOid typeoid = desc->attrs[attnum - 1]->atttypid;
+			PGOid opfamily;
+			PGOid hashfunc;
 
 			opfamily = GetOpclassFamily(opclasses[i]);
 			hashfunc = GetHashProcInOpfamily(opfamily, typeoid);
@@ -3337,7 +3331,7 @@ CTranslatorQueryToDXL::NoteDistributionPolicyOpclasses(const PGRangeTblEntry *rt
 			}
 			else
 			{
-				Oid default_opclass =
+				PGOid default_opclass =
 					GetDefaultDistributionOpclassForType(typeoid);
 
 				if (opclasses[i] == default_opclass)

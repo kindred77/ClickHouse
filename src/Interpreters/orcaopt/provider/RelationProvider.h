@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 #include <gpos/memory/CMemoryPool.h>
 
@@ -21,20 +21,22 @@ using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
 
-typedef void (*RangeVarGetRelidCallback)(const duckdb_libpgquery::PGRangeVar * relation, Oid relId, Oid oldRelId, void * callback_arg);
+using String = std::string;
+
+typedef void (*RangeVarGetRelidCallback)(const duckdb_libpgquery::PGRangeVar * relation, duckdb_libpgquery::PGOid relId, duckdb_libpgquery::PGOid oldRelId, void * callback_arg);
 
 typedef int LOCKMODE;
 
 class RelationProvider
 {
 private:
-    //using ClassMap = std::map<Oid, PGClassPtr>;
+    //using ClassMap = std::map<duckdb_libpgquery::PGOid, PGClassPtr>;
 	//ClassMap oid_class_map;
 
-	using RelationMap = std::map<Oid, PGRelationPtr>;
+	using RelationMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGRelationPtr>;
 	RelationMap oid_relation_map;
 
-    using DatabaseMap = std::map<Oid, PGDatabasePtr>;
+    using DatabaseMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGDatabasePtr>;
 	DatabaseMap oid_database_map;
 
     TypeProviderPtr type_provider;
@@ -54,64 +56,66 @@ private:
 
     void initDb();
 
-    void initAttrs(PGRelationPtr & relation);
+    void initAttrs(duckdb_libpgquery::PGRelationPtr & relation);
 public:
 	//explicit RelationProvider(gpos::CMemoryPool *mp_, ContextPtr context);
     explicit RelationProvider(ContextPtr& context_);
-	//StoragePtr getStorageByOID(Oid oid) const;
+	//StoragePtr getStorageByOID(duckdb_libpgquery::PGOid oid) const;
 
-	//std::optional<std::tuple<Oid, StoragePtr, char> >
+	//std::optional<std::tuple<duckdb_libpgquery::PGOid, StoragePtr, char> >
 	//getPairByDBAndTableName(const String & database_name, const String & table_name) const;
 
-    PGClassPtr getClassByRelOid(Oid oid) const;
+    duckdb_libpgquery::PGClassPtr getClassByRelOid(duckdb_libpgquery::PGOid oid) const;
 
-    bool has_subclass(Oid relationId);
+    bool has_subclass(duckdb_libpgquery::PGOid relationId);
 
-    const std::string get_database_name(Oid dbid) const;
+    const std::string get_database_name(duckdb_libpgquery::PGOid dbid) const;
 
-    char get_rel_relkind(Oid relid) const;
+    char get_rel_relkind(duckdb_libpgquery::PGOid relid) const;
 
-	const std::string get_attname(Oid relid, PGAttrNumber attnum) const;
+	const std::string get_attname(duckdb_libpgquery::PGOid relid, duckdb_libpgquery::PGAttrNumber attnum) const;
 
-    const std::string get_rel_name(Oid relid);
+    const std::string get_rel_name(duckdb_libpgquery::PGOid relid);
 
-    PGAttrPtr get_att_by_reloid_attnum(Oid relid, PGAttrNumber attnum) const;
+    duckdb_libpgquery::PGAttrPtr get_att_by_reloid_attnum(duckdb_libpgquery::PGOid relid, duckdb_libpgquery::PGAttrNumber attnum) const;
 
-	std::string get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, PGAttrNumber attnum);
+	std::string get_rte_attribute_name(duckdb_libpgquery::PGRangeTblEntry * rte, duckdb_libpgquery::PGAttrNumber attnum);
 
-    Oid RangeVarGetRelidExtended(
+    duckdb_libpgquery::PGOid RangeVarGetRelidExtended(
         const duckdb_libpgquery::PGRangeVar * relation, LOCKMODE lockmode, bool missing_ok,
 		bool nowait, RangeVarGetRelidCallback callback, void * callback_arg);
 
-    PGRelationPtr relation_open(Oid relationId, LOCKMODE lockmode);
+    duckdb_libpgquery::PGRelationPtr relation_open(duckdb_libpgquery::PGOid relationId, LOCKMODE lockmode);
 
-    void relation_close(PGRelationPtr relation, LOCKMODE lockmode);
+    void relation_close(duckdb_libpgquery::PGRelationPtr relation, LOCKMODE lockmode);
 
-    PGRelationPtr heap_open(Oid relationId, LOCKMODE lockmode);
+    duckdb_libpgquery::PGRelationPtr heap_open(duckdb_libpgquery::PGOid relationId, LOCKMODE lockmode);
 
-    PGRelationPtr try_heap_open(Oid relationId, LOCKMODE lockmode, bool noWait);
+    duckdb_libpgquery::PGRelationPtr try_heap_open(duckdb_libpgquery::PGOid relationId, LOCKMODE lockmode, bool noWait);
 
-    bool IsSystemRelation(PGRelationPtr relation);
+    bool IsSystemRelation(duckdb_libpgquery::PGRelationPtr relation);
 
-    Oid get_relname_relid(const char * relname, Oid relnamespace);
+    duckdb_libpgquery::PGOid get_relname_relid(const char * relname, duckdb_libpgquery::PGOid relnamespace);
 
-    Oid LookupNamespaceNoError(const char * nspname);
+    duckdb_libpgquery::PGOid LookupNamespaceNoError(const char * nspname);
 
     //PGAttrPtr SystemAttributeByName(const char * attname, bool relhasoids);
 
-    //PGPolicyPtr PGPolicyFetch(Oid tbloid);
+    //PGPolicyPtr PGPolicyFetch(duckdb_libpgquery::PGOid tbloid);
 
-    bool PGPolicyIsReplicated(const PGPolicyPtr policy);
+    bool PGPolicyIsReplicated(const duckdb_libpgquery::PGPolicyPtr policy);
 
-	// bool AttrExistsInRel(Oid rel_oid, int attr_no);
+	// bool AttrExistsInRel(duckdb_libpgquery::PGOid rel_oid, int attr_no);
 
-    PGAttrNumber get_attnum(Oid relid, const char * attname);
+    duckdb_libpgquery::PGAttrNumber get_attnum(duckdb_libpgquery::PGOid relid, const char * attname);
 
-    Oid get_atttype(Oid relid, PGAttrNumber attnum);
+    duckdb_libpgquery::PGOid get_atttype(duckdb_libpgquery::PGOid relid, duckdb_libpgquery::PGAttrNumber attnum);
 
-    Oid LookupExplicitNamespace(const char * nspname, bool missing_ok);
+    duckdb_libpgquery::PGOid LookupExplicitNamespace(const char * nspname, bool missing_ok);
 
-    std::string get_namespace_name(Oid nspid);
+    std::string get_namespace_name(duckdb_libpgquery::PGOid nspid);
+
+    duckdb_libpgquery::PGOid get_rel_type_id(duckdb_libpgquery::PGOid relid);
 };
 
 }

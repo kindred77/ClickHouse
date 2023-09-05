@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -30,11 +30,11 @@ public:
 	explicit CTEParser(const ContextPtr& context_);
 
 	duckdb_libpgquery::PGList *
-	transformWithClause(PGParseState *pstate, duckdb_libpgquery::PGWithClause *withClause);
+	transformWithClause(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGWithClause *withClause);
 
-    void analyzeCTETargetList(PGParseState * pstate, duckdb_libpgquery::PGCommonTableExpr * cte, duckdb_libpgquery::PGList * tlist);
+    void analyzeCTETargetList(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGCommonTableExpr * cte, duckdb_libpgquery::PGList * tlist);
 
-    void analyzeCTE(PGParseState * pstate, duckdb_libpgquery::PGCommonTableExpr * cte);
+    void analyzeCTE(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGCommonTableExpr * cte);
 };
 
 }

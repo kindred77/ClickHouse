@@ -21,7 +21,7 @@
 // #include "nodes/primnodes.h"
 // }
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 #include "gpos/base.h"
 
@@ -67,7 +67,7 @@ class CTranslatorScalarToDXL
 	// shorthand for functions for translating DXL nodes to GPDB expressions
 	typedef CDXLDatum *(DxlDatumFromDatum)(CMemoryPool *mp,
 										   const IMDType *md_type, BOOL is_null,
-										   ULONG len, Datum datum);
+										   ULONG len, duckdb_libpgquery::PGDatum datum);
 
 private:
 	// private constructor for TranslateStandaloneExprToDXL
@@ -309,20 +309,20 @@ public:
 	static CDXLDatum *TranslateDatumToDXL(CMemoryPool *mp,
 										  const IMDType *md_type,
 										  INT type_modifier, BOOL is_null,
-										  ULONG len, Datum datum);
+										  ULONG len, duckdb_libpgquery::PGDatum datum);
 
 	// translate GPDB datum to IDatum
 	static IDatum *CreateIDatumFromGpdbDatum(CMemoryPool *mp,
 											 const IMDType *md_type,
-											 BOOL is_null, Datum datum);
+											 BOOL is_null, duckdb_libpgquery::PGDatum datum);
 
 	// extract the byte array value of the datum
 	static BYTE *ExtractByteArrayFromDatum(CMemoryPool *mp,
 										   const IMDType *md_type, BOOL is_null,
-										   ULONG len, Datum datum);
+										   ULONG len, duckdb_libpgquery::PGDatum datum);
 
 	static CDouble ExtractDoubleValueFromDatum(IMDId *mdid, BOOL is_null,
-											   BYTE *bytes, Datum datum);
+											   BYTE *bytes, duckdb_libpgquery::PGDatum datum);
 
 	// extract the long int value of a datum
 	static LINT ExtractLintValueFromDatum(const IMDType *md_type, BOOL is_null,
@@ -339,38 +339,38 @@ public:
 	static CDXLDatum *TranslateOidDatumToDXL(CMemoryPool *mp,
 											 const IMDType *md_type,
 											 BOOL is_null, ULONG len,
-											 Datum datum);
+											 duckdb_libpgquery::PGDatum datum);
 
 	// datum to int2 CDXLDatum
 	static CDXLDatum *TranslateInt2DatumToDXL(CMemoryPool *mp,
 											  const IMDType *md_type,
 											  BOOL is_null, ULONG len,
-											  Datum datum);
+											  duckdb_libpgquery::PGDatum datum);
 
 	// datum to int4 CDXLDatum
 	static CDXLDatum *TranslateInt4DatumToDXL(CMemoryPool *mp,
 											  const IMDType *md_type,
 											  BOOL is_null, ULONG len,
-											  Datum datum);
+											  duckdb_libpgquery::PGDatum datum);
 
 	// datum to int8 CDXLDatum
 	static CDXLDatum *TranslateInt8DatumToDXL(CMemoryPool *mp,
 											  const IMDType *md_type,
 											  BOOL is_null, ULONG len,
-											  Datum datum);
+											  duckdb_libpgquery::PGDatum datum);
 
 	// datum to bool CDXLDatum
 	static CDXLDatum *TranslateBoolDatumToDXL(CMemoryPool *mp,
 											  const IMDType *md_type,
 											  BOOL is_null, ULONG len,
-											  Datum datum);
+											  duckdb_libpgquery::PGDatum datum);
 
 	// datum to generic CDXLDatum
 	static CDXLDatum *TranslateGenericDatumToDXL(CMemoryPool *mp,
 												 const IMDType *md_type,
 												 INT type_modifier,
 												 BOOL is_null, ULONG len,
-												 Datum datum);
+												 duckdb_libpgquery::PGDatum datum);
 };
 }  // namespace gpdxl
 

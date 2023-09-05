@@ -244,12 +244,36 @@ lcons(void *datum, PGList *list)
 /*
  * Prepend an integer to the list. See lcons()
  */
+PGList *lcons_int(int datum, PGList *list)
+{
+	Assert(IsIntegerList(list));
 
+	if (list == NIL)
+		list = new_list(T_PGIntList);
+	else
+		new_head_cell(list);
+
+	lfirst_int(list->head) = datum;
+	check_list_invariants(list);
+	return list;
+}
 
 /*
  * Prepend an OID to the list. See lcons()
  */
+PGList *lcons_oid(PGOid datum, PGList *list)
+{
+	Assert(IsOidList(list));
 
+	if (list == NIL)
+		list = new_list(T_PGOidList);
+	else
+		new_head_cell(list);
+
+	lfirst_oid(list->head) = datum;
+	check_list_invariants(list);
+	return list;
+}
 
 /*
  * Concatenate list2 to the end of list1, and return list1. list1 is
@@ -358,6 +382,85 @@ list_nth(const PGList *list, int n)
 	return lfirst(list_nth_cell(list, n));
 }
 
+int	list_nth_int(const PGList *list, int n)
+{
+	Assert(IsIntegerList(list));
+	return lfirst_int(list_nth_cell(list, n));
+}
+
+/*
+ * Return the OID value contained in the n'th element of the specified
+ * list.
+ */
+PGOid list_nth_oid(const PGList *list, int n)
+{
+	Assert(IsOidList(list));
+	return lfirst_oid(list_nth_cell(list, n));
+}
+
+bool list_member(const PGList *list, const void *datum)
+{
+	const PGListCell *cell;
+
+	Assert(IsPointerList(list));
+	check_list_invariants(list);
+
+	foreach(cell, list)
+	{
+		if (equal(lfirst(cell), datum))
+			return true;
+	}
+
+	return false;
+}
+
+bool list_member_int(const PGList *list, int datum)
+{
+	const PGListCell *cell;
+
+	Assert(IsIntegerList(list));
+	check_list_invariants(list);
+
+	foreach(cell, list)
+	{
+		if (lfirst_int(cell) == datum)
+			return true;
+	}
+
+	return false;
+}
+
+PGList *list_delete_ptr(PGList *list, void *datum)
+{
+	PGListCell   *cell;
+	PGListCell   *prev;
+
+	Assert(IsPointerList(list));
+	check_list_invariants(list);
+
+	prev = NULL;
+	foreach(cell, list)
+	{
+		if (lfirst(cell) == datum)
+			return list_delete_cell(list, cell, prev);
+
+		prev = cell;
+	}
+
+	/* Didn't find a match: return the list unmodified */
+	return list;
+}
+
+PGList *list_delete_first(PGList *list)
+{
+	check_list_invariants(list);
+
+	if (list == NIL)
+		return NIL;				/* would an error be better? */
+
+	return list_delete_cell(list, list_head(list), NULL);
+}
+
 /*
  * Delete 'cell' from 'list'; 'prev' is the previous element to 'cell'
  * in 'list', if any (i.e. prev == NULL iff list->head == cell)
@@ -424,6 +527,55 @@ list_free_private(PGList *list, bool deep)
 		pfree(list);
 }
 
+PGList *list_union_int(const PGList *list1, const PGList *list2)
+{
+	PGList	   *result;
+	const PGListCell *cell;
+
+	Assert(IsIntegerList(list1));
+	Assert(IsIntegerList(list2));
+
+	result = list_copy(list1);
+	foreach(cell, list2)
+	{
+		if (!list_member_int(result, lfirst_int(cell)))
+			result = lappend_int(result, lfirst_int(cell));
+	}
+
+	check_list_invariants(result);
+	return result;
+}
+
+/*
+ * Append to list1 each member of list2 that isn't already in list1.
+ *
+ * Whether an element is already a member of the list is determined
+ * via equal().
+ *
+ * This is almost the same functionality as list_union(), but list1 is
+ * modified in-place rather than being copied. However, callers of this
+ * function may have strict ordering expectations -- i.e. that the relative
+ * order of those list2 elements that are not duplicates is preserved. Note
+ * also that list2's cells are not inserted in list1, so the analogy to
+ * list_concat() isn't perfect.
+ */
+PGList *list_concat_unique(PGList *list1, PGList *list2)
+{
+    PGListCell   *cell;
+
+	Assert(IsPointerList(list1));
+	Assert(IsPointerList(list2));
+
+	foreach(cell, list2)
+	{
+		if (!list_member(list1, lfirst(cell)))
+			list1 = lappend(list1, lfirst(cell));
+	}
+
+	check_list_invariants(list1);
+	return list1;
+}
+
 /*
  * Free all the cells of the list, as well as the list itself. Any
  * objects that are pointed-to by the cells of the list are NOT
@@ -436,6 +588,23 @@ void
 list_free(PGList *list)
 {
 	list_free_private(list, false);
+}
+
+/*
+ * Free all the cells of the list, the list itself, and all the
+ * objects pointed-to by the cells of the list (each element in the
+ * list must contain a pointer to a palloc()'d region of memory!)
+ *
+ * On return, the argument to this function has been freed, so the
+ * caller would be wise to set it to NIL for safety's sake.
+ */
+void list_free_deep(PGList *list)
+{
+	/*
+	 * A "deep" free operation only makes sense on a list of pointers.
+	 */
+	Assert(IsPointerList(list));
+	list_free_private(list, true);
 }
 
 /*

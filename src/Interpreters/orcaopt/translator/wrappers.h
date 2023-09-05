@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 //#define MakeNode(_type_) ((_type_ *) NewNode(sizeof(_type_), T_##_type_))
 
@@ -36,7 +36,7 @@ LAppendInt(duckdb_libpgquery::PGList *list, int iDatum);
 int
 FindNodes(duckdb_libpgquery::PGNode *node, const std::vector<duckdb_libpgquery::PGNodeTag>& nodeTags);
 
-uint32
+duckdb_libpgquery::uint32
 ListLength(duckdb_libpgquery::PGList *l);
 
 void *
@@ -58,19 +58,19 @@ GPDBFree(void *ptr);
 // IndexExists(Oid oid);
 
 bool
-TypeExists(Oid oid);
+TypeExists(duckdb_libpgquery::PGOid oid);
 
 bool
-RelationExists(Oid oid);
+RelationExists(duckdb_libpgquery::PGOid oid);
 
 bool
-OperatorExists(Oid oid);
+OperatorExists(duckdb_libpgquery::PGOid oid);
 
 bool
-AggregateExists(Oid oid);
+AggregateExists(duckdb_libpgquery::PGOid oid);
 
 bool
-FunctionExists(Oid oid);
+FunctionExists(duckdb_libpgquery::PGOid oid);
 
 std::string
 NodeToString(duckdb_libpgquery::PGNode *obj);
@@ -81,10 +81,10 @@ StringToNode(std::string& str);
 duckdb_libpgquery::PGExpr *
 TransformArrayConstToArrayExpr(duckdb_libpgquery::PGConst *c);
 
-int32
+duckdb_libpgquery::int32
 ExprTypeMod(duckdb_libpgquery::PGNode *expr);
 
-Oid
+duckdb_libpgquery::PGOid
 ExprType(duckdb_libpgquery::PGNode *expr);
 
 bool
@@ -106,43 +106,43 @@ FindFirstMatchingMemberInTargetList(duckdb_libpgquery::PGNode *node, duckdb_libp
 bool
 WalkExpressionTree(duckdb_libpgquery::PGNode *node, bool (*walker)(duckdb_libpgquery::PGNode *node, void *context), void *context);
 
-PGLogicalIndexType
-GetLogicalIndexType(Oid index_oid);
+duckdb_libpgquery::PGLogicalIndexType
+GetLogicalIndexType(duckdb_libpgquery::PGOid index_oid);
 
 bool
-RelPartIsNone(Oid relid);
+RelPartIsNone(duckdb_libpgquery::PGOid relid);
 
 bool
-IsLeafPartition(Oid oid);
+IsLeafPartition(duckdb_libpgquery::PGOid oid);
 
 bool
-RelPartIsRoot(Oid relid);
+RelPartIsRoot(duckdb_libpgquery::PGOid relid);
 
-duckdb_libpgquery::PGNode* GetLeafPartContraints(Oid rel_oid, duckdb_libpgquery::PGList **default_levels);
+duckdb_libpgquery::PGNode* GetLeafPartContraints(duckdb_libpgquery::PGOid rel_oid, duckdb_libpgquery::PGList **default_levels);
 
-PGRelationPtr
-GetRelation(Oid rel_oid);
+duckdb_libpgquery::PGRelationPtr
+GetRelation(duckdb_libpgquery::PGOid rel_oid);
 
 void
-CloseRelation(PGRelationPtr rel);
+CloseRelation(duckdb_libpgquery::PGRelationPtr rel);
 
 duckdb_libpgquery::PGList *
-GetRelationIndexes(PGRelationPtr relation);
+GetRelationIndexes(duckdb_libpgquery::PGRelationPtr relation);
 
-PGLogicalIndexes *
-GetLogicalPartIndexes(Oid oid);
+duckdb_libpgquery::PGLogicalIndexes *
+GetLogicalPartIndexes(duckdb_libpgquery::PGOid oid);
 
-Oid
-GetOpclassFamily(Oid opclass);
+duckdb_libpgquery::PGOid
+GetOpclassFamily(duckdb_libpgquery::PGOid opclass);
 
-Oid
-GetHashProcInOpfamily(Oid opfamily, Oid typid);
+duckdb_libpgquery::PGOid
+GetHashProcInOpfamily(duckdb_libpgquery::PGOid opfamily, duckdb_libpgquery::PGOid typid);
 
-Oid
-IsLegacyCdbHashFunction(Oid funcid);
+duckdb_libpgquery::PGOid
+IsLegacyCdbHashFunction(duckdb_libpgquery::PGOid funcid);
 
-Oid
-GetDefaultDistributionOpclassForType(Oid typid);
+duckdb_libpgquery::PGOid
+GetDefaultDistributionOpclassForType(duckdb_libpgquery::PGOid typid);
 
 duckdb_libpgquery::PGList *
 ListConcat(duckdb_libpgquery::PGList *list1, duckdb_libpgquery::PGList *list2);
@@ -151,46 +151,46 @@ int
 GetIntFromValue(duckdb_libpgquery::PGNode *node);
 
 duckdb_libpgquery::PGList *
-GetCheckConstraintOids(Oid rel_oid);
+GetCheckConstraintOids(duckdb_libpgquery::PGOid rel_oid);
 
 bool
-RelPartIsInterior(Oid relid);
+RelPartIsInterior(duckdb_libpgquery::PGOid relid);
 
 duckdb_libpgquery::PGList *
-GetPartitionAttrs(Oid oid);
+GetPartitionAttrs(duckdb_libpgquery::PGOid oid);
 
 bool
-HasSubclassSlow(Oid rel_oid);
+HasSubclassSlow(duckdb_libpgquery::PGOid rel_oid);
 
 bool
-IsMultilevelPartitionUniform(Oid root_oid);
+IsMultilevelPartitionUniform(duckdb_libpgquery::PGOid root_oid);
 
 bool
-IsChildPartDistributionMismatched(PGRelationPtr rel);
+IsChildPartDistributionMismatched(duckdb_libpgquery::PGRelationPtr rel);
 
 gpos::ULONG
-CountLeafPartTables(Oid rel_oid);
+CountLeafPartTables(duckdb_libpgquery::PGOid rel_oid);
 
 bool
-HasExternalPartition(Oid oid);
+HasExternalPartition(duckdb_libpgquery::PGOid oid);
 
-PGExtTableEntry *
-GetExternalTableEntry(Oid rel_oid);
+duckdb_libpgquery::PGExtTableEntry *
+GetExternalTableEntry(duckdb_libpgquery::PGOid rel_oid);
 
-PGStatisticPtr
-GetAttStats(Oid relid, PGAttrNumber attnum);
+duckdb_libpgquery::PGStatisticPtr
+GetAttStats(duckdb_libpgquery::PGOid relid, duckdb_libpgquery::PGAttrNumber attnum);
 
 duckdb_libpgquery::PGNode *
-GetTypeDefault(Oid typid);
+GetTypeDefault(duckdb_libpgquery::PGOid typid);
 
 duckdb_libpgquery::PGList *
-GetExternalPartitions(Oid oid);
+GetExternalPartitions(duckdb_libpgquery::PGOid oid);
 
-Oid
-GetAggregate(const char *agg, Oid type_oid, int nargs);
+duckdb_libpgquery::PGOid
+GetAggregate(const char *agg, duckdb_libpgquery::PGOid type_oid, int nargs);
 
 bool
-IsAppendOnlyPartitionTable(Oid root_oid);
+IsAppendOnlyPartitionTable(duckdb_libpgquery::PGOid root_oid);
 
 duckdb_libpgquery::PGNode *
 MutateQueryOrExpressionTree(duckdb_libpgquery::PGNode * node,
@@ -211,153 +211,153 @@ WalkQueryOrExpressionTree(duckdb_libpgquery::PGNode *node, bool (*walker)(duckdb
 								int flags);
 
 duckdb_libpgquery::PGTargetEntry *
-MakeTargetEntry(duckdb_libpgquery::PGExpr *expr, PGAttrNumber resno, char *resname, bool resjunk);
+MakeTargetEntry(duckdb_libpgquery::PGExpr *expr, duckdb_libpgquery::PGAttrNumber resno, char *resname, bool resjunk);
 
 duckdb_libpgquery::PGVar *
-MakeVar(PGIndex varno, PGAttrNumber varattno, Oid vartype, int32 vartypmod,
-			  PGIndex varlevelsup);
+MakeVar(duckdb_libpgquery::PGIndex varno, duckdb_libpgquery::PGAttrNumber varattno, duckdb_libpgquery::PGOid vartype, duckdb_libpgquery::int32 vartypmod,
+			  duckdb_libpgquery::PGIndex varlevelsup);
 
 duckdb_libpgquery::PGValue* MakeStringValue(char *str);
 
-Oid
-TypeCollation(Oid type);
+duckdb_libpgquery::PGOid
+TypeCollation(duckdb_libpgquery::PGOid type);
 
 duckdb_libpgquery::PGQuery *
 FlattenJoinAliasVar(duckdb_libpgquery::PGQuery *query, gpos::ULONG query_level);
 
 int GetGPSegmentCount(void);
 
-PGPolicyPtr
-GetDistributionPolicy(PGRelationPtr rel);
+duckdb_libpgquery::PGPolicyPtr
+GetDistributionPolicy(duckdb_libpgquery::PGRelationPtr rel);
 
 duckdb_libpgquery::PGNode *
-GetRelationPartContraints(Oid rel_oid, duckdb_libpgquery::PGList **default_levels);
+GetRelationPartContraints(duckdb_libpgquery::PGOid rel_oid, duckdb_libpgquery::PGList **default_levels);
 
-Oid GetInverseOp(Oid opno);
+duckdb_libpgquery::PGOid GetInverseOp(duckdb_libpgquery::PGOid opno);
 
-bool IsOpHashJoinable(Oid opno, Oid inputtype);
+bool IsOpHashJoinable(duckdb_libpgquery::PGOid opno, duckdb_libpgquery::PGOid inputtype);
 
-bool IsOpMergeJoinable(Oid opno, Oid inputtype);
+bool IsOpMergeJoinable(duckdb_libpgquery::PGOid opno, duckdb_libpgquery::PGOid inputtype);
 
-bool IsCompositeType(Oid typid);
+bool IsCompositeType(duckdb_libpgquery::PGOid typid);
 
-bool IsTextRelatedType(Oid typid);
+bool IsTextRelatedType(duckdb_libpgquery::PGOid typid);
 
-PGTypePtr LookupTypeCache(Oid type_id/* , int flags */);
+duckdb_libpgquery::PGTypePtr LookupTypeCache(duckdb_libpgquery::PGOid type_id/* , int flags */);
 
-Oid GetTypeRelid(Oid typid);
+duckdb_libpgquery::PGOid GetTypeRelid(duckdb_libpgquery::PGOid typid);
 
-Oid GetArrayType(Oid typid);
+duckdb_libpgquery::PGOid GetArrayType(duckdb_libpgquery::PGOid typid);
 
-Oid GetDefaultDistributionOpfamilyForType(Oid typid);
+duckdb_libpgquery::PGOid GetDefaultDistributionOpfamilyForType(duckdb_libpgquery::PGOid typid);
 
-Oid GetLegacyCdbHashOpclassForBaseType(Oid typid);
+duckdb_libpgquery::PGOid GetLegacyCdbHashOpclassForBaseType(duckdb_libpgquery::PGOid typid);
 
-char * GetOpName(Oid opno);
+char * GetOpName(duckdb_libpgquery::PGOid opno);
 
-void GetOpInputTypes(Oid opno, Oid *lefttype, Oid *righttype);
+void GetOpInputTypes(duckdb_libpgquery::PGOid opno, duckdb_libpgquery::PGOid *lefttype, duckdb_libpgquery::PGOid *righttype);
 
-unsigned int WrapperGetComparisonType(Oid op_oid);
+unsigned int WrapperGetComparisonType(duckdb_libpgquery::PGOid op_oid);
 
-Oid GetOpFunc(Oid opno);
+duckdb_libpgquery::PGOid GetOpFunc(duckdb_libpgquery::PGOid opno);
 
-Oid GetFuncRetType(Oid funcid);
+duckdb_libpgquery::PGOid GetFuncRetType(duckdb_libpgquery::PGOid funcid);
 
-Oid GetCommutatorOp(Oid opno);
+duckdb_libpgquery::PGOid GetCommutatorOp(duckdb_libpgquery::PGOid opno);
 
-bool IsOpStrict(Oid opno);
+bool IsOpStrict(duckdb_libpgquery::PGOid opno);
 
-bool IsOpNDVPreserving(Oid opno);
+bool IsOpNDVPreserving(duckdb_libpgquery::PGOid opno);
 
-Oid GetCompatibleHashOpFamily(Oid opno);
+duckdb_libpgquery::PGOid GetCompatibleHashOpFamily(duckdb_libpgquery::PGOid opno);
 
-Oid GetCompatibleLegacyHashOpFamily(Oid opno);
+duckdb_libpgquery::PGOid GetCompatibleLegacyHashOpFamily(duckdb_libpgquery::PGOid opno);
 
-char FuncStability(Oid funcid);
+char FuncStability(duckdb_libpgquery::PGOid funcid);
 
-char FuncDataAccess(Oid funcid);
+char FuncDataAccess(duckdb_libpgquery::PGOid funcid);
 
-char FuncExecLocation(Oid funcid);
+char FuncExecLocation(duckdb_libpgquery::PGOid funcid);
 
-bool GetFuncRetset(Oid funcid);
+bool GetFuncRetset(duckdb_libpgquery::PGOid funcid);
 
-bool FuncStrict(Oid funcid);
+bool FuncStrict(duckdb_libpgquery::PGOid funcid);
 
-bool IsFuncNDVPreserving(Oid funcid);
+bool IsFuncNDVPreserving(duckdb_libpgquery::PGOid funcid);
 
-bool IsFuncAllowedForPartitionSelection(Oid funcid);
+bool IsFuncAllowedForPartitionSelection(duckdb_libpgquery::PGOid funcid);
 
-char * GetFuncName(Oid funcid);
+char * GetFuncName(duckdb_libpgquery::PGOid funcid);
 
-duckdb_libpgquery::PGList * GetFuncOutputArgTypes(Oid funcid);
+duckdb_libpgquery::PGList * GetFuncOutputArgTypes(duckdb_libpgquery::PGOid funcid);
 
-bool IsOrderedAgg(Oid aggid);
+bool IsOrderedAgg(duckdb_libpgquery::PGOid aggid);
 
-bool IsAggPartialCapable(Oid aggid);
+bool IsAggPartialCapable(duckdb_libpgquery::PGOid aggid);
 
-char * WrapperGetTypeName(Oid typid);
+char * WrapperGetTypeName(duckdb_libpgquery::PGOid typid);
 
-Oid GetAggIntermediateResultType(Oid aggid);
+duckdb_libpgquery::PGOid GetAggIntermediateResultType(duckdb_libpgquery::PGOid aggid);
 
-double CdbEstimatePartitionedNumTuples(PGRelationPtr rel);
+double CdbEstimatePartitionedNumTuples(duckdb_libpgquery::PGRelationPtr rel);
 
-bool GetAttrStatsSlot(PGAttStatsSlotPtr& sslot,
-	PGStatisticPtr statstuple, int reqkind, Oid reqop, int flags);
+bool GetAttrStatsSlot(duckdb_libpgquery::PGAttStatsSlotPtr& sslot,
+	duckdb_libpgquery::PGStatisticPtr statstuple, int reqkind, duckdb_libpgquery::PGOid reqop, int flags);
 
-void FreeAttrStatsSlot(PGAttStatsSlotPtr sslot);
+void FreeAttrStatsSlot(duckdb_libpgquery::PGAttStatsSlotPtr sslot);
 
-bool GetCastFunc(Oid src_oid, Oid dest_oid, bool *is_binary_coercible,
-				  Oid *cast_fn_oid, PGCoercionPathType *pathtype);
+bool GetCastFunc(duckdb_libpgquery::PGOid src_oid, duckdb_libpgquery::PGOid dest_oid, bool *is_binary_coercible,
+				  duckdb_libpgquery::PGOid *cast_fn_oid, duckdb_libpgquery::PGCoercionPathType *pathtype);
 
-Oid GetComparisonOperator(Oid left_oid, Oid right_oid, unsigned int cmpt);
+duckdb_libpgquery::PGOid GetComparisonOperator(duckdb_libpgquery::PGOid left_oid, duckdb_libpgquery::PGOid right_oid, unsigned int cmpt);
 
-void GetOrderedPartKeysAndKinds(Oid oid, duckdb_libpgquery::PGList **pkeys, duckdb_libpgquery::PGList **pkinds);
+void GetOrderedPartKeysAndKinds(duckdb_libpgquery::PGOid oid, duckdb_libpgquery::PGList **pkeys, duckdb_libpgquery::PGList **pkinds);
 
-duckdb_libpgquery::PGList * GetRelationKeys(Oid relid);
+duckdb_libpgquery::PGList * GetRelationKeys(duckdb_libpgquery::PGOid relid);
 
-size_t DatumSize(Datum value, bool type_by_val, int iTypLen);
+size_t DatumSize(duckdb_libpgquery::PGDatum value, bool type_by_val, int iTypLen);
 
-bool BoolFromDatum(Datum d);
+bool BoolFromDatum(duckdb_libpgquery::PGDatum d);
 
-int16 Int16FromDatum(Datum d);
+duckdb_libpgquery::int16 Int16FromDatum(duckdb_libpgquery::PGDatum d);
 
-int32 Int32FromDatum(Datum d);
+duckdb_libpgquery::int32 Int32FromDatum(duckdb_libpgquery::PGDatum d);
 
-int64 Int64FromDatum(Datum d);
+duckdb_libpgquery::int64 Int64FromDatum(duckdb_libpgquery::PGDatum d);
 
-Oid OidFromDatum(Datum d);
+duckdb_libpgquery::PGOid OidFromDatum(duckdb_libpgquery::PGDatum d);
 
-bool NumericIsNan(PGNumeric* num);
+bool NumericIsNan(duckdb_libpgquery::PGNumeric* num);
 
-float4 Float4FromDatum(Datum d);
+duckdb_libpgquery::float4 Float4FromDatum(duckdb_libpgquery::PGDatum d);
 
-float8 Float8FromDatum(Datum d);
+duckdb_libpgquery::float8 Float8FromDatum(duckdb_libpgquery::PGDatum d);
 
-double NumericToDoubleNoOverflow(PGNumeric* num);
+double NumericToDoubleNoOverflow(duckdb_libpgquery::PGNumeric* num);
 
-double ConvertTimeValueToScalar(Datum datum, Oid typid);
+double ConvertTimeValueToScalar(duckdb_libpgquery::PGDatum datum, duckdb_libpgquery::PGOid typid);
 
-double ConvertNetworkToScalar(Datum datum, Oid typid);
+double ConvertNetworkToScalar(duckdb_libpgquery::PGDatum datum, duckdb_libpgquery::PGOid typid);
 
-void * PointerFromDatum(Datum d);
+void * PointerFromDatum(duckdb_libpgquery::PGDatum d);
 
-uint32 UUIDHash(Datum d);
+duckdb_libpgquery::uint32 UUIDHash(duckdb_libpgquery::PGDatum d);
 
-uint32 HashBpChar(Datum d);
+duckdb_libpgquery::uint32 HashBpChar(duckdb_libpgquery::PGDatum d);
 
-uint32 HashChar(Datum d);
+duckdb_libpgquery::uint32 HashChar(duckdb_libpgquery::PGDatum d);
 
-uint32 HashName(Datum d);
+duckdb_libpgquery::uint32 HashName(duckdb_libpgquery::PGDatum d);
 
-uint32 HashText(Datum d);
+duckdb_libpgquery::uint32 HashText(duckdb_libpgquery::PGDatum d);
 
-duckdb_libpgquery::PGList * GetFuncArgTypes(Oid funcid);
+duckdb_libpgquery::PGList * GetFuncArgTypes(duckdb_libpgquery::PGOid funcid);
 
-bool ResolvePolymorphicArgType(int numargs, Oid *argtypes, char *argmodes,
+bool ResolvePolymorphicArgType(int numargs, duckdb_libpgquery::PGOid *argtypes, char *argmodes,
 								duckdb_libpgquery::PGFuncExpr *call_expr);
 
 duckdb_libpgquery::PGNode *
-CoerceToCommonType(PGParseState *pstate, duckdb_libpgquery::PGNode *node, Oid target_type,
+CoerceToCommonType(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGOid target_type,
 						 const char *context);
 
 duckdb_libpgquery::PGList *
@@ -371,8 +371,8 @@ void GpdbEreportImpl(int xerrcode, int severitylevel, const char *xerrmsg,
 					 const char *xerrhint, const char *filename, int lineno,
 					 const char *funcname);
 
-duckdb_libpgquery::PGList *GetIndexOpFamilies(Oid index_oid);
+duckdb_libpgquery::PGList *GetIndexOpFamilies(duckdb_libpgquery::PGOid index_oid);
 
-duckdb_libpgquery::PGList *GetOpFamiliesForScOp(Oid opno);
+duckdb_libpgquery::PGList *GetOpFamiliesForScOp(duckdb_libpgquery::PGOid opno);
 
 }

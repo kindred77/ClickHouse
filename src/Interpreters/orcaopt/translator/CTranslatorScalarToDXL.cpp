@@ -1878,7 +1878,7 @@ CTranslatorScalarToDXL::TranslateArrayRefToDXL(
 	GPOS_ASSERT(IsA(expr, PGArrayRef));
 
 	const PGArrayRef *parrayref = (PGArrayRef *) expr;
-	Oid restype;
+	PGOid restype;
 
 	INT type_modifier = parrayref->reftypmod;
 	/* slice and/or store operations yield the array type */

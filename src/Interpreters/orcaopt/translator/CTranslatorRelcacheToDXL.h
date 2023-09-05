@@ -22,7 +22,7 @@
 // #include "catalog/gp_policy.h"
 // }
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 #include "gpos/base.h"
 
@@ -82,7 +82,7 @@ private:
 	{
 	private:
 		// function identifier
-		OID m_oid;
+		duckdb_libpgquery::PGOid m_oid;
 
 		// function stability
 		IMDFunction::EFuncStbl m_stability;
@@ -113,7 +113,7 @@ private:
 		virtual ~SFuncProps(){};
 
 		// return function identifier
-		OID
+		duckdb_libpgquery::PGOid
 		Oid() const
 		{
 			return m_oid;
@@ -165,7 +165,7 @@ private:
 	);
 
 	// check and fall back for unsupported relations
-	static void CheckUnsupportedRelation(OID rel_oid);
+	static void CheckUnsupportedRelation(duckdb_libpgquery::PGOid rel_oid);
 
 	// get type name from the relcache
 	static CMDName *GetTypeName(CMemoryPool *mp, IMDId *mdid);
@@ -201,12 +201,12 @@ private:
 
 	// transform GPDB's MCV information to optimizer's histogram structure
 	static CHistogram *TransformMcvToOrcaHistogram(
-		CMemoryPool *mp, const IMDType *md_type, const Datum *mcv_values,
-		const float4 *mcv_frequencies, ULONG num_mcv_values);
+		CMemoryPool *mp, const IMDType *md_type, const duckdb_libpgquery::PGDatum *mcv_values,
+		const duckdb_libpgquery::float4 *mcv_frequencies, ULONG num_mcv_values);
 
 	// transform GPDB's hist information to optimizer's histogram structure
 	static CHistogram *TransformHistToOrcaHistogram(
-		CMemoryPool *mp, const IMDType *md_type, const Datum *hist_values,
+		CMemoryPool *mp, const IMDType *md_type, const duckdb_libpgquery::PGDatum *hist_values,
 		ULONG num_hist_values, CDouble num_distinct, CDouble hist_freq);
 
 	// histogram to array of dxl buckets
@@ -215,17 +215,17 @@ private:
 
 	// transform stats from pg_stats form to optimizer's preferred form
 	static CDXLBucketArray *TransformStatsToDXLBucketArray(
-		CMemoryPool *mp, OID att_type, CDouble num_distinct, CDouble null_freq,
-		const Datum *mcv_values, const float4 *mcv_frequencies,
-		ULONG num_mcv_values, const Datum *hist_values, ULONG num_hist_values);
+		CMemoryPool *mp, duckdb_libpgquery::PGOid att_type, CDouble num_distinct, CDouble null_freq,
+		const duckdb_libpgquery::PGDatum *mcv_values, const duckdb_libpgquery::float4 *mcv_frequencies,
+		ULONG num_mcv_values, const duckdb_libpgquery::PGDatum *hist_values, ULONG num_hist_values);
 
 	// get partition keys and types for a relation
-	static void RetrievePartKeysAndTypes(CMemoryPool *mp, PGRelationPtr rel, OID oid,
+	static void RetrievePartKeysAndTypes(CMemoryPool *mp, duckdb_libpgquery::PGRelationPtr rel, duckdb_libpgquery::PGOid oid,
 										 ULongPtrArray **part_keys,
 										 CharPtrArray **part_types);
 
 	// get keysets for relation
-	static ULongPtr2dArray *RetrieveRelKeysets(CMemoryPool *mp, OID oid,
+	static ULongPtr2dArray *RetrieveRelKeysets(CMemoryPool *mp, duckdb_libpgquery::PGOid oid,
 											   BOOL should_add_default_keys,
 											   BOOL is_partitioned,
 											   ULONG *attno_mapping);
@@ -235,23 +235,23 @@ private:
 		CHAR storage_type);
 
 	// fix frequencies if they add up to more than 1.0
-	static void NormalizeFrequencies(float4 *pdrgf, ULONG length,
+	static void NormalizeFrequencies(duckdb_libpgquery::float4 *pdrgf, ULONG length,
 									 CDouble *null_freq);
 
 	// get the relation columns
 	static CMDColumnArray *RetrieveRelColumns(
-		CMemoryPool *mp, CMDAccessor *md_accessor, PGRelationPtr rel,
+		CMemoryPool *mp, CMDAccessor *md_accessor, duckdb_libpgquery::PGRelationPtr rel,
 		IMDRelation::Erelstoragetype rel_storage_type);
 
 	// return the dxl representation of the column's default value
 	static CDXLNode *GetDefaultColumnValue(CMemoryPool *mp,
 										   CMDAccessor *md_accessor,
-										   PGTupleDescPtr rd_att, PGAttrNumber attrno);
+										   duckdb_libpgquery::PGTupleDescPtr rd_att, duckdb_libpgquery::PGAttrNumber attrno);
 
 
 	// get the distribution columns
 	static ULongPtrArray *RetrieveRelDistributionCols(
-		CMemoryPool *mp, PGPolicyPtr gp_policy, CMDColumnArray *mdcol_array,
+		CMemoryPool *mp, duckdb_libpgquery::PGPolicyPtr gp_policy, CMDColumnArray *mdcol_array,
 		ULONG size);
 
 	// construct a mapping GPDB attnos -> position in the column array
@@ -260,10 +260,10 @@ private:
 										ULONG max_cols);
 
 	// check if index is supported
-	static BOOL IsIndexSupported(PGRelationPtr index_rel);
+	static BOOL IsIndexSupported(duckdb_libpgquery::PGRelationPtr index_rel);
 
 	// retrieve index info list of partitioned table
-	static duckdb_libpgquery::PGList *RetrievePartTableIndexInfo(PGRelationPtr rel);
+	static duckdb_libpgquery::PGList *RetrievePartTableIndexInfo(duckdb_libpgquery::PGRelationPtr rel);
 
 	// compute the array of included columns
 	static ULongPtrArray *ComputeIncludedCols(CMemoryPool *mp,
@@ -280,7 +280,7 @@ private:
 
 	// retrieve part constraint for relation
 	static CMDPartConstraintGPDB *RetrievePartConstraintForRel(
-		CMemoryPool *mp, CMDAccessor *md_accessor, OID rel_oid,
+		CMemoryPool *mp, CMDAccessor *md_accessor, duckdb_libpgquery::PGOid rel_oid,
 		CMDColumnArray *mdcol_array, BOOL construct_full_expr);
 
 	// retrieve part constraint from a GPDB node
@@ -290,35 +290,35 @@ private:
 		ULongPtrArray *level_with_default_part_array, BOOL is_unbounded);
 
 	// return relation name
-	static CMDName *GetRelName(CMemoryPool *mp, PGRelationPtr rel);
+	static CMDName *GetRelName(CMemoryPool *mp, duckdb_libpgquery::PGRelationPtr rel);
 
 	// return the index info list defined on the given relation
 	static CMDIndexInfoArray *RetrieveRelIndexInfo(CMemoryPool *mp,
-												   PGRelationPtr rel);
+												   duckdb_libpgquery::PGRelationPtr rel);
 
 	// return index info list of indexes defined on a partitioned table
 	static CMDIndexInfoArray *RetrieveRelIndexInfoForPartTable(
-		CMemoryPool *mp, PGRelationPtr root_rel);
+		CMemoryPool *mp, duckdb_libpgquery::PGRelationPtr root_rel);
 
 	// return index info list of indexes defined on regular, external tables or leaf partitions
 	static CMDIndexInfoArray *RetrieveRelIndexInfoForNonPartTable(
-		CMemoryPool *mp, PGRelationPtr rel);
+		CMemoryPool *mp, duckdb_libpgquery::PGRelationPtr rel);
 
 	// retrieve an index over a partitioned table from the relcache
 	static IMDIndex *RetrievePartTableIndex(CMemoryPool *mp,
 											CMDAccessor *md_accessor,
 											IMDId *mdid_index,
 											const IMDRelation *md_rel,
-											PGLogicalIndexes *logical_indexes);
+											duckdb_libpgquery::PGLogicalIndexes *logical_indexes);
 
 	// lookup an index given its id from the logical indexes structure
-	static PGLogicalIndexInfo *LookupLogicalIndexById(
-		PGLogicalIndexes *logical_indexes, OID oid);
+	static duckdb_libpgquery::PGLogicalIndexInfo *LookupLogicalIndexById(
+		duckdb_libpgquery::PGLogicalIndexes *logical_indexes, duckdb_libpgquery::PGOid oid);
 
 	// construct an MD cache index object given its logical index representation
 	static IMDIndex *RetrievePartTableIndex(CMemoryPool *mp,
 											CMDAccessor *md_accessor,
-											PGLogicalIndexInfo *index_info,
+											duckdb_libpgquery::PGLogicalIndexInfo *index_info,
 											IMDId *mdid_index,
 											const IMDRelation *md_rel);
 
@@ -326,7 +326,7 @@ private:
 	// static IMdIdArray *RetrieveRelTriggers(CMemoryPool *mp, PGRelationPtr rel);
 
 	// return the check constraints defined on the relation with the given oid
-	static IMdIdArray *RetrieveRelCheckConstraints(CMemoryPool *mp, OID oid);
+	static IMdIdArray *RetrieveRelCheckConstraints(CMemoryPool *mp, duckdb_libpgquery::PGOid oid);
 
 	// does attribute number correspond to a transaction visibility attribute
 	static BOOL IsTransactionVisibilityAttribute(INT attrnum);
@@ -346,19 +346,19 @@ private:
 											   IMDId *mdid_index);
 
 	static IMdIdArray *RetrieveRelDistributionOpFamilies(CMemoryPool *mp,
-														 PGPolicyPtr policy);
+														 duckdb_libpgquery::PGPolicyPtr policy);
 
 	static IMdIdArray *RetrieveRelExternalPartitions(CMemoryPool *mp,
-													 OID rel_oid);
+													 duckdb_libpgquery::PGOid rel_oid);
 
 	// for non-leaf partition tables return the number of child partitions
 	// else return 1
-	static ULONG RetrieveNumChildPartitions(OID rel_oid);
+	static ULONG RetrieveNumChildPartitions(duckdb_libpgquery::PGOid rel_oid);
 
 	// generate statistics for the system level columns
 	static CDXLColStats *GenerateStatsForSystemCols(
-		CMemoryPool *mp, OID rel_oid, CMDIdColStats *mdid_col_stats,
-		CMDName *md_colname, OID att_type, PGAttrNumber attrnum,
+		CMemoryPool *mp, duckdb_libpgquery::PGOid rel_oid, CMDIdColStats *mdid_col_stats,
+		CMDName *md_colname, duckdb_libpgquery::PGOid att_type, duckdb_libpgquery::PGAttrNumber attrnum,
 		CDXLBucketArray *dxl_stats_bucket_array, CDouble rows);
 
 public:
@@ -373,7 +373,7 @@ public:
 
 	// add system columns (oid, tid, xmin, etc) in table descriptors
 	static void AddSystemColumns(CMemoryPool *mp, CMDColumnArray *mdcol_array,
-								 PGRelationPtr rel, BOOL is_ao_table);
+								 duckdb_libpgquery::PGRelationPtr rel, BOOL is_ao_table);
 
 	// retrieve an index from the relcache
 	// static IMDIndex *RetrieveIndex(CMemoryPool *mp, CMDAccessor *md_accessor,
@@ -410,7 +410,7 @@ public:
 	static IMDType::ECmpType ParseCmpType(ULONG cmpt);
 
 	// get the distribution policy of the relation
-	static IMDRelation::Ereldistrpolicy GetRelDistribution(PGPolicyPtr gp_policy);
+	static IMDRelation::Ereldistrpolicy GetRelDistribution(duckdb_libpgquery::PGPolicyPtr gp_policy);
 };
 }  // namespace gpdxl
 

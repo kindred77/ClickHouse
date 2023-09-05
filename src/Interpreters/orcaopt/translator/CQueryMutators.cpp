@@ -28,19 +28,10 @@
 #include "gpopt/mdcache/CMDAccessorUtils.h"
 #include <Interpreters/orcaopt/translator/CQueryMutators.h>
 #include <Interpreters/orcaopt/translator/wrappers.h>
-#include <Interpreters/orcaopt/walkers.h>
 //#include "Interpreters/orcaopt/translator/CTranslatorDXLToPlStmt.h"
 #include "naucrates/md/IMDAggregate.h"
 #include "naucrates/md/IMDScalarOp.h"
 #include "naucrates/md/IMDTypeBool.h"
-
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wcast-function-type"
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#else
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
 
 using namespace gpdxl;
 using namespace gpmd;

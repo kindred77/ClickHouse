@@ -1,62 +1,17 @@
 #pragma once
-
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
-#pragma clang diagnostic ignored "-Wreserved-identifier"
-#pragma clang diagnostic ignored "-Wcast-align"
-#pragma clang diagnostic ignored "-Wcomma"
-#else
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#endif
-
-#include <nodes/parsenodes.hpp>
-#include <nodes/makefuncs.hpp>
-#include <nodes/nodeFuncs.hpp>
-#include <nodes/nodes.hpp>
-#include <nodes/primnodes.hpp>
-#include <nodes/pg_list.hpp>
-#include <nodes/bitmapset.hpp>
-#include <nodes/lockoptions.hpp>
-#include <nodes/value.hpp>
-#include <pg_functions.hpp>
-#include <access/attnum.hpp>
-//#include <c.h>
-//#include <funcapi.h>
-#include <Common/Exception.h>
-
-#include <string.h>
-#include <boost/algorithm/string.hpp>
+#include "common/common_macro.hpp"
+#include "nodes/pg_list.hpp"
+#include "nodes/parsenodes.hpp"
+#include <vector>
 #include <optional>
-#include <Interpreters/orcaopt/parser_common_macro.h>
 
-/* class RelationParser;
-class CTEParser;
-class ExprParser;
-class ClauseParser;
-class AggParser;
-class TargetParser;
-class NodeParser;
-class CoerceParser;
-class FuncParser;
-class OperParser;
-class TypeParser;
-class SelectParser;
+namespace DB
+{
+    class IStorage;
+    using StoragePtr = std::shared_ptr<IStorage>;
+};
 
-using RelationParserPtr = std::unique_ptr<RelationParser>;
-using CTEParserPtr = std::unique_ptr<CTEParser>;
-using ExprParserPtr = std::unique_ptr<ExprParser>;
-using ClauseParserPtr = std::unique_ptr<ClauseParser>;
-using AggParserPtr = std::unique_ptr<AggParser>;
-using TargetParserPtr = std::unique_ptr<TargetParser>;
-using NodeParserPtr = std::unique_ptr<NodeParser>;
-using CoerceParserPtr = std::unique_ptr<CoerceParser>;
-using FuncParserPtr = std::unique_ptr<FuncParser>;
-using OperParserPtr = std::unique_ptr<OperParser>;
-using TypeParserPtr = std::unique_ptr<TypeParser>;
-using SelectParserPtr = std::unique_ptr<SelectParser>; */
-
-bool		SQL_inheritance = true;
+namespace duckdb_libpgquery {
 
 typedef unsigned char uint8;
 typedef signed short int16;
@@ -70,16 +25,52 @@ typedef float float4;
 typedef double float8;
 typedef unsigned long int uint64;
 
-typedef int64 Datum;
+typedef PGDatum Datum;
 typedef char TYPCATEGORY;
 typedef char *Pointer;
 
-namespace duckdb_libpgquery
-{
-    typedef DistinctExpr PGDistinctExpr;
+// typedef enum {
+// 	ERRCODE_SYNTAX_ERROR,
+// 	ERRCODE_FEATURE_NOT_SUPPORTED,
+// 	ERRCODE_INVALID_PARAMETER_VALUE,
+// 	ERRCODE_WINDOWING_ERROR,
+// 	ERRCODE_RESERVED_NAME,
+// 	ERRCODE_INVALID_ESCAPE_SEQUENCE,
+// 	ERRCODE_NONSTANDARD_USE_OF_ESCAPE_CHARACTER,
+// 	ERRCODE_NAME_TOO_LONG,
+// 	ERRCODE_DATATYPE_MISMATCH,
+// 	ERRCODE_DUPLICATE_COLUMN,
+// 	ERRCODE_AMBIGUOUS_COLUMN,
+// 	ERRCODE_UNDEFINED_COLUMN,
+// 	ERRCODE_GROUPING_ERROR,
+// 	ERRCODE_INVALID_COLUMN_REFERENCE,
+// 	ERRCODE_WRONG_OBJECT_TYPE,
+// 	ERRCODE_TOO_MANY_ARGUMENTS,
+// 	ERRCODE_UNDEFINED_FUNCTION,
+// 	ERRCODE_UNDEFINED_OBJECT,
+// 	ERRCODE_CANNOT_COERCE,
+// 	ERRCODE_UNDEFINED_PARAMETER,
+// 	ERRCODE_INDETERMINATE_DATATYPE,
+// 	ERRCODE_TOO_MANY_COLUMNS,
+// 	ERRCODE_AMBIGUOUS_FUNCTION,
+// 	ERRCODE_INVALID_FUNCTION_DEFINITION,
+// 	ERRCODE_UNDEFINED_TABLE,
+// 	ERRCODE_DUPLICATE_ALIAS,
+// 	ERRCODE_AMBIGUOUS_ALIAS,
+// 	ERRCODE_PROGRAM_LIMIT_EXCEEDED,
+// 	ERRCODE_STATEMENT_TOO_COMPLEX,
+// 	ERRCODE_INVALID_RECURSION,
 
-    typedef NullIfExpr PGNullIfExpr;
-};
+// 	ERRCODE_COLLATION_MISMATCH,
+// 	ERRCODE_DATA_EXCEPTION,
+// 	ERRCODE_QUERY_CANCELED,
+//     ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE,
+// 	ERRCODE_INVALID_TEXT_REPRESENTATION,
+// 	ERRCODE_INTERNAL_ERROR,
+// 	ERRCODE_INVALID_NAME,
+// 	ERRCODE_INVALID_TABLE_DEFINITION,
+//     ERRCODE_SUCCESSFUL_COMPLETION
+// } PGPostgresParserErrors;
 
 typedef enum 
 {
@@ -263,49 +254,6 @@ struct PGCteState
 // 	LCS_FORUPDATE				/* FOR UPDATE */
 // } LockClauseStrength;
 
-typedef enum {
-	ERRCODE_SYNTAX_ERROR,
-	ERRCODE_FEATURE_NOT_SUPPORTED,
-	ERRCODE_INVALID_PARAMETER_VALUE,
-	ERRCODE_WINDOWING_ERROR,
-	ERRCODE_RESERVED_NAME,
-	ERRCODE_INVALID_ESCAPE_SEQUENCE,
-	ERRCODE_NONSTANDARD_USE_OF_ESCAPE_CHARACTER,
-	ERRCODE_NAME_TOO_LONG,
-	ERRCODE_DATATYPE_MISMATCH,
-	ERRCODE_DUPLICATE_COLUMN,
-	ERRCODE_AMBIGUOUS_COLUMN,
-	ERRCODE_UNDEFINED_COLUMN,
-	ERRCODE_GROUPING_ERROR,
-	ERRCODE_INVALID_COLUMN_REFERENCE,
-	ERRCODE_WRONG_OBJECT_TYPE,
-	ERRCODE_TOO_MANY_ARGUMENTS,
-	ERRCODE_UNDEFINED_FUNCTION,
-	ERRCODE_UNDEFINED_OBJECT,
-	ERRCODE_CANNOT_COERCE,
-	ERRCODE_UNDEFINED_PARAMETER,
-	ERRCODE_INDETERMINATE_DATATYPE,
-	ERRCODE_TOO_MANY_COLUMNS,
-	ERRCODE_AMBIGUOUS_FUNCTION,
-	ERRCODE_INVALID_FUNCTION_DEFINITION,
-	ERRCODE_UNDEFINED_TABLE,
-	ERRCODE_DUPLICATE_ALIAS,
-	ERRCODE_AMBIGUOUS_ALIAS,
-	ERRCODE_PROGRAM_LIMIT_EXCEEDED,
-	ERRCODE_STATEMENT_TOO_COMPLEX,
-	ERRCODE_INVALID_RECURSION,
-
-	ERRCODE_COLLATION_MISMATCH,
-	ERRCODE_DATA_EXCEPTION,
-	ERRCODE_QUERY_CANCELED,
-    ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE,
-	ERRCODE_INVALID_TEXT_REPRESENTATION,
-	ERRCODE_INTERNAL_ERROR,
-	ERRCODE_INVALID_NAME,
-	ERRCODE_INVALID_TABLE_DEFINITION,
-    ERRCODE_SUCCESSFUL_COMPLETION
-} PGPostgresParserErrors;
-
 typedef struct ErrorContextCallback
 {
 	struct ErrorContextCallback *previous;
@@ -321,9 +269,9 @@ typedef struct PGParseCallbackState
 	ErrorContextCallback errcallback;
 } PGParseCallbackState;
 
-typedef PGIndex Index;
+//typedef PGIndex Index;
 
-typedef PGOid Oid;
+//typedef PGOid Oid;
 
 typedef duckdb_libpgquery::PGBitmapset *PGRelids;
 
@@ -380,7 +328,7 @@ typedef enum
 
 struct Form_pg_attribute
 {
-    Oid attrelid; /* OID of relation containing this attribute */
+    PGOid attrelid; /* OID of relation containing this attribute */
     std::string attname; /* name of attribute */
 
     /*
@@ -390,7 +338,7 @@ struct Form_pg_attribute
 	 * attributes of this instance, so they had better match or Postgres will
 	 * fail.
 	 */
-    Oid atttypid;
+    PGOid atttypid;
 
     /*
 	 * attstattarget is the target number of statistics datapoints to collect
@@ -496,7 +444,7 @@ struct Form_pg_attribute
     /* Column-level access permissions */
 
 	/* attribute's collation */
-	Oid			attcollation;
+	PGOid			attcollation;
 };
 
 using PGAttrPtr = std::shared_ptr<Form_pg_attribute>;
@@ -537,7 +485,7 @@ struct PGTupleDesc
     std::vector<PGAttrPtr> attrs;
     /* attrs[N] is a pointer to the description of Attribute Number N+1 */
     PGTupleConstrPtr constr;		/* constraints, or NULL if none */
-    Oid tdtypeid; /* composite type ID for tuple type */
+    PGOid tdtypeid; /* composite type ID for tuple type */
     int32 tdtypmod; /* typmod for tuple type */
     bool tdhasoid; /* tuple has oid attribute in its header */
     int tdrefcount; /* reference count, or -1 if not counting */
@@ -547,35 +495,35 @@ using PGTupleDescPtr = std::shared_ptr<PGTupleDesc>;
 
 struct Form_pg_operator
 {
-	Oid oid;
+	PGOid oid;
     std::string oprname; /* name of operator */
-    Oid oprnamespace; /* OID of namespace containing this oper */
-    Oid oprowner; /* operator owner */
+    PGOid oprnamespace; /* OID of namespace containing this oper */
+    PGOid oprowner; /* operator owner */
     char oprkind; /* 'l', 'r', or 'b' */
     bool oprcanmerge;
     bool oprcanhash; /* can be used in hash join? */
-    Oid oprleft; /* left arg type, or 0 if 'l' oprkind */
-    Oid oprright; /* right arg type, or 0 if 'r' oprkind */
-    Oid oprresult; /* result datatype */
-    Oid oprcom; /* OID of commutator oper, or 0 if none */
-    Oid oprnegate; /* OID of negator oper, or 0 if none */
-    Oid oprlsortop; /* OID of left sortop, if mergejoinable */
-    Oid oprrsortop; /* OID of right sortop, if mergejoinable */
-    Oid oprltcmpop; /* OID of "l<r" oper, if mergejoinable */
-    Oid oprgtcmpop; /* OID of "l>r" oper, if mergejoinable */
-    Oid oprcode; /* OID of underlying function */
-    Oid oprrest; /* OID of restriction estimator, or 0 */
-    Oid oprjoin; /* OID of join estimator, or 0 */
+    PGOid oprleft; /* left arg type, or 0 if 'l' oprkind */
+    PGOid oprright; /* right arg type, or 0 if 'r' oprkind */
+    PGOid oprresult; /* result datatype */
+    PGOid oprcom; /* OID of commutator oper, or 0 if none */
+    PGOid oprnegate; /* OID of negator oper, or 0 if none */
+    PGOid oprlsortop; /* OID of left sortop, if mergejoinable */
+    PGOid oprrsortop; /* OID of right sortop, if mergejoinable */
+    PGOid oprltcmpop; /* OID of "l<r" oper, if mergejoinable */
+    PGOid oprgtcmpop; /* OID of "l>r" oper, if mergejoinable */
+    PGOid oprcode; /* OID of underlying function */
+    PGOid oprrest; /* OID of restriction estimator, or 0 */
+    PGOid oprjoin; /* OID of join estimator, or 0 */
 };
 
 using PGOperatorPtr = std::shared_ptr<Form_pg_operator>;
 
 struct Form_pg_type
 {
-	Oid oid;
+	PGOid oid;
     std::string typname; /* type name */
-    Oid typnamespace; /* OID of namespace containing this type */
-    Oid typowner; /* type owner */
+    PGOid typnamespace; /* OID of namespace containing this type */
+    PGOid typowner; /* type owner */
 
     /*
 	 * For a fixed-size type, typlen is the number of bytes we use to
@@ -623,7 +571,7 @@ struct Form_pg_type
 
     char typdelim; /* delimiter for arrays of this type */
 
-    Oid typrelid; /* 0 if not a composite type */
+    PGOid typrelid; /* 0 if not a composite type */
 
     /*
 	 * If typelem is not 0 then it identifies another row in pg_type. The
@@ -636,32 +584,32 @@ struct Form_pg_type
 	 *
 	 * typelem != 0 and typlen == -1.
 	 */
-    Oid typelem;
+    PGOid typelem;
 
     /*
 	 * If there is a "true" array type having this type as element type,
 	 * typarray links to it.  Zero if no associated "true" array type.
 	 */
-    Oid typarray;
+    PGOid typarray;
 
     /*
 	 * I/O conversion procedures for the datatype.
 	 */
-    Oid typinput; /* text format (required) */
-    Oid typoutput;
-    Oid typreceive; /* binary format (optional) */
-    Oid typsend;
+    PGOid typinput; /* text format (required) */
+    PGOid typoutput;
+    PGOid typreceive; /* binary format (optional) */
+    PGOid typsend;
 
     /*
 	 * I/O functions for optional type modifiers.
 	 */
-    Oid typmodin;
-    Oid typmodout;
+    PGOid typmodin;
+    PGOid typmodout;
 
     /*
 	 * Custom ANALYZE procedure for the datatype (0 selects the default).
 	 */
-    Oid typanalyze;
+    PGOid typanalyze;
 
     /* ----------------
 	 * typalign is the alignment required when storing a value of this
@@ -715,7 +663,7 @@ struct Form_pg_type
 	 * Domains use typbasetype to show the base (or domain) type that the
 	 * domain is based on.  Zero if the type is not a domain.
 	 */
-    Oid typbasetype;
+    PGOid typbasetype;
 
     /*
 	 * Domains use typtypmod to record the typmod to be applied to their base
@@ -734,37 +682,37 @@ struct Form_pg_type
 	 * Collation: 0 if type cannot use collations, DEFAULT_COLLATION_OID for
 	 * collatable base types, possibly other OID for domains
 	 */
-    Oid typcollation;
+    PGOid typcollation;
 
-    Oid lt_opr;
-    Oid eq_opr;
-    Oid gt_opr;
-    Oid hash_proc;
-    Oid cmp_proc;
+    PGOid lt_opr;
+    PGOid eq_opr;
+    PGOid gt_opr;
+    PGOid hash_proc;
+    PGOid cmp_proc;
 };
 
 using PGTypePtr = std::shared_ptr<Form_pg_type>;
 
 struct Form_pg_class
 {
-    Oid oid;
+    PGOid oid;
     std::string relname; /* class name */
-    Oid relnamespace; /* OID of namespace containing this class */
-    Oid reltype; /* OID of entry in pg_type for table's
+    PGOid relnamespace; /* OID of namespace containing this class */
+    PGOid reltype; /* OID of entry in pg_type for table's
 								 * implicit row type */
-    Oid reloftype; /* OID of entry in pg_type for underlying
+    PGOid reloftype; /* OID of entry in pg_type for underlying
 								 * composite type */
-    Oid relowner; /* class owner */
-    Oid relam; /* index access method; 0 if not an index */
-    Oid relfilenode; /* identifier of physical storage file */
+    PGOid relowner; /* class owner */
+    PGOid relam; /* index access method; 0 if not an index */
+    PGOid relfilenode; /* identifier of physical storage file */
 
     /* relfilenode == 0 means it is a "mapped" relation, see relmapper.c */
-    Oid reltablespace; /* identifier of table space for relation */
+    PGOid reltablespace; /* identifier of table space for relation */
     int32 relpages; /* # of blocks (not always up-to-date) */
     float4 reltuples; /* # of tuples (not always up-to-date) */
     int32 relallvisible; /* # of all-visible blocks (not always
 								 * up-to-date) */
-    Oid reltoastrelid; /* OID of toast table; 0 if none */
+    PGOid reltoastrelid; /* OID of toast table; 0 if none */
     bool relhasindex; /* T if has (or has had) any indexes */
     bool relisshared; /* T if shared across databases */
     char relpersistence; /* see RELPERSISTENCE_xxx constants below */
@@ -805,15 +753,15 @@ using PGClassPtr = std::shared_ptr<Form_pg_class>;
 
 struct Form_pg_proc
 {
-	Oid oid;
+	PGOid oid;
     std::string proname; /* procedure name */
-    Oid pronamespace; /* OID of namespace containing this proc */
-    Oid proowner; /* procedure owner */
-    Oid prolang; /* OID of pg_language entry */
+    PGOid pronamespace; /* OID of namespace containing this proc */
+    PGOid proowner; /* procedure owner */
+    PGOid prolang; /* OID of pg_language entry */
     float4 procost; /* estimated execution cost */
     float4 prorows; /* estimated # of rows out (if proretset) */
-    Oid provariadic; /* element type of variadic array, or 0 */
-    Oid protransform; /* transforms calls to it during planning */
+    PGOid provariadic; /* element type of variadic array, or 0 */
+    PGOid protransform; /* transforms calls to it during planning */
     bool proisagg; /* is it an aggregate? */
     bool proiswindow; /* is it a window function? */
     bool prosecdef; /* security definer */
@@ -823,16 +771,16 @@ struct Form_pg_proc
     char provolatile; /* see PROVOLATILE_ categories below */
     int16 pronargs; /* number of arguments */
     int16 pronargdefaults; /* number of arguments with defaults */
-    Oid prorettype; /* OID of result type */
+    PGOid prorettype; /* OID of result type */
 
     /*
 	 * variable-length fields start here, but we allow direct access to
 	 * proargtypes
 	 */
     //oidvector proargtypes; /* parameter types (excludes OUT params) */
-	std::vector<Oid> proargtypes;
+	std::vector<PGOid> proargtypes;
     //added by kindred
-    std::vector<Oid> proallargtypes;
+    std::vector<PGOid> proallargtypes;
     std::vector<char> proargmodes;
     std::vector<std::string> proargnames;
     duckdb_libpgquery::PGNode * proargdefaults;
@@ -886,10 +834,10 @@ using PGProcPtr = std::shared_ptr<Form_pg_proc>;
 
 struct Form_pg_cast
 {
-    Oid oid;
-    Oid castsource; /* source datatype for cast */
-    Oid casttarget; /* destination datatype for cast */
-    Oid castfunc; /* cast function; 0 = binary coercible */
+    PGOid oid;
+    PGOid castsource; /* source datatype for cast */
+    PGOid casttarget; /* destination datatype for cast */
+    PGOid castfunc; /* cast function; 0 = binary coercible */
     char castcontext; /* contexts in which cast can be used */
     char castmethod; /* cast method */
 };
@@ -898,23 +846,23 @@ using PGCastPtr = std::shared_ptr<Form_pg_cast>;
 
 struct Form_pg_agg
 {
-    Oid aggfnoid;
+    PGOid aggfnoid;
     char aggkind;
     int16 aggnumdirectargs;
-    Oid aggtransfn;
-    Oid aggfinalfn;
-    Oid aggcombinefn;
-    Oid aggserialfn;
-    Oid aggdeserialfn;
-    Oid aggmtransfn;
-    Oid aggminvtransfn;
-    Oid aggmfinalfn;
+    PGOid aggtransfn;
+    PGOid aggfinalfn;
+    PGOid aggcombinefn;
+    PGOid aggserialfn;
+    PGOid aggdeserialfn;
+    PGOid aggmtransfn;
+    PGOid aggminvtransfn;
+    PGOid aggmfinalfn;
     bool aggfinalextra;
     bool aggmfinalextra;
-    Oid aggsortop;
-    Oid aggtranstype;
+    PGOid aggsortop;
+    PGOid aggtranstype;
     int32 aggtransspace;
-    Oid aggmtranstype;
+    PGOid aggmtranstype;
     int32 aggmtransspace;
 };
 
@@ -923,7 +871,7 @@ using PGAggPtr = std::shared_ptr<Form_pg_agg>;
 struct Sort_group_operator
 {
     /* typeId is the hash lookup key and MUST BE FIRST */
-    Oid type_id; /* OID of the data type */
+    PGOid type_id; /* OID of the data type */
 
     /* some subsidiary information copied from the pg_type row */
     int16 typlen;
@@ -931,7 +879,7 @@ struct Sort_group_operator
     char typalign;
     char typstorage;
     char typtype;
-    Oid typrelid;
+    PGOid typrelid;
 
     /*
 	 * Information obtained from opfamily entries
@@ -941,229 +889,18 @@ struct Sort_group_operator
 	 * composite types, typcache.c checks that the contained types are
 	 * comparable or hashable before allowing eq_opr etc to become set.
 	 */
-    Oid btree_opf; /* the default btree opclass' family */
-    Oid btree_opintype; /* the default btree opclass' opcintype */
-    Oid hash_opf; /* the default hash opclass' family */
-    Oid hash_opintype; /* the default hash opclass' opcintype */
-    Oid eq_opr; /* the equality operator */
-    Oid lt_opr; /* the less-than operator */
-    Oid gt_opr; /* the greater-than operator */
-    Oid cmp_proc; /* the btree comparison function */
-    Oid hash_proc; /* the hash calculation function */
+    PGOid btree_opf; /* the default btree opclass' family */
+    PGOid btree_opintype; /* the default btree opclass' opcintype */
+    PGOid hash_opf; /* the default hash opclass' family */
+    PGOid hash_opintype; /* the default hash opclass' opcintype */
+    PGOid eq_opr; /* the equality operator */
+    PGOid lt_opr; /* the less-than operator */
+    PGOid gt_opr; /* the greater-than operator */
+    PGOid cmp_proc; /* the btree comparison function */
+    PGOid hash_proc; /* the hash calculation function */
 };
 
 using PGSortGroupOperPtr = std::shared_ptr<Sort_group_operator>;
-
-PGTupleDescPtr PGCreateTemplateTupleDesc(int natts, bool hasoid)
-{
-	//TODO kindred
-    // PGTupleDesc * desc;
-    // char * stg;
-    // int attroffset;
-
-    // /*
-	//  * sanity checks
-	//  */
-    // Assert(natts >= 0)
-
-    /*
-	 * Allocate enough memory for the tuple descriptor, including the
-	 * attribute rows, and set up the attribute row pointers.
-	 *
-	 * Note: we assume that sizeof(struct tupleDesc) is a multiple of the
-	 * struct pointer alignment requirement, and hence we don't need to insert
-	 * alignment padding between the struct and the array of attribute row
-	 * pointers.
-	 *
-	 * Note: Only the fixed part of pg_attribute rows is included in tuple
-	 * descriptors, so we only need ATTRIBUTE_FIXED_PART_SIZE space per attr.
-	 * That might need alignment padding, however.
-	 */
-    // attroffset = sizeof(struct tupleDesc) + natts * sizeof(Form_pg_attribute);
-    // attroffset = MAXALIGN(attroffset);
-    // stg = (char *)palloc(attroffset + natts * MAXALIGN(ATTRIBUTE_FIXED_PART_SIZE));
-    // desc = (PGTupleDesc *)stg;
-
-    // if (natts > 0)
-    // {
-    //     Form_pg_attribute * attrs;
-    //     int i;
-
-    //     attrs = (Form_pg_attribute *)(stg + sizeof(struct tupleDesc));
-    //     desc->attrs = attrs;
-    //     stg += attroffset;
-    //     for (i = 0; i < natts; i++)
-    //     {
-    //         attrs[i] = (Form_pg_attribute)stg;
-    //         stg += MAXALIGN(ATTRIBUTE_FIXED_PART_SIZE);
-    //     }
-    // }
-    // else
-    //     desc->attrs = NULL;
-
-    /*
-	 * Initialize other fields of the tupdesc.
-	 */
-    // desc->natts = natts;
-    // desc->constr = NULL;
-    // desc->tdtypeid = RECORDOID;
-    // desc->tdtypmod = -1;
-    // desc->tdhasoid = hasoid;
-    // desc->tdrefcount = -1; /* assume not reference-counted */
-
-    // return desc;
-
-	auto result = std::make_shared<PGTupleDesc>();
-	result->natts = natts;
-    result->attrs.resize(natts);
-	result->tdtypeid = RECORDOID;
-    result->tdtypmod = -1;
-    result->tdhasoid = hasoid;
-    result->tdrefcount = -1;
-
-	return result;
-};
-
-/*
- * CreateTupleDescCopy
- *		This function creates a new TupleDesc by copying from an existing
- *		TupleDesc.
- *
- * !!! Constraints and defaults are not copied !!!
- */
-PGTupleDescPtr PGCreateTupleDescCopy(PGTupleDescPtr tupdesc)
-{
-    PGTupleDescPtr desc = PGCreateTemplateTupleDesc(tupdesc->natts, tupdesc->tdhasoid);
-
-    for (int i = 0; i < desc->natts; i++)
-    {
-        desc->attrs.push_back(std::make_shared<Form_pg_attribute>(*tupdesc->attrs[i].get()));
-        desc->attrs[i]->attnotnull = false;
-        desc->attrs[i]->atthasdef = false;
-    }
-
-    desc->tdtypeid = tupdesc->tdtypeid;
-    desc->tdtypmod = tupdesc->tdtypmod;
-
-    return desc;
-};
-
-/*
- * CreateTupleDescCopyConstr
- *		This function creates a new TupleDesc by copying from an existing
- *		TupleDesc (including its constraints and defaults).
- */
-PGTupleDescPtr PGCreateTupleDescCopyConstr(PGTupleDescPtr tupdesc)
-{
-    PGTupleDescPtr desc = PGCreateTemplateTupleDesc(tupdesc->natts, tupdesc->tdhasoid);
-
-    for (int i = 0; i < desc->natts; i++)
-    {
-        desc->attrs.push_back(std::make_shared<Form_pg_attribute>(*tupdesc->attrs[i].get()));
-    }
-
-    if (tupdesc->constr != nullptr)
-    {
-        PGTupleConstrPtr cpy = std::make_shared<PGTupleConstr>();
-
-        cpy->has_not_null = tupdesc->constr->has_not_null;
-
-        if ((cpy->num_defval = tupdesc->constr->num_defval) > 0)
-        {
-            //cpy->defval = (AttrDefault *)palloc(cpy->num_defval * sizeof(AttrDefault));
-            //memcpy(cpy->defval, tupdesc->constr->defval, cpy->num_defval * sizeof(AttrDefault));
-            for (auto def_val : tupdesc->constr->defval)
-            {
-                cpy->defval.push_back(std::make_shared<PGAttrDefault>(*def_val.get()));
-            }
-            for (int i = cpy->num_defval - 1; i >= 0; i--)
-            {
-                if (tupdesc->constr->defval[i]->adbin != "")
-                    cpy->defval[i]->adbin = tupdesc->constr->defval[i]->adbin;
-            }
-        }
-
-        if ((cpy->num_check = tupdesc->constr->num_check) > 0)
-        {
-            //cpy->check = (ConstrCheck *)palloc(cpy->num_check * sizeof(ConstrCheck));
-            //memcpy(cpy->check, tupdesc->constr->check, cpy->num_check * sizeof(ConstrCheck));
-            for (auto chck : tupdesc->constr->check)
-            {
-                cpy->check.push_back(std::make_shared<PGConstrCheck>(*chck.get()));
-            }
-
-            for (int i = cpy->num_check - 1; i >= 0; i--)
-            {
-                if (tupdesc->constr->check[i]->ccname != "")
-                    cpy->check[i]->ccname = tupdesc->constr->check[i]->ccname;
-                if (tupdesc->constr->check[i]->ccbin != "")
-                    cpy->check[i]->ccbin = tupdesc->constr->check[i]->ccbin;
-                cpy->check[i]->ccvalid = tupdesc->constr->check[i]->ccvalid;
-                cpy->check[i]->ccnoinherit = tupdesc->constr->check[i]->ccnoinherit;
-            }
-        }
-
-        desc->constr = cpy;
-    }
-
-    desc->tdtypeid = tupdesc->tdtypeid;
-    desc->tdtypmod = tupdesc->tdtypmod;
-
-    return desc;
-};
-
-// int
-// namestrcpy(Name name, const char *str)
-// {
-// 	if (!name || !str)
-// 		return -1;
-// 	StrNCpy(NameStr(*name), str, NAMEDATALEN);
-// 	return 0;
-// };
-
-void PGTupleDescInitEntryCollation(PGTupleDescPtr desc, PGAttrNumber attributeNumber, Oid collationid)
-{
-    /*
-	 * sanity checks
-	 */
-    Assert(PointerIsValid(desc.get()))
-    Assert(attributeNumber >= 1)
-    Assert(attributeNumber <= desc->natts)
-
-    desc->attrs[attributeNumber - 1]->attcollation = collationid;
-};
-
-void PGTupleDescCopyEntry(PGTupleDescPtr dst, PGAttrNumber dstAttno, PGTupleDescPtr src, PGAttrNumber srcAttno)
-{
-    /*
-	 * sanity checks
-	 */
-    Assert(src != nullptr)
-    Assert(dst != nullptr)
-    Assert(srcAttno >= 1)
-    Assert(srcAttno <= src->natts)
-    Assert(dstAttno >= 1)
-    Assert(dstAttno <= dst->natts)
-
-	dst->attrs[dstAttno - 1] = src->attrs[srcAttno - 1];
-    //memcpy(dst->attrs[dstAttno - 1], src->attrs[srcAttno - 1], ATTRIBUTE_FIXED_PART_SIZE);
-
-    /*
-	 * Aside from updating the attno, we'd better reset attcacheoff.
-	 *
-	 * XXX Actually, to be entirely safe we'd need to reset the attcacheoff of
-	 * all following columns in dst as well.  Current usage scenarios don't
-	 * require that though, because all following columns will get initialized
-	 * by other uses of this function or TupleDescInitEntry.  So we cheat a
-	 * bit to avoid a useless O(N^2) penalty.
-	 */
-    dst->attrs[dstAttno - 1]->attnum = dstAttno;
-    dst->attrs[dstAttno - 1]->attcacheoff = -1;
-
-    /* since we're not copying constraints or defaults, clear these */
-    dst->attrs[dstAttno - 1]->attnotnull = false;
-    dst->attrs[dstAttno - 1]->atthasdef = false;
-};
 
 typedef enum
 {
@@ -1199,12 +936,12 @@ struct FuncCandidateList
 {
     FuncCandidateListPtr next;
     int pathpos; /* for internal use of namespace lookup */
-    Oid oid; /* the function or operator's OID */
+    PGOid oid; /* the function or operator's OID */
     int nargs; /* number of arg types returned */
     int nvargs; /* number of args to become variadic array */
     int ndargs; /* number of defaulted args */
     int * argnumbers; /* args' positional indexes, if named call */
-    Oid * args; /* arg types --- VARIABLE LENGTH ARRAY */
+    PGOid * args; /* arg types --- VARIABLE LENGTH ARRAY */
 
     ~FuncCandidateList()
     {
@@ -1239,7 +976,7 @@ struct ArrayType
 	int32		vl_len_;		/* varlena header (do not touch directly!) */
 	int			ndim;			/* # of dimensions */
 	int32		dataoffset;		/* offset to data, or 0 if no bitmap */
-	Oid			elemtype;		/* element type OID */
+	PGOid			elemtype;		/* element type OID */
 };
 
 // struct FuzzyAttrMatchState
@@ -1254,9 +991,9 @@ struct ArrayType
 struct OprCacheKey
 {
 	char		oprname[NAMEDATALEN];
-	Oid			left_arg;		/* Left input OID, or 0 if prefix op */
-	Oid			right_arg;		/* Right input OID, or 0 if postfix op */
-	Oid			search_path[MAX_CACHED_PATH_LEN];
+	PGOid			left_arg;		/* Left input OID, or 0 if prefix op */
+	PGOid			right_arg;		/* Right input OID, or 0 if postfix op */
+	PGOid			search_path[MAX_CACHED_PATH_LEN];
 };
 
 /**
@@ -1455,9 +1192,9 @@ struct PGPlannerGlobal
 
     int nParamExec; /* number of PARAM_EXEC Params used */
 
-    Index lastPHId; /* highest PlaceHolderVar ID assigned */
+    PGIndex lastPHId; /* highest PlaceHolderVar ID assigned */
 
-    Index lastRowMarkId; /* highest PlanRowMark ID assigned */
+    PGIndex lastRowMarkId; /* highest PlanRowMark ID assigned */
 
     bool transientPlan; /* redo plan when TransactionXmin changes? */
     bool oneoffPlan; /* redo plan on every execution? */
@@ -1488,7 +1225,7 @@ struct PGPlannerInfo
 
     PGPlannerGlobal * glob; /* global info for current planner run */
 
-    Index query_level; /* 1 at the outermost Query */
+    PGIndex query_level; /* 1 at the outermost Query */
 
     struct PGPlannerInfo * parent_root; /* NULL at outermost Query */
 
@@ -1643,21 +1380,6 @@ struct PGPlannerInfo
     bool disallow_unique_rowid_path; /* true if we decide not to generate unique rowid path */
 };
 
-static inline Datum BoolGetDatum(bool b) { return (b ? 1 : 0); } 
-
-
-static inline int32 DatumGetInt32(Datum d) { return (int32) d; };
-static inline Datum Int16GetDatum(int16 i16) { return (Datum) i16; } 
-static inline Datum Int32GetDatum(int32 i32) { return (Datum) i32; };
-static inline Datum Int64GetDatum(int64 i64) { return (Datum) i64; };
-
-#define DatumGetPointer(X) ((Pointer) (X))
-#define PointerGetDatum(X) ((Datum) (X))
-
-static inline Datum CStringGetDatum(const char *p) { return PointerGetDatum(p); };
-static inline Datum ObjectIdGetDatum(Oid oid) { return (Datum) oid; } ;
-static inline char *DatumGetCString(Datum d) { return (char* ) DatumGetPointer(d); };
-
 static const int oldprecedence_l[] = {
 	0, 10, 10, 3, 2, 8, 4, 5, 6, 4, 5, 6, 7, 8, 9
 };
@@ -1673,361 +1395,6 @@ static const int oldprecedence_r[] = {
 	     (cell) != NULL; \
 	     (cell) = lnext(cell), ++(counter))
 
-Oid			MyDatabaseId = InvalidOid;
-
-size_t
-strlcpy(char *dst, const char *src, size_t siz)
-{
-	char	   *d = dst;
-	const char *s = src;
-	size_t		n = siz;
-
-	/* Copy as many bytes as will fit */
-	if (n != 0)
-	{
-		while (--n != 0)
-		{
-			if ((*d++ = *s++) == '\0')
-				break;
-		}
-	}
-
-	/* Not enough room in dst, add NUL and traverse rest of src */
-	if (n == 0)
-	{
-		if (siz != 0)
-			*d = '\0';			/* NUL-terminate dst */
-		while (*s++)
-			;
-	}
-
-	return (s - src - 1);		/* count does not include NUL */
-}
-
-/*
- * count_nonjunk_tlist_entries
- *		What it says ...
- */
-int
-count_nonjunk_tlist_entries(duckdb_libpgquery::PGList *tlist)
-{
-	int			len = 0;
-    duckdb_libpgquery::PGListCell * l;
-
-    foreach(l, tlist)
-	{
-		duckdb_libpgquery::PGTargetEntry *tle = (duckdb_libpgquery::PGTargetEntry *) lfirst(l);
-
-		if (!tle->resjunk)
-			len++;
-	}
-	return len;
-}
-
-PGParseState *
-make_parsestate(PGParseState *parentParseState)
-{
-	auto pstate = new PGParseState();
-
-	pstate->parentParseState = parentParseState;
-
-	/* Fill in fields that don't start at null/false/zero */
-	pstate->p_next_resno = 1;
-
-	if (parentParseState)
-	{
-		pstate->p_sourcetext = parentParseState->p_sourcetext;
-		/* all hooks are copied from parent */
-		//pstate->p_pre_columnref_hook = parentParseState->p_pre_columnref_hook;
-		//pstate->p_post_columnref_hook = parentParseState->p_post_columnref_hook;
-		//pstate->p_paramref_hook = parentParseState->p_paramref_hook;
-		//pstate->p_coerce_param_hook = parentParseState->p_coerce_param_hook;
-		pstate->p_ref_hook_state = parentParseState->p_ref_hook_state;
-	}
-
-	return pstate;
-};
-
-duckdb_libpgquery::PGValue * makeString(char * str)
-{
-	using duckdb_libpgquery::PGValue;
-	using duckdb_libpgquery::T_PGValue;
-    PGValue * v = makeNode(PGValue);
-
-    v->type = duckdb_libpgquery::T_PGString;
-    v->val.str = str;
-    return v;
-};
-
-int
-parser_errposition(PGParseState *pstate, int location)
-{
-	int			pos;
-
-	/* No-op if location was not provided */
-	if (location < 0)
-		return 0;
-	/* Can't do anything if source text is not available */
-	if (pstate == NULL || pstate->p_sourcetext == NULL)
-		return 0;
-	/* Convert offset to character number */
-	pos = duckdb_libpgquery::pg_mbstrlen_with_len(pstate->p_sourcetext, location) + 1;
-	/* And pass it to the ereport mechanism */
-	return duckdb_libpgquery::errposition(pos);
-};
-
-void
-free_parsestate(PGParseState *pstate)
-{
-	delete pstate;
-	pstate = NULL;
-};
-
-/* Global variables */
-ErrorContextCallback *error_context_stack = NULL;
-
-static void pcb_error_callback(void * arg)
-{
-    PGParseCallbackState * pcbstate = (PGParseCallbackState *)arg;
-
-	//TODO kindred
-    //if (geterrcode() != ERRCODE_QUERY_CANCELED)
-        (void)parser_errposition(pcbstate->pstate, pcbstate->location);
-};
-
-void
-setup_parser_errposition_callback(PGParseCallbackState *pcbstate,
-								  PGParseState *pstate, int location)
-{
-	/* Setup error traceback support for ereport() */
-	pcbstate->pstate = pstate;
-	pcbstate->location = location;
-	pcbstate->errcallback.callback = pcb_error_callback;
-	pcbstate->errcallback.arg = (void *) pcbstate;
-	pcbstate->errcallback.previous = error_context_stack;
-	error_context_stack = &pcbstate->errcallback;
-};
-
-void
-cancel_parser_errposition_callback(PGParseCallbackState *pcbstate)
-{
-	/* Pop the error context stack */
-	error_context_stack = pcbstate->errcallback.previous;
-};
-
-duckdb_libpgquery::PGTargetEntry * get_sortgroupref_tle(Index sortref, duckdb_libpgquery::PGList * targetList)
-{
-	using duckdb_libpgquery::errcode;
-	using duckdb_libpgquery::ereport;
-	using duckdb_libpgquery::errmsg;
-
-    duckdb_libpgquery::PGListCell * l;
-
-    foreach (l, targetList)
-    {
-        duckdb_libpgquery::PGTargetEntry * tle = (duckdb_libpgquery::PGTargetEntry *)lfirst(l);
-
-        if (tle->ressortgroupref == sortref)
-            return tle;
-    }
-
-    /*
-	 * XXX: we probably should catch this earlier, but we have a
-	 * few queries in the regression suite that hit this.
-	 */
-    ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR), errmsg("ORDER/GROUP BY expression not found in targetlist")));
-    return NULL; /* keep compiler quiet */
-};
-
-duckdb_libpgquery::PGTargetEntry * get_sortgroupclause_tle(
-	duckdb_libpgquery::PGSortGroupClause * sgClause, 
-	duckdb_libpgquery::PGList * targetList)
-{
-    return get_sortgroupref_tle(sgClause->tleSortGroupRef, targetList);
-};
-
-duckdb_libpgquery::PGNode *
-get_sortgroupclause_expr(duckdb_libpgquery::PGSortGroupClause * sgClause, duckdb_libpgquery::PGList * targetList)
-{
-    duckdb_libpgquery::PGTargetEntry * tle = get_sortgroupclause_tle(sgClause, targetList);
-
-    return (duckdb_libpgquery::PGNode *)tle->expr;
-};
-
-bool scanint8(const char * str, bool errorOK, int64 * result)
-{
-	using duckdb_libpgquery::ereport;
-	using duckdb_libpgquery::errcode;
-	using duckdb_libpgquery::errmsg;
-
-    const char * ptr = str;
-    int64 tmp = 0;
-    int sign = 1;
-
-    /*
-	 * Do our own scan, rather than relying on sscanf which might be broken
-	 * for long long.
-	 */
-
-    /* skip leading spaces */
-    while (*ptr && isspace((unsigned char)*ptr))
-        ptr++;
-
-    /* handle sign */
-    if (*ptr == '-')
-    {
-        ptr++;
-
-        /*
-		 * Do an explicit check for INT64_MIN.  Ugly though this is, it's
-		 * cleaner than trying to get the loop below to handle it portably.
-		 */
-        if (strncmp(ptr, "9223372036854775808", 19) == 0)
-        {
-            tmp = -INT64CONST(0x7fffffffffffffff) - 1;
-            ptr += 19;
-            goto gotdigits;
-        }
-        sign = -1;
-    }
-    else if (*ptr == '+')
-        ptr++;
-
-    /* require at least one digit */
-    if (!isdigit((unsigned char)*ptr))
-    {
-        if (errorOK)
-            return false;
-        else
-            ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("invalid input syntax for integer: \"%s\"", str)));
-    }
-
-    /* process digits */
-    while (*ptr && isdigit((unsigned char)*ptr))
-    {
-        int64 newtmp = tmp * 10 + (*ptr++ - '0');
-
-        if ((newtmp / 10) != tmp) /* overflow? */
-        {
-            if (errorOK)
-                return false;
-            else
-                ereport(ERROR, (errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE), errmsg("value \"%s\" is out of range for type bigint", str)));
-        }
-        tmp = newtmp;
-    }
-
-gotdigits:
-
-    /* allow trailing whitespace, but not other trailing chars */
-    while (*ptr != '\0' && isspace((unsigned char)*ptr))
-        ptr++;
-
-    if (*ptr != '\0')
-    {
-        if (errorOK)
-            return false;
-        else
-            ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("invalid input syntax for integer: \"%s\"", str)));
-    }
-
-    *result = (sign < 0) ? -tmp : tmp;
-
-    return true;
-};
-
-std::string PGNameListToString(duckdb_libpgquery::PGList * names)
-{
-	using duckdb_libpgquery::elog;
-	using duckdb_libpgquery::PGListCell;
-	using duckdb_libpgquery::PGNode;
-	using duckdb_libpgquery::T_PGString;
-	using duckdb_libpgquery::PGAStar;
-	using duckdb_libpgquery::PGValue;
-	using duckdb_libpgquery::T_PGAStar;
-
-    std::string result = "";
-    PGListCell * l;
-
-    foreach (l, names)
-    {
-        PGNode * name = (PGNode *)lfirst(l);
-
-        if (l != list_head(names))
-		{
-            //appendStringInfoChar(&string, '.');
-			result += ".";
-		}
-
-        if (IsA(name, PGString))
-		{
-            //appendStringInfoString(&string, strVal(name));
-			result += std::string(strVal(name));
-		}
-        else if (IsA(name, PGAStar))
-		{
-            //appendStringInfoString(&string, "*");
-			result += "*";
-		}
-        else
-            elog(ERROR, "unexpected node type in name list: %d", (int)nodeTag(name));
-    }
-
-    return result;
-};
-
-/*
- * DeconstructQualifiedName
- *		Given a possibly-qualified name expressed as a list of String nodes,
- *		extract the schema name and object name.
- *
- * *nspname_p is set to NULL if there is no explicit schema name.
- */
-void DeconstructQualifiedName(duckdb_libpgquery::PGList * names, char ** nspname_p, char ** objname_p)
-{
-	using duckdb_libpgquery::ereport;
-	using duckdb_libpgquery::errcode;
-	using duckdb_libpgquery::errmsg;
-	using duckdb_libpgquery::PGValue;
-
-    //char * catalogname;
-    char * schemaname = NULL;
-    char * objname = NULL;
-
-    switch (list_length(names))
-    {
-        case 1:
-            objname = strVal(linitial(names));
-            break;
-        case 2:
-            schemaname = strVal(linitial(names));
-            objname = strVal(lsecond(names));
-            break;
-        // case 3:
-        //     catalogname = strVal(linitial(names));
-        //     schemaname = strVal(lsecond(names));
-        //     objname = strVal(lthird(names));
-
-        //     /*
-		// 	 * We check the catalog name and then ignore it.
-		// 	 */
-        //     if (strcmp(catalogname, get_database_name(MyDatabaseId)) != 0)
-        //         ereport(
-        //             ERROR,
-        //             (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-        //              errmsg("cross-database references are not implemented: %s", NameListToString(names))));
-        //     break;
-        default:
-            ereport(
-                ERROR,
-                (errcode(ERRCODE_SYNTAX_ERROR), errmsg("improper qualified name (too many dotted names): %s", PGNameListToString(names).c_str())));
-            break;
-    }
-
-    *nspname_p = schemaname;
-    *objname_p = objname;
-};
-
 struct grouped_window_ctx
 {
     duckdb_libpgquery::PGList * subtlist; /* target list for subquery */
@@ -2036,7 +1403,7 @@ struct grouped_window_ctx
 
     /* Scratch area for init_grouped_window context and map_sgr_mutator.
 	 */
-    Index * sgr_map;
+    PGIndex * sgr_map;
 
     /* Scratch area for grouped_window_mutator and var_for_gw_expr.
 	 */
@@ -2047,9 +1414,9 @@ struct grouped_window_ctx
 
 struct RelFileNode
 {
-	Oid			spcNode;		/* tablespace */
-	Oid			dbNode;			/* database */
-	Oid			relNode;		/* relation */
+	PGOid			spcNode;		/* tablespace */
+	PGOid			dbNode;			/* database */
+	PGOid			relNode;		/* relation */
 };
 
 typedef int BackendId;
@@ -2058,8 +1425,8 @@ typedef uint32 SubTransactionId;
 
 typedef struct LockRelId
 {
-	Oid			relId;			/* a relation identifier */
-	Oid			dbId;			/* a database identifier */
+	PGOid			relId;			/* a relation identifier */
+	PGOid			dbId;			/* a database identifier */
 } LockRelId;
 
 typedef struct LockInfoData
@@ -2105,15 +1472,15 @@ struct PGPolicy
     /* These fields apply to POLICYTYPE_PARTITIONED. */
     int nattrs;
     PGAttrNumber * attrs; /* array of attribute numbers  */
-    Oid * opclasses; /* and their opclasses */
+    PGOid * opclasses; /* and their opclasses */
 };
 
 using PGPolicyPtr = std::shared_ptr<PGPolicy>;
 
 struct Form_pg_index
 {
-	Oid			indexrelid;		/* OID of the index */
-	Oid			indrelid;		/* OID of the relation it indexes */
+	PGOid			indexrelid;		/* OID of the index */
+	PGOid			indrelid;		/* OID of the relation it indexes */
 	int16		indnatts;		/* number of columns in index */
 	bool		indisunique;	/* is this a unique index? */
 	bool		indisprimary;	/* is this index for primary key? */
@@ -2133,8 +1500,8 @@ struct Form_pg_index
 //#ifdef CATALOG_VARLEN
 	//oidvector	indcollation;	/* collation identifiers */
 	//oidvector	indclass;		/* opclass identifiers */
-    std::vector<Oid> indcollation;
-    std::vector<Oid> indclass;
+    std::vector<PGOid> indcollation;
+    std::vector<PGOid> indclass;
 	//int2vector	indoption;		/* per-column flags (AM-specific meanings) */
     std::vector<int2> indoption;
 	std::optional<std::string> indexprs;		/* expression trees for index attributes that
@@ -2151,10 +1518,10 @@ using PGIndexPtr = std::shared_ptr<Form_pg_index>;
 struct PGAttStatsSlot
 {
     /* Always filled: */
-    Oid staop; /* Actual staop for the found slot */
+    PGOid staop; /* Actual staop for the found slot */
     /* Filled if ATTSTATSSLOT_VALUES is specified: */
-    Oid valuetype; /* Actual datatype of the values */
-    Datum * values; /* slot's "values" array, or NULL if none */
+    PGOid valuetype; /* Actual datatype of the values */
+    PGDatum * values; /* slot's "values" array, or NULL if none */
     int nvalues; /* length of values[], or 0 */
     /* Filled if ATTSTATSSLOT_NUMBERS is specified: */
     float4 * numbers; /* slot's "numbers" array, or NULL if none */
@@ -2167,15 +1534,9 @@ struct PGAttStatsSlot
 
 using PGAttStatsSlotPtr = std::shared_ptr<PGAttStatsSlot>;
 
-namespace DB
-{
-    class IStorage;
-    using StoragePtr = std::shared_ptr<IStorage>;
-};
-
 struct PGRelation
 {
-    Oid oid;
+    PGOid oid;
     DB::StoragePtr storage_ptr;
     RelFileNode rd_node; /* relation physical identifier */
     /* use "struct" here to avoid needing to include smgr.h: */
@@ -2208,7 +1569,7 @@ struct PGRelation
 
     PGClassPtr rd_rel; /* RELATION tuple */
     PGTupleDescPtr rd_att; /* tuple descriptor */
-    Oid rd_id; /* relation's object id */
+    PGOid rd_id; /* relation's object id */
     LockInfoData rd_lockInfo; /* lock mgr's info for locking relation */
     //RuleLock * rd_rules; /* rewrite rules */
     //MemoryContext rd_rulescxt; /* private memory cxt for rd_rules, if any */
@@ -2218,8 +1579,8 @@ struct PGRelation
 
     /* data managed by RelationGetIndexList: */
     duckdb_libpgquery::PGList * rd_indexlist; /* list of OIDs of indexes on relation */
-    Oid rd_oidindex; /* OID of unique index on OID, if any */
-    Oid rd_replidindex; /* OID of replica identity index, if any */
+    PGOid rd_oidindex; /* OID of unique index on OID, if any */
+    PGOid rd_replidindex; /* OID of replica identity index, if any */
 
     /* data managed by RelationGetIndexAttrBitmap: */
     duckdb_libpgquery::PGBitmapset * rd_indexattr; /* identifies columns used in indexes */
@@ -2256,18 +1617,18 @@ struct PGRelation
 	 */
     //MemoryContext rd_indexcxt; /* private memory cxt for this stuff */
     //RelationAmInfo * rd_aminfo; /* lookup info for funcs found in pg_am */
-    Oid * rd_opfamily; /* OIDs of op families for each index col */
-    Oid * rd_opcintype; /* OIDs of opclass declared input data types */
+    PGOid * rd_opfamily; /* OIDs of op families for each index col */
+    PGOid * rd_opcintype; /* OIDs of opclass declared input data types */
     //RegProcedure * rd_support; /* OIDs of support procedures */
     //FmgrInfo * rd_supportinfo; /* lookup info for support procedures */
     int16 * rd_indoption; /* per-column AM-specific flags */
     duckdb_libpgquery::PGList * rd_indexprs; /* index expression trees, if any */
     duckdb_libpgquery::PGList * rd_indpred; /* index predicate tree, if any */
-    Oid * rd_exclops; /* OIDs of exclusion operators, if any */
-    Oid * rd_exclprocs; /* OIDs of exclusion ops' procs, if any */
+    PGOid * rd_exclops; /* OIDs of exclusion operators, if any */
+    PGOid * rd_exclprocs; /* OIDs of exclusion ops' procs, if any */
     uint16 * rd_exclstrats; /* exclusion ops' strategy numbers, if any */
     void * rd_amcache; /* available for use by index AM */
-    Oid * rd_indcollation; /* OIDs of index collations */
+    PGOid * rd_indcollation; /* OIDs of index collations */
 
     /*
 	 * foreign-table support
@@ -2289,7 +1650,7 @@ struct PGRelation
 	 * version of the main heap, not the toast table itself.)  This also
 	 * causes toast_save_datum() to try to preserve toast value OIDs.
 	 */
-    Oid rd_toastoid; /* Real TOAST table's OID, or InvalidOid */
+    PGOid rd_toastoid; /* Real TOAST table's OID, or InvalidOid */
 
     /*
 	 * AO table support info (used only for AO and AOCS relations)
@@ -2306,106 +1667,14 @@ using PGRelationPtr = std::shared_ptr<PGRelation>;
 
 struct PGDatabase
 {
-    Oid oid;
-    String name;
+    PGOid oid;
+    std::string name;
 };
 
 using PGDatabasePtr = std::shared_ptr<PGDatabase>;
 
 #define RelationGetRelationName(relation) \
 	((relation)->rd_rel->relname.c_str())
-
-duckdb_libpgquery::PGList * stringToQualifiedNameList(const char * string)
-{
-	using duckdb_libpgquery::ereport;
-	using duckdb_libpgquery::errcode;
-	using duckdb_libpgquery::errmsg;
-	using duckdb_libpgquery::pstrdup;
-	using duckdb_libpgquery::lappend;
-	using duckdb_libpgquery::PGList;
-	using duckdb_libpgquery::PGListCell;
-
-    PGList * result = NULL;
-
-	std::string rawname = std::string(string);
-
-	std::vector<std::string> vecSegTag;
-	boost::split(vecSegTag, rawname, boost::is_any_of(","));
-
-	if (vecSegTag.size() == 0)
-	{
-		ereport(ERROR, (errcode(ERRCODE_INVALID_NAME), errmsg("invalid name syntax")));
-	}
-
-    for (auto l : vecSegTag)
-    {
-        result = lappend(result, makeString(pstrdup(l.c_str())));
-    }
-
-    return result;
-};
-
-duckdb_libpgquery::PGRangeVar * makeRangeVarFromNameList(duckdb_libpgquery::PGList * names)
-{
-	using duckdb_libpgquery::ereport;
-	using duckdb_libpgquery::errcode;
-	using duckdb_libpgquery::errmsg;
-	using duckdb_libpgquery::PGValue;
-	using duckdb_libpgquery::makeRangeVar;
-
-    duckdb_libpgquery::PGRangeVar * rel = makeRangeVar(NULL, NULL, -1);
-
-    switch (list_length(names))
-    {
-        case 1:
-            rel->relname = strVal(linitial(names));
-            break;
-        case 2:
-            rel->schemaname = strVal(linitial(names));
-            rel->relname = strVal(lsecond(names));
-            break;
-        case 3:
-            rel->catalogname = strVal(linitial(names));
-            rel->schemaname = strVal(lsecond(names));
-            rel->relname = strVal(lthird(names));
-            break;
-        default:
-            ereport(
-                ERROR,
-                (errcode(ERRCODE_SYNTAX_ERROR), errmsg("improper relation name (too many dotted names): %s", NameListToString(names))));
-            break;
-    }
-
-    return rel;
-};
-
-int pg_strcasecmp(const char * s1, const char * s2)
-{
-    for (;;)
-    {
-        unsigned char ch1 = (unsigned char)*s1++;
-        unsigned char ch2 = (unsigned char)*s2++;
-
-        if (ch1 != ch2)
-        {
-            if (ch1 >= 'A' && ch1 <= 'Z')
-                ch1 += 'a' - 'A';
-            else if (IS_HIGHBIT_SET(ch1) && isupper(ch1))
-                ch1 = tolower(ch1);
-
-            if (ch2 >= 'A' && ch2 <= 'Z')
-                ch2 += 'a' - 'A';
-            else if (IS_HIGHBIT_SET(ch2) && isupper(ch2))
-                ch2 = tolower(ch2);
-
-            if (ch1 != ch2)
-                return (int)ch1 - (int)ch2;
-        }
-        if (ch1 == 0)
-            break;
-    }
-    return 0;
-};
 
 /* comparison types */
 typedef enum
@@ -2432,7 +1701,7 @@ typedef enum
 
 struct PGLogicalIndexInfo
 {
-    Oid logicalIndexOid; /* OID of the logical index */
+    PGOid logicalIndexOid; /* OID of the logical index */
     int nColumns; /* Number of columns in the index */
     PGAttrNumber * indexKeys; /* column numbers of index keys */
     duckdb_libpgquery::PGList * indPred; /* predicate if partial index, or NIL */
@@ -2465,8 +1734,6 @@ typedef enum
     PG_AGGSTAGE_FINAL /* Second (upper, later) stage of 2-stage aggregation. */
 } PGAggStage;
 
-bool optimizer_multilevel_partitioning = false;
-
 /*
  * Descriptor of a single AO relation.
  * For now very similar to the catalog row itself but may change in time.
@@ -2490,7 +1757,7 @@ struct PGExtTableEntry
 struct Form_pg_statistic
 {
     /* These fields form the unique key for the entry: */
-    Oid starelid; /* relation containing attribute */
+    PGOid starelid; /* relation containing attribute */
     int16 staattnum; /* attribute (column) stats are for */
     bool stainherit; /* true if inheritance children are included */
 
@@ -2550,11 +1817,11 @@ struct Form_pg_statistic
     int16 stakind4;
     int16 stakind5;
 
-    Oid staop1;
-    Oid staop2;
-    Oid staop3;
-    Oid staop4;
-    Oid staop5;
+    PGOid staop1;
+    PGOid staop2;
+    PGOid staop3;
+    PGOid staop4;
+    PGOid staop5;
 
 #ifdef CATALOG_VARLEN /* variable-length fields start here */
     float4 stanumbers1[1];
@@ -2637,16 +1904,4 @@ struct PGNumeric
     union PGNumericChoice choice; /* choice of format */
 };
 
-/*
- * Interpretation of high bits.
- */
-
-#define PG_NUMERIC_SIGN_MASK	0xC000
-#define PG_NUMERIC_POS			0x0000
-#define PG_NUMERIC_NEG			0x4000
-#define PG_NUMERIC_SHORT		0x8000
-#define PG_NUMERIC_NAN			0xC000
-
-#define PG_NUMERIC_FLAGBITS(n) ((n)->choice.n_header & PG_NUMERIC_SIGN_MASK)
-#define PG_NUMERIC_IS_NAN(n)		(PG_NUMERIC_FLAGBITS(n) == PG_NUMERIC_NAN)
-#define PG_NUMERIC_IS_SHORT(n)		(PG_NUMERIC_FLAGBITS(n) == PG_NUMERIC_SHORT)
+}

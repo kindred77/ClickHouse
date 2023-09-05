@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -32,11 +32,11 @@ public:
 	//Oid
 	//transformContainerType(Oid *containerType, int32 *containerTypmod);
 
-	Oid transformArrayType(Oid *arrayType, int32 *arrayTypmod);
+	duckdb_libpgquery::PGOid transformArrayType(duckdb_libpgquery::PGOid *arrayType, duckdb_libpgquery::int32 *arrayTypmod);
 
     duckdb_libpgquery::PGArrayRef * transformArraySubscripts(
-        PGParseState * pstate, duckdb_libpgquery::PGNode * arrayBase, Oid arrayType,
-		Oid elementType, int32 arrayTypMod, duckdb_libpgquery::PGList * indirection,
+        duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGNode * arrayBase, duckdb_libpgquery::PGOid arrayType,
+		duckdb_libpgquery::PGOid elementType, duckdb_libpgquery::int32 arrayTypMod, duckdb_libpgquery::PGList * indirection,
 		duckdb_libpgquery::PGNode * assignFrom);
 
     // void
@@ -47,10 +47,10 @@ public:
 	// cancel_parser_errposition_callback(PGParseCallbackState *pcbstate);
 	
 	duckdb_libpgquery::PGVar *
-	make_var(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int attrno, int location);
+	make_var(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int attrno, int location);
 
 	duckdb_libpgquery::PGConst *
-	make_const(PGParseState *pstate, duckdb_libpgquery::PGValue *value, int location);
+	make_const(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGValue *value, int location);
 
 	// void parser_errposition(PGParseState *pstate, int location);
 };

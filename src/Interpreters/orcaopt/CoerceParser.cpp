@@ -1,10 +1,10 @@
 #include <Interpreters/orcaopt/CoerceParser.h>
+
 #include <Interpreters/orcaopt/RelationParser.h>
 #include <Interpreters/orcaopt/SelectParser.h>
 #include <Interpreters/orcaopt/ExprParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/TypeParser.h>
-
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
 #include <Interpreters/orcaopt/provider/CastProvider.h>
@@ -28,12 +28,12 @@ CoerceParser::CoerceParser(ContextPtr& context_) : context(context_)
 	relation_provider = std::make_shared<RelationProvider>(context);
 };
 
-Oid
+PGOid
 CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char* context_str,
 				   PGNode **which_expr)
 {
     PGNode	   *pexpr;
-	Oid			ptype;
+	PGOid			ptype;
 	TYPCATEGORY pcategory;
 	bool		pispreferred;
 	PGListCell   *lc;
@@ -53,7 +53,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 		for_each_cell(lc, lc)
 		{
 			PGNode	   *nexpr = (PGNode *) lfirst(lc);
-			Oid			ntype = exprType(nexpr);
+			PGOid			ntype = exprType(nexpr);
 
 			if (ntype != ptype)
 				break;
@@ -77,7 +77,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 	for_each_cell(lc, lc)
 	{
 		PGNode	   *nexpr = (PGNode *) lfirst(lc);
-		Oid			ntype = type_provider->getBaseType(exprType(nexpr));
+		PGOid			ntype = type_provider->getBaseType(exprType(nexpr));
 
 		/* move on to next one if no new information... */
 		if (ntype != UNKNOWNOID && ntype != ptype)
@@ -103,7 +103,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 					return InvalidOid;
 				parser_errposition(pstate, exprLocation(nexpr));
 				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 				/*------
 				  translator: first %s is name of a SQL construct, eg CASE */
 						 errmsg("%s types %s and %s cannot be matched",
@@ -148,7 +148,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 
 PGNode *
 CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
-						 Oid targetTypeId,
+						 PGOid targetTypeId,
 						 PGCoercionContext ccontext,
 						 PGCoercionForm cformat,
 						 int location)
@@ -181,7 +181,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
     else
         ereport(
             ERROR,
-            (errcode(ERRCODE_CANNOT_COERCE),
+            (errcode(PG_ERRCODE_CANNOT_COERCE),
              errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
              parser_coercion_errposition(pstate, location, node)));
 
@@ -193,7 +193,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
     {
         PGNode * expr;
         PGNode * cexpr;
-        Oid exprtype;
+        PGOid exprtype;
 
         /* Fill in NULLs for dropped columns in rowtype */
         if (tupdesc->attrs[i]->attisdropped)
@@ -202,14 +202,18 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 			 * can't use atttypid here, but it doesn't really matter what type
 			 * the Const claims to be.
 			 */
-            newargs = lappend(newargs, makeNullConst(INT4OID, -1, InvalidOid));
+
+            int16_t typLen;
+            bool typByVal;
+            type_provider->get_typlenbyval(INT4OID, &typLen, &typByVal);
+            newargs = lappend(newargs, makeNullConst(typLen, typByVal, INT4OID, -1, InvalidOid));
             continue;
         }
 
         if (arg == NULL)
             ereport(
                 ERROR,
-                (errcode(ERRCODE_CANNOT_COERCE),
+                (errcode(PG_ERRCODE_CANNOT_COERCE),
                  errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
                  errdetail("Input has too few columns."),
                  parser_coercion_errposition(pstate, location, node)));
@@ -221,7 +225,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
         if (cexpr == NULL)
             ereport(
                 ERROR,
-                (errcode(ERRCODE_CANNOT_COERCE),
+                (errcode(PG_ERRCODE_CANNOT_COERCE),
                  errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
                  errdetail(
                      "Cannot cast type %s to %s in column %d.",
@@ -236,7 +240,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
     if (arg != NULL)
         ereport(
             ERROR,
-            (errcode(ERRCODE_CANNOT_COERCE),
+            (errcode(PG_ERRCODE_CANNOT_COERCE),
              errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
              errdetail("Input has too many columns."),
              parser_coercion_errposition(pstate, location, node)));
@@ -251,7 +255,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 };
 
 bool
-CoerceParser::IsPreferredType(TYPCATEGORY category, Oid type)
+CoerceParser::IsPreferredType(TYPCATEGORY category, PGOid type)
 {
 	char		typcategory;
 	bool		typispreferred;
@@ -265,9 +269,9 @@ CoerceParser::IsPreferredType(TYPCATEGORY category, Oid type)
 
 PGNode * CoerceParser::coerce_to_domain(
         PGNode * arg,
-        Oid baseTypeId,
+        PGOid baseTypeId,
         int32 baseTypeMod,
-        Oid typeId,
+        PGOid typeId,
         PGCoercionForm cformat,
         int location,
         bool hideInputCoercion,
@@ -324,16 +328,16 @@ PGNode * CoerceParser::coerce_to_domain(
 };
 
 bool
-CoerceParser::is_complex_array(Oid typid)
+CoerceParser::is_complex_array(PGOid typid)
 {
-	Oid elemtype = type_provider->get_element_type(typid);
+	PGOid elemtype = type_provider->get_element_type(typid);
 
 	return (OidIsValid(elemtype) && type_parser->typeOrDomainTypeRelid(elemtype) != InvalidOid);
 };
 
-bool CoerceParser::typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId)
+bool CoerceParser::typeIsOfTypedTable(PGOid reltypeId, PGOid reloftypeId)
 {
-    Oid relid = type_parser->typeidTypeRelid(reltypeId);
+    PGOid relid = type_parser->typeidTypeRelid(reltypeId);
     bool result = false;
 
     if (relid)
@@ -352,7 +356,7 @@ bool CoerceParser::typeIsOfTypedTable(Oid reltypeId, Oid reloftypeId)
 PGVar * CoerceParser::coerce_unknown_var(
         PGParseState * pstate,
         PGVar * var,
-        Oid targetTypeId,
+        PGOid targetTypeId,
         int32 targetTypeMod,
         PGCoercionContext ccontext,
         PGCoercionForm cformat,
@@ -410,7 +414,7 @@ PGVar * CoerceParser::coerce_unknown_var(
         case PG_RTE_SUBQUERY: {
             PGTargetEntry * ste;
             PGNode * targetexpr;
-            Oid exprtype;
+            PGOid exprtype;
 
             /* Get referenced subquery result expr */
             ste = relation_parser->get_tle_by_resno(rte->subquery->targetList, var->varattno);
@@ -453,12 +457,12 @@ PGVar * CoerceParser::coerce_unknown_var(
 
 PGNode *
 CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
-			Oid inputTypeId, Oid targetTypeId, int32 targetTypeMod,
+			PGOid inputTypeId, PGOid targetTypeId, int32 targetTypeMod,
 			PGCoercionContext ccontext, PGCoercionForm cformat, int location)
 {
     PGNode * result;
     PGCoercionPathType pathtype;
-    Oid funcId;
+    PGOid funcId;
 
     if (targetTypeId == inputTypeId || node == NULL)
     {
@@ -512,10 +516,10 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
         {
             PGConst * con = (PGConst *)node;
             PGConst * newcon = makeNode(PGConst);
-            Oid elemoid = type_provider->get_element_type(inputTypeId);
+            PGOid elemoid = type_provider->get_element_type(inputTypeId);
 
             if (elemoid == InvalidOid)
-                ereport(ERROR, (errcode(ERRCODE_DATATYPE_MISMATCH), errmsg("Cannot convert non-Array type to ANYARRAY")));
+                ereport(ERROR, (errcode(PG_ERRCODE_DATATYPE_MISMATCH), errmsg("Cannot convert non-Array type to ANYARRAY")));
 
             memcpy(newcon, con, sizeof(PGConst));
             newcon->consttype = ANYARRAYOID;
@@ -525,7 +529,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 
         if (inputTypeId != UNKNOWNOID)
         {
-            Oid baseTypeId = type_provider->getBaseType(inputTypeId);
+            PGOid baseTypeId = type_provider->getBaseType(inputTypeId);
 
             if (baseTypeId != inputTypeId)
             {
@@ -559,7 +563,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		 */
         PGConst * con = (PGConst *)node;
         PGConst * newcon = makeNode(PGConst);
-        Oid baseTypeId;
+        PGOid baseTypeId;
         int32 baseTypeMod;
         int32 inputTypeMod;
         PGTypePtr targetType;
@@ -671,7 +675,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
     if (pstate != NULL && inputTypeId == UNKNOWNOID && IsA(node, PGVar))
     {
         int32 baseTypeMod = -1;
-        Oid baseTypeId = type_provider->getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
+        PGOid baseTypeId = type_provider->getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
         PGVar * fixvar = coerce_unknown_var(pstate, (PGVar *)node, baseTypeId, baseTypeMod, ccontext, cformat, 0);
         node = (PGNode *)fixvar;
         inputTypeId = fixvar->vartype;
@@ -685,10 +689,10 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 			 * get an IO error later.
 			 */
 
-            Oid outfunc = InvalidOid;
+            PGOid outfunc = InvalidOid;
             bool outtypisvarlena = false;
-            Oid infunc = InvalidOid;
-            Oid intypioparam = InvalidOid;
+            PGOid infunc = InvalidOid;
+            PGOid intypioparam = InvalidOid;
             PGFuncExpr * fe;
             PGList * args = NIL;
 
@@ -721,7 +725,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 			 */
             args = list_make3(
                 fe,
-                makeConst(VOIDOID, -1, InvalidOid, sizeof(Oid), ObjectIdGetDatum(intypioparam), false, true),
+                makeConst(VOIDOID, -1, InvalidOid, sizeof(PGOid), ObjectIdGetDatum(intypioparam), false, true),
                 makeConst(INT4OID, -1, InvalidOid, sizeof(int32), Int32GetDatum(-1), false, true));
             fe = makeFuncExpr(infunc, targetTypeId, args, InvalidOid, InvalidOid, cformat);
             fe->location = location;
@@ -742,7 +746,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 			 * and we need to extract the correct typmod to use from the
 			 * domain's typtypmod.
 			 */
-            Oid baseTypeId;
+            PGOid baseTypeId;
             int32 baseTypeMod;
 
             baseTypeMod = targetTypeMod;
@@ -833,7 +837,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 };
 
 TYPCATEGORY
-CoerceParser::TypeCategory(Oid type)
+CoerceParser::TypeCategory(PGOid type)
 {
 	char		typcategory;
 	bool		typispreferred;
@@ -844,9 +848,9 @@ CoerceParser::TypeCategory(Oid type)
 };
 
 PGCoercionPathType
-CoerceParser::find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
+CoerceParser::find_coercion_pathway(PGOid targetTypeId, PGOid sourceTypeId,
 					  PGCoercionContext ccontext,
-					  Oid *funcid)
+					  PGOid *funcid)
 {
 	PGCoercionPathType result = PG_COERCION_PATH_NONE;
 
@@ -927,14 +931,14 @@ CoerceParser::find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
 		 */
 		if (targetTypeId != OIDVECTOROID && targetTypeId != INT2VECTOROID)
 		{
-			Oid			targetElem;
-			Oid			sourceElem;
+			PGOid			targetElem;
+			PGOid			sourceElem;
 
 			if ((targetElem = type_provider->get_element_type(targetTypeId)) != InvalidOid &&
 				(sourceElem = type_provider->get_element_type(sourceTypeId)) != InvalidOid)
 			{
 				PGCoercionPathType elempathtype;
-				Oid			elemfuncid;
+				PGOid			elemfuncid;
 
 				elempathtype = find_coercion_pathway(targetElem,
 													 sourceElem,
@@ -972,16 +976,16 @@ CoerceParser::find_coercion_pathway(Oid targetTypeId, Oid sourceTypeId,
 };
 
 bool
-CoerceParser::check_generic_type_consistency(const Oid *actual_arg_types,
-							   const Oid *declared_arg_types,
+CoerceParser::check_generic_type_consistency(const PGOid *actual_arg_types,
+							   const PGOid *declared_arg_types,
 							   int nargs)
 {
 	int			j;
-	Oid			elem_typeid = InvalidOid;
-	Oid			array_typeid = InvalidOid;
-	Oid			array_typelem;
-	Oid			range_typeid = InvalidOid;
-	Oid			range_typelem;
+	PGOid			elem_typeid = InvalidOid;
+	PGOid			array_typeid = InvalidOid;
+	PGOid			array_typelem;
+	PGOid			range_typeid = InvalidOid;
+	PGOid			range_typelem;
 	bool		have_anyelement = false;
 	bool		have_anynonarray = false;
 	bool		have_anyenum = false;
@@ -992,8 +996,8 @@ CoerceParser::check_generic_type_consistency(const Oid *actual_arg_types,
 	 */
 	for (j = 0; j < nargs; j++)
 	{
-		Oid			decl_type = declared_arg_types[j];
-		Oid			actual_type = actual_arg_types[j];
+		PGOid			decl_type = declared_arg_types[j];
+		PGOid			actual_type = actual_arg_types[j];
 
 		if (decl_type == ANYELEMENTOID ||
 			decl_type == ANYNONARRAYOID ||
@@ -1099,7 +1103,7 @@ CoerceParser::check_generic_type_consistency(const Oid *actual_arg_types,
 };
 
 bool
-CoerceParser::can_coerce_type(int nargs, const Oid *input_typeids, const Oid *target_typeids,
+CoerceParser::can_coerce_type(int nargs, const PGOid *input_typeids, const PGOid *target_typeids,
 				PGCoercionContext ccontext)
 {
 	bool		have_generics = false;
@@ -1108,10 +1112,10 @@ CoerceParser::can_coerce_type(int nargs, const Oid *input_typeids, const Oid *ta
 	/* run through argument list... */
 	for (i = 0; i < nargs; i++)
 	{
-		Oid			inputTypeId = input_typeids[i];
-		Oid			targetTypeId = target_typeids[i];
+		PGOid			inputTypeId = input_typeids[i];
+		PGOid			targetTypeId = target_typeids[i];
 		PGCoercionPathType pathtype;
-		Oid			funcId;
+		PGOid			funcId;
 
 		/* no problem if same type */
 		if (inputTypeId == targetTypeId)
@@ -1217,8 +1221,8 @@ CoerceParser::can_coerce_type(int nargs, const Oid *input_typeids, const Oid *ta
 };
 
 PGCoercionPathType
-CoerceParser::find_typmod_coercion_function(Oid typeId,
-							  Oid *funcid)
+CoerceParser::find_typmod_coercion_function(PGOid typeId,
+							  PGOid *funcid)
 {
 	PGCoercionPathType result;
 	//Type		targetType;
@@ -1276,11 +1280,11 @@ CoerceParser::hide_coercion_node(PGNode *node)
 };
 
 PGNode * CoerceParser::coerce_type_typmod(
-        PGNode * node, Oid targetTypeId, int32 targetTypMod,
+        PGNode * node, PGOid targetTypeId, int32 targetTypMod,
 		PGCoercionForm cformat, int location, bool isExplicit, bool hideInputCoercion)
 {
 	PGCoercionPathType pathtype;
-	Oid			funcId;
+	PGOid			funcId;
 
 	/*
 	 * A negative typmod is assumed to mean that no coercion is wanted. Also,
@@ -1307,8 +1311,8 @@ PGNode * CoerceParser::coerce_type_typmod(
 };
 
 PGNode *
-CoerceParser::coerce_to_target_type(PGParseState *pstate, PGNode *expr, Oid exprtype,
-					  Oid targettype, int32 targettypmod,
+CoerceParser::coerce_to_target_type(PGParseState *pstate, PGNode *expr, PGOid exprtype,
+					  PGOid targettype, int32 targettypmod,
 					  PGCoercionContext ccontext,
 					  PGCoercionForm cformat,
 					  int location)
@@ -1367,7 +1371,7 @@ PGNode *
 CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 				  const char *constructName)
 {
-	Oid			inputTypeId = exprType(node);
+	PGOid			inputTypeId = exprType(node);
 
 	if (inputTypeId != BOOLOID)
 	{
@@ -1382,7 +1386,7 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 		{
 			parser_errposition(pstate, exprLocation(node));
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 			/* translator: first %s is name of a SQL construct, eg WHERE */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName, "boolean",
@@ -1395,7 +1399,7 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 	{
 		parser_errposition(pstate, exprLocation(node));
 		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
+				(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 		/* translator: %s is name of a SQL construct, eg WHERE */
 				 errmsg("argument of %s must not return a set",
 						constructName)));
@@ -1407,8 +1411,8 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 PGNode * CoerceParser::build_coercion_expression(
         PGNode * node,
         PGCoercionPathType pathtype,
-        Oid funcId,
-        Oid targetTypeId,
+        PGOid funcId,
+        PGOid targetTypeId,
         int32 targetTypMod,
         PGCoercionForm cformat,
         int location,
@@ -1516,9 +1520,9 @@ PGNode * CoerceParser::build_coercion_expression(
 
 PGNode *
 CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
-					  Oid targetTypeId, const char* context_str)
+					  PGOid targetTypeId, const char* context_str)
 {
-	Oid			inputTypeId = exprType(node);
+	PGOid			inputTypeId = exprType(node);
 
 	if (inputTypeId == targetTypeId)
 		return node;			/* no work */
@@ -1529,7 +1533,7 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 	{
 		parser_errposition(pstate, exprLocation(node));
 		ereport(ERROR,
-				(errcode(ERRCODE_CANNOT_COERCE),
+				(errcode(PG_ERRCODE_CANNOT_COERCE),
 		/* translator: first %s is name of a SQL construct, eg CASE */
 				 errmsg("%s could not convert type %s to %s",
 						context_str,
@@ -1550,21 +1554,21 @@ CoerceParser::parser_coercion_errposition(PGParseState *pstate,
 		return parser_errposition(pstate, exprLocation(input_expr));
 };
 
-Oid
-CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
-								 Oid *declared_arg_types,
+PGOid
+CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
+								 PGOid *declared_arg_types,
 								 int nargs,
-								 Oid rettype,
+								 PGOid rettype,
 								 bool allow_poly)
 {
 	int			j;
 	bool		have_generics = false;
 	bool		have_unknowns = false;
-	Oid			elem_typeid = InvalidOid;
-	Oid			array_typeid = InvalidOid;
-	Oid			range_typeid = InvalidOid;
-	Oid			array_typelem;
-	Oid			range_typelem;
+	PGOid			elem_typeid = InvalidOid;
+	PGOid			array_typeid = InvalidOid;
+	PGOid			range_typeid = InvalidOid;
+	PGOid			array_typelem;
+	PGOid			range_typelem;
 	bool		have_anyelement = (rettype == ANYELEMENTOID ||
 								   rettype == ANYNONARRAYOID ||
 								   rettype == ANYENUMOID);
@@ -1577,8 +1581,8 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 	 */
 	for (j = 0; j < nargs; j++)
 	{
-		Oid			decl_type = declared_arg_types[j];
-		Oid			actual_type = actual_arg_types[j];
+		PGOid			decl_type = declared_arg_types[j];
+		PGOid			actual_type = actual_arg_types[j];
 
 		if (decl_type == ANYELEMENTOID ||
 			decl_type == ANYNONARRAYOID ||
@@ -1598,7 +1602,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 				continue;		/* no new information here */
 			if (OidIsValid(elem_typeid) && actual_type != elem_typeid)
 				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyelement\" are not all alike"),
 						 errdetail("%s versus %s",
 								   type_provider->format_type_be(elem_typeid).c_str(),
@@ -1618,7 +1622,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			actual_type = type_provider->getBaseType(actual_type); /* flatten domains */
 			if (OidIsValid(array_typeid) && actual_type != array_typeid)
 				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyarray\" are not all alike"),
 						 errdetail("%s versus %s",
 								   type_provider->format_type_be(array_typeid).c_str(),
@@ -1638,7 +1642,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			actual_type = type_provider->getBaseType(actual_type); /* flatten domains */
 			if (OidIsValid(range_typeid) && actual_type != range_typeid)
 				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyrange\" are not all alike"),
 						 errdetail("%s versus %s",
 								   type_provider->format_type_be(range_typeid).c_str(),
@@ -1667,7 +1671,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			array_typelem = type_provider->get_element_type(array_typeid);
 			if (!OidIsValid(array_typelem))
 				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("argument declared %s is not an array but type %s",
 								"anyarray", type_provider->format_type_be(array_typeid).c_str())));
 		}
@@ -1683,7 +1687,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 		{
 			/* otherwise, they better match */
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("argument declared %s is not consistent with argument declared %s",
 							"anyarray", "anyelement"),
 					 errdetail("%s versus %s",
@@ -1705,7 +1709,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			range_typelem = type_provider->get_range_subtype(range_typeid);
 			if (!OidIsValid(range_typelem))
 				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("argument declared %s is not a range type but type %s",
 								"anyrange",
 								type_provider->format_type_be(range_typeid).c_str())));
@@ -1722,7 +1726,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 		{
 			/* otherwise, they better match */
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("argument declared %s is not consistent with argument declared %s",
 							"anyrange", "anyelement"),
 					 errdetail("%s versus %s",
@@ -1743,7 +1747,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 		{
 			/* Only way to get here is if all the generic args are UNKNOWN */
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("could not determine polymorphic type because input has type %s",
 							"unknown")));
 		}
@@ -1754,7 +1758,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 		/* require the element type to not be an array or domain over array */
 		if (type_provider->get_base_element_type(elem_typeid) != InvalidOid)
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("type matched to anynonarray is an array type: %s",
 							type_provider->format_type_be(elem_typeid).c_str())));
 	}
@@ -1764,7 +1768,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 		/* require the element type to be an enum */
 		if (!type_provider->type_is_enum(elem_typeid))
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("type matched to anyenum is not an enum type: %s",
 							type_provider->format_type_be(elem_typeid).c_str())));
 	}
@@ -1776,8 +1780,8 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 	{
 		for (j = 0; j < nargs; j++)
 		{
-			Oid			decl_type = declared_arg_types[j];
-			Oid			actual_type = actual_arg_types[j];
+			PGOid			decl_type = declared_arg_types[j];
+			PGOid			actual_type = actual_arg_types[j];
 
 			if (actual_type != UNKNOWNOID)
 				continue;
@@ -1793,7 +1797,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 					array_typeid = type_provider->get_array_type(elem_typeid);
 					if (!OidIsValid(array_typeid))
 						ereport(ERROR,
-								(errcode(ERRCODE_UNDEFINED_OBJECT),
+								(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 								 errmsg("could not find array type for data type %s",
 										type_provider->format_type_be(elem_typeid).c_str())));
 				}
@@ -1804,7 +1808,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 				if (!OidIsValid(range_typeid))
 				{
 					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_OBJECT),
+							(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 							 errmsg("could not find range type for data type %s",
 									type_provider->format_type_be(elem_typeid).c_str())));
 				}
@@ -1821,7 +1825,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 			array_typeid = type_provider->get_array_type(elem_typeid);
 			if (!OidIsValid(array_typeid))
 				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
+						(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find array type for data type %s",
 								type_provider->format_type_be(elem_typeid).c_str())));
 		}
@@ -1834,7 +1838,7 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 		if (!OidIsValid(range_typeid))
 		{
 			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("could not find range type for data type %s",
 							type_provider->format_type_be(elem_typeid).c_str())));
 		}
@@ -1853,10 +1857,10 @@ CoerceParser::enforce_generic_type_consistency(const Oid *actual_arg_types,
 
 PGNode *
 CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
-							   Oid targetTypeId, int32 targetTypmod,
+							   PGOid targetTypeId, int32 targetTypmod,
 							   const char *constructName)
 {
-	Oid			inputTypeId = exprType(node);
+	PGOid			inputTypeId = exprType(node);
 
 	if (inputTypeId != targetTypeId)
 	{
@@ -1871,7 +1875,7 @@ CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
 		{
 			parser_errposition(pstate, exprLocation(node));
 			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
+					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 			/* translator: first %s is name of a SQL construct, eg LIMIT */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName,
@@ -1885,7 +1889,7 @@ CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
 	{
 		parser_errposition(pstate, exprLocation(node));
 		ereport(ERROR,
-				(errcode(ERRCODE_DATATYPE_MISMATCH),
+				(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 		/* translator: %s is name of a SQL construct, eg LIMIT */
 				 errmsg("argument of %s must not return a set",
 						constructName)));
@@ -1896,7 +1900,7 @@ CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
 
 PGNode *
 CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
-						Oid targetTypeId,
+						PGOid targetTypeId,
 						const char *constructName)
 {
 	return coerce_to_specific_type_typmod(pstate, node,
@@ -1904,7 +1908,7 @@ CoerceParser::coerce_to_specific_type(PGParseState *pstate, PGNode *node,
 										  constructName);
 };
 
-bool CoerceParser::IsBinaryCoercible(Oid srctype, Oid targettype)
+bool CoerceParser::IsBinaryCoercible(PGOid srctype, PGOid targettype)
 {
     bool result;
 

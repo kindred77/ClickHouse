@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -36,14 +36,14 @@ public:
 	explicit TargetParser(const ContextPtr& context_);
 
     duckdb_libpgquery::PGList *
-    transformTargetList(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist,
-					PGParseExprKind exprKind);
+    transformTargetList(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *targetlist,
+					duckdb_libpgquery::PGParseExprKind exprKind);
     
     duckdb_libpgquery::PGTargetEntry *
-    transformTargetEntry(PGParseState *pstate,
+    transformTargetEntry(duckdb_libpgquery::PGParseState *pstate,
 					 duckdb_libpgquery::PGNode *node,
 					 duckdb_libpgquery::PGNode *expr,
-					 PGParseExprKind exprKind,
+					 duckdb_libpgquery::PGParseExprKind exprKind,
 					 char *colname,
 					 bool resjunk);
     
@@ -54,33 +54,33 @@ public:
     FigureColname(duckdb_libpgquery::PGNode *node);
 
     duckdb_libpgquery::PGList *
-    ExpandAllTables(PGParseState *pstate, int location);
+    ExpandAllTables(duckdb_libpgquery::PGParseState *pstate, int location);
 
     duckdb_libpgquery::PGList *
-    ExpandColumnRefStar(PGParseState *pstate, duckdb_libpgquery::PGColumnRef *cref,
+    ExpandColumnRefStar(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGColumnRef *cref,
 					bool make_target_entry);
     
     duckdb_libpgquery::PGList *
-    ExpandRowReference(PGParseState *pstate, duckdb_libpgquery::PGNode *expr,
+    ExpandRowReference(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *expr,
 				   bool make_target_entry);
 
     duckdb_libpgquery::PGList *
-    ExpandSingleTable(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte,
+    ExpandSingleTable(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte,
 				  int location, bool make_target_entry);
 
     duckdb_libpgquery::PGList *
-    ExpandIndirectionStar(PGParseState *pstate, duckdb_libpgquery::PGAIndirection *ind,
-					  bool make_target_entry, PGParseExprKind exprKind);
+    ExpandIndirectionStar(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAIndirection *ind,
+					  bool make_target_entry, duckdb_libpgquery::PGParseExprKind exprKind);
 
-    PGTupleDescPtr
-    expandRecordVariable(PGParseState *pstate, duckdb_libpgquery::PGVar *var, int levelsup);
+    duckdb_libpgquery::PGTupleDescPtr
+    expandRecordVariable(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGVar *var, int levelsup);
 
     duckdb_libpgquery::PGList *
-    transformExpressionList(PGParseState *pstate, duckdb_libpgquery::PGList *exprlist,
-						PGParseExprKind exprKind);
+    transformExpressionList(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *exprlist,
+						duckdb_libpgquery::PGParseExprKind exprKind);
 
     void
-    resolveTargetListUnknowns(PGParseState *pstate, duckdb_libpgquery::PGList *targetlist);
+    resolveTargetListUnknowns(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *targetlist);
 };
 
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -61,115 +61,115 @@ public:
     exprIsNullConstant(duckdb_libpgquery::PGNode *arg);
 
     duckdb_libpgquery::PGNode *
-    transformExpr(PGParseState *pstate, duckdb_libpgquery::PGNode *expr, PGParseExprKind exprKind);
+    transformExpr(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *expr, duckdb_libpgquery::PGParseExprKind exprKind);
 
     duckdb_libpgquery::PGNode *
-    transformExprRecurse(PGParseState *pstate, duckdb_libpgquery::PGNode *expr);
+    transformExprRecurse(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *expr);
 
     duckdb_libpgquery::PGNode *
-    transformWholeRowRef(PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int location);
+    transformWholeRowRef(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGRangeTblEntry *rte, int location);
 
     duckdb_libpgquery::PGNode *
-    transformColumnRef(PGParseState *pstate, duckdb_libpgquery::PGColumnRef *cref);
+    transformColumnRef(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGColumnRef *cref);
 
     duckdb_libpgquery::PGNode *
-    transformParamRef(PGParseState *pstate, duckdb_libpgquery::PGParamRef *pref);
+    transformParamRef(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGParamRef *pref);
 
     duckdb_libpgquery::PGNode *
-    transformIndirection(PGParseState *pstate, duckdb_libpgquery::PGNode *basenode, duckdb_libpgquery::PGList *indirection);
+    transformIndirection(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *basenode, duckdb_libpgquery::PGList *indirection);
 
     duckdb_libpgquery::PGNode *
-    transformArrayExpr(PGParseState *pstate, duckdb_libpgquery::PGAArrayExpr *a,
-				   Oid array_type, Oid element_type, int32 typmod);
+    transformArrayExpr(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAArrayExpr *a,
+				   duckdb_libpgquery::PGOid array_type, duckdb_libpgquery::PGOid element_type, duckdb_libpgquery::int32 typmod);
     
     duckdb_libpgquery::PGNode *
-    transformTypeCast(PGParseState *pstate, duckdb_libpgquery::PGTypeCast *tc);
+    transformTypeCast(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGTypeCast *tc);
 
     duckdb_libpgquery::PGNode *
-    transformCollateClause(PGParseState *pstate, duckdb_libpgquery::PGCollateClause *c);
+    transformCollateClause(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGCollateClause *c);
 
     duckdb_libpgquery::PGNode *
-    transformAExprOp(PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
+    transformAExprOp(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformAExprOpAny(PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
+    transformAExprOpAny(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformAExprOpAll(PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
+    transformAExprOpAll(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformAExprDistinct(PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
+    transformAExprDistinct(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformAExprNullIf(PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
+    transformAExprNullIf(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformAExprOf(PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
+    transformAExprOf(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformAExprIn(PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
+    transformAExprIn(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformAExprBetween(PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
+    transformAExprBetween(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformBoolExpr(PGParseState *pstate, duckdb_libpgquery::PGBoolExpr *a);
+    transformBoolExpr(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGBoolExpr *a);
 
     duckdb_libpgquery::PGNode *
-    transformFuncCall(PGParseState *pstate, duckdb_libpgquery::PGFuncCall *fn);
+    transformFuncCall(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGFuncCall *fn);
 
     duckdb_libpgquery::PGNode *
-    transformRowExpr(PGParseState *pstate, duckdb_libpgquery::PGRowExpr *r);
+    transformRowExpr(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGRowExpr *r);
 
     duckdb_libpgquery::PGNode *
-    transformSubLink(PGParseState *pstate, duckdb_libpgquery::PGSubLink *sublink);
+    transformSubLink(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGSubLink *sublink);
 
     duckdb_libpgquery::PGNode *
-    transformCaseExpr(PGParseState *pstate, duckdb_libpgquery::PGCaseExpr *c);
+    transformCaseExpr(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGCaseExpr *c);
 
     duckdb_libpgquery::PGNode *
-    transformCoalesceExpr(PGParseState *pstate, duckdb_libpgquery::PGCoalesceExpr *c);
+    transformCoalesceExpr(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGCoalesceExpr *c);
 
     duckdb_libpgquery::PGNode *
-    transformMinMaxExpr(PGParseState *pstate, duckdb_libpgquery::PGMinMaxExpr *m);
+    transformMinMaxExpr(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGMinMaxExpr *m);
 
     duckdb_libpgquery::PGNode *
-    transformBooleanTest(PGParseState *pstate, duckdb_libpgquery::PGBooleanTest *b);
+    transformBooleanTest(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGBooleanTest *b);
 
     duckdb_libpgquery::PGNode *
-    transformCurrentOfExpr(PGParseState *pstate, duckdb_libpgquery::PGCurrentOfExpr *cexpr);
+    transformCurrentOfExpr(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGCurrentOfExpr *cexpr);
 
-    duckdb_libpgquery::PGNode * transformGroupingFunc(PGParseState * pstate, duckdb_libpgquery::PGGroupingFunc * gf);
+    duckdb_libpgquery::PGNode * transformGroupingFunc(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGGroupingFunc * gf);
 
     int
     operator_precedence_group(duckdb_libpgquery::PGNode *node, const char **nodename);
 
     void
-    emit_precedence_warnings(PGParseState *pstate,
+    emit_precedence_warnings(duckdb_libpgquery::PGParseState *pstate,
 						 int opgroup, const char *opname,
 						 duckdb_libpgquery::PGNode *lchild, duckdb_libpgquery::PGNode *rchild,
 						 int location);
     
     duckdb_libpgquery::PGNode *
-    make_nulltest_from_distinct(PGParseState *pstate, duckdb_libpgquery::PGAExpr *distincta, duckdb_libpgquery::PGNode *arg);
+    make_nulltest_from_distinct(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGAExpr *distincta, duckdb_libpgquery::PGNode *arg);
 
     const char *
-    ParseExprKindName(PGParseExprKind exprKind);
+    ParseExprKindName(duckdb_libpgquery::PGParseExprKind exprKind);
 
     bool
     isWhenIsNotDistinctFromExpr(duckdb_libpgquery::PGNode *warg);
 
     void
-    unknown_attribute(PGParseState *pstate, duckdb_libpgquery::PGNode *relref, const char *attname,
+    unknown_attribute(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *relref, const char *attname,
 				  int location);
 
     duckdb_libpgquery::PGExpr *
-    make_distinct_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
+    make_distinct_op(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *opname,
                 duckdb_libpgquery::PGNode *ltree, duckdb_libpgquery::PGNode *rtree,
 				int location);
 
     duckdb_libpgquery::PGNode *
-    make_row_distinct_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
+    make_row_distinct_op(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *opname,
 					 duckdb_libpgquery::PGRowExpr *lrow, duckdb_libpgquery::PGRowExpr *rrow,
 					 int location);
 };

@@ -14,7 +14,7 @@
 //	@test:
 //
 //---------------------------------------------------------------------------
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 #include "gpos/base.h"
 #include "gpos/common/CHashMap.h"

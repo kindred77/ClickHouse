@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 #include <Interpreters/Context.h>
 
 #include <gpos/memory/CMemoryPool.h>
@@ -16,7 +16,7 @@ using ContextPtr = std::shared_ptr<const Context>;
 class AggProvider
 {
 private:
-	using Map = std::map<Oid, PGAggPtr>;
+	using Map = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGAggPtr>;
 
 	Map oid_agg_map;
 	ContextPtr context;
@@ -24,7 +24,7 @@ public:
 	//explicit AggProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	explicit AggProvider(const ContextPtr& context_);
 	
-	PGAggPtr getAggByFuncOid(Oid func_oid) const;
+	duckdb_libpgquery::PGAggPtr getAggByFuncOid(duckdb_libpgquery::PGOid func_oid) const;
 };
 
 }

@@ -233,9 +233,9 @@
 #define PG_RELKIND_AOBLOCKDIR 'b' /* AO block directory */
 #define PG_RELKIND_AOVISIMAP 'M' /* AO visibility map */
 
-#define PG_RELPERSISTENCE_PERMANENT 'p' /* regular table */
-#define PG_RELPERSISTENCE_UNLOGGED 'u' /* unlogged permanent table */
-#define PG_RELPERSISTENCE_TEMP 't' /* temporary table */
+#define PG_RELPERSISTENCE_PERMANENT_CHR 'p' /* regular table */
+#define PG_RELPERSISTENCE_UNLOGGED_CHR 'u' /* unlogged permanent table */
+#define PG_RELPERSISTENCE_TEMP_CHR 't' /* temporary table */
 
 /*
  * relstorage describes how a relkind is physically stored in the database.
@@ -309,3 +309,16 @@
 #define PG_GIN_AM_OID 2742
 
 #define PG_COUNT_ANY_OID 2147
+
+/*
+ * Interpretation of high bits.
+ */
+#define PG_NUMERIC_SIGN_MASK	0xC000
+#define PG_NUMERIC_POS			0x0000
+#define PG_NUMERIC_NEG			0x4000
+#define PG_NUMERIC_SHORT		0x8000
+#define PG_NUMERIC_NAN			0xC000
+
+#define PG_NUMERIC_FLAGBITS(n) ((n)->choice.n_header & PG_NUMERIC_SIGN_MASK)
+#define PG_NUMERIC_IS_NAN(n)		(PG_NUMERIC_FLAGBITS(n) == PG_NUMERIC_NAN)
+#define PG_NUMERIC_IS_SHORT(n)		(PG_NUMERIC_FLAGBITS(n) == PG_NUMERIC_SHORT)

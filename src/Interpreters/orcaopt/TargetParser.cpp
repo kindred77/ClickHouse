@@ -9,12 +9,6 @@
 
 #include <Interpreters/Context.h>
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wswitch"
-#else
-#pragma GCC diagnostic ignored "-Wswitch"
-#endif
-
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -313,7 +307,7 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 	{
 		parser_errposition(pstate, location);
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
+				(errcode(PG_ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT * with no tables specified is not valid")));
 	}
 
@@ -440,7 +434,7 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
 					 * could be an outer CTE.
 					 */
                     PGParseState mypstate;
-                    Index levelsup_cte;
+                    PGIndex levelsup_cte;
 
                     MemSet(&mypstate, 0, sizeof(mypstate));
                     /* this loop must work, since GetCTEForRTE did */
@@ -739,14 +733,14 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 				case CRSERR_WRONG_DB:
 					parser_errposition(pstate, cref->location);
 					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cross-database references are not implemented: %s",
 									PGNameListToString(cref->fields).c_str())));
 					break;
 				case CRSERR_TOO_MANY:
 					parser_errposition(pstate, cref->location);
 					ereport(ERROR,
-							(errcode(ERRCODE_SYNTAX_ERROR),
+							(errcode(PG_ERRCODE_SYNTAX_ERROR),
 							 errmsg("improper qualified name (too many dotted names): %s",
 									PGNameListToString(cref->fields).c_str())));
 					break;
@@ -919,7 +913,7 @@ TargetParser::resolveTargetListUnknowns(PGParseState *pstate, PGList *targetlist
 	foreach(l, targetlist)
 	{
 		PGTargetEntry *tle = (PGTargetEntry *) lfirst(l);
-		Oid			restype = exprType((PGNode *) tle->expr);
+		PGOid			restype = exprType((PGNode *) tle->expr);
 
 		if (restype == UNKNOWNOID)
 		{

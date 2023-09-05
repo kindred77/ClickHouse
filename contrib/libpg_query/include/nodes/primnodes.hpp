@@ -499,7 +499,7 @@ typedef struct PGOpExpr {
  * Note that the operator function won't be called at all if either input
  * is NULL, since then the result can be determined directly.
  */
-typedef PGOpExpr DistinctExpr;
+typedef PGOpExpr PGDistinctExpr;
 
 /*
  * NullIfExpr - a NULLIF expression
@@ -507,7 +507,7 @@ typedef PGOpExpr DistinctExpr;
  * Like DistinctExpr, this is represented the same as an PGOpExpr referencing
  * the "=" operator for x and y.
  */
-typedef PGOpExpr NullIfExpr;
+typedef PGOpExpr PGNullIfExpr;
 
 /*
  * PGScalarArrayOpExpr - expression node for "scalar op ANY/ALL (array)"

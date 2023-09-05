@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 #include <Interpreters/Context.h>
 
 #include <naucrates/md/IMDType.h>
@@ -33,12 +33,12 @@ using ContextPtr = std::shared_ptr<const Context>;
 
 struct PGTupleDescHash
 {
-    std::size_t operator()(const PGTupleDescPtr & key) const;
+    std::size_t operator()(const duckdb_libpgquery::PGTupleDescPtr & key) const;
 };
 
 struct PGTupleDescEqual
 {
-    bool operator()(const PGTupleDescPtr & lhs, const PGTupleDescPtr & rhs) const;
+    bool operator()(const duckdb_libpgquery::PGTupleDescPtr & lhs, const duckdb_libpgquery::PGTupleDescPtr & rhs) const;
 };
 
 
@@ -48,91 +48,93 @@ public:
 	//explicit TypeProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	explicit TypeProvider(const ContextPtr& context_);
 	//static void Init();
-	//IMDTypePtr getTypeByOID(Oid oid);
-	PGTypePtr getTypeByOid(Oid oid) const;
+	//IMDTypePtr getTypeByOID(PGOid oid);
+	duckdb_libpgquery::PGTypePtr getTypeByOid(duckdb_libpgquery::PGOid oid) const;
 	//IMDTypePtr getType(Field::Types::Which which);
 
-    Oid getBaseType(Oid typid);
+    duckdb_libpgquery::PGOid getBaseType(duckdb_libpgquery::PGOid typid);
 
-    Oid getBaseTypeAndTypmod(Oid typid, int32 * typmod);
+    duckdb_libpgquery::PGOid getBaseTypeAndTypmod(duckdb_libpgquery::PGOid typid, duckdb_libpgquery::int32 * typmod);
 
-    void get_type_category_preferred(Oid typid, char * typcategory, bool * typispreferred);
+    void get_type_category_preferred(duckdb_libpgquery::PGOid typid, char * typcategory, bool * typispreferred);
 
-	std::string format_type_with_typemod(Oid type_oid, int32 typemod);
+	std::string format_type_with_typemod(duckdb_libpgquery::PGOid type_oid, duckdb_libpgquery::int32 typemod);
 
-    std::string format_type_internal(Oid type_oid, int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify);
+    std::string format_type_internal(duckdb_libpgquery::PGOid type_oid, duckdb_libpgquery::int32 typemod, bool typemod_given, bool allow_invalid, bool force_qualify);
 
-    std::string format_type_be(Oid type_oid);
+    std::string format_type_be(duckdb_libpgquery::PGOid type_oid);
 
-	std::string printTypmod(const char * typname, int32 typmod, Oid typmodout);
+	std::string printTypmod(const char * typname, duckdb_libpgquery::int32 typmod, duckdb_libpgquery::PGOid typmodout);
 
-    bool TypeIsVisible(Oid typid);
+    bool TypeIsVisible(duckdb_libpgquery::PGOid typid);
 
-	PGTupleDescPtr get_tupdesc_by_type_relid(PGTypePtr type);
+	duckdb_libpgquery::PGTupleDescPtr get_tupdesc_by_type_relid(duckdb_libpgquery::PGTypePtr type);
 
-    PGTupleDescPtr lookup_rowtype_tupdesc_internal(Oid type_id, int32 typmod, bool noError);
+    duckdb_libpgquery::PGTupleDescPtr lookup_rowtype_tupdesc_internal(duckdb_libpgquery::PGOid type_id, duckdb_libpgquery::int32 typmod, bool noError);
 
-    PGTupleDescPtr lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod);
+    duckdb_libpgquery::PGTupleDescPtr lookup_rowtype_tupdesc_copy(duckdb_libpgquery::PGOid type_id, duckdb_libpgquery::int32 typmod);
 
-    PGTupleDescPtr lookup_rowtype_tupdesc(Oid type_id, int32 typmod);
+    duckdb_libpgquery::PGTupleDescPtr lookup_rowtype_tupdesc(duckdb_libpgquery::PGOid type_id, duckdb_libpgquery::int32 typmod);
 
-    Oid get_element_type(Oid typid);
+    duckdb_libpgquery::PGOid get_element_type(duckdb_libpgquery::PGOid typid);
 
-	Oid get_typeoid_by_typename_namespaceoid(const char * type_name, Oid namespace_oid = Oid(0));
+	duckdb_libpgquery::PGOid get_typeoid_by_typename_namespaceoid(const char * type_name, duckdb_libpgquery::PGOid namespace_oid = duckdb_libpgquery::PGOid(0));
 
-	PGTypePtr get_type_by_typename_namespaceoid(const std::string& type_name, Oid namespace_oid = Oid(0));
+	duckdb_libpgquery::PGTypePtr get_type_by_typename_namespaceoid(const std::string& type_name, duckdb_libpgquery::PGOid namespace_oid = duckdb_libpgquery::PGOid(0));
 
-    void getTypeOutputInfo(Oid type, Oid * typOutput, bool * typIsVarlena);
+    void getTypeOutputInfo(duckdb_libpgquery::PGOid type, duckdb_libpgquery::PGOid * typOutput, bool * typIsVarlena);
 
-    void getTypeInputInfo(Oid type, Oid * typInput, Oid * typIOParam);
+    void getTypeInputInfo(duckdb_libpgquery::PGOid type, duckdb_libpgquery::PGOid * typInput, duckdb_libpgquery::PGOid * typIOParam);
 
-    bool typeInheritsFrom(Oid subclassTypeId, Oid superclassTypeId);
+    bool typeInheritsFrom(duckdb_libpgquery::PGOid subclassTypeId, duckdb_libpgquery::PGOid superclassTypeId);
 
-    Oid get_range_subtype(Oid rangeOid);
+    duckdb_libpgquery::PGOid get_range_subtype(duckdb_libpgquery::PGOid rangeOid);
 
-    char get_typtype(Oid typid);
+    char get_typtype(duckdb_libpgquery::PGOid typid);
 
-	bool type_is_enum(Oid typid);
+	bool type_is_enum(duckdb_libpgquery::PGOid typid);
 
-    Oid get_base_element_type(Oid typid);
+    duckdb_libpgquery::PGOid get_base_element_type(duckdb_libpgquery::PGOid typid);
 
-    Oid get_array_type(Oid typid);
+    duckdb_libpgquery::PGOid get_array_type(duckdb_libpgquery::PGOid typid);
 
-    bool type_is_range(Oid typid);
+    bool type_is_range(duckdb_libpgquery::PGOid typid);
 
-    bool type_is_rowtype(Oid typid);
+    bool type_is_rowtype(duckdb_libpgquery::PGOid typid);
 
-    Oid get_typcollation(Oid typid);
+    duckdb_libpgquery::PGOid get_typcollation(duckdb_libpgquery::PGOid typid);
 
-    bool type_is_collatable(Oid typid);
+    bool type_is_collatable(duckdb_libpgquery::PGOid typid);
 
     void PGTupleDescInitEntry(
-        PGTupleDescPtr desc, PGAttrNumber attributeNumber, const std::string & attributeName,
-		Oid oidtypeid, int32 typmod, int attdim);
+        duckdb_libpgquery::PGTupleDescPtr desc, duckdb_libpgquery::PGAttrNumber attributeNumber, const std::string & attributeName,
+		duckdb_libpgquery::PGOid oidtypeid, duckdb_libpgquery::int32 typmod, int attdim);
 
-    TypeFuncClass get_expr_result_type(duckdb_libpgquery::PGNode * expr, Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc);
+    duckdb_libpgquery::TypeFuncClass get_expr_result_type(duckdb_libpgquery::PGNode * expr, duckdb_libpgquery::PGOid * resultTypeId, duckdb_libpgquery::PGTupleDescPtr & resultTupleDesc);
 
-    Oid TypenameGetTypidExtended(const char * typname, bool temp_ok);
+    duckdb_libpgquery::PGOid TypenameGetTypidExtended(const char * typname, bool temp_ok);
 
-    Oid getTypeIOParam(PGTypePtr typeTuple);
+    duckdb_libpgquery::PGOid getTypeIOParam(duckdb_libpgquery::PGTypePtr typeTuple);
 
-	TypeFuncClass
-    internal_get_result_type(Oid funcid, duckdb_libpgquery::PGNode * call_expr,
-        Oid * resultTypeId, PGTupleDescPtr & resultTupleDesc);
+	duckdb_libpgquery::TypeFuncClass
+    internal_get_result_type(duckdb_libpgquery::PGOid funcid, duckdb_libpgquery::PGNode * call_expr,
+        duckdb_libpgquery::PGOid * resultTypeId, duckdb_libpgquery::PGTupleDescPtr & resultTupleDesc);
 
-    TypeFuncClass get_type_func_class(Oid typid);
+    duckdb_libpgquery::TypeFuncClass get_type_func_class(duckdb_libpgquery::PGOid typid);
 
-    PGTupleDescPtr build_function_result_tupdesc_t(PGProcPtr & procTuple);
+    duckdb_libpgquery::PGTupleDescPtr build_function_result_tupdesc_t(duckdb_libpgquery::PGProcPtr & procTuple);
 
-    PGTupleDescPtr build_function_result_tupdesc_d(PGProcPtr & procTuple);
+    duckdb_libpgquery::PGTupleDescPtr build_function_result_tupdesc_d(duckdb_libpgquery::PGProcPtr & procTuple);
 
-    Oid get_call_expr_argtype(duckdb_libpgquery::PGNode * expr, int argnum);
+    duckdb_libpgquery::PGOid get_call_expr_argtype(duckdb_libpgquery::PGNode * expr, int argnum);
 
-    Oid resolve_generic_type(Oid declared_type, Oid context_actual_type, Oid context_declared_type);
+    duckdb_libpgquery::PGOid resolve_generic_type(duckdb_libpgquery::PGOid declared_type, duckdb_libpgquery::PGOid context_actual_type, duckdb_libpgquery::PGOid context_declared_type);
 
-    void assign_record_type_typmod(PGTupleDescPtr tupDesc);
+    void assign_record_type_typmod(duckdb_libpgquery::PGTupleDescPtr tupDesc);
 
-    bool resolve_polymorphic_tupdesc(PGTupleDescPtr tupdesc, std::vector<Oid> & declared_args, duckdb_libpgquery::PGNode * call_expr);
+    bool resolve_polymorphic_tupdesc(duckdb_libpgquery::PGTupleDescPtr tupdesc, std::vector<duckdb_libpgquery::PGOid> & declared_args, duckdb_libpgquery::PGNode * call_expr);
+
+	void get_typlenbyval(duckdb_libpgquery::PGOid typid, duckdb_libpgquery::int16 *typlen, bool *typbyval);
 
 private:
 	FunctionProviderPtr function_provider;
@@ -141,42 +143,42 @@ private:
 	OperProviderPtr oper_provider;
 	ProcProviderPtr proc_provider;
 
-	std::unordered_map<PGTupleDescPtr, const PGTupleDesc &, PGTupleDescHash, PGTupleDescEqual> recordCacheHash;
+	std::unordered_map<duckdb_libpgquery::PGTupleDescPtr, const duckdb_libpgquery::PGTupleDesc &, PGTupleDescHash, PGTupleDescEqual> recordCacheHash;
 	size_t NextRecordTypmod = 0;
-	std::vector<PGTupleDescPtr> recordCacheArray;
+	std::vector<duckdb_libpgquery::PGTupleDescPtr> recordCacheArray;
 
 	static int TYPE_OID_ID;
-	static std::pair<Oid, PGTypePtr> TYPE_FLOAT32;
-	static std::pair<Oid, PGTypePtr> TYPE_FLOAT64;
-	static std::pair<Oid, PGTypePtr> TYPE_BOOLEAN;
-	// static std::pair<Oid, PGTypePtr> TYPE_UINT8;
-	// static std::pair<Oid, PGTypePtr> TYPE_UINT16;
-	// static std::pair<Oid, PGTypePtr> TYPE_UINT32;
-	// static std::pair<Oid, PGTypePtr> TYPE_UINT64;
-	// static std::pair<Oid, PGTypePtr> TYPE_UINT128;
-	// static std::pair<Oid, PGTypePtr> TYPE_UINT256;
-	// static std::pair<Oid, PGTypePtr> TYPE_INT8;
-	static std::pair<Oid, PGTypePtr> TYPE_INT16;
-	static std::pair<Oid, PGTypePtr> TYPE_INT32;
-	static std::pair<Oid, PGTypePtr> TYPE_INT64;
-	// static std::pair<Oid, PGTypePtr> TYPE_INT128;
-	// static std::pair<Oid, PGTypePtr> TYPE_INT256;
-	static std::pair<Oid, PGTypePtr> TYPE_STRING;
-	static std::pair<Oid, PGTypePtr> TYPE_FIXEDSTRING;
-	static std::pair<Oid, PGTypePtr> TYPE_DATE;
-	static std::pair<Oid, PGTypePtr> TYPE_DATETIME;
-	static std::pair<Oid, PGTypePtr> TYPE_DATETIME64;
-	// static std::pair<Oid, PGTypePtr> TYPE_ARRAY;
-	// static std::pair<Oid, PGTypePtr> TYPE_TUPLE;
-	// static std::pair<Oid, PGTypePtr> TYPE_DECIMAL32;
-	static std::pair<Oid, PGTypePtr> TYPE_DECIMAL64;
-	// static std::pair<Oid, PGTypePtr> TYPE_DECIMAL128;
-	// static std::pair<Oid, PGTypePtr> TYPE_DECIMAL256;
-	// static std::pair<Oid, PGTypePtr> TYPE_AGGFUNCSTATE;
-	// static std::pair<Oid, PGTypePtr> TYPE_MAP;
-	// static std::pair<Oid, PGTypePtr> TYPE_UUID;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_FLOAT32;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_FLOAT64;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_BOOLEAN;
+	// static std::pair<PGOid, PGTypePtr> TYPE_UINT8;
+	// static std::pair<PGOid, PGTypePtr> TYPE_UINT16;
+	// static std::pair<PGOid, PGTypePtr> TYPE_UINT32;
+	// static std::pair<PGOid, PGTypePtr> TYPE_UINT64;
+	// static std::pair<PGOid, PGTypePtr> TYPE_UINT128;
+	// static std::pair<PGOid, PGTypePtr> TYPE_UINT256;
+	// static std::pair<PGOid, PGTypePtr> TYPE_INT8;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT16;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT32;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT64;
+	// static std::pair<PGOid, PGTypePtr> TYPE_INT128;
+	// static std::pair<PGOid, PGTypePtr> TYPE_INT256;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_STRING;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_FIXEDSTRING;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_DATE;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_DATETIME;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_DATETIME64;
+	// static std::pair<PGOid, PGTypePtr> TYPE_ARRAY;
+	// static std::pair<PGOid, PGTypePtr> TYPE_TUPLE;
+	// static std::pair<PGOid, PGTypePtr> TYPE_DECIMAL32;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_DECIMAL64;
+	// static std::pair<PGOid, PGTypePtr> TYPE_DECIMAL128;
+	// static std::pair<PGOid, PGTypePtr> TYPE_DECIMAL256;
+	// static std::pair<PGOid, PGTypePtr> TYPE_AGGFUNCSTATE;
+	// static std::pair<PGOid, PGTypePtr> TYPE_MAP;
+	// static std::pair<PGOid, PGTypePtr> TYPE_UUID;
 
-	using Map = std::map<Oid, PGTypePtr>;
+	using Map = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr>;
 
 	Map oid_type_map;
 	ContextPtr context;

@@ -1,19 +1,9 @@
 #include <Interpreters/orcaopt/AggParser.h>
-#include <Interpreters/orcaopt/walkers.h>
 
 #include <Interpreters/orcaopt/ClauseParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/ExprParser.h>
-
 #include <Interpreters/Context.h>
-
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wswitch"
-#pragma clang diagnostic ignored "-Wimplicit-fallthrough"
-#else
-#pragma GCC diagnostic ignored "-Wswitch"
-#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
-#endif
 
 using namespace duckdb_libpgquery;
 
@@ -99,7 +89,7 @@ check_agg_arguments_walker(PGNode *node,
 		{
 			parser_errposition(context->pstate, exprLocation(node));
 			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("aggregate function calls cannot contain set-returning function calls"),
 					 errhint("You might be able to move the set-returning function into a LATERAL FROM item.")));
 		}
@@ -108,7 +98,7 @@ check_agg_arguments_walker(PGNode *node,
 			parser_errposition(context->pstate,
 										((PGWindowFunc *) node)->location);
 			ereport(ERROR,
-					(errcode(ERRCODE_GROUPING_ERROR),
+					(errcode(PG_ERRCODE_GROUPING_ERROR),
 					 errmsg("aggregate function calls cannot contain window function calls")));
 		}
 	}
@@ -179,7 +169,7 @@ int AggParser::check_agg_arguments(PGParseState * pstate, PGList * directargs, P
         if (aggloc < 0)
             aggloc = pg_locate_agg_of_level((PGNode *)filter, agglevel);
         parser_errposition(pstate, aggloc);
-        ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls cannot be nested")));
+        ereport(ERROR, (errcode(PG_ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls cannot be nested")));
     }
 
     /*
@@ -201,13 +191,13 @@ int AggParser::check_agg_arguments(PGParseState * pstate, PGList * directargs, P
             parser_errposition(pstate, pg_locate_var_of_level((PGNode *)directargs, check_agg_context.min_varlevel));
             ereport(
                 ERROR,
-                (errcode(ERRCODE_GROUPING_ERROR),
+                (errcode(PG_ERRCODE_GROUPING_ERROR),
                  errmsg("outer-level aggregate cannot contain a lower-level variable in its direct arguments")));
         }
         if (check_agg_context.min_agglevel >= 0 && check_agg_context.min_agglevel <= agglevel)
         {
             parser_errposition(pstate, pg_locate_agg_of_level((PGNode *)directargs, check_agg_context.min_agglevel));
-            ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls cannot be nested")));
+            ereport(ERROR, (errcode(PG_ERRCODE_GROUPING_ERROR), errmsg("aggregate function calls cannot be nested")));
         }
     }
     return agglevel;
@@ -221,7 +211,7 @@ AggParser::check_agglevels_and_constraints(PGParseState *pstate, PGNode *expr)
 	PGExpr	   *filter = NULL;
 	int			min_varlevel;
 	int			location = -1;
-	Index	   *p_levelsup;
+	PGIndex	   *p_levelsup;
 	const char *err;
 	bool		errkind;
 	bool		isAgg = IsA(expr, PGAggref);
@@ -499,7 +489,7 @@ AggParser::check_agglevels_and_constraints(PGParseState *pstate, PGNode *expr)
 	{
 		parser_errposition(pstate, location);
 		ereport(ERROR,
-				(errcode(ERRCODE_GROUPING_ERROR),
+				(errcode(PG_ERRCODE_GROUPING_ERROR),
 				 errmsg_internal("%s", err)));
 	}
 
@@ -514,7 +504,7 @@ AggParser::check_agglevels_and_constraints(PGParseState *pstate, PGNode *expr)
 		
 		parser_errposition(pstate, location);
 		ereport(ERROR,
-				(errcode(ERRCODE_GROUPING_ERROR),
+				(errcode(PG_ERRCODE_GROUPING_ERROR),
 				 errmsg_internal(err,
 								 expr_parser->ParseExprKindName(pstate->p_expr_kind))));
 	}
@@ -532,7 +522,7 @@ AggParser::transformGroupingFunc(PGParseState *pstate, PGGroupingFunc *p)
 	{
 		parser_errposition(pstate, p->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
+				(errcode(PG_ERRCODE_TOO_MANY_ARGUMENTS),
 				 errmsg("GROUPING must have fewer than 32 arguments")));
 	}
 
@@ -660,7 +650,7 @@ void AggParser::transformAggregateCall(PGParseState * pstate,
 
                     ereport(
                         ERROR,
-                        (errcode(ERRCODE_UNDEFINED_FUNCTION),
+                        (errcode(PG_ERRCODE_UNDEFINED_FUNCTION),
                          errmsg("could not identify an ordering operator for type %s"/* , format_type_be(exprType(expr)) */),
                          errdetail("Aggregates with DISTINCT must be able to sort their inputs."),
                          parser_errposition(pstate, exprLocation(expr))));
@@ -808,11 +798,11 @@ void AggParser::transformAggregateCall(PGParseState * pstate,
 			 */
     }
     if (err)
-        ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg_internal("%s", err), parser_errposition(pstate, agg->location)));
+        ereport(ERROR, (errcode(PG_ERRCODE_GROUPING_ERROR), errmsg_internal("%s", err), parser_errposition(pstate, agg->location)));
     if (errkind)
         ereport(
             ERROR,
-            (errcode(ERRCODE_GROUPING_ERROR),
+            (errcode(PG_ERRCODE_GROUPING_ERROR),
              /* translator: %s is name of a SQL construct, eg GROUP BY */
              errmsg("aggregate functions are not allowed in %s", expr_parser->ParseExprKindName(pstate->p_expr_kind)),
              parser_errposition(pstate, agg->location)));
@@ -840,7 +830,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 		parser_errposition(pstate,
 									pg_locate_windowfunc((PGNode *) wfunc->args));
 		ereport(ERROR,
-				(errcode(ERRCODE_WINDOWING_ERROR),
+				(errcode(PG_ERRCODE_WINDOWING_ERROR),
 				 errmsg("window function calls cannot be nested")));
 	}
 
@@ -976,7 +966,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	{
 		parser_errposition(pstate, wfunc->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_WINDOWING_ERROR),
+				(errcode(PG_ERRCODE_WINDOWING_ERROR),
 				 errmsg_internal("%s", err)));
 	}
 
@@ -984,7 +974,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 	{
 		parser_errposition(pstate, wfunc->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_WINDOWING_ERROR),
+				(errcode(PG_ERRCODE_WINDOWING_ERROR),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("window functions are not allowed in %s",
 						expr_parser->ParseExprKindName(pstate->p_expr_kind))));
@@ -1021,7 +1011,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 
 	if (name)
 	{
-		Index		winref = 0;
+		PGIndex		winref = 0;
 		PGListCell   *lc;
 
 		foreach(lc, pstate->p_windowdefs)
@@ -1039,13 +1029,13 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 		{
 			parser_errposition(pstate, windef->location);
 			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("window \"%s\" does not exist", name)));
 		}
 	}
 	else
 	{
-		Index		winref = 0;
+		PGIndex		winref = 0;
 		PGListCell   *lc;
 
 		foreach(lc, pstate->p_windowdefs)
@@ -1405,7 +1395,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
 
             // FIXME: Should this go into check_agg_arguments now?
             if (checkExprHasGroupExtFuncs(expr))
-                ereport(ERROR, (errcode(ERRCODE_GROUPING_ERROR), errmsg("grouping() or group_id() not allowed in GROUP BY clause")));
+                ereport(ERROR, (errcode(PG_ERRCODE_GROUPING_ERROR), errmsg("grouping() or group_id() not allowed in GROUP BY clause")));
             groupClauses = lcons(expr, groupClauses);
         }
     }
@@ -1470,7 +1460,7 @@ AggParser::parseCheckAggregates(PGParseState *pstate, PGQuery *qry)
     if (pstate->p_hasAggs && hasSelfRefRTEs)
         ereport(
             ERROR,
-            (errcode(ERRCODE_INVALID_RECURSION),
+            (errcode(PG_ERRCODE_INVALID_RECURSION),
              errmsg("aggregate functions are not allowed in a recursive query's recursive term"),
              parser_errposition(pstate, pg_locate_agg_of_level((PGNode *)qry, 0))));
 };

@@ -1213,20 +1213,20 @@ pg_expression_tree_mutator(PGNode *node,
 			break;
 		case T_PGDistinctExpr:
 			{
-				DistinctExpr *expr = (DistinctExpr *) node;
-				DistinctExpr *newnode;
+				PGDistinctExpr *expr = (PGDistinctExpr *) node;
+				PGDistinctExpr *newnode;
 
-				FLATCOPY(newnode, expr, DistinctExpr);
+				FLATCOPY(newnode, expr, PGDistinctExpr);
 				MUTATE(newnode->args, expr->args, PGList *);
 				return (PGNode *) newnode;
 			}
 			break;
 		case T_PGNullIfExpr:
 			{
-				NullIfExpr *expr = (NullIfExpr *) node;
-				NullIfExpr *newnode;
+				PGNullIfExpr *expr = (PGNullIfExpr *) node;
+				PGNullIfExpr *newnode;
 
-				FLATCOPY(newnode, expr, NullIfExpr);
+				FLATCOPY(newnode, expr, PGNullIfExpr);
 				MUTATE(newnode->args, expr->args, PGList *);
 				return (PGNode *) newnode;
 			}
@@ -2417,7 +2417,7 @@ bool winref_checkspec_walker(duckdb_libpgquery::PGNode * node, void * ctx)
     return pg_expression_tree_walker(node, (walker_func)winref_checkspec_walker, ctx);
 };
 
-bool winref_checkspec(PGParseState * pstate, PGList * targetlist, Index winref, bool has_order, bool has_frame)
+bool winref_checkspec(PGParseState * pstate, PGList * targetlist, PGIndex winref, bool has_order, bool has_frame)
 {
     winref_check_ctx ctx;
 
@@ -2541,7 +2541,7 @@ bool pg_grouping_rewrite_walker(PGNode * node, void * context)
                 PGVar * var = (PGVar *)node_lc;
 
                 PGParseState * pstate = ctx->pstate;
-                Index levelsup;
+                PGIndex levelsup;
 
                 /* Do not allow expressions inside a grouping function. */
                 if (IsA(node_lc, PGRowExpr))
@@ -2874,7 +2874,7 @@ bool maxSortGroupRef_walker(PGNode *node, maxSortGroupRef_context *cxt)
     return pg_expression_tree_walker(node, (walker_func)maxSortGroupRef_walker, cxt);
 };
 
-Index maxSortGroupRef(PGList *targetlist, bool include_orderedagg)
+PGIndex maxSortGroupRef(PGList *targetlist, bool include_orderedagg)
 {
     maxSortGroupRef_context context;
     context.maxsgr = 0;
@@ -2975,8 +2975,8 @@ generate_alternate_vars(PGVar *invar, grouped_window_ctx *ctx)
     }
     else
     {
-        ListCell * jlc;
-        Index varno = 0;
+        PGListCell * jlc;
+        PGIndex varno = 0;
 
         foreach (jlc, rtable)
         {

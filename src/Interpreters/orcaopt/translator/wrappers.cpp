@@ -1,18 +1,12 @@
 #include <Interpreters/orcaopt/translator/wrappers.h>
 
-#include <Interpreters/orcaopt/walkers.h>
+#include <common/parser_common.hpp>
 
 #include "gpos/base.h"
 #include "gpos/error/CAutoExceptionStack.h"
 #include "gpos/error/CException.h"
 
 #include "naucrates/exception.h"
-
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#else
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
 
 using namespace duckdb_libpgquery;
 
@@ -100,37 +94,37 @@ GPDBFree(void *ptr)
 };
 
 // bool
-// IndexExists(Oid oid)
+// IndexExists(PGOid oid)
 // {
 // 	return false;
 // };
 
 bool
-TypeExists(Oid oid)
+TypeExists(PGOid oid)
 {
 	return false;
 };
 
 bool
-RelationExists(Oid oid)
+RelationExists(PGOid oid)
 {
 	return false;
 };
 
 bool
-OperatorExists(Oid oid)
+OperatorExists(PGOid oid)
 {
 	return false;
 };
 
 bool
-AggregateExists(Oid oid)
+AggregateExists(PGOid oid)
 {
 	return false;
 };
 
 bool
-FunctionExists(Oid oid)
+FunctionExists(PGOid oid)
 {
 	return false;
 };
@@ -159,7 +153,7 @@ ExprTypeMod(PGNode *expr)
 	return 0;
 };
 
-Oid
+PGOid
 ExprType(PGNode *expr)
 {
 	return 0;
@@ -203,36 +197,36 @@ WalkExpressionTree(PGNode *node, bool (*walker)(PGNode *node, void *context), vo
 };
 
 PGLogicalIndexType
-GetLogicalIndexType(Oid index_oid)
+GetLogicalIndexType(PGOid index_oid)
 {
 	return PGINDTYPE_BTREE;
 };
 
 bool
-RelPartIsNone(Oid relid)
+RelPartIsNone(PGOid relid)
 {
 	return false;
 };
 
 bool
-IsLeafPartition(Oid oid)
+IsLeafPartition(PGOid oid)
 {
 	return false;
 };
 
 bool
-RelPartIsRoot(Oid relid)
+RelPartIsRoot(PGOid relid)
 {
 	return false;
 };
 
-PGNode* GetLeafPartContraints(Oid rel_oid, PGList **default_levels)
+PGNode* GetLeafPartContraints(PGOid rel_oid, PGList **default_levels)
 {
 	return NULL;
 };
 
 PGRelationPtr
-GetRelation(Oid rel_oid)
+GetRelation(PGOid rel_oid)
 {
 	return NULL;
 };
@@ -250,31 +244,31 @@ GetRelationIndexes(PGRelationPtr relation)
 };
 
 PGLogicalIndexes *
-GetLogicalPartIndexes(Oid oid)
+GetLogicalPartIndexes(PGOid oid)
 {
 	return NULL;
 };
 
-Oid
-GetOpclassFamily(Oid opclass)
+PGOid
+GetOpclassFamily(PGOid opclass)
 {
 	return 0;
 };
 
-Oid
-GetHashProcInOpfamily(Oid opfamily, Oid typid)
+PGOid
+GetHashProcInOpfamily(PGOid opfamily, PGOid typid)
 {
 	return 0;
 };
 
-Oid
-IsLegacyCdbHashFunction(Oid funcid)
+PGOid
+IsLegacyCdbHashFunction(PGOid funcid)
 {
 	return 0;
 };
 
-Oid
-GetDefaultDistributionOpclassForType(Oid typid)
+PGOid
+GetDefaultDistributionOpclassForType(PGOid typid)
 {
 	return 0;
 };
@@ -292,31 +286,31 @@ GetIntFromValue(PGNode *node)
 };
 
 PGList *
-GetCheckConstraintOids(Oid rel_oid)
+GetCheckConstraintOids(PGOid rel_oid)
 {
 	return NULL;
 };
 
 bool
-RelPartIsInterior(Oid relid)
+RelPartIsInterior(PGOid relid)
 {
 	return false;
 };
 
 PGList *
-GetPartitionAttrs(Oid oid)
+GetPartitionAttrs(PGOid oid)
 {
 	return NULL;
 };
 
 bool
-HasSubclassSlow(Oid rel_oid)
+HasSubclassSlow(PGOid rel_oid)
 {
 	return false;
 };
 
 bool
-IsMultilevelPartitionUniform(Oid root_oid)
+IsMultilevelPartitionUniform(PGOid root_oid)
 {
 	return false;
 };
@@ -328,49 +322,49 @@ IsChildPartDistributionMismatched(PGRelationPtr rel)
 };
 
 gpos::ULONG
-CountLeafPartTables(Oid rel_oid)
+CountLeafPartTables(PGOid rel_oid)
 {
 	return 0;
 };
 
 bool
-HasExternalPartition(Oid oid)
+HasExternalPartition(PGOid oid)
 {
 	return false;
 };
 
 PGExtTableEntry *
-GetExternalTableEntry(Oid rel_oid)
+GetExternalTableEntry(PGOid rel_oid)
 {
 	return NULL;
 }
 
 PGStatisticPtr
-GetAttStats(Oid relid, PGAttrNumber attnum)
+GetAttStats(PGOid relid, PGAttrNumber attnum)
 {
 	return NULL;
 };
 
 PGNode *
-GetTypeDefault(Oid typid)
+GetTypeDefault(PGOid typid)
 {
 	return NULL;
 };
 
 PGList *
-GetExternalPartitions(Oid oid)
+GetExternalPartitions(PGOid oid)
 {
 	return NULL;
 };
 
-Oid
-GetAggregate(const char *agg, Oid type_oid, int nargs)
+PGOid
+GetAggregate(const char *agg, PGOid type_oid, int nargs)
 {
 	return 0;
 };
 
 bool
-IsAppendOnlyPartitionTable(Oid root_oid)
+IsAppendOnlyPartitionTable(PGOid root_oid)
 {
 	return false;
 };
@@ -409,10 +403,10 @@ MakeTargetEntry(PGExpr *expr, PGAttrNumber resno, char *resname, bool resjunk)
 	return makeTargetEntry(expr, resno, resname, resjunk);
 };
 
-Oid
-TypeCollation(Oid type)
+PGOid
+TypeCollation(PGOid type)
 {
-    Oid collation = InvalidOid;
+    PGOid collation = InvalidOid;
     // if (type_is_collatable(type))
     // {
     //     collation = DEFAULT_COLLATION_OID;
@@ -421,10 +415,10 @@ TypeCollation(Oid type)
 };
 
 PGVar *
-MakeVar(PGIndex varno, PGAttrNumber varattno, Oid vartype, int32 vartypmod,
+MakeVar(PGIndex varno, PGAttrNumber varattno, PGOid vartype, int32 vartypmod,
 			  PGIndex varlevelsup)
 {
-    Oid collation = TypeCollation(vartype);
+    PGOid collation = TypeCollation(vartype);
     return makeVar(varno, varattno, vartype, vartypmod, collation, varlevelsup);
 };
 
@@ -451,173 +445,173 @@ GetDistributionPolicy(PGRelationPtr rel)
 };
 
 PGNode *
-GetRelationPartContraints(Oid rel_oid, PGList **default_levels)
+GetRelationPartContraints(PGOid rel_oid, PGList **default_levels)
 {
 	return NULL;
 };
 
-Oid
-GetInverseOp(Oid opno)
+PGOid
+GetInverseOp(PGOid opno)
 {
 	return 0;
 };
 
-bool IsOpHashJoinable(Oid opno, Oid inputtype)
+bool IsOpHashJoinable(PGOid opno, PGOid inputtype)
 {
 	return false;
 };
 
-bool IsOpMergeJoinable(Oid opno, Oid inputtype)
+bool IsOpMergeJoinable(PGOid opno, PGOid inputtype)
 {
 	return false;
 };
 
-bool IsCompositeType(Oid typid)
+bool IsCompositeType(PGOid typid)
 {
 	return false;
 };
 
-bool IsTextRelatedType(Oid typid)
+bool IsTextRelatedType(PGOid typid)
 {
 	return false;
 };
 
-PGTypePtr LookupTypeCache(Oid type_id/* , int flags */)
+PGTypePtr LookupTypeCache(PGOid type_id/* , int flags */)
 {
 	return NULL;
 };
 
-Oid GetTypeRelid(Oid typid)
+PGOid GetTypeRelid(PGOid typid)
 {
 	return 0;
 };
 
-Oid GetArrayType(Oid typid)
+PGOid GetArrayType(PGOid typid)
 {
 	return 0;
 };
 
-Oid GetDefaultDistributionOpfamilyForType(Oid typid)
+PGOid GetDefaultDistributionOpfamilyForType(PGOid typid)
 {
 	return 0;
 };
 
-Oid GetLegacyCdbHashOpclassForBaseType(Oid typid)
+PGOid GetLegacyCdbHashOpclassForBaseType(PGOid typid)
 {
 	return 0;
 };
 
-char * GetOpName(Oid opno)
+char * GetOpName(PGOid opno)
 {
 	return NULL;
 };
 
-void GetOpInputTypes(Oid opno, Oid *lefttype, Oid *righttype)
+void GetOpInputTypes(PGOid opno, PGOid *lefttype, PGOid *righttype)
 {
 	return;
 };
 
-unsigned int WrapperGetComparisonType(Oid op_oid)
+unsigned int WrapperGetComparisonType(PGOid op_oid)
 {
 	return 0;
 };
 
-Oid GetOpFunc(Oid opno)
+PGOid GetOpFunc(PGOid opno)
 {
 	return 0;
 };
 
-Oid GetFuncRetType(Oid funcid)
+PGOid GetFuncRetType(PGOid funcid)
 {
 	return 0;
 };
 
-Oid GetCommutatorOp(Oid opno)
+PGOid GetCommutatorOp(PGOid opno)
 {
 	return 0;
 };
 
-bool IsOpStrict(Oid opno)
+bool IsOpStrict(PGOid opno)
 {
 	return false;
 };
 
-bool IsOpNDVPreserving(Oid opno)
+bool IsOpNDVPreserving(PGOid opno)
 {
 	return false;
 };
 
-Oid GetCompatibleHashOpFamily(Oid opno)
+PGOid GetCompatibleHashOpFamily(PGOid opno)
 {
 	return 0;
 };
 
-Oid GetCompatibleLegacyHashOpFamily(Oid opno)
+PGOid GetCompatibleLegacyHashOpFamily(PGOid opno)
 {
 	return 0;
 };
 
-char FuncStability(Oid funcid)
+char FuncStability(PGOid funcid)
 {
 	return '\0';
 };
 
-char FuncDataAccess(Oid funcid)
+char FuncDataAccess(PGOid funcid)
 {
 	return '\0';
 };
 
-char FuncExecLocation(Oid funcid)
+char FuncExecLocation(PGOid funcid)
 {
 	return '\0';
 };
 
-bool GetFuncRetset(Oid funcid)
+bool GetFuncRetset(PGOid funcid)
 {
 	return false;
 };
 
-bool FuncStrict(Oid funcid)
+bool FuncStrict(PGOid funcid)
 {
 	return false;
 };
 
-bool IsFuncNDVPreserving(Oid funcid)
+bool IsFuncNDVPreserving(PGOid funcid)
 {
 	return false;
 };
 
-bool IsFuncAllowedForPartitionSelection(Oid funcid)
+bool IsFuncAllowedForPartitionSelection(PGOid funcid)
 {
 	return false;
 };
 
-char * GetFuncName(Oid funcid)
+char * GetFuncName(PGOid funcid)
 {
 	return NULL;
 }
 
-PGList * GetFuncOutputArgTypes(Oid funcid)
+PGList * GetFuncOutputArgTypes(PGOid funcid)
 {
 	return NULL;
 };
 
-bool IsOrderedAgg(Oid aggid)
+bool IsOrderedAgg(PGOid aggid)
 {
 	return false;
 };
 
-bool IsAggPartialCapable(Oid aggid)
+bool IsAggPartialCapable(PGOid aggid)
 {
 	return false;
 };
 
-char * WrapperGetTypeName(Oid typid)
+char * WrapperGetTypeName(PGOid typid)
 {
 	return NULL;
 };
 
-Oid GetAggIntermediateResultType(Oid aggid)
+PGOid GetAggIntermediateResultType(PGOid aggid)
 {
 	return 0;
 };
@@ -628,7 +622,7 @@ double CdbEstimatePartitionedNumTuples(PGRelationPtr rel)
 };
 
 bool GetAttrStatsSlot(PGAttStatsSlotPtr& sslot,
-	PGStatisticPtr statstuple, int reqkind, Oid reqop, int flags)
+	PGStatisticPtr statstuple, int reqkind, PGOid reqop, int flags)
 {
 	return false;
 };
@@ -638,23 +632,23 @@ void FreeAttrStatsSlot(PGAttStatsSlotPtr sslot)
 	return;
 };
 
-bool GetCastFunc(Oid src_oid, Oid dest_oid, bool *is_binary_coercible,
-				  Oid *cast_fn_oid, PGCoercionPathType *pathtype)
+bool GetCastFunc(PGOid src_oid, PGOid dest_oid, bool *is_binary_coercible,
+				  PGOid *cast_fn_oid, PGCoercionPathType *pathtype)
 {
 	return false;
 };
 
-Oid GetComparisonOperator(Oid left_oid, Oid right_oid, unsigned int cmpt)
+PGOid GetComparisonOperator(PGOid left_oid, PGOid right_oid, unsigned int cmpt)
 {
 	return 0;
 };
 
-void GetOrderedPartKeysAndKinds(Oid oid, PGList **pkeys, PGList **pkinds)
+void GetOrderedPartKeysAndKinds(PGOid oid, PGList **pkeys, PGList **pkinds)
 {
 	return;
 };
 
-duckdb_libpgquery::PGList * GetRelationKeys(Oid relid)
+duckdb_libpgquery::PGList * GetRelationKeys(PGOid relid)
 {
 	return NULL;
 };
@@ -689,17 +683,17 @@ bool NumericIsNan(PGNumeric* num)
 	return PG_NUMERIC_IS_NAN(num);
 };
 
-float4 Float4FromDatum(Datum d)
+float4 Float4FromDatum(PGDatum d)
 {
 	return 0.0;
 };
 
-float8 Float8FromDatum(Datum d)
+float8 Float8FromDatum(PGDatum d)
 {
 	return 0.0;
 };
 
-Oid OidFromDatum(Datum d)
+PGOid OidFromDatum(PGDatum d)
 {
 	return 0;
 };
@@ -709,59 +703,59 @@ double NumericToDoubleNoOverflow(PGNumeric* num)
 	return 0.0;
 };
 
-double ConvertTimeValueToScalar(Datum datum, Oid typid)
+double ConvertTimeValueToScalar(PGDatum datum, PGOid typid)
 {
 	return 0.0;
 };
 
-double ConvertNetworkToScalar(Datum datum, Oid typid)
+double ConvertNetworkToScalar(PGDatum datum, PGOid typid)
 {
 	return 0.0;
 };
 
-void * PointerFromDatum(Datum d)
+void * PointerFromDatum(PGDatum d)
 {
 	return NULL;
 };
 
-uint32 UUIDHash(Datum d)
+uint32 UUIDHash(PGDatum d)
 {
 	return 0;
 };
 
-uint32 HashBpChar(Datum d)
+uint32 HashBpChar(PGDatum d)
 {
 	return 0;
 };
 
-uint32 HashChar(Datum d)
+uint32 HashChar(PGDatum d)
 {
 	return 0;
 };
 
-uint32 HashName(Datum d)
+uint32 HashName(PGDatum d)
 {
 	return 0;
 };
 
-uint32 HashText(Datum d)
+uint32 HashText(PGDatum d)
 {
 	return 0;
 };
 
-PGList * GetFuncArgTypes(Oid funcid)
+PGList * GetFuncArgTypes(PGOid funcid)
 {
 	return NULL;
 };
 
-bool ResolvePolymorphicArgType(int numargs, Oid *argtypes, char *argmodes,
+bool ResolvePolymorphicArgType(int numargs, PGOid *argtypes, char *argmodes,
 								PGFuncExpr *call_expr)
 {
 	return false;
 };
 
 PGNode *
-CoerceToCommonType(PGParseState *pstate, PGNode *node, Oid target_type,
+CoerceToCommonType(PGParseState *pstate, PGNode *node, PGOid target_type,
 						 const char *context)
 {
 	return NULL;
@@ -792,12 +786,12 @@ void GpdbEreportImpl(int xerrcode, int severitylevel, const char *xerrmsg,
 	// 				  xerrhint ? errhint("%s", xerrhint) : 0);
 };
 
-PGList *GetIndexOpFamilies(Oid index_oid)
+PGList *GetIndexOpFamilies(PGOid index_oid)
 {
 	return NULL;
 };
 
-PGList *GetOpFamiliesForScOp(Oid opno)
+PGList *GetOpFamiliesForScOp(PGOid opno)
 {
 	return NULL;
 };

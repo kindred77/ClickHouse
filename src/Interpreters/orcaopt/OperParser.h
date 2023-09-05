@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -39,14 +39,14 @@ public:
 	// Oid
 	// compatible_oper_opid(duckdb_libpgquery::PGList *op, Oid arg1, Oid arg2, bool noError);
 
-	PGOperatorPtr
-	compatible_oper(PGParseState *pstate, duckdb_libpgquery::PGList *op, Oid arg1, Oid arg2,
+	duckdb_libpgquery::PGOperatorPtr
+	compatible_oper(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *op, duckdb_libpgquery::PGOid arg1, duckdb_libpgquery::PGOid arg2,
 				bool noError, int location);
 
 	void
-	get_sort_group_operators(Oid argtype,
+	get_sort_group_operators(duckdb_libpgquery::PGOid argtype,
 						 bool needLT, bool needEQ, bool needGT,
-						 Oid *ltOpr, Oid *eqOpr, Oid *gtOpr,
+						 duckdb_libpgquery::PGOid *ltOpr, duckdb_libpgquery::PGOid *eqOpr, duckdb_libpgquery::PGOid *gtOpr,
 						 bool *isHashable);
 
 	//bool
@@ -59,40 +59,40 @@ public:
 	// Oid
 	// find_oper_cache_entry(OprCacheKey *key);
 
-	Oid
-	binary_oper_exact(duckdb_libpgquery::PGList *opname, Oid arg1, Oid arg2);
+	duckdb_libpgquery::PGOid
+	binary_oper_exact(duckdb_libpgquery::PGList *opname, duckdb_libpgquery::PGOid arg1, duckdb_libpgquery::PGOid arg2);
 
-	FuncDetailCode
+	duckdb_libpgquery::FuncDetailCode
 	oper_select_candidate(int nargs,
-					  Oid *input_typeids,
-					  FuncCandidateListPtr & candidates,
-					  Oid *operOid); /* output argument */
+					  duckdb_libpgquery::PGOid *input_typeids,
+					  duckdb_libpgquery::FuncCandidateListPtr & candidates,
+					  duckdb_libpgquery::PGOid *operOid); /* output argument */
 
 	std::string
-	op_signature_string(duckdb_libpgquery::PGList *op, char oprkind, Oid arg1, Oid arg2);
+	op_signature_string(duckdb_libpgquery::PGList *op, char oprkind, duckdb_libpgquery::PGOid arg1, duckdb_libpgquery::PGOid arg2);
 	
-	PGOperatorPtr
-	right_oper(PGParseState *pstate, duckdb_libpgquery::PGList *op,
-			Oid arg, bool noError, int location);
+	duckdb_libpgquery::PGOperatorPtr
+	right_oper(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *op,
+			duckdb_libpgquery::PGOid arg, bool noError, int location);
 
-	PGOperatorPtr
-	left_oper(PGParseState *pstate, duckdb_libpgquery::PGList *op,
-			Oid arg, bool noError, int location);
+	duckdb_libpgquery::PGOperatorPtr
+	left_oper(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *op,
+			duckdb_libpgquery::PGOid arg, bool noError, int location);
 
-	PGOperatorPtr
-	oper(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
-		Oid ltypeId, Oid rtypeId,bool noError, int location);
+	duckdb_libpgquery::PGOperatorPtr
+	oper(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *opname,
+		duckdb_libpgquery::PGOid ltypeId, duckdb_libpgquery::PGOid rtypeId,bool noError, int location);
 
-    duckdb_libpgquery::PGExpr * make_op(PGParseState * pstate, duckdb_libpgquery::PGList * opname,
+    duckdb_libpgquery::PGExpr * make_op(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGList * opname,
 		duckdb_libpgquery::PGNode * ltree, duckdb_libpgquery::PGNode * rtree, int location);
 
     void
-	op_error(PGParseState *pstate, duckdb_libpgquery::PGList *op, char oprkind,
-		 Oid arg1, Oid arg2,
-		 FuncDetailCode fdresult, int location);
+	op_error(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *op, char oprkind,
+		 duckdb_libpgquery::PGOid arg1, duckdb_libpgquery::PGOid arg2,
+		 duckdb_libpgquery::FuncDetailCode fdresult, int location);
 
 	duckdb_libpgquery::PGExpr *
-	make_scalar_array_op(PGParseState *pstate, duckdb_libpgquery::PGList *opname,
+	make_scalar_array_op(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *opname,
 					 bool useOr,
 					 duckdb_libpgquery::PGNode *ltree, duckdb_libpgquery::PGNode *rtree,
 					 int location);

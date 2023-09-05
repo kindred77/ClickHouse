@@ -30,12 +30,11 @@
  *-------------------------------------------------------------------------
  */
 #include "pg_functions.hpp"
-
-
-
 #include "fmgr.hpp"
 #include "nodes/makefuncs.hpp"
 #include "nodes/nodeFuncs.hpp"
+#include "common/common_datum.hpp"
+#include "common/common_macro.hpp"
 
 namespace duckdb_libpgquery {
 
@@ -73,6 +72,32 @@ PGAExpr *makeSimpleAExpr(PGAExpr_Kind kind, const char *name, PGNode *lexpr, PGN
  * makeVar -
  *	  creates a PGVar node
  */
+PGVar *makeVar(PGIndex varno, PGAttrNumber varattno, PGOid vartype, int32_t vartypmod, PGOid varcollid,
+               PGIndex varlevelsup)
+{
+	PGVar *var = makeNode(PGVar);
+
+	var->varno = varno;
+	var->varattno = varattno;
+	var->vartype = vartype;
+	var->vartypmod = vartypmod;
+	var->varcollid = varcollid;
+	var->varlevelsup = varlevelsup;
+
+	/*
+	 * Since few if any routines ever create Var nodes with varnoold/varoattno
+	 * different from varno/varattno, we don't provide separate arguments for
+	 * them, but just initialize them to the given varno/varattno. This
+	 * reduces code clutter and chance of error for most callers.
+	 */
+	var->varnoold = varno;
+	var->varoattno = varattno;
+
+	/* Likewise, we just set location to "unknown" here */
+	var->location = -1;
+
+	return var;
+}
 
 /*
  * makeVarFromTargetEntry -
@@ -97,10 +122,128 @@ PGAExpr *makeSimpleAExpr(PGAExpr_Kind kind, const char *name, PGNode *lexpr, PGN
  * value that the whole-row notation might otherwise suggest.
  */
 
+PGVar *makeWholeRowVar(PGRangeTblEntry *rte, PGIndex varno, PGIndex varlevelsup, bool allowScalar, PGOid relTypeOid, bool isRowType)
+{
+	PGVar		   *result;
+	PGOid			toid;
+	PGNode	   *fexpr;
+
+	switch (rte->rtekind)
+	{
+		case PG_RTE_RELATION:
+			/* relation: the rowtype is a named composite type */
+			//toid = get_rel_type_id(rte->relid);
+			toid = relTypeOid;
+			if (!OidIsValid(toid))
+				elog(ERROR, "could not find type OID for relation %u",
+					 rte->relid);
+			result = makeVar(varno,
+							 InvalidAttrNumber,
+							 toid,
+							 -1,
+							 InvalidOid,
+							 varlevelsup);
+			break;
+		//case PG_RTE_TABLEFUNCTION:
+		case PG_RTE_FUNCTION:
+
+			/*
+			 * If there's more than one function, or ordinality is requested,
+			 * force a RECORD result, since there's certainly more than one
+			 * column involved and it can't be a known named type.
+			 */
+			if (rte->funcordinality || list_length(rte->functions) != 1)
+			{
+				/* always produces an anonymous RECORD result */
+				result = makeVar(varno,
+								 InvalidAttrNumber,
+								 RECORDOID,
+								 -1,
+								 InvalidOid,
+								 varlevelsup);
+				break;
+			}
+
+			fexpr = ((PGRangeTblFunction *) linitial(rte->functions))->funcexpr;
+			toid = exprType(fexpr);
+			//if (type_is_rowtype(toid))
+			if (isRowType)
+			{
+				/* func returns composite; same as relation case */
+				result = makeVar(varno,
+								 InvalidAttrNumber,
+								 toid,
+								 -1,
+								 InvalidOid,
+								 varlevelsup);
+			}
+			else if (allowScalar)
+			{
+				/* func returns scalar; just return its output as-is */
+				result = makeVar(varno,
+								 1,
+								 toid,
+								 -1,
+								 exprCollation(fexpr),
+								 varlevelsup);
+			}
+			else
+			{
+				/* func returns scalar, but we want a composite result */
+				result = makeVar(varno,
+								 InvalidAttrNumber,
+								 RECORDOID,
+								 -1,
+								 InvalidOid,
+								 varlevelsup);
+			}
+			break;
+
+		default:
+
+			/*
+			 * RTE is a join, subselect, or VALUES.  We represent this as a
+			 * whole-row Var of RECORD type. (Note that in most cases the Var
+			 * will be expanded to a RowExpr during planning, but that is not
+			 * our concern here.)
+			 */
+			result = makeVar(varno,
+							 InvalidAttrNumber,
+							 RECORDOID,
+							 -1,
+							 InvalidOid,
+							 varlevelsup);
+			break;
+	}
+
+	return result;
+}
+
 /*
  * makeTargetEntry -
  *	  creates a PGTargetEntry node
  */
+PGTargetEntry *makeTargetEntry(PGExpr *expr, PGAttrNumber resno, char *resname, bool resjunk)
+{
+	PGTargetEntry *tle = makeNode(PGTargetEntry);
+	
+	tle->expr = expr;
+	tle->resno = resno;
+	tle->resname = resname;
+
+	/*
+	 * We always set these fields to 0. If the caller wants to change them he
+	 * must do so explicitly.  Few callers do that, so omitting these
+	 * arguments reduces the chance of error.
+	 */
+	tle->ressortgroupref = 0;
+	tle->resorigtbl = InvalidOid;
+	tle->resorigcol = 0;
+
+	tle->resjunk = resjunk;
+
+	return tle;
+}
 
 /*
  * flatCopyTargetEntry -
@@ -112,26 +255,72 @@ PGAExpr *makeSimpleAExpr(PGAExpr_Kind kind, const char *name, PGNode *lexpr, PGN
 
 /*
  * makeFromExpr -
- *	  creates a PGFromExpr node
+ *	  creates a FromExpr node
  */
+PGFromExpr *
+makeFromExpr(PGList *fromlist, PGNode *quals)
+{
+	PGFromExpr   *f = makeNode(PGFromExpr);
+
+	f->fromlist = fromlist;
+	f->quals = quals;
+	return f;
+}
 
 /*
  * makeConst -
  *	  creates a PGConst node
  */
+PGConst *makeConst(PGOid consttype, int32_t consttypmod, PGOid constcollid, int constlen, PGDatum constvalue,
+                   bool constisnull, bool constbyval)
+{
+	PGConst	   *cnst = makeNode(PGConst);
+
+	cnst->consttype = consttype;
+	cnst->consttypmod = consttypmod;
+	cnst->constcollid = constcollid;
+	cnst->constlen = constlen;
+	cnst->constvalue = constvalue;
+	cnst->constisnull = constisnull;
+	cnst->constbyval = constbyval;
+	cnst->location = -1;		/* "unknown" */
+
+	return cnst;
+}
 
 /*
  * makeNullConst -
- *	  creates a PGConst node representing a NULL of the specified type/typmod
+ *	  creates a Const node representing a NULL of the specified type/typmod
  *
  * This is a convenience routine that just saves a lookup of the type's
  * storage properties.
  */
+PGConst *makeNullConst(int16_t typLen, bool typByVal, PGOid consttype, int32_t consttypmod, PGOid constcollid)
+{
+	// int16_t		typLen;
+	// bool		typByVal;
+
+	// get_typlenbyval(consttype, &typLen, &typByVal);
+	return makeConst(consttype,
+					 consttypmod,
+					 constcollid,
+					 (int) typLen,
+					 (PGDatum) 0,
+					 true,
+					 typByVal);
+}
 
 /*
  * makeBoolConst -
  *	  creates a PGConst node representing a boolean value (can be NULL too)
  */
+
+PGNode *makeBoolConst(bool value, bool isnull)
+{
+	/* note that pg_type.h hardwires size of bool as 1 ... duplicate it */
+	return (PGNode *) makeConst(BOOLOID, -1, InvalidOid, 1,
+							  BoolGetDatum(value), isnull, true);
+}
 
 /*
  * makeBoolExpr -
@@ -164,8 +353,21 @@ PGAlias *makeAlias(const char *aliasname, PGList *colnames) {
 
 /*
  * makeRelabelType -
- *	  creates a PGRelabelType node
+ *	  creates a RelabelType node
  */
+PGRelabelType *makeRelabelType(PGExpr *arg, PGOid rtype, int32_t rtypmod, PGOid rcollid, PGCoercionForm rformat)
+{
+	PGRelabelType *r = makeNode(PGRelabelType);
+
+	r->arg = arg;
+	r->resulttype = rtype;
+	r->resulttypmod = rtypmod;
+	r->resultcollid = rcollid;
+	r->relabelformat = rformat;
+	r->location = -1;
+
+	return r;
+}
 
 /*
  * makeRangeVar -
@@ -231,6 +433,24 @@ PGTypeName *makeTypeNameFromNameList(PGList *names) {
  *
  * The argument expressions must have been transformed already.
  */
+PGFuncExpr *makeFuncExpr(PGOid funcid, PGOid rettype, PGList *args, PGOid funccollid, PGOid inputcollid,
+                         PGCoercionForm fformat)
+{
+	PGFuncExpr   *funcexpr;
+
+	funcexpr = makeNode(PGFuncExpr);
+	funcexpr->funcid = funcid;
+	funcexpr->funcresulttype = rettype;
+	funcexpr->funcretset = false;		/* only allowed case here */
+	funcexpr->funcvariadic = false;		/* only allowed case here */
+	funcexpr->funcformat = fformat;
+	funcexpr->funccollid = funccollid;
+	funcexpr->inputcollid = inputcollid;
+	funcexpr->args = args;
+	funcexpr->location = -1;
+
+	return funcexpr;
+}
 
 /*
  * makeDefElem -

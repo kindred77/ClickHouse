@@ -25,7 +25,7 @@
 // #include "nodes/parsenodes.h"
 // }
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 #include "gpos/base.h"
 #include "gpos/common/CBitSet.h"
@@ -63,7 +63,7 @@ enum DistributionHashOpsKind
 	DistrUseLegacyHashOps
 };
 
-typedef uint16 PGStrategyNumber;
+typedef duckdb_libpgquery::uint16 PGStrategyNumber;
 
 typedef enum PGScanDirection
 {
@@ -124,23 +124,23 @@ public:
 		EdxlIndexScanDirection idx_scan_direction);
 
 	// get the oid of comparison operator
-	static OID OidCmpOperator(duckdb_libpgquery::PGExpr *expr);
+	static duckdb_libpgquery::PGOid OidCmpOperator(duckdb_libpgquery::PGExpr *expr);
 
 	// get the opfamily for index key
-	static OID GetOpFamilyForIndexQual(INT attno, OID oid_index);
+	static duckdb_libpgquery::PGOid GetOpFamilyForIndexQual(INT attno, duckdb_libpgquery::PGOid oid_index);
 
 	// return the type for the system column with the given number
-	static CMDIdGPDB *GetSystemColType(CMemoryPool *mp, PGAttrNumber attno);
+	static CMDIdGPDB *GetSystemColType(CMemoryPool *mp, duckdb_libpgquery::PGAttrNumber attno);
 
 	// find the n-th column descriptor in the table descriptor
 	static const CDXLColDescr *GetColumnDescrAt(
 		const CDXLTableDescr *table_descr, ULONG pos);
 
 	// return the name for the system column with given number
-	static const CWStringConst *GetSystemColName(PGAttrNumber attno);
+	static const CWStringConst *GetSystemColName(duckdb_libpgquery::PGAttrNumber attno);
 
 	// returns the length for the system column with given attno number
-	static ULONG GetSystemColLength(PGAttrNumber attno);
+	static ULONG GetSystemColLength(duckdb_libpgquery::PGAttrNumber attno);
 
 	// translate the join type from its GPDB representation into the DXL one
 	static EdxlJoinType ConvertToDXLJoinType(duckdb_libpgquery::PGJoinType jt);
@@ -205,7 +205,7 @@ public:
 	static duckdb_libpgquery::PGQuery *FixUnknownTypeConstant(duckdb_libpgquery::PGQuery *query, duckdb_libpgquery::PGList *target_list);
 
 	// return the type of the nth non-resjunked target list entry
-	static OID GetTargetListReturnTypeOid(duckdb_libpgquery::PGList *target_list, ULONG col_pos);
+	static duckdb_libpgquery::PGOid GetTargetListReturnTypeOid(duckdb_libpgquery::PGList *target_list, ULONG col_pos);
 
 	// construct an array of DXL column identifiers for a target list
 	static ULongPtrArray *GenerateColIds(CMemoryPool *mp, duckdb_libpgquery::PGList *target_list,
@@ -314,7 +314,7 @@ public:
 	// check if the given function is a SIRV (single row volatile) that reads
 	// or modifies SQL data
 	static BOOL IsSirvFunc(CMemoryPool *mp, CMDAccessor *md_accessor,
-						   OID func_oid);
+						   duckdb_libpgquery::PGOid func_oid);
 
 	// is this a motion sensitive to duplicates
 	static BOOL IsDuplicateSensitiveMotion(CDXLPhysicalMotion *dxl_motion);

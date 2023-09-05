@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -54,65 +54,65 @@ private:
 public:
 	explicit FuncParser(const ContextPtr& context_);
 
-    duckdb_libpgquery::PGNode * ParseFuncOrColumn(PGParseState * pstate, duckdb_libpgquery::PGList * funcname, 
+    duckdb_libpgquery::PGNode * ParseFuncOrColumn(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGList * funcname, 
 		duckdb_libpgquery::PGList * fargs, duckdb_libpgquery::PGFuncCall * fn, int location);
 
     duckdb_libpgquery::PGNode *
-    ParseComplexProjection(PGParseState *pstate, const char *funcname, duckdb_libpgquery::PGNode *first_arg,
+    ParseComplexProjection(duckdb_libpgquery::PGParseState *pstate, const char *funcname, duckdb_libpgquery::PGNode *first_arg,
 					   int location);
 
     int
     func_match_argtypes(int nargs,
-					Oid *input_typeids,
-					FuncCandidateListPtr raw_candidates,
-					FuncCandidateListPtr & candidates);	/* return value */
+					duckdb_libpgquery::PGOid *input_typeids,
+					duckdb_libpgquery::FuncCandidateListPtr raw_candidates,
+					duckdb_libpgquery::FuncCandidateListPtr & candidates);	/* return value */
 
-    FuncCandidateListPtr
+    duckdb_libpgquery::FuncCandidateListPtr
     func_select_candidate(int nargs,
-					  Oid *input_typeids,
-					  FuncCandidateListPtr & candidates);
+					  duckdb_libpgquery::PGOid *input_typeids,
+					  duckdb_libpgquery::FuncCandidateListPtr & candidates);
 
-    Oid
+    duckdb_libpgquery::PGOid
     FuncNameAsType(duckdb_libpgquery::PGList *funcname);
 
     std::string
     funcname_signature_string(const char *funcname, int nargs,
-						  duckdb_libpgquery::PGList *argnames, const Oid *argtypes);
+						  duckdb_libpgquery::PGList *argnames, const duckdb_libpgquery::PGOid *argtypes);
 
     std::string
     func_signature_string(duckdb_libpgquery::PGList *funcname, int nargs,
-					  duckdb_libpgquery::PGList *argnames, const Oid *argtypes);
+					  duckdb_libpgquery::PGList *argnames, const duckdb_libpgquery::PGOid *argtypes);
 
-    FuncDetailCode
+    duckdb_libpgquery::FuncDetailCode
     func_get_detail(duckdb_libpgquery::PGList *funcname,
 				duckdb_libpgquery::PGList *fargs,
 				duckdb_libpgquery::PGList *fargnames,
 				int nargs,
-				Oid *argtypes,
+				duckdb_libpgquery::PGOid *argtypes,
 				bool expand_variadic,
 				bool expand_defaults,
-				Oid *funcid,	/* return value */
-				Oid *rettype,	/* return value */
+				duckdb_libpgquery::PGOid *funcid,	/* return value */
+				duckdb_libpgquery::PGOid *rettype,	/* return value */
 				bool *retset,	/* return value */
 				int *nvargs,	/* return value */
-				Oid *vatype,	/* return value */
-				Oid **true_typeids, /* return value */
+				duckdb_libpgquery::PGOid *vatype,	/* return value */
+				duckdb_libpgquery::PGOid **true_typeids, /* return value */
 				duckdb_libpgquery::PGList **argdefaults) /* optional return value */;
 
     void
-    unify_hypothetical_args(PGParseState *pstate,
+    unify_hypothetical_args(duckdb_libpgquery::PGParseState *pstate,
 						duckdb_libpgquery::PGList *fargs,
 						int numAggregatedArgs,
-						Oid *actual_arg_types,
-						Oid *declared_arg_types);
+						duckdb_libpgquery::PGOid *actual_arg_types,
+						duckdb_libpgquery::PGOid *declared_arg_types);
 
     void
-    make_fn_arguments(PGParseState *pstate,
+    make_fn_arguments(duckdb_libpgquery::PGParseState *pstate,
 				  duckdb_libpgquery::PGList *fargs,
-				  Oid *actual_arg_types,
-				  Oid *declared_arg_types);
+				  duckdb_libpgquery::PGOid *actual_arg_types,
+				  duckdb_libpgquery::PGOid *declared_arg_types);
 
-    void check_srf_call_placement(PGParseState * pstate, int location);
+    void check_srf_call_placement(duckdb_libpgquery::PGParseState * pstate, int location);
 };
 
 }

@@ -12,7 +12,7 @@ AggProvider::AggProvider(const ContextPtr& context_) : context(context_)
 
 };
 
-PGAggPtr AggProvider::getAggByFuncOid(Oid func_oid) const
+PGAggPtr AggProvider::getAggByFuncOid(PGOid func_oid) const
 {
 	//TODO kindred
 	auto it = oid_agg_map.find(func_oid);

@@ -10,14 +10,6 @@
 
 #include <Interpreters/Context.h>
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wcovered-switch-default"
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#else
-#pragma GCC diagnostic ignored "-Wcovered-switch-default"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -36,9 +28,9 @@ RelationParser::RelationParser(const ContextPtr& context_) : context(context_)
 
 PGCommonTableExpr *
 RelationParser::scanNameSpaceForCTE(PGParseState *pstate, const char *refname,
-					Index *ctelevelsup)
+					PGIndex *ctelevelsup)
 {
-	Index		levelsup;
+	PGIndex		levelsup;
 
 	for (levelsup = 0;
 		 pstate != NULL;
@@ -63,7 +55,7 @@ RelationParser::scanNameSpaceForCTE(PGParseState *pstate, const char *refname,
 PGRangeTblEntry *
 RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 						 PGCommonTableExpr *cte,
-						 Index levelsup,
+						 PGIndex levelsup,
 						 PGRangeVar *rv,
 						 bool inFromCl)
 {
@@ -102,7 +94,7 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 		{
 			parser_errposition(pstate, rv->location);
 			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("WITH query \"%s\" does not have a RETURNING clause",
 							cte->ctename)));
 		}
@@ -129,7 +121,7 @@ RelationParser::addRangeTableEntryForCTE(PGParseState *pstate,
 	}
 	if (varattno < numaliases)
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+				(errcode(PG_ERRCODE_INVALID_COLUMN_REFERENCE),
 				 errmsg("table \"%s\" has %d columns available but %d columns specified",
 						refname, varattno, numaliases)));
 
@@ -217,7 +209,7 @@ RelationParser::buildRelationAliases(PGTupleDescPtr tupdesc, PGAlias *alias, PGA
     if (aliaslc)
         ereport(
             ERROR,
-            (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+            (errcode(PG_ERRCODE_INVALID_COLUMN_REFERENCE),
              errmsg("table \"%s\" has %d columns available but %d columns specified", eref->aliasname, maxattrs - numdropped, numaliases)));
 };
 
@@ -225,10 +217,10 @@ PGRangeTblEntry *
 RelationParser::searchRangeTableForRel(PGParseState *pstate, PGRangeVar *relation)
 {
     const char * refname = relation->relname;
-    Oid relId = InvalidOid;
+    PGOid relId = InvalidOid;
     PGCommonTableExpr * cte = NULL;
-    Index ctelevelsup = 0;
-    Index levelsup;
+    PGIndex ctelevelsup = 0;
+    PGIndex levelsup;
 
     /*
 	 * If it's an unqualified name, check for possible CTE matches. A CTE
@@ -303,7 +295,7 @@ RelationParser::errorMissingRTE(PGParseState *pstate, PGRangeVar *relation)
 	{
 		parser_errposition(pstate, relation->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_TABLE),
+				(errcode(PG_ERRCODE_UNDEFINED_TABLE),
 				 errmsg("invalid reference to FROM-clause entry for table \"%s\"",
 						relation->relname),
 				 (badAlias ?
@@ -316,7 +308,7 @@ RelationParser::errorMissingRTE(PGParseState *pstate, PGRangeVar *relation)
 	{
 		parser_errposition(pstate, relation->location);
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_TABLE),
+				(errcode(PG_ERRCODE_UNDEFINED_TABLE),
 				 errmsg("missing FROM-clause entry for table \"%s\"",
 						relation->relname)));
 	}
@@ -336,7 +328,7 @@ RelationParser::errorMissingColumn(PGParseState *pstate,
     if (relname)
         ereport(
             ERROR,
-            (errcode(ERRCODE_UNDEFINED_COLUMN),
+            (errcode(PG_ERRCODE_UNDEFINED_COLUMN),
              errmsg("column %s.%s does not exist", relname, colname),
              parser_errposition(pstate, location)));
 
@@ -351,7 +343,7 @@ RelationParser::errorMissingColumn(PGParseState *pstate,
 
     ereport(
         ERROR,
-        (errcode(ERRCODE_UNDEFINED_COLUMN),
+        (errcode(PG_ERRCODE_UNDEFINED_COLUMN),
          errmsg("column \"%s\" does not exist", colname),
          rte ? errmsg(
              "There is a column named \"%s\" in table \"%s\", but it cannot be referenced from this part of the query.",
@@ -419,7 +411,11 @@ RelationParser::expandTupleDesc(PGTupleDescPtr tupdesc, PGAlias *eref, int count
 					 * can't use atttypid here, but it doesn't really matter
 					 * what type the Const claims to be.
 					 */
-                    *colvars = lappend(*colvars, makeNullConst(INT4OID, -1, InvalidOid));
+
+					int16_t typLen;
+                    bool typByVal;
+                    type_provider->get_typlenbyval(INT4OID, &typLen, &typByVal);
+                    *colvars = lappend(*colvars, makeNullConst(typLen, typByVal, INT4OID, -1, InvalidOid));
                 }
             }
             if (aliascell)
@@ -515,7 +511,7 @@ RelationParser::get_tle_by_resno(PGList *tlist, PGAttrNumber resno)
 PGCommonTableExpr *
 RelationParser::GetCTEForRTE(PGParseState *pstate, PGRangeTblEntry *rte, int rtelevelsup)
 {
-	Index		levelsup;
+	PGIndex		levelsup;
 	PGListCell   *lc;
 
 	/* Determine RTE's levelsup if caller didn't know it */
@@ -572,7 +568,7 @@ RelationParser::RTERangeTablePosn(PGParseState *pstate, PGRangeTblEntry *rte, in
 };
 
 void
-RelationParser::expandRelation(Oid relid, PGAlias *eref, int rtindex, int sublevels_up,
+RelationParser::expandRelation(PGOid relid, PGAlias *eref, int rtindex, int sublevels_up,
 			   int location, bool include_dropped,
 			   PGList **colnames, PGList **colvars)
 {
@@ -668,7 +664,7 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 				{
 					PGRangeTblFunction *rtfunc = (PGRangeTblFunction *) lfirst(lc);
 					TypeFuncClass functypclass;
-					Oid			funcrettype;
+					PGOid			funcrettype;
 					PGTupleDescPtr tupdesc = nullptr;
 
 					functypclass = type_provider->get_expr_result_type(rtfunc->funcexpr,
@@ -730,9 +726,9 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 									 l2, rtfunc->funccoltypmods,
 									 l3, rtfunc->funccolcollations)
 							{
-								Oid			attrtype = lfirst_oid(l1);
+								PGOid			attrtype = lfirst_oid(l1);
 								int32		attrtypmod = lfirst_int(l2);
-								Oid			attrcollation = lfirst_oid(l3);
+								PGOid			attrcollation = lfirst_oid(l3);
 								PGVar		   *varnode;
 
 								attnum++;
@@ -813,8 +809,11 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 								 * be dropped!); but it doesn't really matter
 								 * what type the Const claims to be.
 								 */
+								int16_t typLen;
+                                bool typByVal;
+                                type_provider->get_typlenbyval(INT4OID, &typLen, &typByVal);
 								*colvars = lappend(*colvars,
-												   makeNullConst(INT4OID, -1,
+												   makeNullConst(typLen, typByVal, INT4OID, -1,
 																 InvalidOid));
 							}
 						}
@@ -861,9 +860,9 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 						 lcm, rte->coltypmods,
 						 lcc, rte->colcollations)
 				{
-					Oid			coltype = lfirst_oid(lct);
+					PGOid			coltype = lfirst_oid(lct);
 					int32		coltypmod = lfirst_int(lcm);
-					Oid			colcoll = lfirst_oid(lcc);
+					PGOid			colcoll = lfirst_oid(lcc);
 
 					varattno++;
 
@@ -903,8 +902,11 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 							 * It doesn't really matter what type the Const
 							 * claims to be.
 							 */
+							int16_t typLen;
+                            bool typByVal;
+                            type_provider->get_typlenbyval(INT4OID, &typLen, &typByVal);
 							*colvars = lappend(*colvars,
-											   makeNullConst(INT4OID, -1,
+											   makeNullConst(typLen, typByVal, INT4OID, -1,
 															 InvalidOid));
 						}
 					}
@@ -943,7 +945,7 @@ PGRelationPtr RelationParser::parserOpenTable(PGParseState * pstate, const PGRan
     //setup_parser_errposition_callback(&pcbstate, pstate, relation->location);
 
     /* Look up the appropriate relation using namespace search */
-    Oid relid = relation_provider->RangeVarGetRelidExtended(relation, NoLock, true, false, NULL, NULL);
+    PGOid relid = relation_provider->RangeVarGetRelidExtended(relation, NoLock, true, false, NULL, NULL);
     
     /*
 	 * CdbTryOpenRelation might return NULL (for example, if the table
@@ -957,7 +959,7 @@ PGRelationPtr RelationParser::parserOpenTable(PGParseState * pstate, const PGRan
         if (relation->schemaname)
             ereport(
                 ERROR,
-                (errcode(ERRCODE_UNDEFINED_TABLE), errmsg("relation \"%s.%s\" does not exist", relation->schemaname, relation->relname)));
+                (errcode(PG_ERRCODE_UNDEFINED_TABLE), errmsg("relation \"%s.%s\" does not exist", relation->schemaname, relation->relname)));
         else
         {
             /*
@@ -969,13 +971,13 @@ PGRelationPtr RelationParser::parserOpenTable(PGParseState * pstate, const PGRan
             if (isFutureCTE(pstate, relation->relname))
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_UNDEFINED_TABLE),
+                    (errcode(PG_ERRCODE_UNDEFINED_TABLE),
                      errmsg("relation \"%s\" does not exist", relation->relname),
                      errdetail(
                          "There is a WITH item named \"%s\", but it cannot be referenced from this part of the query.", relation->relname),
                      errhint("Use WITH RECURSIVE, or re-order the WITH items to remove forward references.")));
             else
-                ereport(ERROR, (errcode(ERRCODE_UNDEFINED_TABLE), errmsg("relation \"%s\" does not exist", relation->relname)));
+                ereport(ERROR, (errcode(PG_ERRCODE_UNDEFINED_TABLE), errmsg("relation \"%s\" does not exist", relation->relname)));
         }
     }
 
@@ -1011,7 +1013,7 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
     {
         if (locking->strength >= PG_LCS_FORNOKEYUPDATE)
         {
-            Oid relid;
+            PGOid relid;
 
             relid = relation_provider->RangeVarGetRelidExtended(relation, lockmode, false, false, NULL, NULL);
 
@@ -1022,7 +1024,7 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
             if (rel->rd_rel->relkind == PG_RELKIND_MATVIEW)
                     ereport(
                         ERROR,
-                        (errcode(ERRCODE_WRONG_OBJECT_TYPE),
+                        (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
                          errmsg("cannot lock rows in materialized view \"%s\"", RelationGetRelationName(rel))));
 
             lockmode = relation_provider->IsSystemRelation(rel) ? RowExclusiveLock : ExclusiveLock;
@@ -1127,7 +1129,7 @@ RelationParser::addRangeTableEntryForSubquery(PGParseState *pstate,
 	}
 	if (varattno < numaliases)
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+				(errcode(PG_ERRCODE_INVALID_COLUMN_REFERENCE),
 				 errmsg("table \"%s\" has %d columns available but %d columns specified",
 						refname, varattno, numaliases)));
 
@@ -1189,7 +1191,7 @@ RelationParser::checkNameSpaceConflicts(PGParseState *pstate, PGList *namespace1
 				rte1->relid != rte2->relid)
 				continue;		/* no conflict per SQL rule */
 			ereport(ERROR,
-					(errcode(ERRCODE_DUPLICATE_ALIAS),
+					(errcode(PG_ERRCODE_DUPLICATE_ALIAS),
 					 errmsg("table name \"%s\" specified more than once",
 							aliasname1)));
 		}
@@ -1250,7 +1252,7 @@ RelationParser::getLockedRefname(PGParseState *pstate, const char *refname)
 };
 
 PGRangeTblEntry *
-RelationParser::scanNameSpaceForRelid(PGParseState *pstate, Oid relid, int location)
+RelationParser::scanNameSpaceForRelid(PGParseState *pstate, PGOid relid, int location)
 {
 	PGRangeTblEntry *result = NULL;
 	PGListCell   *l;
@@ -1276,7 +1278,7 @@ RelationParser::scanNameSpaceForRelid(PGParseState *pstate, Oid relid, int locat
 			{
 				parser_errposition(pstate, location);
 				ereport(ERROR,
-						(errcode(ERRCODE_AMBIGUOUS_ALIAS),
+						(errcode(PG_ERRCODE_AMBIGUOUS_ALIAS),
 						 errmsg("table reference %u is ambiguous",
 								relid)));
 			}
@@ -1299,7 +1301,7 @@ RelationParser::check_lateral_ref_ok(PGParseState *pstate, PGParseNamespaceItem 
 
 		parser_errposition(pstate, location);
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+				(errcode(PG_ERRCODE_INVALID_COLUMN_REFERENCE),
 				 errmsg("invalid reference to FROM-clause entry for table \"%s\"",
 						refname),
 				 (rte == pstate->p_target_rangetblentry) ?
@@ -1333,7 +1335,7 @@ RelationParser::scanNameSpaceForRefname(PGParseState *pstate, const char *refnam
 			{
 				parser_errposition(pstate, location);
 				ereport(ERROR,
-						(errcode(ERRCODE_AMBIGUOUS_ALIAS),
+						(errcode(PG_ERRCODE_AMBIGUOUS_ALIAS),
 						 errmsg("table reference \"%s\" is ambiguous",
 								refname)));
 			}
@@ -1351,14 +1353,14 @@ RelationParser::refnameRangeTblEntry(PGParseState *pstate,
 					 int location,
 					 int *sublevels_up)
 {
-	Oid			relId = InvalidOid;
+	PGOid			relId = InvalidOid;
 
 	if (sublevels_up)
 		*sublevels_up = 0;
 
 	if (schemaname != NULL)
 	{
-		Oid			namespaceId;
+		PGOid			namespaceId;
 
 		/*
 		 * We can use LookupNamespaceNoError() here because we are only
@@ -1418,7 +1420,7 @@ RelationParser::addRangeTableEntryForJoin(PGParseState *pstate,
 	 */
 	if (list_length(aliasvars) > MaxAttrNumber)
 		ereport(ERROR,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+				(errcode(PG_ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 				 errmsg("joins can have at most %d columns",
 						MaxAttrNumber)));
 
@@ -1554,7 +1556,7 @@ RelationParser::markRTEForSelectPriv(PGParseState *pstate, PGRangeTblEntry *rte,
 void
 RelationParser::markVarForSelectPriv(PGParseState *pstate, PGVar *var, PGRangeTblEntry *rte)
 {
-	Index		lv;
+	PGIndex		lv;
 
 	Assert(IsA(var, PGVar))
 	/* Find the appropriate pstate if it's an uplevel Var */
@@ -1602,7 +1604,7 @@ PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate,
             if (result)
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_AMBIGUOUS_COLUMN),
+                    (errcode(PG_ERRCODE_AMBIGUOUS_COLUMN),
                      errmsg("column reference \"%s\" is ambiguous", colname),
                      parser_errposition(pstate, location)));
             var = node_parser->make_var(pstate, rte, attnum, location);
@@ -1708,7 +1710,7 @@ RelationParser::colNameToVar(PGParseState *pstate, const char *colname, bool loc
                 if (result)
                     ereport(
                         ERROR,
-                        (errcode(ERRCODE_AMBIGUOUS_COLUMN),
+                        (errcode(PG_ERRCODE_AMBIGUOUS_COLUMN),
                          errmsg("column reference \"%s\" is ambiguous", colname),
                          parser_errposition(pstate, location)));
                 check_lateral_ref_ok(pstate, nsitem, location);
@@ -1726,14 +1728,14 @@ RelationParser::colNameToVar(PGParseState *pstate, const char *colname, bool loc
 };
 
 bool
-RelationParser::isSimplyUpdatableRelation(Oid relid, bool noerror)
+RelationParser::isSimplyUpdatableRelation(PGOid relid, bool noerror)
 {
     bool return_value = true;
 
     if (!OidIsValid(relid))
     {
         if (!noerror)
-            ereport(ERROR, (errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("Invalid oid: %d is not simply updatable", relid)));
+            ereport(ERROR, (errcode(PG_ERRCODE_UNDEFINED_OBJECT), errmsg("Invalid oid: %d is not simply updatable", relid)));
         return false;
     }
 
@@ -1748,7 +1750,7 @@ RelationParser::isSimplyUpdatableRelation(Oid relid, bool noerror)
         if (rel->rd_rel->relkind == PG_RELKIND_VIEW)
         {
             if (!noerror)
-                ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("WHERE CURRENT OF on a view is not implemented")));
+                ereport(ERROR, (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("WHERE CURRENT OF on a view is not implemented")));
             return_value = false;
             break;
         }
@@ -1758,7 +1760,7 @@ RelationParser::isSimplyUpdatableRelation(Oid relid, bool noerror)
             if (!noerror)
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("\"%s\" is not simply updatable", RelationGetRelationName(rel))));
+                    (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("\"%s\" is not simply updatable", RelationGetRelationName(rel))));
             return_value = false;
             break;
         }
@@ -1768,7 +1770,7 @@ RelationParser::isSimplyUpdatableRelation(Oid relid, bool noerror)
             if (!noerror)
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("\"%s\" is not simply updatable", RelationGetRelationName(rel))));
+                    (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("\"%s\" is not simply updatable", RelationGetRelationName(rel))));
             return_value = false;
             break;
         }
@@ -1784,7 +1786,7 @@ RelationParser::isSimplyUpdatableRelation(Oid relid, bool noerror)
             if (!noerror)
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("\"%s\" is not simply updatable", RelationGetRelationName(rel))));
+                    (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("\"%s\" is not simply updatable", RelationGetRelationName(rel))));
             return_value = false;
             break;
         }
@@ -1855,7 +1857,7 @@ int32 * RelationParser::getValuesTypmods(PGRangeTblEntry * rte)
 
 void
 RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum,
-					   Oid *vartype, int32 *vartypmod, Oid *varcollid)
+					   PGOid *vartype, int32 *vartypmod, PGOid *varcollid)
 {
     switch (rte->rtekind)
     {
@@ -1872,7 +1874,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
             if (tp->attisdropped)
                     ereport(
                         ERROR,
-                        (errcode(ERRCODE_UNDEFINED_COLUMN),
+                        (errcode(PG_ERRCODE_UNDEFINED_COLUMN),
                          errmsg("column \"%s\" of relation \"%s\" does not exist", tp->attname.c_str(), relation_provider->get_rel_name(rte->relid).c_str())));
             *vartype = tp->atttypid;
             *vartypmod = tp->atttypmod;
@@ -1904,7 +1906,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
 
                     if (attnum > atts_done && attnum <= atts_done + rtfunc->funccolcount)
                     {
-                        Oid funcrettype;
+                        PGOid funcrettype;
                         PGTupleDescPtr tupdesc = nullptr;
 
                         attnum -= atts_done; /* now relative to this func */
@@ -1925,7 +1927,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
                             if (att_tup->attisdropped)
                                 ereport(
                                     ERROR,
-                                    (errcode(ERRCODE_UNDEFINED_COLUMN),
+                                    (errcode(PG_ERRCODE_UNDEFINED_COLUMN),
                                      errmsg(
                                          "column \"%s\" of relation \"%s\" does not exist",
                                          att_tup->attname.c_str(),
@@ -1972,7 +1974,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
             /* this probably can't happen ... */
             ereport(
                 ERROR,
-                (errcode(ERRCODE_UNDEFINED_COLUMN), errmsg("column %d of relation \"%s\" does not exist", attnum, rte->eref->aliasname)));
+                (errcode(PG_ERRCODE_UNDEFINED_COLUMN), errmsg("column %d of relation \"%s\" does not exist", attnum, rte->eref->aliasname)));
         }
         break;
         case PG_RTE_VALUES: {
@@ -2107,7 +2109,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
         PGList * coldeflist = (PGList *)lfirst(lc3);
         PGRangeTblFunction * rtfunc = makeNode(PGRangeTblFunction);
         TypeFuncClass functypclass;
-        Oid funcrettype;
+        PGOid funcrettype;
 
         /* Initialize RangeTblFunction node */
         rtfunc->funcexpr = funcexpr;
@@ -2252,7 +2254,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
             if (functypclass != TYPEFUNC_RECORD)
                     ereport(
                         ERROR,
-                        (errcode(ERRCODE_SYNTAX_ERROR),
+                        (errcode(PG_ERRCODE_SYNTAX_ERROR),
                          errmsg("a column definition list is only allowed for functions returning \"record\""),
                          parser_errposition(pstate, exprLocation((PGNode *)coldeflist))));
         }
@@ -2261,7 +2263,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
             if (functypclass == TYPEFUNC_RECORD)
                     ereport(
                         ERROR,
-                        (errcode(ERRCODE_SYNTAX_ERROR),
+                        (errcode(PG_ERRCODE_SYNTAX_ERROR),
                          errmsg("a column definition list is required for functions returning \"record\""),
                          parser_errposition(pstate, exprLocation(funcexpr))));
         }
@@ -2291,7 +2293,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
             {
                     PGColumnDef * n = (PGColumnDef *)lfirst(col);
                     char * attrname;
-                    Oid attrtype;
+                    PGOid attrtype;
                     int32 attrtypmod;
 					//TODO kindred
                     //Oid attrcollation;
@@ -2300,7 +2302,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
                     if (n->typeName->setof)
                         ereport(
                             ERROR,
-                            (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+                            (errcode(PG_ERRCODE_INVALID_TABLE_DEFINITION),
                              errmsg("column \"%s\" cannot be declared SETOF", attrname),
                              parser_errposition(pstate, n->location)));
                     type_parser->typenameTypeIdAndMod(pstate, n->typeName, &attrtype, &attrtypmod);
@@ -2325,7 +2327,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
         else
             ereport(
                 ERROR,
-                (errcode(ERRCODE_DATATYPE_MISMATCH),
+                (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
                  errmsg("function \"%s\" in FROM has unsupported return type %s", funcname, type_provider->format_type_be(funcrettype).c_str()),
                  parser_errposition(pstate, exprLocation(funcexpr))));
 

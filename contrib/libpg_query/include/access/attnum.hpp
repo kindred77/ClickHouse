@@ -15,6 +15,8 @@
 
 #include <cstdint>
 
+namespace duckdb_libpgquery {
+
 /*
  * user defined attribute numbers start at 1.   -ay 2/95
  */
@@ -60,3 +62,5 @@ typedef int16_t PGAttrNumber;
  */
 #define AttrOffsetGetAttrNumber(attributeOffset) \
 	 ((PGAttrNumber) (1 + (attributeOffset)))
+
+}

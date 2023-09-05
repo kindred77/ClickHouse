@@ -1,6 +1,5 @@
 #include <Interpreters/orcaopt/SelectParser.h>
 
-#include <Interpreters/orcaopt/walkers.h>
 #include <Interpreters/orcaopt/ClauseParser.h>
 #include <Interpreters/orcaopt/CoerceParser.h>
 #include <Interpreters/orcaopt/TargetParser.h>
@@ -13,16 +12,6 @@
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 
 #include <Interpreters/Context.h>
-
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wswitch"
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wsometimes-uninitialized"
-#else
-#pragma GCC diagnostic ignored "-Wswitch"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wsometimes-uninitialized"
-#endif
 
 using namespace duckdb_libpgquery;
 
@@ -184,7 +173,7 @@ void SelectParser::init_grouped_window_context(grouped_window_ctx * ctx, PGQuery
     PGList * grp_sortops;
     PGList * grp_eqops;
     PGListCell * lc = NULL;
-    Index maxsgr = 0;
+    PGIndex maxsgr = 0;
 
     pg_get_sortgroupclauses_tles(qry->groupClause, qry->targetList, &grp_tles, &grp_sortops, &grp_eqops);
     list_free(grp_sortops);
@@ -200,11 +189,11 @@ void SelectParser::init_grouped_window_context(grouped_window_ctx * ctx, PGQuery
 
     /* Map input = outer query sortgroupref values to subquery values while building the
 	 * subquery target list prefix. */
-    ctx->sgr_map = (Index *)palloc((maxsgr + 1) * sizeof(ctx->sgr_map[0]));
+    ctx->sgr_map = (PGIndex *)palloc((maxsgr + 1) * sizeof(ctx->sgr_map[0]));
     foreach (lc, grp_tles)
     {
         PGTargetEntry * tle;
-        Index old_sgr;
+        PGIndex old_sgr;
 
         tle = (PGTargetEntry *)copyObject(lfirst(lc));
         old_sgr = tle->ressortgroupref;
@@ -395,7 +384,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
     if (stmt->intoClause)
         ereport(
             ERROR,
-            (errcode(ERRCODE_SYNTAX_ERROR),
+            (errcode(PG_ERRCODE_SYNTAX_ERROR),
              errmsg("SELECT ... INTO is not allowed here"),
              parser_errposition(pstate, exprLocation((PGNode *)stmt->intoClause))));
 

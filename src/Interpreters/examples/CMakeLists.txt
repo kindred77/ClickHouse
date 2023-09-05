@@ -38,3 +38,6 @@ target_link_libraries (two_level_hash_map PRIVATE dbms)
 
 add_executable (jit_example jit_example.cpp)
 target_link_libraries (jit_example PRIVATE dbms)
+
+add_executable (gporca_test gporca_test.cpp)
+target_link_libraries (gporca_test PRIVATE dbms)

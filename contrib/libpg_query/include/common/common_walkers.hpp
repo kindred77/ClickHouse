@@ -1,6 +1,9 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include "common/common_macro.hpp"
+#include "common/common_def.hpp"
+
+namespace duckdb_libpgquery {
 
 extern duckdb_libpgquery::PGTargetEntry *
 tlist_member(duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList *targetlist);
@@ -13,11 +16,11 @@ struct contain_aggs_of_level_context
 struct assign_collations_context
 {
 	PGParseState *pstate;			/* parse state (for error reporting) */
-	Oid			collation;		/* OID of current collation, if any */
+	PGOid			collation;		/* OID of current collation, if any */
 	CollateStrength strength;	/* strength of current collation choice */
 	int			location;		/* location of expr that set collation */
 	/* Remaining fields are only valid when strength == COLLATE_CONFLICT */
-	Oid			collation2;		/* OID of conflicting collation */
+	PGOid			collation2;		/* OID of conflicting collation */
 	int			location2;		/* location of expr that set collation2 */
 };
 
@@ -223,7 +226,7 @@ contain_vars_of_level(duckdb_libpgquery::PGNode *node, int levelsup);
 struct winref_check_ctx
 {
     PGParseState * pstate;
-    Index winref;
+    PGIndex winref;
     bool has_order;
     bool has_frame;
 };
@@ -243,7 +246,7 @@ extern bool winref_checkspec_walker(duckdb_libpgquery::PGNode * node, void * ctx
  * but we need to do this here after all the transformations
  * (especially parent inheritance) was done.
  */
-extern bool winref_checkspec(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist, Index winref, bool has_order, bool has_frame);
+extern bool winref_checkspec(PGParseState * pstate, duckdb_libpgquery::PGList * targetlist, PGIndex winref, bool has_order, bool has_frame);
 
 struct check_table_func_context
 {
@@ -299,13 +302,13 @@ pg_get_sortgroupclauses_tles(duckdb_libpgquery::PGList *clauses, duckdb_libpgque
 
 struct maxSortGroupRef_context
 {
-	Index maxsgr;
+	PGIndex maxsgr;
 	bool include_orderedagg;
 };
 
 extern bool maxSortGroupRef_walker(duckdb_libpgquery::PGNode *node, maxSortGroupRef_context *cxt);
 
-extern Index maxSortGroupRef(duckdb_libpgquery::PGList *targetlist, bool include_orderedagg);
+extern PGIndex maxSortGroupRef(duckdb_libpgquery::PGList *targetlist, bool include_orderedagg);
 
 extern char * generate_positional_name(PGAttrNumber attrno);
 
@@ -329,3 +332,5 @@ struct pg_find_nodes_context
 
 extern bool
 pg_find_nodes_walker(duckdb_libpgquery::PGNode *node, pg_find_nodes_context *context);
+
+}

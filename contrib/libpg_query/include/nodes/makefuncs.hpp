@@ -26,7 +26,7 @@ PGVar *makeVar(PGIndex varno, PGAttrNumber varattno, PGOid vartype, int32_t vart
 
 PGVar *makeVarFromTargetEntry(PGIndex varno, PGTargetEntry *tle);
 
-PGVar *makeWholeRowVar(PGRangeTblEntry *rte, PGIndex varno, PGIndex varlevelsup, bool allowScalar);
+PGVar *makeWholeRowVar(PGRangeTblEntry *rte, PGIndex varno, PGIndex varlevelsup, bool allowScalar, PGOid relTypeOid = InvalidOid, bool isRowType = false);
 
 PGTargetEntry *makeTargetEntry(PGExpr *expr, PGAttrNumber resno, char *resname, bool resjunk);
 
@@ -37,7 +37,7 @@ PGFromExpr *makeFromExpr(PGList *fromlist, PGNode *quals);
 PGConst *makeConst(PGOid consttype, int32_t consttypmod, PGOid constcollid, int constlen, PGDatum constvalue,
                    bool constisnull, bool constbyval);
 
-PGConst *makeNullConst(PGOid consttype, int32_t consttypmod, PGOid constcollid);
+PGConst *makeNullConst(int16_t typLen, bool typByVal, PGOid consttype, int32_t consttypmod, PGOid constcollid);
 
 PGNode *makeBoolConst(bool value, bool isnull);
 

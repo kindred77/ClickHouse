@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -50,66 +50,66 @@ public:
 	explicit ClauseParser(const ContextPtr& context_);
     
     void
-    transformFromClause(PGParseState *pstate, duckdb_libpgquery::PGList *frmList);
+    transformFromClause(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *frmList);
 
     duckdb_libpgquery::PGNode *
-    transformWhereClause(PGParseState *pstate, duckdb_libpgquery::PGNode *clause,
-					 PGParseExprKind exprKind, const char *constructName);
+    transformWhereClause(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *clause,
+					 duckdb_libpgquery::PGParseExprKind exprKind, const char *constructName);
     
     duckdb_libpgquery::PGTargetEntry *
-    findTargetlistEntrySQL99(PGParseState *pstate, duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList **tlist,
-						 PGParseExprKind exprKind);
+    findTargetlistEntrySQL99(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList **tlist,
+						 duckdb_libpgquery::PGParseExprKind exprKind);
 
     duckdb_libpgquery::PGTargetEntry *
-    findTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList **tlist,
-						 PGParseExprKind exprKind);
+    findTargetlistEntrySQL92(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *node, duckdb_libpgquery::PGList **tlist,
+						 duckdb_libpgquery::PGParseExprKind exprKind);
 
     duckdb_libpgquery::PGList *
-    addTargetToSortList(PGParseState * pstate, duckdb_libpgquery::PGTargetEntry * tle,
+    addTargetToSortList(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGTargetEntry * tle,
         duckdb_libpgquery::PGList * sortlist, duckdb_libpgquery::PGList * targetlist,
         duckdb_libpgquery::PGSortBy * sortby, bool resolveUnknown);
 
     duckdb_libpgquery::PGList * transformSortClause(
-        PGParseState * pstate,
+        duckdb_libpgquery::PGParseState * pstate,
         duckdb_libpgquery::PGList * orderlist,
         duckdb_libpgquery::PGList ** targetlist,
-        PGParseExprKind exprKind, bool resolveUnknown, bool useSQL99);
+        duckdb_libpgquery::PGParseExprKind exprKind, bool resolveUnknown, bool useSQL99);
 
-    duckdb_libpgquery::PGRangeTblEntry * transformCTEReference(PGParseState * pstate,
-        duckdb_libpgquery::PGRangeVar * r, duckdb_libpgquery::PGCommonTableExpr * cte, Index levelsup);
+    duckdb_libpgquery::PGRangeTblEntry * transformCTEReference(duckdb_libpgquery::PGParseState * pstate,
+        duckdb_libpgquery::PGRangeVar * r, duckdb_libpgquery::PGCommonTableExpr * cte, duckdb_libpgquery::PGIndex levelsup);
 
-    duckdb_libpgquery::PGRangeTblEntry * transformRangeFunction(PGParseState * pstate, duckdb_libpgquery::PGRangeFunction * r);
+    duckdb_libpgquery::PGRangeTblEntry * transformRangeFunction(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGRangeFunction * r);
 
     duckdb_libpgquery::PGNode *
-    transformFromClauseItem(PGParseState *pstate, duckdb_libpgquery::PGNode *n,
+    transformFromClauseItem(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *n,
 						duckdb_libpgquery::PGRangeTblEntry **top_rte, int *top_rti,
 						duckdb_libpgquery::PGList **namespace_ptr);
 
     duckdb_libpgquery::PGRangeTblEntry *
-    transformTableEntry(PGParseState *pstate, duckdb_libpgquery::PGRangeVar *r);
+    transformTableEntry(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGRangeVar *r);
 
-    PGParseNamespaceItem *
+    duckdb_libpgquery::PGParseNamespaceItem *
     makeNamespaceItem(duckdb_libpgquery::PGRangeTblEntry *rte, bool rel_visible, bool cols_visible,
 				  bool lateral_only, bool lateral_ok);
 
     duckdb_libpgquery::PGRangeTblEntry *
-    transformRangeSubselect(PGParseState *pstate, duckdb_libpgquery::PGRangeSubselect *r);
+    transformRangeSubselect(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGRangeSubselect *r);
 
     void
     setNamespaceLateralState(duckdb_libpgquery::PGList *namespace_ptr,
                     bool lateral_only, bool lateral_ok);
 
     duckdb_libpgquery::PGNode *
-    buildMergedJoinVar(PGParseState *pstate, duckdb_libpgquery::PGJoinType jointype,
+    buildMergedJoinVar(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGJoinType jointype,
 				   duckdb_libpgquery::PGVar *l_colvar, duckdb_libpgquery::PGVar *r_colvar);
 
     duckdb_libpgquery::PGNode *
-    transformJoinUsingClause(PGParseState *pstate,
+    transformJoinUsingClause(duckdb_libpgquery::PGParseState *pstate,
 						 duckdb_libpgquery::PGRangeTblEntry *leftRTE, duckdb_libpgquery::PGRangeTblEntry *rightRTE,
 						 duckdb_libpgquery::PGList *leftVars, duckdb_libpgquery::PGList *rightVars);
     
     duckdb_libpgquery::PGNode *
-    transformJoinOnClause(PGParseState *pstate, duckdb_libpgquery::PGJoinExpr *j, duckdb_libpgquery::PGList *namespace_ptr);
+    transformJoinOnClause(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGJoinExpr *j, duckdb_libpgquery::PGList *namespace_ptr);
 
     void
     extractRemainingColumns(duckdb_libpgquery::PGList *common_colnames,
@@ -120,88 +120,88 @@ public:
     setNamespaceColumnVisibility(duckdb_libpgquery::PGList *namespace_ptr, bool cols_visible);
 
     void
-    checkTargetlistEntrySQL92(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
-						  PGParseExprKind exprKind);
+    checkTargetlistEntrySQL92(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
+						  duckdb_libpgquery::PGParseExprKind exprKind);
 
     bool
-    targetIsInSortList(duckdb_libpgquery::PGTargetEntry *tle, Oid sortop, duckdb_libpgquery::PGList *sortList);
+    targetIsInSortList(duckdb_libpgquery::PGTargetEntry *tle, duckdb_libpgquery::PGOid sortop, duckdb_libpgquery::PGList *sortList);
 
-    Index
+    duckdb_libpgquery::PGIndex
     assignSortGroupRef(duckdb_libpgquery::PGTargetEntry *tle, duckdb_libpgquery::PGList *tlist);
 
     duckdb_libpgquery::PGList *
-    addTargetToGroupList(PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
+    addTargetToGroupList(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGTargetEntry *tle,
 					 duckdb_libpgquery::PGList *grouplist,
                      duckdb_libpgquery::PGList *targetlist, int location);
 
     duckdb_libpgquery::PGList *
-    transformDistinctClause(PGParseState *pstate,
+    transformDistinctClause(duckdb_libpgquery::PGParseState *pstate,
 						duckdb_libpgquery::PGList **targetlist,
                         duckdb_libpgquery::PGList *sortClause, bool is_agg);
 
     void freeGroupList(duckdb_libpgquery::PGList * grouplist);
 
-    duckdb_libpgquery::PGList * transformRowExprToGroupClauses(PGParseState * pstate,
+    duckdb_libpgquery::PGList * transformRowExprToGroupClauses(duckdb_libpgquery::PGParseState * pstate,
         duckdb_libpgquery::PGRowExpr * rowexpr, duckdb_libpgquery::PGList * groupsets,
         duckdb_libpgquery::PGList * targetList);
 
     duckdb_libpgquery::PGList * reorderGroupList(duckdb_libpgquery::PGList * grouplist);
 
     duckdb_libpgquery::PGList * findListTargetlistEntries(
-        PGParseState * pstate, duckdb_libpgquery::PGNode * node,
+        duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGNode * node,
         duckdb_libpgquery::PGList ** tlist, bool in_grpext, bool ignore_in_grpext,
-        PGParseExprKind exprKind, bool useSQL99);
+        duckdb_libpgquery::PGParseExprKind exprKind, bool useSQL99);
 
     duckdb_libpgquery::PGList * transformGroupClause(
-        PGParseState * pstate, duckdb_libpgquery::PGList * grouplist,
+        duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGList * grouplist,
         duckdb_libpgquery::PGList ** targetlist, duckdb_libpgquery::PGList * sortClause,
-        PGParseExprKind exprKind, bool useSQL99);
+        duckdb_libpgquery::PGParseExprKind exprKind, bool useSQL99);
 
     duckdb_libpgquery::PGList *
-    transformDistinctOnClause(PGParseState *pstate, duckdb_libpgquery::PGList *distinctlist,
+    transformDistinctOnClause(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *distinctlist,
 						  duckdb_libpgquery::PGList **targetlist,
                           duckdb_libpgquery::PGList *sortClause);
 
     duckdb_libpgquery::PGNode * transformFrameOffset(
-        PGParseState * pstate, int frameOptions,
+        duckdb_libpgquery::PGParseState * pstate, int frameOptions,
         duckdb_libpgquery::PGNode * clause,
         duckdb_libpgquery::PGList * orderClause,
         duckdb_libpgquery::PGList * targetlist, bool isFollowing, int location);
 
-    duckdb_libpgquery::PGTargetEntry * getTargetBySortGroupRef(Index ref, duckdb_libpgquery::PGList * tl);
+    duckdb_libpgquery::PGTargetEntry * getTargetBySortGroupRef(duckdb_libpgquery::PGIndex ref, duckdb_libpgquery::PGList * tl);
 
     duckdb_libpgquery::PGNode *
-    transformLimitClause(PGParseState *pstate, duckdb_libpgquery::PGNode *clause,
-					 PGParseExprKind exprKind, const char *constructName);
+    transformLimitClause(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *clause,
+					 duckdb_libpgquery::PGParseExprKind exprKind, const char *constructName);
 
     duckdb_libpgquery::PGList *
-    transformWindowDefinitions(PGParseState *pstate,
+    transformWindowDefinitions(duckdb_libpgquery::PGParseState *pstate,
 						   duckdb_libpgquery::PGList *windowdefs,
 						   duckdb_libpgquery::PGList **targetlist);
 
     duckdb_libpgquery::PGNode *
     flatten_grouping_sets(duckdb_libpgquery::PGNode *expr, bool toplevel, bool *hasGroupingSets);
 
-    Index
+    duckdb_libpgquery::PGIndex
     transformGroupClauseExpr(duckdb_libpgquery::PGList **flatresult,
                         duckdb_libpgquery::PGBitmapset *seen_local,
-						PGParseState *pstate, duckdb_libpgquery::PGNode *gexpr,
+						duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *gexpr,
 						duckdb_libpgquery::PGList **targetlist,
                         duckdb_libpgquery::PGList *sortClause,
-						PGParseExprKind exprKind, bool useSQL99, bool toplevel);
+						duckdb_libpgquery::PGParseExprKind exprKind, bool useSQL99, bool toplevel);
 
     duckdb_libpgquery::PGList *
     transformGroupClauseList(duckdb_libpgquery::PGList **flatresult,
-						 PGParseState *pstate, duckdb_libpgquery::PGList *list,
+						 duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *list,
 						 duckdb_libpgquery::PGList **targetlist,
                          duckdb_libpgquery::PGList *sortClause,
-						 PGParseExprKind exprKind, bool useSQL99, bool toplevel);
+						 duckdb_libpgquery::PGParseExprKind exprKind, bool useSQL99, bool toplevel);
 
     duckdb_libpgquery::PGNode *
     transformGroupingSet(duckdb_libpgquery::PGList **flatresult,
-					 PGParseState *pstate, duckdb_libpgquery::PGGroupingSet *gset,
+					 duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGGroupingSet *gset,
 					 duckdb_libpgquery::PGList **targetlist, duckdb_libpgquery::PGList *sortClause,
-					 PGParseExprKind exprKind, bool useSQL99, bool toplevel);
+					 duckdb_libpgquery::PGParseExprKind exprKind, bool useSQL99, bool toplevel);
 
     duckdb_libpgquery::PGWindowClause *
     findWindowClause(duckdb_libpgquery::PGList *wclist, const char *name);
@@ -211,20 +211,20 @@ public:
                     duckdb_libpgquery::PGList *exprs);
 
     void
-    checkExprIsVarFree(PGParseState *pstate, duckdb_libpgquery::PGNode *n, const char *constructName);
+    checkExprIsVarFree(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGNode *n, const char *constructName);
 
     duckdb_libpgquery::PGSortGroupClause * make_group_clause(duckdb_libpgquery::PGTargetEntry * tle,
-        duckdb_libpgquery::PGList * targetlist, Oid eqop, Oid sortop, bool nulls_first, bool hashable);
+        duckdb_libpgquery::PGList * targetlist, duckdb_libpgquery::PGOid eqop, duckdb_libpgquery::PGOid sortop, bool nulls_first, bool hashable);
 
     duckdb_libpgquery::PGList * create_group_clause(duckdb_libpgquery::PGList * tlist_group,
         duckdb_libpgquery::PGList * targetlist, duckdb_libpgquery::PGList * sortClause,
         duckdb_libpgquery::PGList ** tlist_remainder);
 
-    duckdb_libpgquery::PGList * transformDistinctToGroupBy(PGParseState * pstate,
+    duckdb_libpgquery::PGList * transformDistinctToGroupBy(duckdb_libpgquery::PGParseState * pstate,
         duckdb_libpgquery::PGList ** targetlist, duckdb_libpgquery::PGList ** sortClause,
         duckdb_libpgquery::PGList ** groupClause);
 
-    void processExtendedGrouping(PGParseState * pstate, duckdb_libpgquery::PGNode * havingQual,
+    void processExtendedGrouping(duckdb_libpgquery::PGParseState * pstate, duckdb_libpgquery::PGNode * havingQual,
         duckdb_libpgquery::PGList * windowClause, duckdb_libpgquery::PGList * targetlist);
 };
 

@@ -17,6 +17,7 @@
 
 using namespace gpdxl;
 using namespace gpos;
+using namespace duckdb_libpgquery;
 
 //---------------------------------------------------------------------------
 //	@function:

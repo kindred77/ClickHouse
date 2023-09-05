@@ -20,12 +20,6 @@
 
 #include <Interpreters/Context.h>
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#else
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -374,19 +368,19 @@ FunctionProvider::FunctionProvider(const ContextPtr& context_) : context(context
 //     return result;
 // };
 
-Datum FunctionProvider::OidInputFunctionCall(Oid functionId, const char * str, Oid typioparam, int32 typmod)
+PGDatum FunctionProvider::OidInputFunctionCall(PGOid functionId, const char * str, PGOid typioparam, int32 typmod)
 {
     // FmgrInfo	flinfo;
 
 	// fmgr_info(functionId, &flinfo);
 	// return InputFunctionCall(&flinfo, str, typioparam, typmod);
 
-    Datum result = 0;
+    PGDatum result = 0;
     return result;
 };
 
 int FunctionProvider::get_func_arg_info(const PGProcPtr& procTup,
-    std::vector<Oid>& p_argtypes, std::vector<String>& p_argnames, std::vector<char>& p_argmodes)
+    std::vector<PGOid>& p_argtypes, std::vector<String>& p_argnames, std::vector<char>& p_argmodes)
 {
     //Form_pg_proc procStruct = (Form_pg_proc)GETSTRUCT(procTup);
     //Datum proallargtypes;
@@ -487,7 +481,7 @@ bool FunctionProvider::MatchNamedCall(const PGProcPtr& proctup, int nargs, PGLis
     int pronargs = proctup->pronargs;
     int numposargs = nargs - list_length(argnames);
     int pronallargs;
-    std::vector<Oid> p_argtypes;
+    std::vector<PGOid> p_argtypes;
     std::vector<String> p_argnames;
     std::vector<char> p_argmodes;
     bool arggiven[FUNC_MAX_ARGS];
@@ -617,7 +611,7 @@ FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argn
         //int pathpos = 0;
         bool variadic;
         bool use_defaults;
-        Oid va_elem_type;
+        PGOid va_elem_type;
         int * argnumbers = NULL;
         FuncCandidateListPtr newResult;
 
@@ -738,7 +732,7 @@ FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argn
         newResult->oid = proc_ptr->oid;
         newResult->nargs = effective_nargs;
         newResult->argnumbers = argnumbers;
-        newResult->args = new Oid[newResult->nargs];
+        newResult->args = new PGOid[newResult->nargs];
         if (argnumbers)
         {
             /* Re-order the argument types into call's logical order */
@@ -797,7 +791,7 @@ FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argn
             if (/* catlist->ordered && */ !any_special)
             {
                 /* ndargs must be 0 if !any_special */
-                if (effective_nargs == resultList->nargs && memcmp(newResult->args, resultList->args, effective_nargs * sizeof(Oid)) == 0)
+                if (effective_nargs == resultList->nargs && memcmp(newResult->args, resultList->args, effective_nargs * sizeof(PGOid)) == 0)
                 {
                     prevResult = resultList;
                 }
@@ -811,7 +805,7 @@ FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argn
                 for (prevResult = resultList; prevResult; prevResult = prevResult->next)
                 {
                     if (cmp_nargs == prevResult->nargs - prevResult->ndargs
-                        && memcmp(newResult->args, prevResult->args, cmp_nargs * sizeof(Oid)) == 0)
+                        && memcmp(newResult->args, prevResult->args, cmp_nargs * sizeof(PGOid)) == 0)
                         break;
                 }
             }
@@ -919,7 +913,7 @@ PGList * FunctionProvider::SystemFuncName(const char * name)
     return list_make1(makeString(name));
 };
 
-String FunctionProvider::get_func_result_name(Oid functionId)
+String FunctionProvider::get_func_result_name(PGOid functionId)
 {
     String result;
     // HeapTuple procTuple;

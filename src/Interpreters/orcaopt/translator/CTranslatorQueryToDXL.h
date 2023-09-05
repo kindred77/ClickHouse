@@ -16,7 +16,7 @@
 //
 //---------------------------------------------------------------------------
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 #include "gpos/base.h"
 
@@ -362,7 +362,7 @@ private:
 		IntToUlongMap *output_attno_to_colid_mapping, duckdb_libpgquery::PGList *group_clause);
 
 	// helper to check if OID is included in given array of OIDs
-	static BOOL OIDFound(Oid oid, const Oid oids[], ULONG size);
+	static BOOL OIDFound(duckdb_libpgquery::PGOid oid, const duckdb_libpgquery::PGOid oids[], ULONG size);
 
 	// check if given operator is lead() window function
 	static BOOL IsLeadWindowFunc(CDXLOperator *dxlop);

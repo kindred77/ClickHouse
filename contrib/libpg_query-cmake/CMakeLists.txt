@@ -10,13 +10,19 @@ add_library(duckdb_pg_query STATIC
             "${LIBPGQUERY_SOURCE_DIR}/postgres_parser.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/pg_functions.cpp"
 #            "${LIBPGQUERY_SOURCE_DIR}/pg_copyfuncs.cpp"
+            "${LIBPGQUERY_SOURCE_DIR}/src_backend_nodes_bitmapset.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_parser_parser.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_parser_gram.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_nodes_list.cpp"
+            "${LIBPGQUERY_SOURCE_DIR}/src_backend_nodes_funcs.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_parser_scansup.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_nodes_makefuncs.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_nodes_value.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_parser_scan.cpp"
+            "${LIBPGQUERY_SOURCE_DIR}/src_backend_common_datum.cpp"
+            "${LIBPGQUERY_SOURCE_DIR}/src_backend_common_equalfuncs.cpp"
+            "${LIBPGQUERY_SOURCE_DIR}/src_backend_common_walkers.cpp"
+            "${LIBPGQUERY_SOURCE_DIR}/src_backend_parser_common.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_common_keywords.cpp")
 
 target_include_directories(

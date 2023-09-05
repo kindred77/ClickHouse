@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Interpreters/orcaopt/parser_common.h>
+#include <common/parser_common.hpp>
 
 namespace DB
 {
@@ -33,55 +33,55 @@ private:
 public:
 	explicit TypeParser(const ContextPtr& context_);
 
-    Oid typenameTypeId(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName);
+    duckdb_libpgquery::PGOid typenameTypeId(duckdb_libpgquery::PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName);
 
     void
-    typenameTypeIdAndMod(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName,
-					 Oid *typeid_p, int32 *typmod_p);
+    typenameTypeIdAndMod(duckdb_libpgquery::PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName,
+					 duckdb_libpgquery::PGOid *typeid_p, duckdb_libpgquery::int32 *typmod_p);
     
-    PGTypePtr
-    typenameType(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, int32 *typmod_p);
+    duckdb_libpgquery::PGTypePtr
+    typenameType(duckdb_libpgquery::PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, duckdb_libpgquery::int32 *typmod_p);
 
-    PGTypePtr LookupTypeName(PGParseState * pstate, const duckdb_libpgquery::PGTypeName * typeName,
-        int32 * typmod_p, bool missing_ok);
+    duckdb_libpgquery::PGTypePtr LookupTypeName(duckdb_libpgquery::PGParseState * pstate, const duckdb_libpgquery::PGTypeName * typeName,
+        duckdb_libpgquery::int32 * typmod_p, bool missing_ok);
 
-    PGTypePtr LookupTypeNameExtended(PGParseState * pstate, const duckdb_libpgquery::PGTypeName * typeName,
-        int32 * typmod_p, bool temp_ok, bool missing_ok);
+    duckdb_libpgquery::PGTypePtr LookupTypeNameExtended(duckdb_libpgquery::PGParseState * pstate, const duckdb_libpgquery::PGTypeName * typeName,
+        duckdb_libpgquery::int32 * typmod_p, bool temp_ok, bool missing_ok);
 
     std::string
     TypeNameToString(const duckdb_libpgquery::PGTypeName *typeName);
 
-    int32
-    typenameTypeMod(PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, PGTypePtr typ);
+    duckdb_libpgquery::int32
+    typenameTypeMod(duckdb_libpgquery::PGParseState *pstate, const duckdb_libpgquery::PGTypeName *typeName, duckdb_libpgquery::PGTypePtr typ);
 
-    PGTypePtr
-    typeidType(Oid id);
+    duckdb_libpgquery::PGTypePtr
+    typeidType(duckdb_libpgquery::PGOid id);
 
-    Oid
-    typeTypeCollation(PGTypePtr typ);
+    duckdb_libpgquery::PGOid
+    typeTypeCollation(duckdb_libpgquery::PGTypePtr typ);
 
-    int16
-    typeLen(PGTypePtr t);
+    duckdb_libpgquery::int16
+    typeLen(duckdb_libpgquery::PGTypePtr t);
 
     bool
-    typeByVal(PGTypePtr t);
+    typeByVal(duckdb_libpgquery::PGTypePtr t);
 
-    Datum
-    stringTypeDatum(PGTypePtr tp, const char *str, int32 atttypmod);
+    duckdb_libpgquery::Datum
+    stringTypeDatum(duckdb_libpgquery::PGTypePtr tp, const char *str, duckdb_libpgquery::int32 atttypmod);
 
-    Oid
-    typeOrDomainTypeRelid(Oid type_id);
+    duckdb_libpgquery::PGOid
+    typeOrDomainTypeRelid(duckdb_libpgquery::PGOid type_id);
 
-    Oid
-    typeTypeRelid(PGTypePtr typ);
+    duckdb_libpgquery::PGOid
+    typeTypeRelid(duckdb_libpgquery::PGTypePtr typ);
 
-    Oid typeidTypeRelid(Oid type_id);
+    duckdb_libpgquery::PGOid typeidTypeRelid(duckdb_libpgquery::PGOid type_id);
 
-    Oid
-    typeTypeId(PGTypePtr tp);
+    duckdb_libpgquery::PGOid
+    typeTypeId(duckdb_libpgquery::PGTypePtr tp);
 
-    Oid
-    LookupCollation(PGParseState *pstate, duckdb_libpgquery::PGList *collnames, int location);
+    duckdb_libpgquery::PGOid
+    LookupCollation(duckdb_libpgquery::PGParseState *pstate, duckdb_libpgquery::PGList *collnames, int location);
 };
 
 }

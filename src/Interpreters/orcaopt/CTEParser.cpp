@@ -1,4 +1,5 @@
 #include <Interpreters/orcaopt/CTEParser.h>
+
 #include <Interpreters/orcaopt/RelationParser.h>
 #include <Interpreters/orcaopt/NodeParser.h>
 #include <Interpreters/orcaopt/SelectParser.h>
@@ -42,9 +43,9 @@ void CTEParser::analyzeCTETargetList(PGParseState * pstate, PGCommonTableExpr * 
     foreach (tlistitem, tlist)
     {
         PGTargetEntry * te = (PGTargetEntry *)lfirst(tlistitem);
-        Oid coltype;
+        PGOid coltype;
         int32 coltypmod;
-        Oid colcoll;
+        PGOid colcoll;
 
         if (te->resjunk)
             continue;
@@ -86,7 +87,7 @@ void CTEParser::analyzeCTETargetList(PGParseState * pstate, PGCommonTableExpr * 
     if (varattno < numaliases)
         ereport(
             ERROR,
-            (errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+            (errcode(PG_ERRCODE_INVALID_COLUMN_REFERENCE),
              errmsg("WITH query \"%s\" has %d columns available but %d columns specified", cte->ctename, varattno, numaliases),
              parser_errposition(pstate, cte->location)));
 };
@@ -117,7 +118,7 @@ void CTEParser::analyzeCTE(PGParseState * pstate, PGCommonTableExpr * cte)
     if (query->commandType != PG_CMD_SELECT && pstate->parentParseState != NULL)
         ereport(
             ERROR,
-            (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+            (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
              errmsg("WITH clause containing a data-modifying statement must be at the top level"),
              parser_errposition(pstate, cte->location)));
 
@@ -163,7 +164,7 @@ void CTEParser::analyzeCTE(PGParseState * pstate, PGCommonTableExpr * cte)
             if (exprType(texpr) != lfirst_oid(lctyp) || exprTypmod(texpr) != lfirst_int(lctypmod))
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_DATATYPE_MISMATCH),
+                    (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
                      errmsg(
                          "recursive query \"%s\" column %d has type %s in non-recursive term but type %s overall",
                          cte->ctename,
@@ -175,7 +176,7 @@ void CTEParser::analyzeCTE(PGParseState * pstate, PGCommonTableExpr * cte)
             if (exprCollation(texpr) != lfirst_oid(lccoll))
                 ereport(
                     ERROR,
-                    (errcode(ERRCODE_COLLATION_MISMATCH),
+                    (errcode(PG_ERRCODE_COLLATION_MISMATCH),
                      errmsg(
                          "recursive query \"%s\" column %d has collation \"%s\" in non-recursive term but collation \"%s\" overall",
                          cte->ctename,
@@ -208,7 +209,7 @@ CTEParser::transformWithClause(PGParseState *pstate, PGWithClause *withClause)
 	 */
 	if (withClause->recursive/*  && !gp_recursive_cte */)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("RECURSIVE clauses in WITH queries are currently disabled"),
 				 errhint("In order to use recursive CTEs, \"gp_recursive_cte\" must be turned on.")));
 
@@ -232,7 +233,7 @@ CTEParser::transformWithClause(PGParseState *pstate, PGWithClause *withClause)
 			{
 				parser_errposition(pstate, cte2->location);
 				ereport(ERROR,
-						(errcode(ERRCODE_DUPLICATE_ALIAS),
+						(errcode(PG_ERRCODE_DUPLICATE_ALIAS),
 						 errmsg("WITH query name \"%s\" specified more than once",
 								cte2->ctename)));
 			}
@@ -256,7 +257,7 @@ CTEParser::transformWithClause(PGParseState *pstate, PGWithClause *withClause)
 			 */
 			if (pstate->p_hasModifyingCTE)
 				ereport(ERROR,
-						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						(errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("only one modifying WITH clause allowed per query"),
 						 errdetail("Greenplum Database currently only support CTEs with one writable clause."),
 						 errhint("Rewrite the query to only include one writable CTE clause.")));
