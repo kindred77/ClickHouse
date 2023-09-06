@@ -20,20 +20,20 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-ExprParser::ExprParser(const ContextPtr& context_) : context(context_)
-{
-	relation_parser = std::make_shared<RelationParser>(context);
-	coerce_parser = std::make_shared<CoerceParser>(context);
-	select_parser = std::make_shared<SelectParser>(context);
-	target_parser = std::make_shared<TargetParser>(context);
-	type_parser = std::make_shared<TypeParser>(context);
-	func_parser = std::make_shared<FuncParser>(context);
-	oper_parser = std::make_shared<OperParser>(context);
-	node_parser = std::make_shared<NodeParser>(context);
-	agg_parser = std::make_shared<AggParser>(context);
-	//type_provider = std::make_shared<TypeProvider>(context);
-	//relation_provider = std::make_shared<RelationProvider>(context);
-};
+bool ExprParser::operator_precedence_warning = false;
+bool ExprParser::Transform_null_equals = false;
+// ExprParser::ExprParser(const ContextPtr& context_) : context(context_)
+// {
+// 	relation_parser = std::make_shared<RelationParser>(context);
+// 	coerce_parser = std::make_shared<CoerceParser>(context);
+// 	select_parser = std::make_shared<SelectParser>(context);
+// 	target_parser = std::make_shared<TargetParser>(context);
+// 	type_parser = std::make_shared<TypeParser>(context);
+// 	func_parser = std::make_shared<FuncParser>(context);
+// 	oper_parser = std::make_shared<OperParser>(context);
+// 	node_parser = std::make_shared<NodeParser>(context);
+// 	agg_parser = std::make_shared<AggParser>(context);
+// };
 
 bool
 ExprParser::exprIsNullConstant(PGNode *arg)
@@ -74,7 +74,7 @@ ExprParser::transformWholeRowRef(PGParseState *pstate, PGRangeTblEntry *rte, int
 	int			sublevels_up;
 
 	/* Find the RTE's rangetable location */
-	vnum = relation_parser->RTERangeTablePosn(pstate, rte, &sublevels_up);
+	vnum = RelationParser::RTERangeTablePosn(pstate, rte, &sublevels_up);
 
 	/*
 	 * Build the appropriate referencing node.  Note that if the RTE is a
@@ -103,7 +103,7 @@ ExprParser::transformWholeRowRef(PGParseState *pstate, PGRangeTblEntry *rte, int
 	result->location = location;
 
 	/* mark relation as requiring whole-row SELECT access */
-	relation_parser->markVarForSelectPriv(pstate, result, rte);
+	RelationParser::markVarForSelectPriv(pstate, result, rte);
 
 	return (PGNode *) result;
 };
@@ -169,7 +169,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             colname = strVal(field1);
 
             /* Try to identify as an unqualified column */
-            node = relation_parser->colNameToVar(pstate, colname, false, cref->location);
+            node = RelationParser::colNameToVar(pstate, colname, false, cref->location);
 
             if (node == NULL)
             {
@@ -204,7 +204,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
 					 * PostQUEL-inspired syntax.  The preferred form now is
 					 * "rel.*".
 					 */
-                rte = relation_parser->refnameRangeTblEntry(pstate, NULL, colname, cref->location, &levels_up);
+                rte = RelationParser::refnameRangeTblEntry(pstate, NULL, colname, cref->location, &levels_up);
                 if (rte)
                         node = transformWholeRowRef(pstate, rte, cref->location);
             }
@@ -218,7 +218,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             relname = strVal(field1);
 
             /* Locate the referenced RTE */
-            rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname, cref->location, &levels_up);
+            rte = RelationParser::refnameRangeTblEntry(pstate, nspname, relname, cref->location, &levels_up);
             if (rte == NULL)
             {
                 crerr = CRERR_NO_RTE;
@@ -236,12 +236,12 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             colname = strVal(field2);
 
             /* Try to identify as a column of the RTE */
-            node = relation_parser->scanRTEForColumn(pstate, rte, colname, cref->location);
+            node = RelationParser::scanRTEForColumn(pstate, rte, colname, cref->location);
             if (node == NULL)
             {
                 /* Try it as a function call on the whole row */
                 node = transformWholeRowRef(pstate, rte, cref->location);
-                node = func_parser->ParseFuncOrColumn(pstate, list_make1(makeString(colname)), list_make1(node), NULL, cref->location);
+                node = FuncParser::ParseFuncOrColumn(pstate, list_make1(makeString(colname)), list_make1(node), NULL, cref->location);
             }
             break;
         }
@@ -256,7 +256,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             relname = strVal(field2);
 
             /* Locate the referenced RTE */
-            rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname, cref->location, &levels_up);
+            rte = RelationParser::refnameRangeTblEntry(pstate, nspname, relname, cref->location, &levels_up);
             if (rte == NULL)
             {
                 crerr = CRERR_NO_RTE;
@@ -274,12 +274,12 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             colname = strVal(field3);
 
             /* Try to identify as a column of the RTE */
-            node = relation_parser->scanRTEForColumn(pstate, rte, colname, cref->location);
+            node = RelationParser::scanRTEForColumn(pstate, rte, colname, cref->location);
             if (node == NULL)
             {
                 /* Try it as a function call on the whole row */
                 node = transformWholeRowRef(pstate, rte, cref->location);
-                node = func_parser->ParseFuncOrColumn(pstate, list_make1(makeString(colname)), list_make1(node), NULL, cref->location);
+                node = FuncParser::ParseFuncOrColumn(pstate, list_make1(makeString(colname)), list_make1(node), NULL, cref->location);
             }
             break;
         }
@@ -307,7 +307,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             }
 
             /* Locate the referenced RTE */
-            rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname, cref->location, &levels_up);
+            rte = RelationParser::refnameRangeTblEntry(pstate, nspname, relname, cref->location, &levels_up);
             if (rte == NULL)
             {
                 crerr = CRERR_NO_RTE;
@@ -325,12 +325,12 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             colname = strVal(field4);
 
             /* Try to identify as a column of the RTE */
-            node = relation_parser->scanRTEForColumn(pstate, rte, colname, cref->location);
+            node = RelationParser::scanRTEForColumn(pstate, rte, colname, cref->location);
             if (node == NULL)
             {
                 /* Try it as a function call on the whole row */
                 node = transformWholeRowRef(pstate, rte, cref->location);
-                node = func_parser->ParseFuncOrColumn(pstate, list_make1(makeString(colname)), list_make1(node), NULL, cref->location);
+                node = FuncParser::ParseFuncOrColumn(pstate, list_make1(makeString(colname)), list_make1(node), NULL, cref->location);
             }
             break;
         }
@@ -371,10 +371,10 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
         switch (crerr)
         {
             case CRERR_NO_COLUMN:
-                relation_parser->errorMissingColumn(pstate, relname, colname, cref->location);
+                RelationParser::errorMissingColumn(pstate, relname, colname, cref->location);
                 break;
             case CRERR_NO_RTE:
-                relation_parser->errorMissingRTE(pstate, makeRangeVar(nspname, relname, cref->location));
+                RelationParser::errorMissingRTE(pstate, makeRangeVar(nspname, relname, cref->location));
                 break;
             case CRERR_WRONG_DB:
                 ereport(
@@ -443,7 +443,7 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 		((PGVar *) relref)->varattno == InvalidAttrNumber)
 	{
 		/* Reference the RTE by alias not by actual table name */
-		rte = relation_parser->GetRTEByRangeTablePosn(pstate,
+		rte = RelationParser::GetRTEByRangeTablePosn(pstate,
 									 ((PGVar *) relref)->varno,
 									 ((PGVar *) relref)->varlevelsup);
 		parser_errposition(pstate, location);
@@ -457,7 +457,7 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 		/* Have to do it by reference to the type of the expression */
 		PGOid			relTypeId = exprType(relref);
 
-		if (type_parser->typeOrDomainTypeRelid(relTypeId) != InvalidOid)
+		if (TypeParser::typeOrDomainTypeRelid(relTypeId) != InvalidOid)
 		{
 			parser_errposition(pstate, location);
 			ereport(ERROR,
@@ -521,10 +521,10 @@ ExprParser::transformIndirection(PGParseState *pstate, PGNode *basenode, PGList 
             /* process subscripts before this field selection */
             if (subscripts)
                 result
-                    = (PGNode *)node_parser->transformArraySubscripts(pstate, result, exprType(result), InvalidOid, exprTypmod(result), subscripts, NULL);
+                    = (PGNode *)NodeParser::transformArraySubscripts(pstate, result, exprType(result), InvalidOid, exprTypmod(result), subscripts, NULL);
             subscripts = NIL;
 
-            newresult = func_parser->ParseFuncOrColumn(pstate, list_make1(n), list_make1(result), NULL, location);
+            newresult = FuncParser::ParseFuncOrColumn(pstate, list_make1(n), list_make1(result), NULL, location);
             if (newresult == NULL)
                 unknown_attribute(pstate, result, strVal(n), location);
             result = newresult;
@@ -532,7 +532,7 @@ ExprParser::transformIndirection(PGParseState *pstate, PGNode *basenode, PGList 
     }
     /* process trailing subscripts, if any */
     if (subscripts)
-        result = (PGNode *)node_parser->transformArraySubscripts(pstate, result, exprType(result), InvalidOid, exprTypmod(result), subscripts, NULL);
+        result = (PGNode *)NodeParser::transformArraySubscripts(pstate, result, exprType(result), InvalidOid, exprTypmod(result), subscripts, NULL);
 
     return result;
 };
@@ -622,7 +622,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 		}
 
 		/* Select a common type for the elements */
-		coerce_type = coerce_parser->select_common_type(pstate, newelems, "ARRAY", NULL);
+		coerce_type = CoerceParser::select_common_type(pstate, newelems, "ARRAY", NULL);
 
 		if (newa->multidims)
 		{
@@ -670,7 +670,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 
 		if (coerce_hard)
 		{
-			newe = coerce_parser->coerce_to_target_type(pstate, e,
+			newe = CoerceParser::coerce_to_target_type(pstate, e,
 										 exprType(e),
 										 coerce_type,
 										 typmod,
@@ -688,7 +688,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 			}
 		}
 		else
-			newe = coerce_parser->coerce_to_common_type(pstate, e,
+			newe = CoerceParser::coerce_to_common_type(pstate, e,
 										 coerce_type,
 										 "ARRAY");
 		newcoercedelems = lappend(newcoercedelems, newe);
@@ -715,7 +715,7 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 	int			location;
 
 	/* Look up the type name first */
-	type_parser->typenameTypeIdAndMod(pstate, tc->typeName, &targetType, &targetTypmod);
+	TypeParser::typenameTypeIdAndMod(pstate, tc->typeName, &targetType, &targetTypmod);
 
 	/*
 	 * Look through any AEXPR_PAREN nodes that may have been inserted thanks
@@ -775,14 +775,14 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 	if (location < 0)
 		location = tc->typeName->location;
 
-	result = coerce_parser->coerce_to_target_type(pstate, expr, inputType,
+	result = CoerceParser::coerce_to_target_type(pstate, expr, inputType,
 								   targetType, targetTypmod,
 								   PG_COERCION_EXPLICIT,
 								   PG_COERCE_EXPLICIT_CAST,
 								   location);
 	if (result == NULL)
 	{
-		coerce_parser->parser_coercion_errposition(pstate, location, expr);
+		CoerceParser::parser_coercion_errposition(pstate, location, expr);
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_CANNOT_COERCE),
 				 errmsg("cannot cast type %s to %s",
@@ -817,7 +817,7 @@ ExprParser::transformCollateClause(PGParseState *pstate, PGCollateClause *c)
 						TypeProvider::format_type_be(argtype).c_str())));
 	}
 
-	newc->collOid = type_parser->LookupCollation(pstate, c->collname, c->location);
+	newc->collOid = TypeParser::LookupCollation(pstate, c->collname, c->location);
 	newc->location = c->location;
 
 	return (PGNode *) newc;
@@ -1117,7 +1117,7 @@ ExprParser::transformAExprOp(PGParseState *pstate, PGAExpr *a)
         lexpr = transformExprRecurse(pstate, lexpr);
         rexpr = transformExprRecurse(pstate, rexpr);
 
-        result = (PGNode *)oper_parser->make_op(pstate, a->name, lexpr, rexpr, a->location);
+        result = (PGNode *)OperParser::make_op(pstate, a->name, lexpr, rexpr, a->location);
     }
 
     return result;
@@ -1138,7 +1138,7 @@ ExprParser::transformAExprOpAny(PGParseState *pstate, PGAExpr *a)
 	lexpr = transformExprRecurse(pstate, lexpr);
 	rexpr = transformExprRecurse(pstate, rexpr);
 
-	return (PGNode *) oper_parser->make_scalar_array_op(pstate,
+	return (PGNode *) OperParser::make_scalar_array_op(pstate,
 										 a->name,
 										 true,
 										 lexpr,
@@ -1217,7 +1217,7 @@ ExprParser::transformAExprOpAll(PGParseState *pstate, PGAExpr *a)
 	lexpr = transformExprRecurse(pstate, lexpr);
 	rexpr = transformExprRecurse(pstate, rexpr);
 
-	return (PGNode *) oper_parser->make_scalar_array_op(pstate,
+	return (PGNode *) OperParser::make_scalar_array_op(pstate,
 										 a->name,
 										 false,
 										 lexpr,
@@ -1249,7 +1249,7 @@ ExprParser::make_distinct_op(PGParseState *pstate, PGList *opname,
 {
     PGExpr * result;
 
-    result = oper_parser->make_op(pstate, opname, ltree, rtree, location);
+    result = OperParser::make_op(pstate, opname, ltree, rtree, location);
     if (((PGOpExpr *)result)->opresulttype != BOOLOID)
         ereport(
             ERROR,
@@ -1371,7 +1371,7 @@ ExprParser::transformAExprNullIf(PGParseState *pstate, PGAExpr *a)
     PGNode * rexpr = transformExprRecurse(pstate, a->rexpr);
     PGOpExpr * result;
 
-    result = (PGOpExpr *)oper_parser->make_op(pstate, a->name, lexpr, rexpr, a->location);
+    result = (PGOpExpr *)OperParser::make_op(pstate, a->name, lexpr, rexpr, a->location);
 
     /*
 	 * The comparison operator itself should yield boolean ...
@@ -1416,7 +1416,7 @@ ExprParser::transformAExprOf(PGParseState *pstate, PGAExpr *a)
 	ltype = exprType(lexpr);
 	foreach(telem, (PGList *) a->rexpr)
 	{
-		rtype = type_parser->typenameTypeId(pstate, (PGTypeName *)lfirst(telem));
+		rtype = TypeParser::typenameTypeId(pstate, (PGTypeName *)lfirst(telem));
 		matched = (rtype == ltype);
 		if (matched)
 			break;
@@ -1498,7 +1498,7 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
 		 * Note: use list_concat here not lcons, to avoid damaging rnonvars.
 		 */
         allexprs = list_concat(list_make1(lexpr), rnonvars);
-        scalar_type = coerce_parser->select_common_type(pstate, allexprs, NULL, NULL);
+        scalar_type = CoerceParser::select_common_type(pstate, allexprs, NULL, NULL);
 
         /*
 		 * Do we have an array type to use?  Aside from the case where there
@@ -1524,7 +1524,7 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
             {
                 PGNode * rexpr = (PGNode *)lfirst(l);
 
-                rexpr = coerce_parser->coerce_to_common_type(pstate, rexpr, scalar_type, "IN");
+                rexpr = CoerceParser::coerce_to_common_type(pstate, rexpr, scalar_type, "IN");
                 aexprs = lappend(aexprs, rexpr);
             }
             newa = makeNode(PGArrayExpr);
@@ -1535,7 +1535,7 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
             newa->multidims = false;
             newa->location = -1;
 
-            result = (PGNode *)oper_parser->make_scalar_array_op(pstate, a->name, useOr, lexpr, (PGNode *)newa, a->location);
+            result = (PGNode *)OperParser::make_scalar_array_op(pstate, a->name, useOr, lexpr, (PGNode *)newa, a->location);
 
             /* Consider only the Vars (if any) in the loop below */
             rexprs = rvars;
@@ -1564,10 +1564,10 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
         else
         {
             /* Ordinary scalar operator */
-            cmp = (PGNode *)oper_parser->make_op(pstate, a->name, (PGNode *)copyObject(lexpr), rexpr, a->location);
+            cmp = (PGNode *)OperParser::make_op(pstate, a->name, (PGNode *)copyObject(lexpr), rexpr, a->location);
         }
 
-        cmp = coerce_parser->coerce_to_boolean(pstate, cmp, "IN");
+        cmp = CoerceParser::coerce_to_boolean(pstate, cmp, "IN");
         if (result == NULL)
             result = cmp;
         else
@@ -1716,7 +1716,7 @@ ExprParser::transformBoolExpr(PGParseState *pstate, PGBoolExpr *a)
 		PGNode	   *arg = (PGNode *) lfirst(lc);
 
 		arg = transformExprRecurse(pstate, arg);
-		arg = coerce_parser->coerce_to_boolean(pstate, arg, opname);
+		arg = CoerceParser::coerce_to_boolean(pstate, arg, opname);
 		args = lappend(args, arg);
 	}
 
@@ -1756,7 +1756,7 @@ ExprParser::transformFuncCall(PGParseState *pstate, PGFuncCall *fn)
     }
 
     /* ... and hand off to ParseFuncOrColumn */
-    return func_parser->ParseFuncOrColumn(pstate, fn->funcname, targs, fn, fn->location);
+    return FuncParser::ParseFuncOrColumn(pstate, fn->funcname, targs, fn, fn->location);
 };
 
 PGNode *
@@ -1774,7 +1774,7 @@ ExprParser::transformRowExpr(PGParseState *pstate, PGRowExpr *r)
     newr = makeNode(PGRowExpr);
 
     /* Transform the field expressions */
-    newr->args = target_parser->transformExpressionList(pstate, r->args, pstate->p_expr_kind);
+    newr->args = TargetParser::transformExpressionList(pstate, r->args, pstate->p_expr_kind);
 
     /* Barring later casting, we consider the type RECORD */
     newr->row_typeid = RECORDOID;
@@ -1893,7 +1893,7 @@ ExprParser::transformSubLink(PGParseState *pstate, PGSubLink *sublink)
 	/*
 	 * OK, let's transform the sub-SELECT.
 	 */
-	qtree = select_parser->parse_sub_analyze(sublink->subselect, pstate, NULL, NULL);
+	qtree = SelectParser::parse_sub_analyze(sublink->subselect, pstate, NULL, NULL);
 
 	/*
 	 * Check that we got something reasonable.  Many of these conditions are
@@ -2066,7 +2066,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 		 * commonly seen.
 		 */
 		if (exprType(arg) == UNKNOWNOID)
-			arg = coerce_parser->coerce_to_common_type(pstate, arg, TEXTOID, "CASE");
+			arg = CoerceParser::coerce_to_common_type(pstate, arg, TEXTOID, "CASE");
 
 		/*
 		 * Run collation assignment on the test expression so that we know
@@ -2133,7 +2133,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 		}
 		neww->expr = (PGExpr *) transformExprRecurse(pstate, warg);
 
-		neww->expr = (PGExpr *) coerce_parser->coerce_to_boolean(pstate,
+		neww->expr = (PGExpr *) CoerceParser::coerce_to_boolean(pstate,
 												(PGNode *) neww->expr,
 												"CASE/WHEN");
 
@@ -2166,14 +2166,14 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 	 */
 	resultexprs = lcons(newc->defresult, resultexprs);
 
-	ptype = coerce_parser->select_common_type(pstate, resultexprs, "CASE", NULL);
+	ptype = CoerceParser::select_common_type(pstate, resultexprs, "CASE", NULL);
 	Assert(OidIsValid(ptype))
 	newc->casetype = ptype;
 	/* casecollid will be set by parse_collate.c */
 
 	/* Convert default result clause, if necessary */
 	newc->defresult = (PGExpr *)
-		coerce_parser->coerce_to_common_type(pstate,
+		CoerceParser::coerce_to_common_type(pstate,
 							  (PGNode *) newc->defresult,
 							  ptype,
 							  "CASE/ELSE");
@@ -2184,7 +2184,7 @@ ExprParser::transformCaseExpr(PGParseState *pstate, PGCaseExpr *c)
 		PGCaseWhen   *w = (PGCaseWhen *) lfirst(l);
 
 		w->result = (PGExpr *)
-			coerce_parser->coerce_to_common_type(pstate,
+			CoerceParser::coerce_to_common_type(pstate,
 								  (PGNode *) w->result,
 								  ptype,
 								  "CASE/WHEN");
@@ -2226,7 +2226,7 @@ ExprParser::transformCoalesceExpr(PGParseState *pstate, PGCoalesceExpr *c)
 		newargs = lappend(newargs, newe);
 	}
 
-	newc->coalescetype = coerce_parser->select_common_type(pstate, newargs, "COALESCE", NULL);
+	newc->coalescetype = CoerceParser::select_common_type(pstate, newargs, "COALESCE", NULL);
 	/* coalescecollid will be set by parse_collate.c */
 
 	/* Convert arguments if necessary */
@@ -2235,7 +2235,7 @@ ExprParser::transformCoalesceExpr(PGParseState *pstate, PGCoalesceExpr *c)
 		PGNode	   *e = (PGNode *) lfirst(args);
 		PGNode	   *newe;
 
-		newe = coerce_parser->coerce_to_common_type(pstate, e,
+		newe = CoerceParser::coerce_to_common_type(pstate, e,
 									 newc->coalescetype,
 									 "COALESCE");
 		newcoercedargs = lappend(newcoercedargs, newe);
@@ -2278,7 +2278,7 @@ ExprParser::transformMinMaxExpr(PGParseState *pstate, PGMinMaxExpr *m)
 		newargs = lappend(newargs, newe);
 	}
 
-	newm->minmaxtype = coerce_parser->select_common_type(pstate, newargs, funcname, NULL);
+	newm->minmaxtype = CoerceParser::select_common_type(pstate, newargs, funcname, NULL);
 	/* minmaxcollid and inputcollid will be set by parse_collate.c */
 
 	/* Convert arguments if necessary */
@@ -2287,7 +2287,7 @@ ExprParser::transformMinMaxExpr(PGParseState *pstate, PGMinMaxExpr *m)
 		PGNode	   *e = (PGNode *) lfirst(args);
 		PGNode	   *newe;
 
-		newe = coerce_parser->coerce_to_common_type(pstate, e,
+		newe = CoerceParser::coerce_to_common_type(pstate, e,
 									 newm->minmaxtype,
 									 funcname);
 		newcoercedargs = lappend(newcoercedargs, newe);
@@ -2336,7 +2336,7 @@ ExprParser::transformBooleanTest(PGParseState *pstate, PGBooleanTest *b)
 
 	b->arg = (PGExpr *) transformExprRecurse(pstate, (PGNode *) b->arg);
 
-	b->arg = (PGExpr *) coerce_parser->coerce_to_boolean(pstate,
+	b->arg = (PGExpr *) CoerceParser::coerce_to_boolean(pstate,
 										(PGNode *) b->arg,
 										clausename);
 
@@ -2354,11 +2354,11 @@ ExprParser::transformCurrentOfExpr(PGParseState *pstate, PGCurrentOfExpr *cexpr)
 	 * rewriting/planning against views, for example.
 	 */
 	Assert(pstate->p_target_rangetblentry != NULL)
-	(void) relation_parser->isSimplyUpdatableRelation(pstate->p_target_rangetblentry->relid, false);
+	(void) RelationParser::isSimplyUpdatableRelation(pstate->p_target_rangetblentry->relid, false);
 
 	/* CURRENT OF can only appear at top level of UPDATE/DELETE */
 	Assert(pstate->p_target_rangetblentry != NULL)
-	cexpr->cvarno = relation_parser->RTERangeTablePosn(pstate,
+	cexpr->cvarno = RelationParser::RTERangeTablePosn(pstate,
 									  pstate->p_target_rangetblentry,
 									  &sublevels_up);
 	Assert(sublevels_up == 0)
@@ -2459,7 +2459,7 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
             PGAConst * con = (PGAConst *)expr;
             PGValue * val = &con->val;
 
-            result = (PGNode *) node_parser->make_const(pstate, val, con->location);
+            result = (PGNode *) NodeParser::make_const(pstate, val, con->location);
             break;
         }
 
@@ -2491,7 +2491,7 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
                     PGOid elementType;
                     int32 targetTypmod;
 
-                    type_parser->typenameTypeIdAndMod(pstate, tc->typeName, &targetType, &targetTypmod);
+                    TypeParser::typenameTypeIdAndMod(pstate, tc->typeName, &targetType, &targetTypmod);
 
                     /*
 					 * If target is a domain over array, work with the base

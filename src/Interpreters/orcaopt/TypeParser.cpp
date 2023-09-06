@@ -13,14 +13,11 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-TypeParser::TypeParser(const ContextPtr& context_) : context(context_)
-{
-    relation_parser = std::make_shared<RelationParser>(context);
-    node_parser = std::make_shared<NodeParser>(context);
-    // type_provider = std::make_shared<TypeProvider>(context);
-    // relation_provider = std::make_shared<RelationProvider>(context);
-    // function_provider = std::make_shared<FunctionProvider>(context);
-};
+// TypeParser::TypeParser(const ContextPtr& context_) : context(context_)
+// {
+//     relation_parser = std::make_shared<RelationParser>(context);
+//     node_parser = std::make_shared<NodeParser>(context);
+// };
 
 void
 TypeParser::typenameTypeIdAndMod(PGParseState *pstate, const PGTypeName *typeName,

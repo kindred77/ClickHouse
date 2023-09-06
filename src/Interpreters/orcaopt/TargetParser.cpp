@@ -14,15 +14,13 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-TargetParser::TargetParser(const ContextPtr& context_) : context(context_)
-{
-	relation_parser = std::make_shared<RelationParser>(context);
-    expr_parser = std::make_shared<ExprParser>(context);
-    node_parser = std::make_shared<NodeParser>(context);
-    coerce_parser = std::make_shared<CoerceParser>(context);
-    // type_provider = std::make_shared<TypeProvider>(context);
-    // relation_provider = std::make_shared<RelationProvider>(context);
-};
+// TargetParser::TargetParser(const ContextPtr& context_) : context(context_)
+// {
+// 	relation_parser = std::make_shared<RelationParser>(context);
+//     expr_parser = std::make_shared<ExprParser>(context);
+//     node_parser = std::make_shared<NodeParser>(context);
+//     coerce_parser = std::make_shared<CoerceParser>(context);
+// };
 
 int
 TargetParser::FigureColnameInternal(PGNode *node, std::string & name)
@@ -250,7 +248,7 @@ TargetParser::transformTargetEntry(PGParseState *pstate,
 		if (exprKind == EXPR_KIND_UPDATE_SOURCE && IsA(node, PGSetToDefault))
 			expr = node;
 		else
-			expr = expr_parser->transformExpr(pstate, node, exprKind);
+			expr = ExprParser::transformExpr(pstate, node, exprKind);
 	}
 
 	if (colname == NULL && !resjunk)
@@ -290,9 +288,9 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 		found_table = true;
 
 		target = list_concat(target,
-							 relation_parser->expandRelAttrs(pstate,
+							 RelationParser::expandRelAttrs(pstate,
 											rte,
-											relation_parser->RTERangeTablePosn(pstate, rte,
+											RelationParser::RTERangeTablePosn(pstate, rte,
 															  NULL),
 											0,
 											location));
@@ -328,7 +326,7 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
     Assert(var->vartype == RECORDOID)
 
     netlevelsup = var->varlevelsup + levelsup;
-    rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+    rte = RelationParser::GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
     attnum = var->varattno;
 
     if (attnum == InvalidAttrNumber)
@@ -338,7 +336,7 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
         PGListCell *lname, *lvar;
         int i;
 
-        relation_parser->expandRTE(rte, var->varno, 0, var->location, false, &names, &vars);
+        RelationParser::expandRTE(rte, var->varno, 0, var->location, false, &names, &vars);
 
         tupleDesc = PGCreateTemplateTupleDesc(list_length(vars), false);
         i = 1;
@@ -371,7 +369,7 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
             break;
         case PG_RTE_SUBQUERY: {
             /* Subselect-in-FROM: examine sub-select's output expr */
-            PGTargetEntry * ste = relation_parser->get_tle_by_resno(rte->subquery->targetList, attnum);
+            PGTargetEntry * ste = RelationParser::get_tle_by_resno(rte->subquery->targetList, attnum);
 
             if (ste == NULL || ste->resjunk)
                 elog(ERROR, "subquery %s does not have attribute %d", rte->eref->aliasname, attnum);
@@ -418,10 +416,10 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
             /* CTE reference: examine subquery's output expr */
             if (!rte->self_reference)
             {
-                PGCommonTableExpr * cte = relation_parser->GetCTEForRTE(pstate, rte, netlevelsup);
+                PGCommonTableExpr * cte = RelationParser::GetCTEForRTE(pstate, rte, netlevelsup);
                 PGTargetEntry * ste;
 
-                ste = relation_parser->get_tle_by_resno(GetCTETargetList(cte), attnum);
+                ste = RelationParser::get_tle_by_resno(GetCTETargetList(cte), attnum);
                 if (ste == NULL || ste->resjunk)
                     elog(ERROR, "subquery %s does not have attribute %d", rte->eref->aliasname, attnum);
                 expr = (PGNode *)ste->expr;
@@ -492,7 +490,7 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
         PGVar * var = (PGVar *)expr;
         PGRangeTblEntry * rte;
 
-        rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, var->varlevelsup);
+        rte = RelationParser::GetRTEByRangeTablePosn(pstate, var->varno, var->varlevelsup);
         return ExpandSingleTable(pstate, rte, var->location, make_target_entry);
     }
 
@@ -558,12 +556,12 @@ TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 	int			sublevels_up;
 	int			rtindex;
 
-	rtindex = relation_parser->RTERangeTablePosn(pstate, rte, &sublevels_up);
+	rtindex = RelationParser::RTERangeTablePosn(pstate, rte, &sublevels_up);
 
 	if (make_target_entry)
 	{
 		/* expandRelAttrs handles permissions marking */
-		return relation_parser->expandRelAttrs(pstate, rte, rtindex, sublevels_up,
+		return RelationParser::expandRelAttrs(pstate, rte, rtindex, sublevels_up,
 							  location);
 	}
 	else
@@ -571,7 +569,7 @@ TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 		PGList	   *vars;
 		ListCell   *l;
 
-		relation_parser->expandRTE(rte, rtindex, sublevels_up, location, false,
+		RelationParser::expandRTE(rte, rtindex, sublevels_up, location, false,
 				  NULL, &vars);
 
 		/*
@@ -586,7 +584,7 @@ TargetParser::ExpandSingleTable(PGParseState *pstate, PGRangeTblEntry *rte,
 		{
 			PGVar		   *var = (PGVar *) lfirst(l);
 
-			relation_parser->markVarForSelectPriv(pstate, var, rte);
+			RelationParser::markVarForSelectPriv(pstate, var, rte);
 		}
 
 		return vars;
@@ -659,14 +657,14 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 		{
 			case 2:
 				relname = strVal(linitial(fields));
-				rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname,
+				rte = RelationParser::refnameRangeTblEntry(pstate, nspname, relname,
 										   cref->location,
 										   &levels_up);
 				break;
 			case 3:
 				nspname = strVal(linitial(fields));
 				relname = strVal(lsecond(fields));
-				rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname,
+				rte = RelationParser::refnameRangeTblEntry(pstate, nspname, relname,
 										   cref->location,
 										   &levels_up);
 				break;
@@ -684,7 +682,7 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 					}
 					nspname = strVal(lsecond(fields));
 					relname = strVal(lthird(fields));
-					rte = relation_parser->refnameRangeTblEntry(pstate, nspname, relname,
+					rte = RelationParser::refnameRangeTblEntry(pstate, nspname, relname,
 											   cref->location,
 											   &levels_up);
 					break;
@@ -727,7 +725,7 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 			switch (crserr)
 			{
 				case CRSERR_NO_RTE:
-					relation_parser->errorMissingRTE(pstate, makeRangeVar(nspname, relname,
+					RelationParser::errorMissingRTE(pstate, makeRangeVar(nspname, relname,
 														 cref->location));
 					break;
 				case CRSERR_WRONG_DB:
@@ -766,7 +764,7 @@ TargetParser::ExpandIndirectionStar(PGParseState *pstate, PGAIndirection *ind,
 									 list_length(ind->indirection) - 1);
 
 	/* And transform that */
-	expr = expr_parser->transformExpr(pstate, (PGNode *) ind, exprKind);
+	expr = ExprParser::transformExpr(pstate, (PGNode *) ind, exprKind);
 
 	/* Expand the rowtype expression into individual fields */
 	return ExpandRowReference(pstate, expr, make_target_entry);
@@ -899,7 +897,7 @@ TargetParser::transformExpressionList(PGParseState *pstate, PGList *exprlist,
         /*
 		 * Not "something.*", so transform as a single expression
 		 */
-        result = lappend(result, expr_parser->transformExpr(pstate, e, exprKind));
+        result = lappend(result, ExprParser::transformExpr(pstate, e, exprKind));
     }
 
     return result;
@@ -917,7 +915,7 @@ TargetParser::resolveTargetListUnknowns(PGParseState *pstate, PGList *targetlist
 
 		if (restype == UNKNOWNOID)
 		{
-			tle->expr = (PGExpr *) coerce_parser->coerce_type(pstate, (PGNode *) tle->expr,
+			tle->expr = (PGExpr *) CoerceParser::coerce_type(pstate, (PGNode *) tle->expr,
 											 restype, TEXTOID, -1,
 											 PG_COERCION_IMPLICIT,
 											 PG_COERCE_IMPLICIT_CAST,

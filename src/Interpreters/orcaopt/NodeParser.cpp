@@ -13,13 +13,12 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-NodeParser::NodeParser(const ContextPtr& context_) : context(context_)
-{
-	coerce_parser = std::make_shared<CoerceParser>(context);
-	expr_parser = std::make_shared<ExprParser>(context);
-	relation_parser = std::make_shared<RelationParser>(context);
-	// type_provider = std::make_shared<TypeProvider>(context);
-};
+// NodeParser::NodeParser(const ContextPtr& context_) : context(context_)
+// {
+// 	coerce_parser = std::make_shared<CoerceParser>(context);
+// 	expr_parser = std::make_shared<ExprParser>(context);
+// 	relation_parser = std::make_shared<RelationParser>(context);
+// };
 
 PGOid NodeParser::transformArrayType(PGOid *arrayType, int32 *arrayTypmod)
 {
@@ -136,10 +135,10 @@ PGArrayRef * NodeParser::transformArraySubscripts(
         {
             if (ai->lidx)
             {
-                subexpr = expr_parser->transformExpr(pstate, ai->lidx, pstate->p_expr_kind);
+                subexpr = ExprParser::transformExpr(pstate, ai->lidx, pstate->p_expr_kind);
                 /* If it's not int4 already, try to coerce */
                 subexpr
-                    = coerce_parser->coerce_to_target_type(pstate, subexpr, exprType(subexpr), INT4OID, -1, PG_COERCION_ASSIGNMENT, PG_COERCE_IMPLICIT_CAST, -1);
+                    = CoerceParser::coerce_to_target_type(pstate, subexpr, exprType(subexpr), INT4OID, -1, PG_COERCION_ASSIGNMENT, PG_COERCE_IMPLICIT_CAST, -1);
                 if (subexpr == NULL)
                     ereport(
                         ERROR,
@@ -154,9 +153,9 @@ PGArrayRef * NodeParser::transformArraySubscripts(
             }
             lowerIndexpr = lappend(lowerIndexpr, subexpr);
         }
-        subexpr = expr_parser->transformExpr(pstate, ai->uidx, pstate->p_expr_kind);
+        subexpr = ExprParser::transformExpr(pstate, ai->uidx, pstate->p_expr_kind);
         /* If it's not int4 already, try to coerce */
-        subexpr = coerce_parser->coerce_to_target_type(pstate, subexpr, exprType(subexpr), INT4OID, -1, PG_COERCION_ASSIGNMENT, PG_COERCE_IMPLICIT_CAST, -1);
+        subexpr = CoerceParser::coerce_to_target_type(pstate, subexpr, exprType(subexpr), INT4OID, -1, PG_COERCION_ASSIGNMENT, PG_COERCE_IMPLICIT_CAST, -1);
         if (subexpr == NULL)
             ereport(
                 ERROR,
@@ -176,7 +175,7 @@ PGArrayRef * NodeParser::transformArraySubscripts(
         PGOid typeneeded = isSlice ? arrayType : elementType;
         PGNode * newFrom;
 
-        newFrom = coerce_parser->coerce_to_target_type(pstate, assignFrom, typesource, typeneeded, arrayTypMod,
+        newFrom = CoerceParser::coerce_to_target_type(pstate, assignFrom, typesource, typeneeded, arrayTypMod,
 			PG_COERCION_ASSIGNMENT, PG_COERCE_IMPLICIT_CAST, -1);
         if (newFrom == NULL)
             ereport(
@@ -218,8 +217,8 @@ NodeParser::make_var(PGParseState *pstate, PGRangeTblEntry *rte, int attrno, int
 	int32		type_mod;
 	PGOid			varcollid;
 
-	vnum = relation_parser->RTERangeTablePosn(pstate, rte, &sublevels_up);
-	relation_parser->get_rte_attribute_type(rte, attrno, &vartypeid, &type_mod, &varcollid);
+	vnum = RelationParser::RTERangeTablePosn(pstate, rte, &sublevels_up);
+	RelationParser::get_rte_attribute_type(rte, attrno, &vartypeid, &type_mod, &varcollid);
 	result = makeVar(vnum, attrno, vartypeid, type_mod, varcollid, sublevels_up);
 	result->location = location;
 	return result;

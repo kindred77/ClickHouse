@@ -15,16 +15,12 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-RelationParser::RelationParser(const ContextPtr& context_) : context(context_)
-{
-	coerce_parser = std::make_shared<CoerceParser>(context);
-	node_parser = std::make_shared<NodeParser>(context);
-	type_parser = std::make_shared<TypeParser>(context);
-
-	// relation_provider = std::make_shared<RelationProvider>(context);
-	// type_provider = std::make_shared<TypeProvider>(context);
-	// function_provider = std::make_shared<FunctionProvider>(context);
-};
+// RelationParser::RelationParser(const ContextPtr& context_) : context(context_)
+// {
+// 	coerce_parser = std::make_shared<CoerceParser>(context);
+// 	node_parser = std::make_shared<NodeParser>(context);
+// 	type_parser = std::make_shared<TypeParser>(context);
+// };
 
 PGCommonTableExpr *
 RelationParser::scanNameSpaceForCTE(PGParseState *pstate, const char *refname,
@@ -1607,7 +1603,7 @@ PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate,
                     (errcode(PG_ERRCODE_AMBIGUOUS_COLUMN),
                      errmsg("column reference \"%s\" is ambiguous", colname),
                      parser_errposition(pstate, location)));
-            var = node_parser->make_var(pstate, rte, attnum, location);
+            var = NodeParser::make_var(pstate, rte, attnum, location);
             /* Require read access to the column */
             markVarForSelectPriv(pstate, var, rte);
             result = (PGNode *)var;
@@ -1667,7 +1663,7 @@ PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate,
     //         if (RelationProvider::AttrExistsInRel(rte->relid, attnum)
     //             && RelationProvider::get_rel_relkind(rte->relid) != PG_RELKIND_VIEW)
     //         {
-    //             var = node_parser->make_var(pstate, rte, attnum, location);
+    //             var = NodeParser::make_var(pstate, rte, attnum, location);
     //             /* Require read access to the column */
     //             markVarForSelectPriv(pstate, var, rte);
     //             result = (PGNode *)var;
@@ -2305,7 +2301,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
                             (errcode(PG_ERRCODE_INVALID_TABLE_DEFINITION),
                              errmsg("column \"%s\" cannot be declared SETOF", attrname),
                              parser_errposition(pstate, n->location)));
-                    type_parser->typenameTypeIdAndMod(pstate, n->typeName, &attrtype, &attrtypmod);
+                    TypeParser::typenameTypeIdAndMod(pstate, n->typeName, &attrtype, &attrtypmod);
                     //attrcollation = GetColumnDefCollation(pstate, n, attrtype);
                     TypeProvider::PGTupleDescInitEntry(tupdesc, (PGAttrNumber)i, attrname, attrtype, attrtypmod, 0);
                     //TupleDescInitEntryCollation(tupdesc, (PGAttrNumber)i, attrcollation);

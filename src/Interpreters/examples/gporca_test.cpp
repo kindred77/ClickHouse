@@ -19,9 +19,9 @@ int main(int argc, char ** argv)
     for (auto entry = parser.parse_tree->head; entry != nullptr; entry = entry->next)
     {
         auto query_node = (duckdb_libpgquery::PGNode *)entry->data.ptr_value;
-        auto select_parser = std::make_shared<DB::SelectParser>(global_context);
+        //auto select_parser = std::make_shared<DB::SelectParser>(global_context);
         auto ps_stat = std::make_shared<duckdb_libpgquery::PGParseState>();
-        auto query = select_parser->transformStmt(ps_stat.get(), query_node);
+        auto query = DB::SelectParser::transformStmt(ps_stat.get(), query_node);
     }
     return 0;
 }

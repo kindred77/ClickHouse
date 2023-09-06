@@ -18,18 +18,17 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-SelectParser::SelectParser(const ContextPtr& context_) : context(context_)
-{
-    clause_parser = std::make_shared<ClauseParser>(context);
-    target_parser = std::make_shared<TargetParser>(context);
-    coerce_parser = std::make_shared<CoerceParser>(context);
-    node_parser = std::make_shared<NodeParser>(context);
-    relation_parser = std::make_shared<RelationParser>(context);
-    cte_parser = std::make_shared<CTEParser>(context);
-    agg_parser = std::make_shared<AggParser>(context);
-    func_parser = std::make_shared<FuncParser>(context);
-    // relation_provider = std::make_shared<RelationProvider>(context);
-};
+// SelectParser::SelectParser(const ContextPtr& context_) : context(context_)
+// {
+//     clause_parser = std::make_shared<ClauseParser>(context);
+//     target_parser = std::make_shared<TargetParser>(context);
+//     coerce_parser = std::make_shared<CoerceParser>(context);
+//     node_parser = std::make_shared<NodeParser>(context);
+//     relation_parser = std::make_shared<RelationParser>(context);
+//     cte_parser = std::make_shared<CTEParser>(context);
+//     agg_parser = std::make_shared<AggParser>(context);
+//     func_parser = std::make_shared<FuncParser>(context);
+// };
 
 void
 SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
@@ -42,7 +41,7 @@ SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 	if (var == NULL || !IsA(var, PGVar))
 		return;
 	netlevelsup = var->varlevelsup + levelsup;
-	rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+	rte = RelationParser::GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
 	attnum = var->varattno;
 
 	switch (rte->rtekind)
@@ -56,7 +55,7 @@ SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 			/* Subselect-in-FROM: copy up from the subselect */
 			if (attnum != InvalidAttrNumber)
 			{
-				PGTargetEntry *ste = relation_parser->get_tle_by_resno(rte->subquery->targetList,
+				PGTargetEntry *ste = RelationParser::get_tle_by_resno(rte->subquery->targetList,
 													attnum);
 
 				if (ste == NULL || ste->resjunk)
@@ -99,10 +98,10 @@ SelectParser::markTargetListOrigin(PGParseState *pstate, PGTargetEntry *tle,
 			 */
 			if (attnum != InvalidAttrNumber && !rte->self_reference)
 			{
-				PGCommonTableExpr *cte = relation_parser->GetCTEForRTE(pstate, rte, netlevelsup);
+				PGCommonTableExpr *cte = RelationParser::GetCTEForRTE(pstate, rte, netlevelsup);
 				PGTargetEntry *ste;
 
-				ste = relation_parser->get_tle_by_resno(GetCTETargetList(cte), attnum);
+				ste = RelationParser::get_tle_by_resno(GetCTETargetList(cte), attnum);
 				if (ste == NULL || ste->resjunk)
 					elog(ERROR, "subquery %s does not have attribute %d",
 						 rte->eref->aliasname, attnum);
@@ -376,7 +375,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
     if (stmt->withClause)
     {
         qry->hasRecursive = stmt->withClause->recursive;
-        qry->cteList = cte_parser->transformWithClause(pstate, stmt->withClause);
+        qry->cteList = CTEParser::transformWithClause(pstate, stmt->withClause);
         qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
     }
 
@@ -398,26 +397,26 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
     pstate->p_windowdefs = stmt->windowClause;
 
     /* process the FROM clause */
-    clause_parser->transformFromClause(pstate, stmt->fromClause);
+    ClauseParser::transformFromClause(pstate, stmt->fromClause);
 
     /* transform targetlist */
-    qry->targetList = target_parser->transformTargetList(pstate, stmt->targetList, EXPR_KIND_SELECT_TARGET);
+    qry->targetList = TargetParser::transformTargetList(pstate, stmt->targetList, EXPR_KIND_SELECT_TARGET);
 
     /* mark column origins */
     markTargetListOrigins(pstate, qry->targetList);
 
     /* transform WHERE */
-    qual = clause_parser->transformWhereClause(pstate, stmt->whereClause, EXPR_KIND_WHERE, "WHERE");
+    qual = ClauseParser::transformWhereClause(pstate, stmt->whereClause, EXPR_KIND_WHERE, "WHERE");
 
     /* initial processing of HAVING clause is much like WHERE clause */
-    qry->havingQual = clause_parser->transformWhereClause(pstate, stmt->havingClause, EXPR_KIND_HAVING, "HAVING");
+    qry->havingQual = ClauseParser::transformWhereClause(pstate, stmt->havingClause, EXPR_KIND_HAVING, "HAVING");
 
     /*
      * CDB: Untyped Const or Param nodes in a subquery in the FROM clause
      * might have been assigned proper types when we transformed the WHERE
      * clause, targetlist, etc.  Bring targetlist Var types up to date.
      */
-    coerce_parser->fixup_unknown_vars_in_targetlist(pstate, qry->targetList);
+    CoerceParser::fixup_unknown_vars_in_targetlist(pstate, qry->targetList);
 
     /*
 	 * Transform sorting/grouping stuff.  Do ORDER BY first because both
@@ -425,10 +424,10 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	 * that these functions can also change the targetList, so it's passed to
 	 * them by reference.
 	 */
-    qry->sortClause = clause_parser->transformSortClause(
+    qry->sortClause = ClauseParser::transformSortClause(
         pstate, stmt->sortClause, &qry->targetList, EXPR_KIND_ORDER_BY, true /* fix unknowns */, false /* allow SQL92 rules */);
 
-    qry->groupClause = clause_parser->transformGroupClause(
+    qry->groupClause = ClauseParser::transformGroupClause(
         pstate, stmt->groupClause, &qry->targetList, qry->sortClause, EXPR_KIND_GROUP_BY, false /* allow SQL92 rules */);
 
     /*
@@ -441,7 +440,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 	 */
 	//TODO kindred
     // Insist(!(stmt->scatterClause && stmt->intoClause));
-    // qry->scatterClause = clause_parser->transformScatterClause(pstate, stmt->scatterClause, &qry->targetList);
+    // qry->scatterClause = ClauseParser::transformScatterClause(pstate, stmt->scatterClause, &qry->targetList);
 
     if (stmt->distinctClause == NIL)
     {
@@ -458,29 +457,29 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 			 * turn distinct clause into grouping clause to make both sort-based
 			 * and hash-based grouping implementations viable plan options
 			 */
-            qry->distinctClause = clause_parser->transformDistinctToGroupBy(pstate, &qry->targetList, &qry->sortClause, &qry->groupClause);
+            qry->distinctClause = ClauseParser::transformDistinctToGroupBy(pstate, &qry->targetList, &qry->sortClause, &qry->groupClause);
         }
         else
         {
-            qry->distinctClause = clause_parser->transformDistinctClause(pstate, &qry->targetList, qry->sortClause, false);
+            qry->distinctClause = ClauseParser::transformDistinctClause(pstate, &qry->targetList, qry->sortClause, false);
         }
         qry->hasDistinctOn = false;
     }
     else
     {
         /* We had SELECT DISTINCT ON */
-        qry->distinctClause = clause_parser->transformDistinctOnClause(pstate, stmt->distinctClause, &qry->targetList, qry->sortClause);
+        qry->distinctClause = ClauseParser::transformDistinctOnClause(pstate, stmt->distinctClause, &qry->targetList, qry->sortClause);
         qry->hasDistinctOn = true;
     }
 
     /* transform LIMIT */
-    qry->limitOffset = clause_parser->transformLimitClause(pstate, stmt->limitOffset, EXPR_KIND_OFFSET, "OFFSET");
-    qry->limitCount = clause_parser->transformLimitClause(pstate, stmt->limitCount, EXPR_KIND_LIMIT, "LIMIT");
+    qry->limitOffset = ClauseParser::transformLimitClause(pstate, stmt->limitOffset, EXPR_KIND_OFFSET, "OFFSET");
+    qry->limitCount = ClauseParser::transformLimitClause(pstate, stmt->limitCount, EXPR_KIND_LIMIT, "LIMIT");
 
     /* transform window clauses after we have seen all window functions */
-    qry->windowClause = clause_parser->transformWindowDefinitions(pstate, pstate->p_windowdefs, &qry->targetList);
+    qry->windowClause = ClauseParser::transformWindowDefinitions(pstate, pstate->p_windowdefs, &qry->targetList);
 
-    clause_parser->processExtendedGrouping(pstate, qry->havingQual, qry->windowClause, qry->targetList);
+    ClauseParser::processExtendedGrouping(pstate, qry->havingQual, qry->windowClause, qry->targetList);
 
     qry->rtable = pstate->p_rtable;
     qry->jointree = makeFromExpr(pstate->p_joinlist, qual);
@@ -504,7 +503,7 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 
     /* this must be done after collations, for reliable comparison of exprs */
     if (pstate->p_hasAggs || qry->groupClause || qry->havingQual)
-        agg_parser->parseCheckAggregates(pstate, qry);
+        AggParser::parseCheckAggregates(pstate, qry);
 
     /*
 	 * If the query mixes window functions and aggregates, we need to

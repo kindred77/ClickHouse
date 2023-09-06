@@ -19,19 +19,17 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-ClauseParser::ClauseParser(const ContextPtr& context_) : context(context_)
-{
-	relation_parser = std::make_shared<RelationParser>(context);
-	select_parser = std::make_shared<SelectParser>(context);
-	coerce_parser = std::make_shared<CoerceParser>(context);
-	expr_parser = std::make_shared<ExprParser>(context);
-	target_parser = std::make_shared<TargetParser>(context);
-	oper_parser = std::make_shared<OperParser>(context);
-	node_parser = std::make_shared<NodeParser>(context);
-	type_parser = std::make_shared<TypeParser>(context);
-	//oper_provider = std::make_shared<OperProvider>(context);
-	//function_provider = std::make_shared<FunctionProvider>(context);
-}
+// ClauseParser::ClauseParser(const ContextPtr& context_) : context(context_)
+// {
+// 	relation_parser = std::make_shared<RelationParser>(context);
+// 	select_parser = std::make_shared<SelectParser>(context);
+// 	coerce_parser = std::make_shared<CoerceParser>(context);
+// 	expr_parser = std::make_shared<ExprParser>(context);
+// 	target_parser = std::make_shared<TargetParser>(context);
+// 	oper_parser = std::make_shared<OperParser>(context);
+// 	node_parser = std::make_shared<NodeParser>(context);
+// 	type_parser = std::make_shared<TypeParser>(context);
+// }
 
 PGRangeTblEntry *
 ClauseParser::transformTableEntry(PGParseState *pstate, PGRangeVar *r)
@@ -39,7 +37,7 @@ ClauseParser::transformTableEntry(PGParseState *pstate, PGRangeVar *r)
 	PGRangeTblEntry *rte;
 
 	/* We need only build a range table entry */
-	rte = relation_parser->addRangeTableEntry(pstate, r, r->alias, r->inh, true);
+	rte = RelationParser::addRangeTableEntry(pstate, r, r->alias, r->inh, true);
 
 	return rte;
 };
@@ -94,8 +92,8 @@ ClauseParser::transformRangeSubselect(PGParseState *pstate, PGRangeSubselect *r)
 	/*
 	 * Analyze and transform the subquery.
 	 */
-	query = select_parser->parse_sub_analyze(r->subquery, pstate, NULL,
-							  relation_parser->getLockedRefname(pstate, r->alias->aliasname));
+	query = SelectParser::parse_sub_analyze(r->subquery, pstate, NULL,
+							  RelationParser::getLockedRefname(pstate, r->alias->aliasname));
 
 	/* Restore state */
 	pstate->p_lateral_active = false;
@@ -112,7 +110,7 @@ ClauseParser::transformRangeSubselect(PGParseState *pstate, PGRangeSubselect *r)
 	/*
 	 * OK, build an RTE for the subquery.
 	 */
-	rte = relation_parser->addRangeTableEntryForSubquery(pstate,
+	rte = RelationParser::addRangeTableEntryForSubquery(pstate,
 										query,
 										r->alias,
 										r->lateral,
@@ -153,7 +151,7 @@ ClauseParser::buildMergedJoinVar(PGParseState *pstate, PGJoinType jointype,
 	outcoltypmod = l_colvar->vartypmod;
 	if (outcoltype != r_colvar->vartype)
 	{
-		outcoltype = coerce_parser->select_common_type(pstate,
+		outcoltype = CoerceParser::select_common_type(pstate,
 										list_make2(l_colvar, r_colvar),
 										"JOIN/USING",
 										NULL);
@@ -172,7 +170,7 @@ ClauseParser::buildMergedJoinVar(PGParseState *pstate, PGJoinType jointype,
 	 * not same as input.  We never need coerce_type_typmod.
 	 */
 	if (l_colvar->vartype != outcoltype)
-		l_node = coerce_parser->coerce_type(pstate, (PGNode *) l_colvar, l_colvar->vartype,
+		l_node = CoerceParser::coerce_type(pstate, (PGNode *) l_colvar, l_colvar->vartype,
 							 outcoltype, outcoltypmod,
 							 PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 	else if (l_colvar->vartypmod != outcoltypmod)
@@ -184,7 +182,7 @@ ClauseParser::buildMergedJoinVar(PGParseState *pstate, PGJoinType jointype,
 		l_node = (PGNode *) l_colvar;
 
 	if (r_colvar->vartype != outcoltype)
-		r_node = coerce_parser->coerce_type(pstate, (PGNode *) r_colvar, r_colvar->vartype,
+		r_node = CoerceParser::coerce_type(pstate, (PGNode *) r_colvar, r_colvar->vartype,
 							 outcoltype, outcoltypmod,
 							 PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 	else if (r_colvar->vartypmod != outcoltypmod)
@@ -277,8 +275,8 @@ ClauseParser::transformJoinUsingClause(PGParseState *pstate,
 		PGAExpr	   *e;
 
 		/* Require read access to the join variables */
-		relation_parser->markVarForSelectPriv(pstate, lvar, leftRTE);
-		relation_parser->markVarForSelectPriv(pstate, rvar, rightRTE);
+		RelationParser::markVarForSelectPriv(pstate, lvar, leftRTE);
+		RelationParser::markVarForSelectPriv(pstate, rvar, rightRTE);
 
 		/* Now create the lvar = rvar join condition */
 		e = makeSimpleAExpr(PG_AEXPR_OP, "=",
@@ -301,9 +299,9 @@ ClauseParser::transformJoinUsingClause(PGParseState *pstate,
 	 * transformJoinOnClause() does.  Just invoke transformExpr() to fix up
 	 * the operators, and we're done.
 	 */
-	result = expr_parser->transformExpr(pstate, result, EXPR_KIND_JOIN_USING);
+	result = ExprParser::transformExpr(pstate, result, EXPR_KIND_JOIN_USING);
 
-	result = coerce_parser->coerce_to_boolean(pstate, result, "JOIN/USING");
+	result = CoerceParser::coerce_to_boolean(pstate, result, "JOIN/USING");
 
 	return result;
 };
@@ -393,7 +391,7 @@ PGRangeTblEntry * ClauseParser::transformCTEReference(PGParseState * pstate,
 {
     PGRangeTblEntry * rte;
 
-    rte = relation_parser->addRangeTableEntryForCTE(pstate, cte, levelsup, r, true);
+    rte = RelationParser::addRangeTableEntryForCTE(pstate, cte, levelsup, r, true);
 
     return rte;
 };
@@ -451,7 +449,7 @@ PGRangeTblEntry * ClauseParser::transformRangeFunction(PGParseState * pstate, PG
                     rel = makeRangeVarFromNameList(qualified_name_list);
                     rel->location = arg_val->location;
 
-                    rte = relation_parser->addRangeTableEntry(pstate, rel, r->alias, false, true);
+                    rte = RelationParser::addRangeTableEntry(pstate, rel, r->alias, false, true);
 
                     /* Now we set our special attribute in the rte. */
 					//TODO kindred
@@ -541,9 +539,9 @@ PGRangeTblEntry * ClauseParser::transformRangeFunction(PGParseState * pstate, PG
 
                     newfc = makeFuncCall(FunctionProvider::SystemFuncName("unnest"), list_make1(arg), fc->location);
 
-                    funcexprs = lappend(funcexprs, expr_parser->transformExpr(pstate, (PGNode *)newfc, EXPR_KIND_FROM_FUNCTION));
+                    funcexprs = lappend(funcexprs, ExprParser::transformExpr(pstate, (PGNode *)newfc, EXPR_KIND_FROM_FUNCTION));
 
-                    funcnames = lappend(funcnames, (void *)target_parser->FigureColname((PGNode *)newfc).c_str());
+                    funcnames = lappend(funcnames, (void *)TargetParser::FigureColname((PGNode *)newfc).c_str());
 
                     /* coldeflist is empty, so no error is possible */
 
@@ -554,9 +552,9 @@ PGRangeTblEntry * ClauseParser::transformRangeFunction(PGParseState * pstate, PG
         }
 
         /* normal case ... */
-        funcexprs = lappend(funcexprs, expr_parser->transformExpr(pstate, fexpr, EXPR_KIND_FROM_FUNCTION));
+        funcexprs = lappend(funcexprs, ExprParser::transformExpr(pstate, fexpr, EXPR_KIND_FROM_FUNCTION));
 
-        funcnames = lappend(funcnames, (void *)target_parser->FigureColname(fexpr).c_str());
+        funcnames = lappend(funcnames, (void *)TargetParser::FigureColname(fexpr).c_str());
 
         if (coldeflist && r->coldeflist)
             ereport(
@@ -627,7 +625,7 @@ PGRangeTblEntry * ClauseParser::transformRangeFunction(PGParseState * pstate, PG
     /*
 	 * OK, build an RTE for the function.
 	 */
-    rte = relation_parser->addRangeTableEntryForFunction(pstate, funcnames, funcexprs, coldeflists, r, is_lateral, true);
+    rte = RelationParser::addRangeTableEntryForFunction(pstate, funcnames, funcexprs, coldeflists, r, is_lateral, true);
 
     return rte;
 };
@@ -653,7 +651,7 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
             PGCommonTableExpr * cte;
             PGIndex levelsup;
 
-            cte = relation_parser->scanNameSpaceForCTE(pstate, rv->relname, &levelsup);
+            cte = RelationParser::scanNameSpaceForCTE(pstate, rv->relname, &levelsup);
             if (cte)
                 rte = transformCTEReference(pstate, rv, cte, levelsup);
         }
@@ -760,7 +758,7 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 		 * this because higher levels will assume I hand back a self-
 		 * consistent namespace list.
 		 */
-        relation_parser->checkNameSpaceConflicts(pstate, l_namespace, r_namespace);
+        RelationParser::checkNameSpaceConflicts(pstate, l_namespace, r_namespace);
 
         /*
 		 * Generate combined namespace info for possible use below.
@@ -772,8 +770,8 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
 		 *
 		 * Note: expandRTE returns new lists, safe for me to modify
 		 */
-        relation_parser->expandRTE(l_rte, l_rtindex, 0, -1, false, &l_colnames, &l_colvars);
-        relation_parser->expandRTE(r_rte, r_rtindex, 0, -1, false, &r_colnames, &r_colvars);
+        RelationParser::expandRTE(l_rte, l_rtindex, 0, -1, false, &l_colnames, &l_colvars);
+        RelationParser::expandRTE(r_rte, r_rtindex, 0, -1, false, &r_colnames, &r_colvars);
 
         /*
 		 * Natural join does not explicitly specify columns; must generate
@@ -948,7 +946,7 @@ ClauseParser::transformFromClauseItem(PGParseState *pstate, PGNode *n,
         /*
 		 * Now build an RTE for the result of the join
 		 */
-        rte = relation_parser->addRangeTableEntryForJoin(pstate, res_colnames, j->jointype, res_colvars, j->alias, true);
+        rte = RelationParser::addRangeTableEntryForJoin(pstate, res_colnames, j->jointype, res_colvars, j->alias, true);
 
         /* assume new rte is at end */
         j->rtindex = list_length(pstate->p_rtable);
@@ -1022,7 +1020,7 @@ ClauseParser::transformFromClause(PGParseState *pstate, PGList *frmList)
 									&rtindex,
 									&namespace_ptr);
 
-		relation_parser->checkNameSpaceConflicts(pstate, pstate->p_namespace, namespace_ptr);
+		RelationParser::checkNameSpaceConflicts(pstate, pstate->p_namespace, namespace_ptr);
 
 		/* Mark the new namespace items as visible only to LATERAL */
 		setNamespaceLateralState(namespace_ptr, true, true);
@@ -1049,9 +1047,9 @@ ClauseParser::transformWhereClause(PGParseState *pstate, PGNode *clause,
 	if (clause == NULL)
 		return NULL;
 
-	qual = expr_parser->transformExpr(pstate, clause, exprKind);
+	qual = ExprParser::transformExpr(pstate, clause, exprKind);
 
-	qual = coerce_parser->coerce_to_boolean(pstate, qual, constructName);
+	qual = CoerceParser::coerce_to_boolean(pstate, qual, constructName);
 
 	return qual;
 };
@@ -1071,7 +1069,7 @@ ClauseParser::findTargetlistEntrySQL99(PGParseState *pstate, PGNode *node, PGLis
 	 * resjunk target here, though the SQL92 cases above must ignore resjunk
 	 * targets.
 	 */
-	expr = expr_parser->transformExpr(pstate, node, exprKind);
+	expr = ExprParser::transformExpr(pstate, node, exprKind);
 
 	foreach(tl, *tlist)
 	{
@@ -1098,7 +1096,7 @@ ClauseParser::findTargetlistEntrySQL99(PGParseState *pstate, PGNode *node, PGLis
 	 * end of the target list.  This target is given resjunk = true so that it
 	 * will not be projected into the final tuple.
 	 */
-	target_result = target_parser->transformTargetEntry(pstate, node, expr, exprKind,
+	target_result = TargetParser::transformTargetEntry(pstate, node, expr, exprKind,
 										 NULL, true);
 
 	*tlist = lappend(*tlist, target_result);
@@ -1123,7 +1121,7 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 						(errcode(PG_ERRCODE_GROUPING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("aggregate functions are not allowed in %s",
-								expr_parser->ParseExprKindName(exprKind))));
+								ExprParser::ParseExprKindName(exprKind))));
 			}
 
 			if (pstate->p_hasWindowFuncs &&
@@ -1135,7 +1133,7 @@ ClauseParser::checkTargetlistEntrySQL92(PGParseState *pstate, PGTargetEntry *tle
 						(errcode(PG_ERRCODE_WINDOWING_ERROR),
 				/* translator: %s is name of a SQL construct, eg GROUP BY */
 						 errmsg("window functions are not allowed in %s",
-								expr_parser->ParseExprKindName(exprKind))));
+								ExprParser::ParseExprKindName(exprKind))));
 			}
 			break;
 		case EXPR_KIND_ORDER_BY:
@@ -1219,7 +1217,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 			 * breaks no cases that are legal per spec, and it seems a more
 			 * self-consistent behavior.
 			 */
-			if (relation_parser->colNameToVar(pstate, name, true, location) != NULL)
+			if (RelationParser::colNameToVar(pstate, name, true, location) != NULL)
 				name = NULL;
 		}
 
@@ -1245,7 +1243,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 							/*------
 							  translator: first %s is name of a SQL construct, eg ORDER BY */
 									 errmsg("%s \"%s\" is ambiguous",
-											expr_parser->ParseExprKindName(exprKind),
+											ExprParser::ParseExprKindName(exprKind),
 											name)));
 						}
 					}
@@ -1276,7 +1274,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 					(errcode(PG_ERRCODE_SYNTAX_ERROR),
 			/* translator: %s is name of a SQL construct, eg ORDER BY */
 					 errmsg("non-integer constant in %s",
-							expr_parser->ParseExprKindName(exprKind))));
+							ExprParser::ParseExprKindName(exprKind))));
 		}
 
 		target_pos = intVal(val);
@@ -1299,7 +1297,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 				(errcode(PG_ERRCODE_INVALID_COLUMN_REFERENCE),
 		/* translator: %s is name of a SQL construct, eg ORDER BY */
 				 errmsg("%s position %d is not in select list",
-						expr_parser->ParseExprKindName(exprKind), target_pos)));
+						ExprParser::ParseExprKindName(exprKind), target_pos)));
 	}
 
 	/*
@@ -1377,7 +1375,7 @@ ClauseParser::addTargetToSortList(PGParseState * pstate, PGTargetEntry * tle,
     /* if tlist item is an UNKNOWN literal, change it to TEXT */
     if (restype == UNKNOWNOID && resolveUnknown)
     {
-        tle->expr = (PGExpr *)coerce_parser->coerce_type(
+        tle->expr = (PGExpr *)CoerceParser::coerce_type(
             pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, exprLocation((PGNode *)tle->expr));
         restype = TEXTOID;
     }
@@ -1400,16 +1398,16 @@ ClauseParser::addTargetToSortList(PGParseState * pstate, PGTargetEntry * tle,
     {
         case PG_SORTBY_DEFAULT:
         case PG_SORTBY_ASC:
-            oper_parser->get_sort_group_operators(restype, true, true, false, &sortop, &eqop, NULL, &hashable);
+            OperParser::get_sort_group_operators(restype, true, true, false, &sortop, &eqop, NULL, &hashable);
             reverse = false;
             break;
         case PG_SORTBY_DESC:
-            oper_parser->get_sort_group_operators(restype, false, true, true, NULL, &eqop, &sortop, &hashable);
+            OperParser::get_sort_group_operators(restype, false, true, true, NULL, &eqop, &sortop, &hashable);
             reverse = true;
             break;
         case SORTBY_USING:
             // Assert(sortby->useOp != NIL)
-            // sortop = oper_parser->compatible_oper_opid(sortby->useOp, restype, restype, false);
+            // sortop = OperParser::compatible_oper_opid(sortby->useOp, restype, restype, false);
 
             /*
 			 * Verify it's a valid ordering operator, fetch the corresponding
@@ -1513,7 +1511,7 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
 	/* if tlist item is an UNKNOWN literal, change it to TEXT */
 	if (restype == UNKNOWNOID)
 	{
-		tle->expr = (PGExpr *) coerce_parser->coerce_type(pstate, (PGNode *) tle->expr,
+		tle->expr = (PGExpr *) CoerceParser::coerce_type(pstate, (PGNode *) tle->expr,
 										 restype, TEXTOID, -1,
 										 PG_COERCION_IMPLICIT,
 										 PG_COERCE_IMPLICIT_CAST,
@@ -1533,7 +1531,7 @@ ClauseParser::addTargetToGroupList(PGParseState *pstate, PGTargetEntry *tle,
 		setup_parser_errposition_callback(&pcbstate, pstate, location);
 
 		/* determine the eqop and optional sortop */
-		oper_parser->get_sort_group_operators(restype,
+		OperParser::get_sort_group_operators(restype,
 								 false, true, false,
 								 &sortop, &eqop, NULL,
 								 &hashable);
@@ -2058,7 +2056,7 @@ PGList * ClauseParser::transformRowExprToGroupClauses(PGParseState * pstate,
             PGOid eqop;
             bool hashable;
 
-            oper_parser->get_sort_group_operators(exprType((PGNode *)arg_tle->expr), true, true, false, &sortop, &eqop, NULL, &hashable);
+            OperParser::get_sort_group_operators(exprType((PGNode *)arg_tle->expr), true, true, false, &sortop, &eqop, NULL, &hashable);
 
             /* avoid making duplicate expression entries */
             if (targetIsInSortList(arg_tle, sortop, groupsets))
@@ -2131,7 +2129,7 @@ PGList * ClauseParser::transformGroupClause(
 
             if (restype == UNKNOWNOID)
                 tle->expr
-                    = (PGExpr *)coerce_parser->coerce_type(pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
+                    = (PGExpr *)CoerceParser::coerce_type(pstate, (PGNode *)tle->expr, restype, TEXTOID, -1, PG_COERCION_IMPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
 
             /*
 			 * The tle_list will be used to match with the ORDER by element below.
@@ -2214,7 +2212,7 @@ PGList * ClauseParser::transformGroupClause(
             if (targetIsInSortList(tle, InvalidOid, result))
                 continue;
 
-            oper_parser->get_sort_group_operators(exprType((PGNode *)tle->expr), true, true, false, &sortop, &eqop, NULL, &hashable);
+            OperParser::get_sort_group_operators(exprType((PGNode *)tle->expr), true, true, false, &sortop, &eqop, NULL, &hashable);
             gc = make_group_clause(tle, *targetlist, eqop, sortop, false, hashable);
             result = lappend(result, gc);
         }
@@ -2387,9 +2385,9 @@ ClauseParser::transformLimitClause(PGParseState *pstate, PGNode *clause,
 	if (clause == NULL)
 		return NULL;
 
-	qual = expr_parser->transformExpr(pstate, clause, exprKind);
+	qual = ExprParser::transformExpr(pstate, clause, exprKind);
 
-	qual = coerce_parser->coerce_to_specific_type(pstate, qual, INT8OID, constructName);
+	qual = CoerceParser::coerce_to_specific_type(pstate, qual, INT8OID, constructName);
 
 	/* LIMIT can't refer to any variables of the current query */
 	checkExprIsVarFree(pstate, qual, constructName);
@@ -2443,13 +2441,13 @@ PGNode * ClauseParser::transformFrameOffset(
     if (frameOptions & FRAMEOPTION_ROWS)
     {
         /* Transform the raw expression tree */
-        node = expr_parser->transformExpr(pstate, clause, EXPR_KIND_WINDOW_FRAME_ROWS);
+        node = ExprParser::transformExpr(pstate, clause, EXPR_KIND_WINDOW_FRAME_ROWS);
 
         /*
 		 * Like LIMIT clause, simply coerce to int8
 		 */
         constructName = "ROWS";
-        node = coerce_parser->coerce_to_specific_type(pstate, node, INT8OID, constructName);
+        node = CoerceParser::coerce_to_specific_type(pstate, node, INT8OID, constructName);
     }
     else if (frameOptions & FRAMEOPTION_RANGE)
     {
@@ -2464,7 +2462,7 @@ PGNode * ClauseParser::transformFrameOffset(
         int32 typmod;
 
         /* Transform the raw expression tree */
-        node = expr_parser->transformExpr(pstate, clause, EXPR_KIND_WINDOW_FRAME_RANGE);
+        node = ExprParser::transformExpr(pstate, clause, EXPR_KIND_WINDOW_FRAME_RANGE);
 
         /*
 		 * this needs a lot of thought to decide how to support in the context
@@ -2511,7 +2509,7 @@ PGNode * ClauseParser::transformFrameOffset(
         else
             oprname = lappend(NIL, makeString("-"));
 
-        tup = oper_parser->oper(pstate, oprname, otype, rtype, true, 0);
+        tup = OperParser::oper(pstate, oprname, otype, rtype, true, 0);
 
         if (tup == NULL)
             ereport(
@@ -2534,7 +2532,7 @@ PGNode * ClauseParser::transformFrameOffset(
             /* XXX: we assume that the typmod for the new RHS type
 			 * is the same as before... is that safe?
 			 */
-            PGExpr * expr = (PGExpr *)coerce_parser->coerce_to_target_type(NULL, node, rtype, newrtype, typmod, PG_COERCION_EXPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
+            PGExpr * expr = (PGExpr *)CoerceParser::coerce_to_target_type(NULL, node, rtype, newrtype, typmod, PG_COERCION_EXPLICIT, PG_COERCE_IMPLICIT_CAST, -1);
             if (!PointerIsValid(expr))
             {
                 ereport(
@@ -2561,7 +2559,7 @@ PGNode * ClauseParser::transformFrameOffset(
 			 *
 			 * XXX: Why not do it here?
 			 */
-            if (!coerce_parser->can_coerce_type(1, &oprresult, &otype, PG_COERCION_EXPLICIT))
+            if (!CoerceParser::can_coerce_type(1, &oprresult, &otype, PG_COERCION_EXPLICIT))
                 ereport(
                     ERROR,
                     (errcode(PG_ERRCODE_SYNTAX_ERROR),
@@ -2584,16 +2582,16 @@ PGNode * ClauseParser::transformFrameOffset(
             // PGConst * con = (PGConst *)node;
             // Oid sortop;
 
-            // oper_parser->get_sort_group_operators(newrtype, false, false, false, &sortop, NULL, NULL, NULL);
+            // OperParser::get_sort_group_operators(newrtype, false, false, false, &sortop, NULL, NULL, NULL);
 
             // if (OidIsValid(sortop))
             // {
-            //     PGTypePtr typ = type_parser->typeidType(newrtype);
+            //     PGTypePtr typ = TypeParser::typeidType(newrtype);
             //     Oid funcoid = OperProvider::get_opcode(sortop);
             //     Datum zero;
             //     Datum result;
 
-            //     zero = type_parser->stringTypeDatum(typ, "0", exprTypmod(node));
+            //     zero = TypeParser::stringTypeDatum(typ, "0", exprTypmod(node));
 
             //     /*
 			// 	 * As we know the value is a const and since transformExpr()

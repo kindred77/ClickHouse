@@ -12,13 +12,12 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-CTEParser::CTEParser(const ContextPtr& context_) : context(context_)
-{
-	relation_parser = std::make_shared<RelationParser>(context);
-	node_parser = std::make_shared<NodeParser>(context);
-	select_parser = std::make_shared<SelectParser>(context);
-	//type_provider = std::make_shared<TypeProvider>(context);
-};
+// CTEParser::CTEParser(const ContextPtr& context_) : context(context_)
+// {
+// 	relation_parser = std::make_shared<RelationParser>(context);
+// 	node_parser = std::make_shared<NodeParser>(context);
+// 	select_parser = std::make_shared<SelectParser>(context);
+// };
 
 void CTEParser::analyzeCTETargetList(PGParseState * pstate, PGCommonTableExpr * cte, PGList * tlist)
 {
@@ -99,7 +98,7 @@ void CTEParser::analyzeCTE(PGParseState * pstate, PGCommonTableExpr * cte)
     /* Analysis not done already */
     Assert(!IsA(cte->ctequery, PGQuery))
 
-    query = select_parser->parse_sub_analyze(cte->ctequery, pstate, cte, NULL);
+    query = SelectParser::parse_sub_analyze(cte->ctequery, pstate, cte, NULL);
     cte->ctequery = (PGNode *)query;
 
     /*

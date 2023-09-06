@@ -10,12 +10,12 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-AggParser::AggParser(const ContextPtr& context_) : context(context_)
-{
-	clause_parser = std::make_shared<ClauseParser>(context);
-	node_parser = std::make_shared<NodeParser>(context);
-	expr_parser = std::make_shared<ExprParser>(context);
-};
+// AggParser::AggParser(const ContextPtr& context_) : context(context_)
+// {
+// 	clause_parser = std::make_shared<ClauseParser>(context);
+// 	node_parser = std::make_shared<NodeParser>(context);
+// 	expr_parser = std::make_shared<ExprParser>(context);
+// };
 
 int AggParser::check_agg_arguments(PGParseState * pstate, PGList * directargs, PGList * args, PGExpr * filter)
 {
@@ -395,7 +395,7 @@ AggParser::check_agglevels_and_constraints(PGParseState *pstate, PGNode *expr)
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_GROUPING_ERROR),
 				 errmsg_internal(err,
-								 expr_parser->ParseExprKindName(pstate->p_expr_kind))));
+								 ExprParser::ParseExprKindName(pstate->p_expr_kind))));
 	}
 };
 
@@ -419,7 +419,7 @@ AggParser::transformGroupingFunc(PGParseState *pstate, PGGroupingFunc *p)
 	{
 		PGNode	   *current_result;
 
-		current_result = expr_parser->transformExpr(pstate, (PGNode *) lfirst(lc), pstate->p_expr_kind);
+		current_result = ExprParser::transformExpr(pstate, (PGNode *) lfirst(lc), pstate->p_expr_kind);
 
 		/* acceptability of expressions is checked later */
 
@@ -480,7 +480,7 @@ void AggParser::transformAggregateCall(PGParseState * pstate,
             tle = makeTargetEntry(arg, attno++, NULL, false);
             tlist = lappend(tlist, tle);
 
-            torder = clause_parser->addTargetToSortList(pstate, tle, torder, tlist, sortby, true /* fix unknowns */);
+            torder = ClauseParser::addTargetToSortList(pstate, tle, torder, tlist, sortby, true /* fix unknowns */);
         }
 
         /* Never any DISTINCT in an ordered-set agg */
@@ -516,14 +516,14 @@ void AggParser::transformAggregateCall(PGParseState * pstate,
         save_next_resno = pstate->p_next_resno;
         pstate->p_next_resno = attno;
 
-        torder = clause_parser->transformSortClause(pstate, aggorder, &tlist, EXPR_KIND_ORDER_BY, true /* fix unknowns */, true /* force SQL99 rules */);
+        torder = ClauseParser::transformSortClause(pstate, aggorder, &tlist, EXPR_KIND_ORDER_BY, true /* fix unknowns */, true /* force SQL99 rules */);
 
         /*
 		 * If we have DISTINCT, transform that to produce a distinctList.
 		 */
         if (agg_distinct)
         {
-            tdistinct = clause_parser->transformDistinctClause(pstate, &tlist, torder, true);
+            tdistinct = ClauseParser::transformDistinctClause(pstate, &tlist, torder, true);
 
             /*
 			 * Remove this check if executor support for hashed distinct for
@@ -693,7 +693,7 @@ void AggParser::transformAggregateCall(PGParseState * pstate,
             ERROR,
             (errcode(PG_ERRCODE_GROUPING_ERROR),
              /* translator: %s is name of a SQL construct, eg GROUP BY */
-             errmsg("aggregate functions are not allowed in %s", expr_parser->ParseExprKindName(pstate->p_expr_kind)),
+             errmsg("aggregate functions are not allowed in %s", ExprParser::ParseExprKindName(pstate->p_expr_kind)),
              parser_errposition(pstate, agg->location)));
 };
 
@@ -866,7 +866,7 @@ AggParser::transformWindowFuncCall(PGParseState *pstate, PGWindowFunc *wfunc,
 				(errcode(PG_ERRCODE_WINDOWING_ERROR),
 		/* translator: %s is name of a SQL construct, eg GROUP BY */
 				 errmsg("window functions are not allowed in %s",
-						expr_parser->ParseExprKindName(pstate->p_expr_kind))));
+						ExprParser::ParseExprKindName(pstate->p_expr_kind))));
 	}
 
 	/*

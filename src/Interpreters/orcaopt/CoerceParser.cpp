@@ -17,16 +17,12 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-CoerceParser::CoerceParser(ContextPtr& context_) : context(context_)
-{
-	relation_parser = std::make_shared<RelationParser>(context);
-	node_parser = std::make_shared<NodeParser>(context);
-	type_parser = std::make_shared<TypeParser>(context);
-	// type_provider = std::make_shared<TypeProvider>(context);
-	// proc_provider = std::make_shared<ProcProvider>(context);
-	// cast_provider = std::make_shared<CastProvider>(context);
-	// relation_provider = std::make_shared<RelationProvider>(context);
-};
+// CoerceParser::CoerceParser(ContextPtr& context_) : context(context_)
+// {
+// 	relation_parser = std::make_shared<RelationParser>(context);
+// 	node_parser = std::make_shared<NodeParser>(context);
+// 	type_parser = std::make_shared<TypeParser>(context);
+// };
 
 PGOid
 CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char* context_str,
@@ -175,8 +171,8 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
         int vlocation = ((PGVar *)node)->location;
         PGRangeTblEntry * rte;
 
-        rte = relation_parser->GetRTEByRangeTablePosn(pstate, rtindex, sublevels_up);
-        relation_parser->expandRTE(rte, rtindex, sublevels_up, vlocation, false, NULL, &args);
+        rte = RelationParser::GetRTEByRangeTablePosn(pstate, rtindex, sublevels_up);
+        RelationParser::expandRTE(rte, rtindex, sublevels_up, vlocation, false, NULL, &args);
     }
     else
         ereport(
@@ -332,12 +328,12 @@ CoerceParser::is_complex_array(PGOid typid)
 {
 	PGOid elemtype = TypeProvider::get_element_type(typid);
 
-	return (OidIsValid(elemtype) && type_parser->typeOrDomainTypeRelid(elemtype) != InvalidOid);
+	return (OidIsValid(elemtype) && TypeParser::typeOrDomainTypeRelid(elemtype) != InvalidOid);
 };
 
 bool CoerceParser::typeIsOfTypedTable(PGOid reltypeId, PGOid reloftypeId)
 {
-    PGOid relid = type_parser->typeidTypeRelid(reltypeId);
+    PGOid relid = TypeParser::typeidTypeRelid(reltypeId);
     bool result = false;
 
     if (relid)
@@ -375,7 +371,7 @@ PGVar * CoerceParser::coerce_unknown_var(
     if (!PointerIsValid(pstate))
         return var;
 
-    rte = relation_parser->GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
+    rte = RelationParser::GetRTEByRangeTablePosn(pstate, var->varno, netlevelsup);
 
     switch (rte->rtekind)
     {
@@ -417,7 +413,7 @@ PGVar * CoerceParser::coerce_unknown_var(
             PGOid exprtype;
 
             /* Get referenced subquery result expr */
-            ste = relation_parser->get_tle_by_resno(rte->subquery->targetList, var->varattno);
+            ste = RelationParser::get_tle_by_resno(rte->subquery->targetList, var->varattno);
             Assert(ste && !ste->resjunk && ste->expr)
             targetexpr = (PGNode *)ste->expr;
 
@@ -594,13 +590,13 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
         else
             inputTypeMod = -1;
 
-        targetType = type_parser->typeidType(baseTypeId);
+        targetType = TypeParser::typeidType(baseTypeId);
 
         newcon->consttype = baseTypeId;
         newcon->consttypmod = inputTypeMod;
-        newcon->constcollid = type_parser->typeTypeCollation(targetType);
-        newcon->constlen = type_parser->typeLen(targetType);
-        newcon->constbyval = type_parser->typeByVal(targetType);
+        newcon->constcollid = TypeParser::typeTypeCollation(targetType);
+        newcon->constlen = TypeParser::typeLen(targetType);
+        newcon->constbyval = TypeParser::typeByVal(targetType);
         newcon->constisnull = con->constisnull;
 
         /*
@@ -621,9 +617,9 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		 * as CSTRING.
 		 */
         if (!con->constisnull)
-            newcon->constvalue = type_parser->stringTypeDatum(targetType, DatumGetCString(con->constvalue), inputTypeMod);
+            newcon->constvalue = TypeParser::stringTypeDatum(targetType, DatumGetCString(con->constvalue), inputTypeMod);
         else
-            newcon->constvalue = type_parser->stringTypeDatum(targetType, NULL, inputTypeMod);
+            newcon->constvalue = TypeParser::stringTypeDatum(targetType, NULL, inputTypeMod);
 
         cancel_parser_errposition_callback(&pcbstate);
 
@@ -792,12 +788,12 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
         }
         return result;
     }
-    if (inputTypeId == RECORDOID && type_parser->typeidTypeRelid(targetTypeId) != InvalidOid)
+    if (inputTypeId == RECORDOID && TypeParser::typeidTypeRelid(targetTypeId) != InvalidOid)
     {
         /* Coerce a RECORD to a specific complex type */
         return coerce_record_to_complex(pstate, node, targetTypeId, ccontext, cformat, location);
     }
-    if (targetTypeId == RECORDOID && type_parser->typeidTypeRelid(inputTypeId) != InvalidOid)
+    if (targetTypeId == RECORDOID && TypeParser::typeidTypeRelid(inputTypeId) != InvalidOid)
     {
         /* Coerce a specific complex type to RECORD */
         /* NB: we do NOT want a RelabelType here */
@@ -1168,14 +1164,14 @@ CoerceParser::can_coerce_type(int nargs, const PGOid *input_typeids, const PGOid
 		 * coerce (may need tighter checking here)
 		 */
 		if (inputTypeId == RECORDOID &&
-			type_parser->typeOrDomainTypeRelid(targetTypeId) != InvalidOid)
+			TypeParser::typeOrDomainTypeRelid(targetTypeId) != InvalidOid)
 			continue;
 
 		/*
 		 * If input is a composite type and target is RECORD, accept
 		 */
 		if (targetTypeId == RECORDOID &&
-			type_parser->typeOrDomainTypeRelid(inputTypeId) != InvalidOid)
+			TypeParser::typeOrDomainTypeRelid(inputTypeId) != InvalidOid)
 			continue;
 
 #ifdef NOT_USED					/* not implemented yet */
@@ -1232,7 +1228,7 @@ CoerceParser::find_typmod_coercion_function(PGOid typeId,
 	*funcid = InvalidOid;
 	result = PG_COERCION_PATH_FUNC;
 
-	PGTypePtr targetType = type_parser->typeidType(typeId);
+	PGTypePtr targetType = TypeParser::typeidType(typeId);
 	//typeForm = (Form_pg_type) GETSTRUCT(targetType);
 
 	/* Check for a varlena array type */
@@ -1950,7 +1946,7 @@ bool CoerceParser::IsBinaryCoercible(PGOid srctype, PGOid targettype)
 
     /* Also accept any composite type as coercible to RECORD */
     if (targettype == RECORDOID)
-        if (type_parser->typeidTypeRelid(srctype) != InvalidOid)
+        if (TypeParser::typeidTypeRelid(srctype) != InvalidOid)
             return true;
 
     /* Also accept any composite array type as coercible to RECORD[] */

@@ -14,15 +14,12 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-OperParser::OperParser(const ContextPtr& context_) : context(context_)
-{
-    func_parser = std::make_shared<FuncParser>(context);
-	node_parser = std::make_shared<NodeParser>(context);
-	coerce_parser = std::make_shared<CoerceParser>(context);
-	// oper_provider = std::make_shared<OperProvider>(context);
-	// type_provider = std::make_shared<TypeProvider>(context);
-	// proc_provider = std::make_shared<ProcProvider>(context);
-};
+// OperParser::OperParser(const ContextPtr& context_) : context(context_)
+// {
+//     func_parser = std::make_shared<FuncParser>(context);
+// 	node_parser = std::make_shared<NodeParser>(context);
+// 	coerce_parser = std::make_shared<CoerceParser>(context);
+// };
 
 // Oid OperParser::compatible_oper_opid(PGList * op, Oid arg1, Oid arg2, bool noError)
 // {
@@ -51,7 +48,7 @@ PGOperatorPtr OperParser::compatible_oper(PGParseState * pstate, PGList * op, PG
 
     /* but is it good enough? */
     //opform = (Form_pg_operator)GETSTRUCT(optup);
-    if (coerce_parser->IsBinaryCoercible(arg1, optup->oprleft) && coerce_parser->IsBinaryCoercible(arg2, optup->oprright))
+    if (CoerceParser::IsBinaryCoercible(arg1, optup->oprleft) && CoerceParser::IsBinaryCoercible(arg2, optup->oprright))
         return optup;
 
     /* nope... */
@@ -386,7 +383,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
 	 * possibly adjusting return type or declared_arg_types (which will be
 	 * used as the cast destination by make_fn_arguments)
 	 */
-    rettype = coerce_parser->enforce_generic_type_consistency(actual_arg_types, declared_arg_types, 2, tup->oprresult, false);
+    rettype = CoerceParser::enforce_generic_type_consistency(actual_arg_types, declared_arg_types, 2, tup->oprresult, false);
 
     /*
 	 * Check that operator result is boolean
@@ -429,7 +426,7 @@ PGExpr * OperParser::make_scalar_array_op(PGParseState * pstate, PGList * opname
     declared_arg_types[1] = res_atypeId;
 
     /* perform the necessary typecasting of arguments */
-    func_parser->make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
+    FuncParser::make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
 
     /* and build the expression node */
     result = makeNode(PGScalarArrayOpExpr);
@@ -453,7 +450,7 @@ FuncDetailCode OperParser::oper_select_candidate(int nargs, PGOid * input_typeid
 	 * Delete any candidates that cannot actually accept the given input
 	 * types, whether directly or by coercion.
 	 */
-    ncandidates = func_parser->func_match_argtypes(nargs, input_typeids, candidates, candidates);
+    ncandidates = FuncParser::func_match_argtypes(nargs, input_typeids, candidates, candidates);
 
     /* Done if no candidate or only one candidate survives */
     if (ncandidates == 0)
@@ -471,7 +468,7 @@ FuncDetailCode OperParser::oper_select_candidate(int nargs, PGOid * input_typeid
 	 * Use the same heuristics as for ambiguous functions to resolve the
 	 * conflict.
 	 */
-    candidates = func_parser->func_select_candidate(nargs, input_typeids, candidates);
+    candidates = FuncParser::func_select_candidate(nargs, input_typeids, candidates);
 
     if (candidates)
     {
@@ -716,10 +713,10 @@ PGExpr * OperParser::make_op(PGParseState * pstate, PGList * opname,
 	 * possibly adjusting return type or declared_arg_types (which will be
 	 * used as the cast destination by make_fn_arguments)
 	 */
-    rettype = coerce_parser->enforce_generic_type_consistency(actual_arg_types, declared_arg_types, nargs, tup->oprresult, false);
+    rettype = CoerceParser::enforce_generic_type_consistency(actual_arg_types, declared_arg_types, nargs, tup->oprresult, false);
 
     /* perform the necessary typecasting of arguments */
-    func_parser->make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
+    FuncParser::make_fn_arguments(pstate, args, actual_arg_types, declared_arg_types);
 
     /* and build the expression node */
     result = makeNode(PGOpExpr);

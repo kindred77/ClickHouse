@@ -20,21 +20,17 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-FuncParser::FuncParser(const ContextPtr& context_) : context(context_)
-{
-    coerce_parser = std::make_shared<CoerceParser>(context);
-    agg_parser = std::make_shared<AggParser>(context);
-    clause_parser = std::make_shared<ClauseParser>(context);
-    node_parser = std::make_shared<NodeParser>(context);
-    type_parser = std::make_shared<TypeParser>(context);
-    relation_parser = std::make_shared<RelationParser>(context);
-	target_parser = std::make_shared<TargetParser>(context);
-    expr_parser = std::make_shared<ExprParser>(context);
-	// type_provider = std::make_shared<TypeProvider>(context);
-	// proc_provider = std::make_shared<ProcProvider>(context);
-	// agg_provider = std::make_shared<AggProvider>(context);
-	// func_provider = std::make_shared<FunctionProvider>(context);
-};
+// FuncParser::FuncParser(const ContextPtr& context_) : context(context_)
+// {
+//     coerce_parser = std::make_shared<CoerceParser>(context);
+//     agg_parser = std::make_shared<AggParser>(context);
+//     clause_parser = std::make_shared<ClauseParser>(context);
+//     node_parser = std::make_shared<NodeParser>(context);
+//     type_parser = std::make_shared<TypeParser>(context);
+//     relation_parser = std::make_shared<RelationParser>(context);
+// 	target_parser = std::make_shared<TargetParser>(context);
+//     expr_parser = std::make_shared<ExprParser>(context);
+// };
 
 PGNode *
 FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, PGNode *first_arg,
@@ -57,9 +53,9 @@ FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, P
     {
         PGRangeTblEntry * rte;
 
-        rte = relation_parser->GetRTEByRangeTablePosn(pstate, ((PGVar *)first_arg)->varno, ((PGVar *)first_arg)->varlevelsup);
+        rte = RelationParser::GetRTEByRangeTablePosn(pstate, ((PGVar *)first_arg)->varno, ((PGVar *)first_arg)->varlevelsup);
         /* Return a Var if funcname matches a column, else NULL */
-        return relation_parser->scanRTEForColumn(pstate, rte, funcname, location);
+        return RelationParser::scanRTEForColumn(pstate, rte, funcname, location);
     }
 
     /*
@@ -70,7 +66,7 @@ FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, P
 	 * That task is handled by expandRecordVariable().
 	 */
     if (IsA(first_arg, PGVar) && ((PGVar *)first_arg)->vartype == RECORDOID)
-        tupdesc = target_parser->expandRecordVariable(pstate, (PGVar *)first_arg, 0);
+        tupdesc = TargetParser::expandRecordVariable(pstate, (PGVar *)first_arg, 0);
 	//TODO kindred
 	else
 	{
@@ -124,7 +120,7 @@ FuncParser::func_match_argtypes(int nargs,
 		 current_candidate = next_candidate)
 	{
 		next_candidate = current_candidate->next;
-		if (coerce_parser->can_coerce_type(nargs, input_typeids, current_candidate->args,
+		if (CoerceParser::can_coerce_type(nargs, input_typeids, current_candidate->args,
 							PG_COERCION_IMPLICIT))
 		{
 			current_candidate->next = candidates;
@@ -245,7 +241,7 @@ FuncParser::func_select_candidate(int nargs,
 	 * conversions to preferred types.)  Keep all candidates if none match.
 	 */
 	for (i = 0; i < nargs; i++) /* avoid multiple lookups */
-		slot_category[i] = coerce_parser->TypeCategory(input_base_typeids[i]);
+		slot_category[i] = CoerceParser::TypeCategory(input_base_typeids[i]);
 	ncandidates = 0;
 	nbestMatch = 0;
 	last_candidate = NULL;
@@ -260,7 +256,7 @@ FuncParser::func_select_candidate(int nargs,
 			if (input_base_typeids[i] != UNKNOWNOID)
 			{
 				if (current_typeids[i] == input_base_typeids[i] ||
-					coerce_parser->IsPreferredType(slot_category[i], current_typeids[i]))
+					CoerceParser::IsPreferredType(slot_category[i], current_typeids[i]))
 					nmatch++;
 			}
 		}
@@ -471,7 +467,7 @@ FuncParser::func_select_candidate(int nargs,
 				 current_candidate = current_candidate->next)
 			{
 				current_typeids = current_candidate->args;
-				if (coerce_parser->can_coerce_type(nargs, input_base_typeids, current_typeids,
+				if (CoerceParser::can_coerce_type(nargs, input_base_typeids, current_typeids,
 									PG_COERCION_IMPLICIT))
 				{
 					if (++ncandidates > 1)
@@ -496,13 +492,13 @@ FuncParser::FuncNameAsType(PGList *funcname)
 {
 	PGOid			result;
 
-	PGTypePtr typtup = type_parser->LookupTypeName(NULL, makeTypeNameFromNameList(funcname), NULL, false);
+	PGTypePtr typtup = TypeParser::LookupTypeName(NULL, makeTypeNameFromNameList(funcname), NULL, false);
 	if (typtup == NULL)
 		return InvalidOid;
 
 	if (typtup->typisdefined &&
-		!OidIsValid(type_parser->typeTypeRelid(typtup)))
-		result = type_parser->typeTypeId(typtup);
+		!OidIsValid(TypeParser::typeTypeRelid(typtup)))
+		result = TypeParser::typeTypeId(typtup);
 	else
 		result = InvalidOid;
 
@@ -612,14 +608,14 @@ FuncParser::func_get_detail(PGList *funcname,
                     PGCoercionPathType cpathtype;
                     PGOid cfuncid;
 
-                    cpathtype = coerce_parser->find_coercion_pathway(targetType, sourceType, PG_COERCION_EXPLICIT, &cfuncid);
+                    cpathtype = CoerceParser::find_coercion_pathway(targetType, sourceType, PG_COERCION_EXPLICIT, &cfuncid);
                     switch (cpathtype)
                     {
                         case PG_COERCION_PATH_RELABELTYPE:
                             iscoercion = true;
                             break;
                         case PG_COERCION_PATH_COERCEVIAIO:
-                            if ((sourceType == RECORDOID || type_parser->typeidTypeRelid(sourceType) != InvalidOid) && coerce_parser->TypeCategory(targetType) == TYPCATEGORY_STRING)
+                            if ((sourceType == RECORDOID || TypeParser::typeidTypeRelid(sourceType) != InvalidOid) && CoerceParser::TypeCategory(targetType) == TYPCATEGORY_STRING)
                                 iscoercion = false;
                             else
                                 iscoercion = true;
@@ -903,7 +899,7 @@ FuncParser::unify_hypothetical_args(PGParseState *pstate,
 		 * type (we'd rather coerce the direct argument once than coerce all
 		 * the aggregated values).
 		 */
-		commontype = coerce_parser->select_common_type(pstate,
+		commontype = CoerceParser::select_common_type(pstate,
 										list_make2(args[aargpos], args[i]),
 										"WITHIN GROUP",
 										NULL);
@@ -912,7 +908,7 @@ FuncParser::unify_hypothetical_args(PGParseState *pstate,
 		 * Perform the coercions.  We don't need to worry about NamedArgExprs
 		 * here because they aren't supported with aggregates.
 		 */
-		args[i] = coerce_parser->coerce_type(pstate,
+		args[i] = CoerceParser::coerce_type(pstate,
 							  args[i],
 							  actual_arg_types[i],
 							  commontype, -1,
@@ -920,7 +916,7 @@ FuncParser::unify_hypothetical_args(PGParseState *pstate,
 							  PG_COERCE_IMPLICIT_CAST,
 							  -1);
 		actual_arg_types[i] = commontype;
-		args[aargpos] = coerce_parser->coerce_type(pstate,
+		args[aargpos] = CoerceParser::coerce_type(pstate,
 									args[aargpos],
 									actual_arg_types[aargpos],
 									commontype, -1,
@@ -971,7 +967,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 	 * If there's an aggregate filter, transform it using transformWhereClause
 	 */
     if (fn && fn->agg_filter != NULL)
-        agg_filter = (PGExpr *)clause_parser->transformWhereClause(pstate, fn->agg_filter, EXPR_KIND_FILTER, "FILTER");
+        agg_filter = (PGExpr *)ClauseParser::transformWhereClause(pstate, fn->agg_filter, EXPR_KIND_FILTER, "FILTER");
 
     /*
 	 * Most of the rest of the parser just assumes that functions do not have
@@ -1077,7 +1073,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
     {
         PGOid argtype = actual_arg_types[0];
 
-        if (argtype == RECORDOID || type_parser->typeidTypeRelid(argtype) != InvalidOid)
+        if (argtype == RECORDOID || TypeParser::typeidTypeRelid(argtype) != InvalidOid)
         {
             retval = ParseComplexProjection(pstate, strVal(linitial(funcname)), first_arg, location);
             if (retval)
@@ -1126,7 +1122,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 		 * We interpreted it as a type coercion. coerce_type can handle these
 		 * cases, so why duplicate code...
 		 */
-        return coerce_parser->coerce_type(pstate, (PGNode *)linitial(fargs), actual_arg_types[0], rettype, -1, PG_COERCION_EXPLICIT, PG_COERCE_EXPLICIT_CALL, location);
+        return CoerceParser::coerce_type(pstate, (PGNode *)linitial(fargs), actual_arg_types[0], rettype, -1, PG_COERCION_EXPLICIT, PG_COERCE_EXPLICIT_CALL, location);
     }
     else if (fdresult == FUNCDETAIL_NORMAL)
     {
@@ -1425,7 +1421,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 	 * possibly adjusting return type or declared_arg_types (which will be
 	 * used as the cast destination by make_fn_arguments)
 	 */
-    rettype = coerce_parser->enforce_generic_type_consistency(actual_arg_types, declared_arg_types, nargsplusdefs, rettype, false);
+    rettype = CoerceParser::enforce_generic_type_consistency(actual_arg_types, declared_arg_types, nargsplusdefs, rettype, false);
 
     /* perform the necessary typecasting of arguments */
     make_fn_arguments(pstate, fargs, actual_arg_types, declared_arg_types);
@@ -1568,7 +1564,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                  parser_errposition(pstate, location)));
 
         /* parse_agg.c does additional aggregate-specific processing */
-        agg_parser->transformAggregateCall(pstate, aggref, fargs, agg_order, agg_distinct);
+        AggParser::transformAggregateCall(pstate, aggref, fargs, agg_order, agg_distinct);
 
         retval = (PGNode *)aggref;
     }
@@ -1656,7 +1652,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                  parser_errposition(pstate, location)));
 
         /* parse_agg.c does additional window-func-specific processing */
-        agg_parser->transformWindowFuncCall(pstate, wfunc, over);
+        AggParser::transformWindowFuncCall(pstate, wfunc, over);
 
         retval = (PGNode *)wfunc;
     }
@@ -1813,7 +1809,7 @@ FuncParser::check_srf_call_placement(PGParseState * pstate, int location)
             ERROR,
             (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
              /* translator: %s is name of a SQL construct, eg GROUP BY */
-             errmsg("set-returning functions are not allowed in %s", expr_parser->ParseExprKindName(pstate->p_expr_kind)),
+             errmsg("set-returning functions are not allowed in %s", ExprParser::ParseExprKindName(pstate->p_expr_kind)),
              parser_errposition(pstate, location)));
 };
 
@@ -1841,7 +1837,7 @@ FuncParser::make_fn_arguments(PGParseState *pstate,
 			{
 				PGNamedArgExpr *na = (PGNamedArgExpr *) node;
 
-				node = coerce_parser->coerce_type(pstate,
+				node = CoerceParser::coerce_type(pstate,
 								   (PGNode *) na->arg,
 								   actual_arg_types[i],
 								   declared_arg_types[i], -1,
@@ -1852,7 +1848,7 @@ FuncParser::make_fn_arguments(PGParseState *pstate,
 			}
 			else
 			{
-				node = coerce_parser->coerce_type(pstate,
+				node = CoerceParser::coerce_type(pstate,
 								   node,
 								   actual_arg_types[i],
 								   declared_arg_types[i], -1,
