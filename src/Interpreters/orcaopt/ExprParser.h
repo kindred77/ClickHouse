@@ -15,8 +15,8 @@ class NodeParser;
 class TypeParser;
 class FuncParser;
 class AggParser;
-class TypeProvider;
-class RelationProvider;
+// class TypeProvider;
+// class RelationProvider;
 
 using RelationParserPtr = std::shared_ptr<RelationParser>;
 using SelectParserPtr = std::shared_ptr<SelectParser>;
@@ -28,8 +28,8 @@ using NodeParserPtr = std::shared_ptr<NodeParser>;
 using TypeParserPtr = std::shared_ptr<TypeParser>;
 using FuncParserPtr = std::shared_ptr<FuncParser>;
 using AggParserPtr = std::shared_ptr<AggParser>;
-using TypeProviderPtr = std::shared_ptr<TypeProvider>;
-using RelationProviderPtr = std::shared_ptr<RelationProvider>;
+// using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+// using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -47,8 +47,8 @@ private:
     //CollationParserPtr collation_parser;
     NodeParserPtr node_parser;
     AggParserPtr agg_parser;
-    TypeProviderPtr type_provider;
-    RelationProviderPtr relation_provider;
+    // TypeProviderPtr type_provider;
+    // RelationProviderPtr relation_provider;
 
     bool		operator_precedence_warning = false;
     bool		Transform_null_equals = false;

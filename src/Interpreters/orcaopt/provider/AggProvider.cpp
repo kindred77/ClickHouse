@@ -7,12 +7,16 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-AggProvider::AggProvider(const ContextPtr& context_) : context(context_)
-{
-
+AggProvider::OidAggMap AggProvider::oid_agg_map = {
+	
 };
 
-PGAggPtr AggProvider::getAggByFuncOid(PGOid func_oid) const
+// AggProvider::AggProvider(const ContextPtr& context_) : context(context_)
+// {
+
+// };
+
+PGAggPtr AggProvider::getAggByFuncOid(PGOid func_oid)
 {
 	//TODO kindred
 	auto it = oid_agg_map.find(func_oid);

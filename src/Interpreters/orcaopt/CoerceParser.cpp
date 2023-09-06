@@ -22,10 +22,10 @@ CoerceParser::CoerceParser(ContextPtr& context_) : context(context_)
 	relation_parser = std::make_shared<RelationParser>(context);
 	node_parser = std::make_shared<NodeParser>(context);
 	type_parser = std::make_shared<TypeParser>(context);
-	type_provider = std::make_shared<TypeProvider>(context);
-	proc_provider = std::make_shared<ProcProvider>(context);
-	cast_provider = std::make_shared<CastProvider>(context);
-	relation_provider = std::make_shared<RelationProvider>(context);
+	// type_provider = std::make_shared<TypeProvider>(context);
+	// proc_provider = std::make_shared<ProcProvider>(context);
+	// cast_provider = std::make_shared<CastProvider>(context);
+	// relation_provider = std::make_shared<RelationProvider>(context);
 };
 
 PGOid
@@ -71,13 +71,13 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 	 * points to the first list item with type different from pexpr's; we need
 	 * not re-examine any items the previous loop advanced over.
 	 */
-	ptype = type_provider->getBaseType(ptype);
-	type_provider->get_type_category_preferred(ptype, &pcategory, &pispreferred);
+	ptype = TypeProvider::getBaseType(ptype);
+	TypeProvider::get_type_category_preferred(ptype, &pcategory, &pispreferred);
 
 	for_each_cell(lc, lc)
 	{
 		PGNode	   *nexpr = (PGNode *) lfirst(lc);
-		PGOid			ntype = type_provider->getBaseType(exprType(nexpr));
+		PGOid			ntype = TypeProvider::getBaseType(exprType(nexpr));
 
 		/* move on to next one if no new information... */
 		if (ntype != UNKNOWNOID && ntype != ptype)
@@ -85,7 +85,7 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 			TYPCATEGORY ncategory;
 			bool		nispreferred;
 
-			type_provider->get_type_category_preferred(ntype, &ncategory, &nispreferred);
+			TypeProvider::get_type_category_preferred(ntype, &ncategory, &nispreferred);
 			if (ptype == UNKNOWNOID)
 			{
 				/* so far, only unknowns so take anything... */
@@ -108,8 +108,8 @@ CoerceParser::select_common_type(PGParseState *pstate, PGList *exprs, const char
 				  translator: first %s is name of a SQL construct, eg CASE */
 						 errmsg("%s types %s and %s cannot be matched",
 								context_str,
-								type_provider->format_type_be(ptype).c_str(),
-								type_provider->format_type_be(ntype).c_str())));
+								TypeProvider::format_type_be(ptype).c_str(),
+								TypeProvider::format_type_be(ntype).c_str())));
 			}
 			else if (!pispreferred &&
 					 can_coerce_type(1, &ptype, &ntype, PG_COERCION_IMPLICIT) &&
@@ -182,10 +182,10 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
         ereport(
             ERROR,
             (errcode(PG_ERRCODE_CANNOT_COERCE),
-             errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
+             errmsg("cannot cast type %s to %s", TypeProvider::format_type_be(RECORDOID).c_str(), TypeProvider::format_type_be(targetTypeId).c_str()),
              parser_coercion_errposition(pstate, location, node)));
 
-    PGTupleDescPtr tupdesc = type_provider->lookup_rowtype_tupdesc(targetTypeId, -1);
+    PGTupleDescPtr tupdesc = TypeProvider::lookup_rowtype_tupdesc(targetTypeId, -1);
     newargs = NIL;
     ucolno = 1;
     arg = list_head(args);
@@ -205,7 +205,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
 
             int16_t typLen;
             bool typByVal;
-            type_provider->get_typlenbyval(INT4OID, &typLen, &typByVal);
+            TypeProvider::get_typlenbyval(INT4OID, &typLen, &typByVal);
             newargs = lappend(newargs, makeNullConst(typLen, typByVal, INT4OID, -1, InvalidOid));
             continue;
         }
@@ -214,7 +214,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
             ereport(
                 ERROR,
                 (errcode(PG_ERRCODE_CANNOT_COERCE),
-                 errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
+                 errmsg("cannot cast type %s to %s", TypeProvider::format_type_be(RECORDOID).c_str(), TypeProvider::format_type_be(targetTypeId).c_str()),
                  errdetail("Input has too few columns."),
                  parser_coercion_errposition(pstate, location, node)));
         expr = (PGNode *)lfirst(arg);
@@ -226,11 +226,11 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
             ereport(
                 ERROR,
                 (errcode(PG_ERRCODE_CANNOT_COERCE),
-                 errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
+                 errmsg("cannot cast type %s to %s", TypeProvider::format_type_be(RECORDOID).c_str(), TypeProvider::format_type_be(targetTypeId).c_str()),
                  errdetail(
                      "Cannot cast type %s to %s in column %d.",
-                     type_provider->format_type_be(exprtype).c_str(),
-                     type_provider->format_type_be(tupdesc->attrs[i]->atttypid).c_str(),
+                     TypeProvider::format_type_be(exprtype).c_str(),
+                     TypeProvider::format_type_be(tupdesc->attrs[i]->atttypid).c_str(),
                      ucolno),
                  parser_coercion_errposition(pstate, location, expr)));
         newargs = lappend(newargs, cexpr);
@@ -241,7 +241,7 @@ CoerceParser::coerce_record_to_complex(PGParseState *pstate, PGNode *node,
         ereport(
             ERROR,
             (errcode(PG_ERRCODE_CANNOT_COERCE),
-             errmsg("cannot cast type %s to %s", type_provider->format_type_be(RECORDOID).c_str(), type_provider->format_type_be(targetTypeId).c_str()),
+             errmsg("cannot cast type %s to %s", TypeProvider::format_type_be(RECORDOID).c_str(), TypeProvider::format_type_be(targetTypeId).c_str()),
              errdetail("Input has too many columns."),
              parser_coercion_errposition(pstate, location, node)));
 
@@ -260,7 +260,7 @@ CoerceParser::IsPreferredType(TYPCATEGORY category, PGOid type)
 	char		typcategory;
 	bool		typispreferred;
 
-	type_provider->get_type_category_preferred(type, &typcategory, &typispreferred);
+	TypeProvider::get_type_category_preferred(type, &typcategory, &typispreferred);
 	if (category == typcategory || category == TYPCATEGORY_INVALID)
 		return typispreferred;
 	else
@@ -281,7 +281,7 @@ PGNode * CoerceParser::coerce_to_domain(
 
     /* Get the base type if it hasn't been supplied */
     if (baseTypeId == InvalidOid)
-        baseTypeId = type_provider->getBaseTypeAndTypmod(typeId, &baseTypeMod);
+        baseTypeId = TypeProvider::getBaseTypeAndTypmod(typeId, &baseTypeMod);
 
     /* If it isn't a domain, return the node as it was passed in */
     if (baseTypeId == typeId)
@@ -330,7 +330,7 @@ PGNode * CoerceParser::coerce_to_domain(
 bool
 CoerceParser::is_complex_array(PGOid typid)
 {
-	PGOid elemtype = type_provider->get_element_type(typid);
+	PGOid elemtype = TypeProvider::get_element_type(typid);
 
 	return (OidIsValid(elemtype) && type_parser->typeOrDomainTypeRelid(elemtype) != InvalidOid);
 };
@@ -342,7 +342,7 @@ bool CoerceParser::typeIsOfTypedTable(PGOid reltypeId, PGOid reloftypeId)
 
     if (relid)
     {
-		PGClassPtr tp = relation_provider->getClassByRelOid(relid);
+		PGClassPtr tp = RelationProvider::getClassByRelOid(relid);
         if (tp == NULL)
             elog(ERROR, "cache lookup failed for relation %u", relid);
 
@@ -516,7 +516,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
         {
             PGConst * con = (PGConst *)node;
             PGConst * newcon = makeNode(PGConst);
-            PGOid elemoid = type_provider->get_element_type(inputTypeId);
+            PGOid elemoid = TypeProvider::get_element_type(inputTypeId);
 
             if (elemoid == InvalidOid)
                 ereport(ERROR, (errcode(PG_ERRCODE_DATATYPE_MISMATCH), errmsg("Cannot convert non-Array type to ANYARRAY")));
@@ -529,7 +529,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 
         if (inputTypeId != UNKNOWNOID)
         {
-            PGOid baseTypeId = type_provider->getBaseType(inputTypeId);
+            PGOid baseTypeId = TypeProvider::getBaseType(inputTypeId);
 
             if (baseTypeId != inputTypeId)
             {
@@ -578,7 +578,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		 * inside coerce_to_domain().
 		 */
         baseTypeMod = targetTypeMod;
-        baseTypeId = type_provider->getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
+        baseTypeId = TypeProvider::getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
 
         /*
 		 * For most types we pass typmod -1 to the input routine, because
@@ -675,7 +675,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
     if (pstate != NULL && inputTypeId == UNKNOWNOID && IsA(node, PGVar))
     {
         int32 baseTypeMod = -1;
-        PGOid baseTypeId = type_provider->getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
+        PGOid baseTypeId = TypeProvider::getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
         PGVar * fixvar = coerce_unknown_var(pstate, (PGVar *)node, baseTypeId, baseTypeMod, ccontext, cformat, 0);
         node = (PGNode *)fixvar;
         inputTypeId = fixvar->vartype;
@@ -696,8 +696,8 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
             PGFuncExpr * fe;
             PGList * args = NIL;
 
-            type_provider->getTypeOutputInfo(UNKNOWNOID, &outfunc, &outtypisvarlena);
-            type_provider->getTypeInputInfo(targetTypeId, &infunc, &intypioparam);
+            TypeProvider::getTypeOutputInfo(UNKNOWNOID, &outfunc, &outtypisvarlena);
+            TypeProvider::getTypeInputInfo(targetTypeId, &infunc, &intypioparam);
 
 			//TODO kindred
             //Insist(OidIsValid(outfunc));
@@ -750,7 +750,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
             int32 baseTypeMod;
 
             baseTypeMod = targetTypeMod;
-            baseTypeId = type_provider->getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
+            baseTypeId = TypeProvider::getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
 
             result = build_coercion_expression(
                 node, pathtype, funcId, baseTypeId, baseTypeMod, cformat, location, (cformat != PG_COERCE_IMPLICIT_CAST));
@@ -816,7 +816,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
         /* NB: we do NOT want a RelabelType here */
         return node;
     }
-    if (type_provider->typeInheritsFrom(inputTypeId, targetTypeId) || typeIsOfTypedTable(inputTypeId, targetTypeId))
+    if (TypeProvider::typeInheritsFrom(inputTypeId, targetTypeId) || typeIsOfTypedTable(inputTypeId, targetTypeId))
     {
         /*
 		 * Input class type is a subclass of target, so generate an
@@ -832,7 +832,7 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
         return (PGNode *)r;
     }
     /* If we get here, caller blew it */
-    elog(ERROR, "failed to find conversion function from %s to %s", type_provider->format_type_be(inputTypeId).c_str(), type_provider->format_type_be(targetTypeId).c_str());
+    elog(ERROR, "failed to find conversion function from %s to %s", TypeProvider::format_type_be(inputTypeId).c_str(), TypeProvider::format_type_be(targetTypeId).c_str());
     return NULL; /* keep compiler quiet */
 };
 
@@ -842,7 +842,7 @@ CoerceParser::TypeCategory(PGOid type)
 	char		typcategory;
 	bool		typispreferred;
 
-	type_provider->get_type_category_preferred(type, &typcategory, &typispreferred);
+	TypeProvider::get_type_category_preferred(type, &typcategory, &typispreferred);
 	Assert(typcategory != TYPCATEGORY_INVALID)
 	return (TYPCATEGORY) typcategory;
 };
@@ -858,16 +858,16 @@ CoerceParser::find_coercion_pathway(PGOid targetTypeId, PGOid sourceTypeId,
 
 	/* Perhaps the types are domains; if so, look at their base types */
 	if (OidIsValid(sourceTypeId))
-		sourceTypeId = type_provider->getBaseType(sourceTypeId);
+		sourceTypeId = TypeProvider::getBaseType(sourceTypeId);
 	if (OidIsValid(targetTypeId))
-		targetTypeId = type_provider->getBaseType(targetTypeId);
+		targetTypeId = TypeProvider::getBaseType(targetTypeId);
 
 	/* Domains are always coercible to and from their base type */
 	if (sourceTypeId == targetTypeId)
 		return PG_COERCION_PATH_RELABELTYPE;
 
 	/* Look in pg_cast */
-	PGCastPtr tuple = cast_provider->getCastBySourceTypeAndTargetTypeOid(sourceTypeId, targetTypeId);
+	PGCastPtr tuple = CastProvider::getCastBySourceTypeAndTargetTypeOid(sourceTypeId, targetTypeId);
 
 	if (tuple != NULL)
 	{
@@ -934,8 +934,8 @@ CoerceParser::find_coercion_pathway(PGOid targetTypeId, PGOid sourceTypeId,
 			PGOid			targetElem;
 			PGOid			sourceElem;
 
-			if ((targetElem = type_provider->get_element_type(targetTypeId)) != InvalidOid &&
-				(sourceElem = type_provider->get_element_type(sourceTypeId)) != InvalidOid)
+			if ((targetElem = TypeProvider::get_element_type(targetTypeId)) != InvalidOid &&
+				(sourceElem = TypeProvider::get_element_type(sourceTypeId)) != InvalidOid)
 			{
 				PGCoercionPathType elempathtype;
 				PGOid			elemfuncid;
@@ -1018,7 +1018,7 @@ CoerceParser::check_generic_type_consistency(const PGOid *actual_arg_types,
 		{
 			if (actual_type == UNKNOWNOID)
 				continue;
-			actual_type = type_provider->getBaseType(actual_type); /* flatten domains */
+			actual_type = TypeProvider::getBaseType(actual_type); /* flatten domains */
 			if (OidIsValid(array_typeid) && actual_type != array_typeid)
 				return false;
 			array_typeid = actual_type;
@@ -1027,7 +1027,7 @@ CoerceParser::check_generic_type_consistency(const PGOid *actual_arg_types,
 		{
 			if (actual_type == UNKNOWNOID)
 				continue;
-			actual_type = type_provider->getBaseType(actual_type); /* flatten domains */
+			actual_type = TypeProvider::getBaseType(actual_type); /* flatten domains */
 			if (OidIsValid(range_typeid) && actual_type != range_typeid)
 				return false;
 			range_typeid = actual_type;
@@ -1045,7 +1045,7 @@ CoerceParser::check_generic_type_consistency(const PGOid *actual_arg_types,
 			return true;
 		}
 
-		array_typelem = type_provider->get_element_type(array_typeid);
+		array_typelem = TypeProvider::get_element_type(array_typeid);
 		if (!OidIsValid(array_typelem))
 			return false;		/* should be an array, but isn't */
 
@@ -1066,7 +1066,7 @@ CoerceParser::check_generic_type_consistency(const PGOid *actual_arg_types,
 	/* Get the element type based on the range type, if we have one */
 	if (OidIsValid(range_typeid))
 	{
-		range_typelem = type_provider->get_range_subtype(range_typeid);
+		range_typelem = TypeProvider::get_range_subtype(range_typeid);
 		if (!OidIsValid(range_typelem))
 			return false;		/* should be a range, but isn't */
 
@@ -1087,14 +1087,14 @@ CoerceParser::check_generic_type_consistency(const PGOid *actual_arg_types,
 	if (have_anynonarray)
 	{
 		/* require the element type to not be an array or domain over array */
-		if (type_provider->get_base_element_type(elem_typeid) != InvalidOid)
+		if (TypeProvider::get_base_element_type(elem_typeid) != InvalidOid)
 			return false;
 	}
 
 	if (have_anyenum)
 	{
 		/* require the element type to be an enum */
-		if (!type_provider->type_is_enum(elem_typeid))
+		if (!TypeProvider::type_is_enum(elem_typeid))
 			return false;
 	}
 
@@ -1199,7 +1199,7 @@ CoerceParser::can_coerce_type(int nargs, const PGOid *input_typeids, const PGOid
 		/*
 		 * If input is a class type that inherits from target, accept
 		 */
-		if (type_provider->typeInheritsFrom(inputTypeId, targetTypeId)
+		if (TypeProvider::typeInheritsFrom(inputTypeId, targetTypeId)
 			|| typeIsOfTypedTable(inputTypeId, targetTypeId))
 			continue;
 
@@ -1245,7 +1245,7 @@ CoerceParser::find_typmod_coercion_function(PGOid typeId,
 	//ReleaseSysCache(targetType);
 
 	/* Look in pg_cast */
-	PGCastPtr tuple = cast_provider->getCastBySourceTypeAndTargetTypeOid(typeId, typeId);
+	PGCastPtr tuple = CastProvider::getCastBySourceTypeAndTargetTypeOid(typeId, typeId);
 
 	if (tuple != NULL)
 	{
@@ -1390,7 +1390,7 @@ CoerceParser::coerce_to_boolean(PGParseState *pstate, PGNode *node,
 			/* translator: first %s is name of a SQL construct, eg WHERE */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName, "boolean",
-							type_provider->format_type_be(inputTypeId).c_str())));
+							TypeProvider::format_type_be(inputTypeId).c_str())));
 		}
 		node = newnode;
 	}
@@ -1422,7 +1422,7 @@ PGNode * CoerceParser::build_coercion_expression(
 
     if (OidIsValid(funcId))
     {
-        PGProcPtr tp = proc_provider->getProcByOid(funcId);
+        PGProcPtr tp = ProcProvider::getProcByOid(funcId);
         if (tp == NULL)
             elog(ERROR, "cache lookup failed for function %u", funcId);
 
@@ -1537,8 +1537,8 @@ CoerceParser::coerce_to_common_type(PGParseState *pstate, PGNode *node,
 		/* translator: first %s is name of a SQL construct, eg CASE */
 				 errmsg("%s could not convert type %s to %s",
 						context_str,
-						type_provider->format_type_be(inputTypeId).c_str(),
-						type_provider->format_type_be(targetTypeId).c_str())));
+						TypeProvider::format_type_be(inputTypeId).c_str(),
+						TypeProvider::format_type_be(targetTypeId).c_str())));
 	}
 	return node;
 };
@@ -1605,8 +1605,8 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyelement\" are not all alike"),
 						 errdetail("%s versus %s",
-								   type_provider->format_type_be(elem_typeid).c_str(),
-								   type_provider->format_type_be(actual_type).c_str())));
+								   TypeProvider::format_type_be(elem_typeid).c_str(),
+								   TypeProvider::format_type_be(actual_type).c_str())));
 			elem_typeid = actual_type;
 		}
 		else if (decl_type == ANYARRAYOID)
@@ -1619,14 +1619,14 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 			}
 			if (allow_poly && decl_type == actual_type)
 				continue;		/* no new information here */
-			actual_type = type_provider->getBaseType(actual_type); /* flatten domains */
+			actual_type = TypeProvider::getBaseType(actual_type); /* flatten domains */
 			if (OidIsValid(array_typeid) && actual_type != array_typeid)
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyarray\" are not all alike"),
 						 errdetail("%s versus %s",
-								   type_provider->format_type_be(array_typeid).c_str(),
-								   type_provider->format_type_be(actual_type).c_str())));
+								   TypeProvider::format_type_be(array_typeid).c_str(),
+								   TypeProvider::format_type_be(actual_type).c_str())));
 			array_typeid = actual_type;
 		}
 		else if (decl_type == ANYRANGEOID)
@@ -1639,14 +1639,14 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 			}
 			if (allow_poly && decl_type == actual_type)
 				continue;		/* no new information here */
-			actual_type = type_provider->getBaseType(actual_type); /* flatten domains */
+			actual_type = TypeProvider::getBaseType(actual_type); /* flatten domains */
 			if (OidIsValid(range_typeid) && actual_type != range_typeid)
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("arguments declared \"anyrange\" are not all alike"),
 						 errdetail("%s versus %s",
-								   type_provider->format_type_be(range_typeid).c_str(),
-								   type_provider->format_type_be(actual_type).c_str())));
+								   TypeProvider::format_type_be(range_typeid).c_str(),
+								   TypeProvider::format_type_be(actual_type).c_str())));
 			range_typeid = actual_type;
 		}
 	}
@@ -1668,12 +1668,12 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 		}
 		else
 		{
-			array_typelem = type_provider->get_element_type(array_typeid);
+			array_typelem = TypeProvider::get_element_type(array_typeid);
 			if (!OidIsValid(array_typelem))
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("argument declared %s is not an array but type %s",
-								"anyarray", type_provider->format_type_be(array_typeid).c_str())));
+								"anyarray", TypeProvider::format_type_be(array_typeid).c_str())));
 		}
 
 		if (!OidIsValid(elem_typeid))
@@ -1691,8 +1691,8 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 					 errmsg("argument declared %s is not consistent with argument declared %s",
 							"anyarray", "anyelement"),
 					 errdetail("%s versus %s",
-							   type_provider->format_type_be(array_typeid).c_str(),
-							   type_provider->format_type_be(elem_typeid).c_str())));
+							   TypeProvider::format_type_be(array_typeid).c_str(),
+							   TypeProvider::format_type_be(elem_typeid).c_str())));
 		}
 	}
 
@@ -1706,13 +1706,13 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 		}
 		else
 		{
-			range_typelem = type_provider->get_range_subtype(range_typeid);
+			range_typelem = TypeProvider::get_range_subtype(range_typeid);
 			if (!OidIsValid(range_typelem))
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("argument declared %s is not a range type but type %s",
 								"anyrange",
-								type_provider->format_type_be(range_typeid).c_str())));
+								TypeProvider::format_type_be(range_typeid).c_str())));
 		}
 
 		if (!OidIsValid(elem_typeid))
@@ -1730,8 +1730,8 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 					 errmsg("argument declared %s is not consistent with argument declared %s",
 							"anyrange", "anyelement"),
 					 errdetail("%s versus %s",
-							   type_provider->format_type_be(range_typeid).c_str(),
-							   type_provider->format_type_be(elem_typeid).c_str())));
+							   TypeProvider::format_type_be(range_typeid).c_str(),
+							   TypeProvider::format_type_be(elem_typeid).c_str())));
 		}
 	}
 
@@ -1756,21 +1756,21 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 	if (have_anynonarray && elem_typeid != ANYELEMENTOID)
 	{
 		/* require the element type to not be an array or domain over array */
-		if (type_provider->get_base_element_type(elem_typeid) != InvalidOid)
+		if (TypeProvider::get_base_element_type(elem_typeid) != InvalidOid)
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("type matched to anynonarray is an array type: %s",
-							type_provider->format_type_be(elem_typeid).c_str())));
+							TypeProvider::format_type_be(elem_typeid).c_str())));
 	}
 
 	if (have_anyenum && elem_typeid != ANYELEMENTOID)
 	{
 		/* require the element type to be an enum */
-		if (!type_provider->type_is_enum(elem_typeid))
+		if (!TypeProvider::type_is_enum(elem_typeid))
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("type matched to anyenum is not an enum type: %s",
-							type_provider->format_type_be(elem_typeid).c_str())));
+							TypeProvider::format_type_be(elem_typeid).c_str())));
 	}
 
 	/*
@@ -1794,12 +1794,12 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 			{
 				if (!OidIsValid(array_typeid))
 				{
-					array_typeid = type_provider->get_array_type(elem_typeid);
+					array_typeid = TypeProvider::get_array_type(elem_typeid);
 					if (!OidIsValid(array_typeid))
 						ereport(ERROR,
 								(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 								 errmsg("could not find array type for data type %s",
-										type_provider->format_type_be(elem_typeid).c_str())));
+										TypeProvider::format_type_be(elem_typeid).c_str())));
 				}
 				declared_arg_types[j] = array_typeid;
 			}
@@ -1810,7 +1810,7 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 					ereport(ERROR,
 							(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 							 errmsg("could not find range type for data type %s",
-									type_provider->format_type_be(elem_typeid).c_str())));
+									TypeProvider::format_type_be(elem_typeid).c_str())));
 				}
 				declared_arg_types[j] = range_typeid;
 			}
@@ -1822,12 +1822,12 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 	{
 		if (!OidIsValid(array_typeid))
 		{
-			array_typeid = type_provider->get_array_type(elem_typeid);
+			array_typeid = TypeProvider::get_array_type(elem_typeid);
 			if (!OidIsValid(array_typeid))
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find array type for data type %s",
-								type_provider->format_type_be(elem_typeid).c_str())));
+								TypeProvider::format_type_be(elem_typeid).c_str())));
 		}
 		return array_typeid;
 	}
@@ -1840,7 +1840,7 @@ CoerceParser::enforce_generic_type_consistency(const PGOid *actual_arg_types,
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("could not find range type for data type %s",
-							type_provider->format_type_be(elem_typeid).c_str())));
+							TypeProvider::format_type_be(elem_typeid).c_str())));
 		}
 		return range_typeid;
 	}
@@ -1879,8 +1879,8 @@ CoerceParser::coerce_to_specific_type_typmod(PGParseState *pstate, PGNode *node,
 			/* translator: first %s is name of a SQL construct, eg LIMIT */
 					 errmsg("argument of %s must be type %s, not type %s",
 							constructName,
-							type_provider->format_type_be(targetTypeId).c_str(),
-							type_provider->format_type_be(inputTypeId).c_str())));
+							TypeProvider::format_type_be(targetTypeId).c_str(),
+							TypeProvider::format_type_be(inputTypeId).c_str())));
 		}
 		node = newnode;
 	}
@@ -1922,7 +1922,7 @@ bool CoerceParser::IsBinaryCoercible(PGOid srctype, PGOid targettype)
 
     /* If srctype is a domain, reduce to its base type */
     if (OidIsValid(srctype))
-        srctype = type_provider->getBaseType(srctype);
+        srctype = TypeProvider::getBaseType(srctype);
 
     /* Somewhat-fast path for domain -> base type case */
     if (srctype == targettype)
@@ -1930,22 +1930,22 @@ bool CoerceParser::IsBinaryCoercible(PGOid srctype, PGOid targettype)
 
     /* Also accept any array type as coercible to ANYARRAY */
     if (targettype == ANYARRAYOID)
-        if (type_provider->get_element_type(srctype) != InvalidOid)
+        if (TypeProvider::get_element_type(srctype) != InvalidOid)
             return true;
 
     /* Also accept any non-array type as coercible to ANYNONARRAY */
     if (targettype == ANYNONARRAYOID)
-        if (type_provider->get_element_type(srctype) == InvalidOid)
+        if (TypeProvider::get_element_type(srctype) == InvalidOid)
             return true;
 
     /* Also accept any enum type as coercible to ANYENUM */
     if (targettype == ANYENUMOID)
-        if (type_provider->type_is_enum(srctype))
+        if (TypeProvider::type_is_enum(srctype))
             return true;
 
     /* Also accept any range type as coercible to ANYRANGE */
     if (targettype == ANYRANGEOID)
-        if (type_provider->type_is_range(srctype))
+        if (TypeProvider::type_is_range(srctype))
             return true;
 
     /* Also accept any composite type as coercible to RECORD */
@@ -1961,7 +1961,7 @@ bool CoerceParser::IsBinaryCoercible(PGOid srctype, PGOid targettype)
 	}
         
     /* Else look in pg_cast */
-	PGCastPtr tuple = cast_provider->getCastBySourceTypeAndTargetTypeOid(srctype, targettype);
+	PGCastPtr tuple = CastProvider::getCastBySourceTypeAndTargetTypeOid(srctype, targettype);
     if (tuple == NULL)
         return false; /* no cast */
 

@@ -13,9 +13,9 @@ class FunctionProvider;
 
 using RelationParserPtr = std::shared_ptr<RelationParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
-using TypeProviderPtr = std::shared_ptr<TypeProvider>;
-using RelationProviderPtr = std::shared_ptr<RelationProvider>;
-using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
+// using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+// using RelationProviderPtr = std::shared_ptr<RelationProvider>;
+// using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -25,9 +25,9 @@ class TypeParser
 private:
     RelationParserPtr relation_parser;
     NodeParserPtr node_parser;
-    TypeProviderPtr type_provider;
-    RelationProviderPtr relation_provider;
-    FunctionProviderPtr function_provider;
+    // TypeProviderPtr type_provider;
+    // RelationProviderPtr relation_provider;
+    // FunctionProviderPtr function_provider;
 
     ContextPtr context;
 public:

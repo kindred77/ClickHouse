@@ -19,9 +19,8 @@ using ContextPtr = std::shared_ptr<const Context>;
 class ProcProvider
 {
 private:
-	using Map = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr>;
-
-	Map oid_proc_map;
+	using OidProcMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr>;
+	static OidProcMap oid_proc_map;
 
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_INT2PL;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_INT4PL;
@@ -67,16 +66,16 @@ private:
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_DECIMAL64TOINT32;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_DECIMAL64TOFLOAT64;
 
-	ContextPtr context;
+	//ContextPtr context;
 public:
 	//explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit ProcProvider(const ContextPtr& context_);
+	//explicit ProcProvider(const ContextPtr& context_);
 	
-	duckdb_libpgquery::PGProcPtr getProcByOid(duckdb_libpgquery::PGOid oid) const;
+	static duckdb_libpgquery::PGProcPtr getProcByOid(duckdb_libpgquery::PGOid oid);
 
-	std::unique_ptr<std::vector<duckdb_libpgquery::PGProcPtr>> search_procs_by_name(const std::string & func_name);
+	static std::unique_ptr<std::vector<duckdb_libpgquery::PGProcPtr>> search_procs_by_name(const std::string & func_name);
 
-    bool get_func_retset(duckdb_libpgquery::PGOid funcid);
+    static bool get_func_retset(duckdb_libpgquery::PGOid funcid);
 };
 
 }

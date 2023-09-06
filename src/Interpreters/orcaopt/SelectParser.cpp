@@ -28,7 +28,7 @@ SelectParser::SelectParser(const ContextPtr& context_) : context(context_)
     cte_parser = std::make_shared<CTEParser>(context);
     agg_parser = std::make_shared<AggParser>(context);
     func_parser = std::make_shared<FuncParser>(context);
-    relation_provider = std::make_shared<RelationProvider>(context);
+    // relation_provider = std::make_shared<RelationProvider>(context);
 };
 
 void
@@ -669,7 +669,7 @@ PGAlias * SelectParser::make_replacement_alias(PGQuery *qry, const char *aname)
 			 * attribute in the query's range table. */
             PGVar * var = (PGVar *)tle->expr;
             PGRangeTblEntry * rte = rt_fetch(var->varno, qry->rtable);
-            name = pstrdup(relation_provider->get_rte_attribute_name(rte, var->varattno).c_str());
+            name = pstrdup(RelationProvider::get_rte_attribute_name(rte, var->varattno).c_str());
         }
         else
         {

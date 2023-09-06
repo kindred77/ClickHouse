@@ -17,7 +17,7 @@ CTEParser::CTEParser(const ContextPtr& context_) : context(context_)
 	relation_parser = std::make_shared<RelationParser>(context);
 	node_parser = std::make_shared<NodeParser>(context);
 	select_parser = std::make_shared<SelectParser>(context);
-	type_provider = std::make_shared<TypeProvider>(context);
+	//type_provider = std::make_shared<TypeProvider>(context);
 };
 
 void CTEParser::analyzeCTETargetList(PGParseState * pstate, PGCommonTableExpr * cte, PGList * tlist)
@@ -169,8 +169,8 @@ void CTEParser::analyzeCTE(PGParseState * pstate, PGCommonTableExpr * cte)
                          "recursive query \"%s\" column %d has type %s in non-recursive term but type %s overall",
                          cte->ctename,
                          varattno,
-                         type_provider->format_type_with_typemod(lfirst_oid(lctyp), lfirst_int(lctypmod)).c_str(),
-                         type_provider->format_type_with_typemod(exprType(texpr), exprTypmod(texpr)).c_str()),
+                         TypeProvider::format_type_with_typemod(lfirst_oid(lctyp), lfirst_int(lctypmod)).c_str(),
+                         TypeProvider::format_type_with_typemod(exprType(texpr), exprTypmod(texpr)).c_str()),
                      errhint("Cast the output of the non-recursive term to the correct type."),
                      parser_errposition(pstate, exprLocation(texpr))));
             if (exprCollation(texpr) != lfirst_oid(lccoll))

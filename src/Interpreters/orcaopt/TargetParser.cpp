@@ -20,8 +20,8 @@ TargetParser::TargetParser(const ContextPtr& context_) : context(context_)
     expr_parser = std::make_shared<ExprParser>(context);
     node_parser = std::make_shared<NodeParser>(context);
     coerce_parser = std::make_shared<CoerceParser>(context);
-    type_provider = std::make_shared<TypeProvider>(context);
-    relation_provider = std::make_shared<RelationProvider>(context);
+    // type_provider = std::make_shared<TypeProvider>(context);
+    // relation_provider = std::make_shared<RelationProvider>(context);
 };
 
 int
@@ -347,7 +347,7 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
             char * label = strVal(lfirst(lname));
             PGNode * varnode = (PGNode *)lfirst(lvar);
 
-            type_provider->PGTupleDescInitEntry(tupleDesc, i, label, exprType(varnode), exprTypmod(varnode), 0);
+            TypeProvider::PGTupleDescInitEntry(tupleDesc, i, label, exprType(varnode), exprTypmod(varnode), 0);
             PGTupleDescInitEntryCollation(tupleDesc, i, exprCollation(varnode));
             i++;
         }
@@ -461,9 +461,9 @@ TargetParser::expandRecordVariable(PGParseState *pstate, PGVar *var, int levelsu
 	 * lookup_rowtype_tupdesc() which will probably fail, but will give an
 	 * appropriate error message while failing.
 	 */
-    if (type_provider->get_expr_result_type(expr, NULL, tupleDesc) != TYPEFUNC_COMPOSITE)
+    if (TypeProvider::get_expr_result_type(expr, NULL, tupleDesc) != TYPEFUNC_COMPOSITE)
 	{
-        tupleDesc = type_provider->lookup_rowtype_tupdesc_copy(exprType(expr), exprTypmod(expr));
+        tupleDesc = TypeProvider::lookup_rowtype_tupdesc_copy(exprType(expr), exprTypmod(expr));
 	}
 
 	return tupleDesc;
@@ -514,8 +514,8 @@ TargetParser::ExpandRowReference(PGParseState *pstate, PGNode *expr,
 	 */
     if (IsA(expr, PGVar) && ((PGVar *)expr)->vartype == RECORDOID)
         tupleDesc = expandRecordVariable(pstate, (PGVar *)expr, 0);
-    else if (type_provider->get_expr_result_type(expr, NULL, tupleDesc) != TYPEFUNC_COMPOSITE)
-        tupleDesc = type_provider->lookup_rowtype_tupdesc_copy(exprType(expr), exprTypmod(expr));
+    else if (TypeProvider::get_expr_result_type(expr, NULL, tupleDesc) != TYPEFUNC_COMPOSITE)
+        tupleDesc = TypeProvider::lookup_rowtype_tupdesc_copy(exprType(expr), exprTypmod(expr));
     Assert(tupleDesc)
 
     /* Generate a list of references to the individual fields */
@@ -677,7 +677,7 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 					/*
 					 * We check the catalog name and then ignore it.
 					 */
-					if (strcmp(catname, relation_provider->get_database_name(MyDatabaseId).c_str()) != 0)
+					if (strcmp(catname, RelationProvider::get_database_name(MyDatabaseId).c_str()) != 0)
 					{
 						crserr = CRSERR_WRONG_DB;
 						break;

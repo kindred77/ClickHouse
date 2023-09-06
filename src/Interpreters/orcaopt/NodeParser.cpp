@@ -18,7 +18,7 @@ NodeParser::NodeParser(const ContextPtr& context_) : context(context_)
 	coerce_parser = std::make_shared<CoerceParser>(context);
 	expr_parser = std::make_shared<ExprParser>(context);
 	relation_parser = std::make_shared<RelationParser>(context);
-	type_provider = std::make_shared<TypeProvider>(context);
+	// type_provider = std::make_shared<TypeProvider>(context);
 };
 
 PGOid NodeParser::transformArrayType(PGOid *arrayType, int32 *arrayTypmod)
@@ -33,7 +33,7 @@ PGOid NodeParser::transformArrayType(PGOid *arrayType, int32 *arrayTypmod)
 	 * itself.  (Note that we provide no method whereby the creator of a
 	 * domain over an array type could hide its ability to be subscripted.)
 	 */
-    *arrayType = type_provider->getBaseTypeAndTypmod(*arrayType, arrayTypmod);
+    *arrayType = TypeProvider::getBaseTypeAndTypmod(*arrayType, arrayTypmod);
 
     /*
 	 * We treat int2vector and oidvector as though they were domains over
@@ -48,7 +48,7 @@ PGOid NodeParser::transformArrayType(PGOid *arrayType, int32 *arrayTypmod)
         *arrayType = OIDARRAYOID;
 
     /* Get the type tuple for the array */
-    PGTypePtr type_tuple_array = type_provider->getTypeByOid(*arrayType);
+    PGTypePtr type_tuple_array = TypeProvider::getTypeByOid(*arrayType);
     if (type_tuple_array == NULL)
         elog(ERROR, "cache lookup failed for type %u", *arrayType);
 
@@ -59,7 +59,7 @@ PGOid NodeParser::transformArrayType(PGOid *arrayType, int32 *arrayTypmod)
         ereport(
             ERROR,
             (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
-             errmsg("cannot subscript type %s because it is not an array", type_provider->format_type_be(origArrayType).c_str())));
+             errmsg("cannot subscript type %s because it is not an array", TypeProvider::format_type_be(origArrayType).c_str())));
 
 
     return elementType;
@@ -185,8 +185,8 @@ PGArrayRef * NodeParser::transformArraySubscripts(
                  errmsg(
                      "array assignment requires type %s"
                      " but expression is of type %s",
-                     type_provider->format_type_be(typeneeded).c_str(),
-                     type_provider->format_type_be(typesource).c_str()),
+                     TypeProvider::format_type_be(typeneeded).c_str(),
+                     TypeProvider::format_type_be(typesource).c_str()),
                  errhint("You will need to rewrite or cast the expression."),
                  parser_errposition(pstate, exprLocation(assignFrom))));
         assignFrom = newFrom;

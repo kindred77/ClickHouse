@@ -18,6 +18,9 @@ namespace DB
 {
 
 int TypeProvider::TYPE_OID_ID = 3;
+std::unordered_map<PGTupleDescPtr, const PGTupleDesc &, PGTupleDescHash, PGTupleDescEqual> TypeProvider::recordCacheHash = {};
+size_t TypeProvider::NextRecordTypmod = 0;
+std::vector<PGTupleDescPtr> TypeProvider::recordCacheArray = {};
 
 std::pair<PGOid, PGTypePtr> TypeProvider::TYPE_FLOAT32
     = {PGOid(700),
@@ -1023,38 +1026,70 @@ std::pair<PGOid, PGTypePtr> TypeProvider::TYPE_DECIMAL64
 // 	return mdname;
 // }
 
-TypeProvider::TypeProvider(const ContextPtr& context_) : context(context_)
-{
-	oid_type_map.insert(TYPE_FLOAT32);
-	oid_type_map.insert(TYPE_FLOAT64);
-	oid_type_map.insert(TYPE_BOOLEAN);
-	// oid_type_map.insert(TYPE_UINT8);
-	// oid_type_map.insert(TYPE_UINT16);
-	// oid_type_map.insert(TYPE_UINT32);
-	// oid_type_map.insert(TYPE_UINT64);
-	// oid_type_map.insert(TYPE_UINT128);
-	// oid_type_map.insert(TYPE_UINT256);
-	// oid_type_map.insert(TYPE_INT8);
-	oid_type_map.insert(TYPE_INT16);
-	oid_type_map.insert(TYPE_INT32);
-	oid_type_map.insert(TYPE_INT64);
-	// oid_type_map.insert(TYPE_INT128);
-	// oid_type_map.insert(TYPE_INT256);
-	oid_type_map.insert(TYPE_STRING);
-	oid_type_map.insert(TYPE_FIXEDSTRING);
-	oid_type_map.insert(TYPE_DATE);
-	oid_type_map.insert(TYPE_DATETIME);
-	oid_type_map.insert(TYPE_DATETIME64);
-	// oid_type_map.insert(TYPE_ARRAY);
-	// oid_type_map.insert(TYPE_TUPLE);
-	// oid_type_map.insert(TYPE_DECIMAL32);
-	oid_type_map.insert(TYPE_DECIMAL64);
-	// oid_type_map.insert(TYPE_DECIMAL128);
-	// oid_type_map.insert(TYPE_DECIMAL256);
-	// oid_type_map.insert(TYPE_AGGFUNCSTATE);
-	// oid_type_map.insert(TYPE_MAP);
-	// oid_type_map.insert(TYPE_UUID);
+TypeProvider::OidTypeMap TypeProvider::oid_type_map = {
+    TypeProvider::TYPE_FLOAT32,
+	TypeProvider::TYPE_FLOAT64,
+	TypeProvider::TYPE_BOOLEAN,
+	// TypeProvider::TYPE_UINT8,
+	// TypeProvider::TYPE_UINT16,
+	// TypeProvider::TYPE_UINT32,
+	// TypeProvider::TYPE_UINT64,
+	// TypeProvider::TYPE_UINT128,
+	// TypeProvider::TYPE_UINT256,
+	// TypeProvider::TYPE_INT8,
+	TypeProvider::TYPE_INT16,
+	TypeProvider::TYPE_INT32,
+	TypeProvider::TYPE_INT64,
+	// TypeProvider::TYPE_INT128,
+	// TypeProvider::TYPE_INT256,
+	TypeProvider::TYPE_STRING,
+	TypeProvider::TYPE_FIXEDSTRING,
+	TypeProvider::TYPE_DATE,
+	TypeProvider::TYPE_DATETIME,
+	TypeProvider::TYPE_DATETIME64,
+	// TypeProvider::TYPE_ARRAY,
+	// TypeProvider::TYPE_TUPLE,
+	// TypeProvider::TYPE_DECIMAL32,
+	TypeProvider::TYPE_DECIMAL64,
+	// TypeProvider::TYPE_DECIMAL128,
+	// TypeProvider::TYPE_DECIMAL256,
+	// TypeProvider::TYPE_AGGFUNCSTATE,
+	// TypeProvider::TYPE_MAP,
+	// TypeProvider::TYPE_UUID
 };
+
+// TypeProvider::TypeProvider(const ContextPtr& context_) : context(context_)
+// {
+	// oid_type_map.insert(TYPE_FLOAT32);
+	// oid_type_map.insert(TYPE_FLOAT64);
+	// oid_type_map.insert(TYPE_BOOLEAN);
+	// // oid_type_map.insert(TYPE_UINT8);
+	// // oid_type_map.insert(TYPE_UINT16);
+	// // oid_type_map.insert(TYPE_UINT32);
+	// // oid_type_map.insert(TYPE_UINT64);
+	// // oid_type_map.insert(TYPE_UINT128);
+	// // oid_type_map.insert(TYPE_UINT256);
+	// // oid_type_map.insert(TYPE_INT8);
+	// oid_type_map.insert(TYPE_INT16);
+	// oid_type_map.insert(TYPE_INT32);
+	// oid_type_map.insert(TYPE_INT64);
+	// // oid_type_map.insert(TYPE_INT128);
+	// // oid_type_map.insert(TYPE_INT256);
+	// oid_type_map.insert(TYPE_STRING);
+	// oid_type_map.insert(TYPE_FIXEDSTRING);
+	// oid_type_map.insert(TYPE_DATE);
+	// oid_type_map.insert(TYPE_DATETIME);
+	// oid_type_map.insert(TYPE_DATETIME64);
+	// // oid_type_map.insert(TYPE_ARRAY);
+	// // oid_type_map.insert(TYPE_TUPLE);
+	// // oid_type_map.insert(TYPE_DECIMAL32);
+	// oid_type_map.insert(TYPE_DECIMAL64);
+	// // oid_type_map.insert(TYPE_DECIMAL128);
+	// // oid_type_map.insert(TYPE_DECIMAL256);
+	// // oid_type_map.insert(TYPE_AGGFUNCSTATE);
+	// // oid_type_map.insert(TYPE_MAP);
+	// // oid_type_map.insert(TYPE_UUID);
+//};
 
 // IMDTypePtr
 // TypeProvider::getTypeByOID(OID oid)
@@ -1120,7 +1155,7 @@ TypeProvider::TypeProvider(const ContextPtr& context_) : context(context_)
 // 	}
 // };
 
-PGTypePtr TypeProvider::getTypeByOid(PGOid oid) const
+PGTypePtr TypeProvider::getTypeByOid(PGOid oid)
 {
 	auto it = oid_type_map.find(oid);
 	if (it == oid_type_map.end())
@@ -1230,7 +1265,7 @@ std::string TypeProvider::printTypmod(const char * typname, int32 typmod, PGOid 
         /* Use the type-specific typmodout procedure */
         // char * tmstr;
 
-        // tmstr = DatumGetCString(function_provider->OidFunctionCall1Coll(typmodout, InvalidOid, Int32GetDatum(typmod)));
+        // tmstr = DatumGetCString(FunctionProvider::OidFunctionCall1Coll(typmodout, InvalidOid, Int32GetDatum(typmod)));
         // //res = psprintf("%s%s", typname, tmstr);
         // res = std::string(typname) + std::string(tmstr);
 
@@ -1488,7 +1523,7 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
         if (!force_qualify && TypeIsVisible(type_oid))
             nspname = "";
         else
-            nspname = relation_provider->get_namespace_name(tuple->typnamespace);
+            nspname = RelationProvider::get_namespace_name(tuple->typnamespace);
 
         typname = tuple->typname;
 
@@ -1516,7 +1551,7 @@ PGTupleDescPtr TypeProvider::get_tupdesc_by_type_relid(PGTypePtr type)
         elog(ERROR, "invalid typrelid for composite type %u", type->oid);
 		return nullptr;
 	}
-    PGRelationPtr rel = relation_provider->relation_open(type->typrelid, AccessShareLock);
+    PGRelationPtr rel = RelationProvider::relation_open(type->typrelid, AccessShareLock);
     Assert(rel->rd_rel->reltype == type->oid)
 
     /*
@@ -1531,7 +1566,7 @@ PGTupleDescPtr TypeProvider::get_tupdesc_by_type_relid(PGTypePtr type)
     //Assert(typentry->tupDesc->tdrefcount > 0);
     //typentry->tupDesc->tdrefcount++;
 
-	relation_provider->relation_close(rel, AccessShareLock);
+	RelationProvider::relation_close(rel, AccessShareLock);
 
 	return rel->rd_att;
 };
@@ -1715,7 +1750,7 @@ bool TypeProvider::typeInheritsFrom(PGOid subclassTypeId, PGOid superclassTypeId
 	// }
 
     // /* No point in searching if the superclass has no subclasses */
-    // if (!relation_provider->has_subclass(superclassRelid))
+    // if (!RelationProvider::has_subclass(superclassRelid))
     //     return false;
 
     // /*
@@ -1724,7 +1759,7 @@ bool TypeProvider::typeInheritsFrom(PGOid subclassTypeId, PGOid superclassTypeId
     // queue = list_make1_oid(subclassRelid);
     // visited = NIL;
 
-    // inhrel = relation_provider->heap_open(InheritsRelationId, AccessShareLock);
+    // inhrel = RelationProvider::heap_open(InheritsRelationId, AccessShareLock);
 
     // /*
 	//  * Use queue to do a breadth-first traversal of the inheritance graph from
@@ -2494,7 +2529,7 @@ TypeProvider::internal_get_result_type(PGOid funcid, duckdb_libpgquery::PGNode *
     //     elog(ERROR, "cache lookup failed for function %u", funcid);
     // procform = (Form_pg_proc)GETSTRUCT(tp);
 
-	PGProcPtr tp = proc_provider->getProcByOid(funcid);
+	PGProcPtr tp = ProcProvider::getProcByOid(funcid);
 	if (nullptr == tp)
 	{
 		elog(ERROR, "cache lookup failed for function %u", funcid);
@@ -2649,7 +2684,7 @@ TypeFuncClass TypeProvider::get_expr_result_type(PGNode * expr, PGOid * resultTy
     }
     else if (expr && IsA(expr, PGOpExpr))
     {
-        result = internal_get_result_type(oper_provider->get_opcode(((PGOpExpr *)expr)->opno), expr, resultTypeId, resultTupleDesc);
+        result = internal_get_result_type(OperProvider::get_opcode(((PGOpExpr *)expr)->opno), expr, resultTypeId, resultTupleDesc);
     }
     else
     {

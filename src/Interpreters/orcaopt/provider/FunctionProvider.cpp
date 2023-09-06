@@ -25,22 +25,22 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-gpdxl::CMDName *
-FunctionProvider::CreateMDName(const char *name_str)
-{
-	gpos::CWStringDynamic *str_name =
-			gpdxl::CDXLUtils::CreateDynamicStringFromCharArray(mp, name_str);
-	gpdxl::CMDName *mdname = GPOS_NEW(mp) gpdxl::CMDName(mp, str_name);
+// gpdxl::CMDName *
+// FunctionProvider::CreateMDName(const char *name_str)
+// {
+// 	gpos::CWStringDynamic *str_name =
+// 			gpdxl::CDXLUtils::CreateDynamicStringFromCharArray(mp, name_str);
+// 	gpdxl::CMDName *mdname = GPOS_NEW(mp) gpdxl::CMDName(mp, str_name);
 
-	// cleanup
-	GPOS_DELETE(str_name);
-	return mdname;
-};
+// 	// cleanup
+// 	GPOS_DELETE(str_name);
+// 	return mdname;
+// };
 
-FunctionProvider::FunctionProvider(const ContextPtr& context_) : context(context_)
-{
+// FunctionProvider::FunctionProvider(const ContextPtr& context_) : context(context_)
+// {
 
-};
+// };
 
 // FunctionProvider::FunctionProvider(gpos::CMemoryPool *mp_, ContextPtr context_)
 // 		: context(std::move(context_)),
@@ -602,7 +602,7 @@ FunctionProvider::FuncnameGetCandidates(PGList * names, int nargs, PGList * argn
     // }
 
     /* Search syscache by name only */
-    auto procs = proc_provider->search_procs_by_name(funcname);
+    auto procs = ProcProvider::search_procs_by_name(funcname);
 
     for (auto proc_ptr : *procs.get())
     {
@@ -930,7 +930,7 @@ String FunctionProvider::get_func_result_name(PGOid functionId)
 
     // /* First fetch the function's pg_proc row */
     // procTuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(functionId));
-    PGProcPtr procTuple = proc_provider->getProcByOid(functionId);
+    PGProcPtr procTuple = ProcProvider::getProcByOid(functionId);
     if (!procTuple)
     {
         elog(ERROR, "can not find function: %u", functionId);

@@ -24,8 +24,8 @@ using TargetParserPtr = std::shared_ptr<TargetParser>;
 using OperParserPtr = std::shared_ptr<OperParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
 using TypeParserPtr = std::shared_ptr<TypeParser>;
-using OperProviderPtr = std::shared_ptr<OperProvider>;
-using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
+//using OperProviderPtr = std::shared_ptr<OperProvider>;
+//using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -42,8 +42,8 @@ private:
     OperParserPtr oper_parser;
     NodeParserPtr node_parser;
     TypeParserPtr type_parser;
-    OperProviderPtr oper_provider;
-    FunctionProviderPtr function_provider;
+    //OperProviderPtr oper_provider;
+    //FunctionProviderPtr function_provider;
     //std::shared_ptr<ScalarOperatorProvider> scalar_operator_provider = nullptr;
     ContextPtr context;
 public:

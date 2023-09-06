@@ -21,9 +21,9 @@ RelationParser::RelationParser(const ContextPtr& context_) : context(context_)
 	node_parser = std::make_shared<NodeParser>(context);
 	type_parser = std::make_shared<TypeParser>(context);
 
-	relation_provider = std::make_shared<RelationProvider>(context);
-	type_provider = std::make_shared<TypeProvider>(context);
-	function_provider = std::make_shared<FunctionProvider>(context);
+	// relation_provider = std::make_shared<RelationProvider>(context);
+	// type_provider = std::make_shared<TypeProvider>(context);
+	// function_provider = std::make_shared<FunctionProvider>(context);
 };
 
 PGCommonTableExpr *
@@ -237,12 +237,12 @@ RelationParser::searchRangeTableForRel(PGParseState *pstate, PGRangeVar *relatio
     if (!relation->schemaname)
         cte = scanNameSpaceForCTE(pstate, refname, &ctelevelsup);
     if (!cte)
-        relId = relation_provider->RangeVarGetRelidExtended(relation, NoLock, true, false, NULL, NULL);
+        relId = RelationProvider::RangeVarGetRelidExtended(relation, NoLock, true, false, NULL, NULL);
 
     /* Now look for RTEs matching either the relation/CTE or the alias */
     for (levelsup = 0; pstate != NULL; pstate = pstate->parentParseState, levelsup++)
     {
-        ListCell * l;
+        PGListCell * l;
 
         foreach (l, pstate->p_rtable)
         {
@@ -414,7 +414,7 @@ RelationParser::expandTupleDesc(PGTupleDescPtr tupdesc, PGAlias *eref, int count
 
 					int16_t typLen;
                     bool typByVal;
-                    type_provider->get_typlenbyval(INT4OID, &typLen, &typByVal);
+                    TypeProvider::get_typlenbyval(INT4OID, &typLen, &typByVal);
                     *colvars = lappend(*colvars, makeNullConst(typLen, typByVal, INT4OID, -1, InvalidOid));
                 }
             }
@@ -573,12 +573,12 @@ RelationParser::expandRelation(PGOid relid, PGAlias *eref, int rtindex, int subl
 			   PGList **colnames, PGList **colvars)
 {
 	/* Get the tupledesc and turn it over to expandTupleDesc */
-	PGRelationPtr rel = relation_provider->relation_open(relid, AccessShareLock);
+	PGRelationPtr rel = RelationProvider::relation_open(relid, AccessShareLock);
 	expandTupleDesc(rel->rd_att, eref, rel->rd_att->natts, 0,
 					rtindex, sublevels_up,
 					location, include_dropped,
 					colnames, colvars);
-	relation_provider->relation_close(rel, AccessShareLock);
+	RelationProvider::relation_close(rel, AccessShareLock);
 };
 
 void
@@ -667,7 +667,7 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 					PGOid			funcrettype;
 					PGTupleDescPtr tupdesc = nullptr;
 
-					functypclass = type_provider->get_expr_result_type(rtfunc->funcexpr,
+					functypclass = TypeProvider::get_expr_result_type(rtfunc->funcexpr,
 														&funcrettype,
 														tupdesc);
 					if (functypclass == TYPEFUNC_COMPOSITE /* ||
@@ -811,7 +811,7 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 								 */
 								int16_t typLen;
                                 bool typByVal;
-                                type_provider->get_typlenbyval(INT4OID, &typLen, &typByVal);
+                                TypeProvider::get_typlenbyval(INT4OID, &typLen, &typByVal);
 								*colvars = lappend(*colvars,
 												   makeNullConst(typLen, typByVal, INT4OID, -1,
 																 InvalidOid));
@@ -904,7 +904,7 @@ RelationParser::expandRTE(PGRangeTblEntry *rte, int rtindex, int sublevels_up,
 							 */
 							int16_t typLen;
                             bool typByVal;
-                            type_provider->get_typlenbyval(INT4OID, &typLen, &typByVal);
+                            TypeProvider::get_typlenbyval(INT4OID, &typLen, &typByVal);
 							*colvars = lappend(*colvars,
 											   makeNullConst(typLen, typByVal, INT4OID, -1,
 															 InvalidOid));
@@ -945,14 +945,14 @@ PGRelationPtr RelationParser::parserOpenTable(PGParseState * pstate, const PGRan
     //setup_parser_errposition_callback(&pcbstate, pstate, relation->location);
 
     /* Look up the appropriate relation using namespace search */
-    PGOid relid = relation_provider->RangeVarGetRelidExtended(relation, NoLock, true, false, NULL, NULL);
+    PGOid relid = RelationProvider::RangeVarGetRelidExtended(relation, NoLock, true, false, NULL, NULL);
     
     /*
 	 * CdbTryOpenRelation might return NULL (for example, if the table
 	 * is dropped by another transaction). Every time we invoke function
 	 * CdbTryOpenRelation, we should check if the return value is NULL.
 	 */
-    auto rel = relation_provider->heap_open(relid, lockmode);
+    auto rel = RelationProvider::heap_open(relid, lockmode);
 
     if (!rel)
     {
@@ -1015,9 +1015,9 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
         {
             PGOid relid;
 
-            relid = relation_provider->RangeVarGetRelidExtended(relation, lockmode, false, false, NULL, NULL);
+            relid = RelationProvider::RangeVarGetRelidExtended(relation, lockmode, false, false, NULL, NULL);
 
-            rel = relation_provider->try_heap_open(relid, NoLock, true);
+            rel = RelationProvider::try_heap_open(relid, NoLock, true);
             if (!rel)
                     elog(ERROR, "open relation(%u) fail", relid);
 
@@ -1027,8 +1027,8 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
                         (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
                          errmsg("cannot lock rows in materialized view \"%s\"", RelationGetRelationName(rel))));
 
-            lockmode = relation_provider->IsSystemRelation(rel) ? RowExclusiveLock : ExclusiveLock;
-            relation_provider->relation_close(rel, NoLock);
+            lockmode = RelationProvider::IsSystemRelation(rel) ? RowExclusiveLock : ExclusiveLock;
+            RelationProvider::relation_close(rel, NoLock);
         }
         else
         {
@@ -1060,7 +1060,7 @@ RelationParser::addRangeTableEntry(PGParseState *pstate,
 	 * so that the table can't be deleted or have its schema modified
 	 * underneath us.
 	 */
-    relation_provider->relation_close(rel, NoLock);
+    RelationProvider::relation_close(rel, NoLock);
 
     /*
 	 * Set flags and access permissions.
@@ -1370,10 +1370,10 @@ RelationParser::refnameRangeTblEntry(PGParseState *pstate,
 		 * found", not "no permissions for schema", if the name happens to
 		 * match a schema name the user hasn't got access to.
 		 */
-		namespaceId = relation_provider->LookupNamespaceNoError(schemaname);
+		namespaceId = RelationProvider::LookupNamespaceNoError(schemaname);
 		if (!OidIsValid(namespaceId))
 			return NULL;
-		relId = relation_provider->get_relname_relid(refname, namespaceId);
+		relId = RelationProvider::get_relname_relid(refname, namespaceId);
 		if (!OidIsValid(relId))
 			return NULL;
 	}
@@ -1569,7 +1569,7 @@ RelationParser::markVarForSelectPriv(PGParseState *pstate, PGVar *var, PGRangeTb
 // {
 //     PGAttrPtr sysatt;
 
-//     sysatt = relation_provider->SystemAttributeByName(attname, true /* "oid" will be accepted */);
+//     sysatt = RelationProvider::SystemAttributeByName(attname, true /* "oid" will be accepted */);
 //     if (sysatt != NULL)
 //         return sysatt->attnum;
 //     return InvalidAttrNumber;
@@ -1635,7 +1635,7 @@ PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate,
 	// 	 * unless it's GP_ROLE_UTILITY for debug purpose.
 	// 	 */
 	// 	//TODO kindred
-    //     if (relation_provider->PGPolicyIsReplicated(relation_provider->PGPolicyFetch(rte->relid)) /* && Gp_role != GP_ROLE_UTILITY */)
+    //     if (RelationProvider::PGPolicyIsReplicated(RelationProvider::PGPolicyFetch(rte->relid)) /* && Gp_role != GP_ROLE_UTILITY */)
     //         return result;
 
     //     /* quick check to see if name could be a system column */
@@ -1664,8 +1664,8 @@ PGNode * RelationParser::scanRTEForColumn(PGParseState * pstate,
 	// 		 * even though views should not have such --- so we also check
 	// 		 * the relkind.  This kluge will not be needed in 9.3 and later.
 	// 		 */
-    //         if (relation_provider->AttrExistsInRel(rte->relid, attnum)
-    //             && relation_provider->get_rel_relkind(rte->relid) != PG_RELKIND_VIEW)
+    //         if (RelationProvider::AttrExistsInRel(rte->relid, attnum)
+    //             && RelationProvider::get_rel_relkind(rte->relid) != PG_RELKIND_VIEW)
     //         {
     //             var = node_parser->make_var(pstate, rte, attnum, location);
     //             /* Require read access to the column */
@@ -1739,7 +1739,7 @@ RelationParser::isSimplyUpdatableRelation(PGOid relid, bool noerror)
         return false;
     }
 
-    PGRelationPtr rel = relation_provider->relation_open(relid, AccessShareLock);
+    PGRelationPtr rel = RelationProvider::relation_open(relid, AccessShareLock);
 
     do
     {
@@ -1781,7 +1781,7 @@ RelationParser::isSimplyUpdatableRelation(PGOid relid, bool noerror)
 		 * the ctid is also not guaranteed to be the same, so it's not simply
 		 * updateable for CURRENT OF.
 		 */
-        if (relation_provider->PGPolicyIsReplicated(rel->rd_cdbpolicy))
+        if (RelationProvider::PGPolicyIsReplicated(rel->rd_cdbpolicy))
         {
             if (!noerror)
                 ereport(
@@ -1792,7 +1792,7 @@ RelationParser::isSimplyUpdatableRelation(PGOid relid, bool noerror)
         }
     } while (0);
 
-    relation_provider->relation_close(rel, NoLock);
+    RelationProvider::relation_close(rel, NoLock);
     return return_value;
 };
 
@@ -1863,7 +1863,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
     {
         case PG_RTE_RELATION: {
             /* Plain relation RTE --- get the attribute's type info */
-			PGAttrPtr tp = relation_provider->get_att_by_reloid_attnum(rte->relid, attnum);
+			PGAttrPtr tp = RelationProvider::get_att_by_reloid_attnum(rte->relid, attnum);
             if (tp == NULL) /* shouldn't happen */
                 elog(ERROR, "cache lookup failed for attribute %d of relation %u", attnum, rte->relid);
 
@@ -1875,7 +1875,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
                     ereport(
                         ERROR,
                         (errcode(PG_ERRCODE_UNDEFINED_COLUMN),
-                         errmsg("column \"%s\" of relation \"%s\" does not exist", tp->attname.c_str(), relation_provider->get_rel_name(rte->relid).c_str())));
+                         errmsg("column \"%s\" of relation \"%s\" does not exist", tp->attname.c_str(), RelationProvider::get_rel_name(rte->relid).c_str())));
             *vartype = tp->atttypid;
             *vartypmod = tp->atttypmod;
             *varcollid = tp->attcollation;
@@ -1910,7 +1910,7 @@ RelationParser::get_rte_attribute_type(PGRangeTblEntry *rte, PGAttrNumber attnum
                         PGTupleDescPtr tupdesc = nullptr;
 
                         attnum -= atts_done; /* now relative to this func */
-                        TypeFuncClass functypclass = type_provider->get_expr_result_type(rtfunc->funcexpr, &funcrettype, tupdesc);
+                        TypeFuncClass functypclass = TypeProvider::get_expr_result_type(rtfunc->funcexpr, &funcrettype, tupdesc);
 
                         if (functypclass == TYPEFUNC_COMPOSITE)
                         {
@@ -2035,7 +2035,7 @@ String RelationParser::chooseScalarFunctionAlias(PGNode * funcexpr, char * funcn
 	 */
     if (funcexpr && IsA(funcexpr, PGFuncExpr))
     {
-        auto pname = function_provider->get_func_result_name(((PGFuncExpr *)funcexpr)->funcid);
+        auto pname = FunctionProvider::get_func_result_name(((PGFuncExpr *)funcexpr)->funcid);
         if (pname != "")
             return pname;
     }
@@ -2183,7 +2183,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
         /*
 		 * Now determine if the function returns a simple or composite type.
 		 */
-        functypclass = type_provider->get_expr_result_type(funcexpr, &funcrettype, tupdesc);
+        functypclass = TypeProvider::get_expr_result_type(funcexpr, &funcrettype, tupdesc);
 
         /*
 		 * Handle dynamic type resolution for functions with DESCRIBE callbacks.
@@ -2277,7 +2277,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
         {
             /* Base data type, i.e. scalar */
             tupdesc = PGCreateTemplateTupleDesc(1, false);
-            type_provider->PGTupleDescInitEntry(tupdesc, (PGAttrNumber)1, chooseScalarFunctionAlias(funcexpr, funcname, alias, nfuncs), funcrettype, -1, 0);
+            TypeProvider::PGTupleDescInitEntry(tupdesc, (PGAttrNumber)1, chooseScalarFunctionAlias(funcexpr, funcname, alias, nfuncs), funcrettype, -1, 0);
         }
         else if (functypclass == TYPEFUNC_RECORD)
         {
@@ -2307,7 +2307,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
                              parser_errposition(pstate, n->location)));
                     type_parser->typenameTypeIdAndMod(pstate, n->typeName, &attrtype, &attrtypmod);
                     //attrcollation = GetColumnDefCollation(pstate, n, attrtype);
-                    type_provider->PGTupleDescInitEntry(tupdesc, (PGAttrNumber)i, attrname, attrtype, attrtypmod, 0);
+                    TypeProvider::PGTupleDescInitEntry(tupdesc, (PGAttrNumber)i, attrname, attrtype, attrtypmod, 0);
                     //TupleDescInitEntryCollation(tupdesc, (PGAttrNumber)i, attrcollation);
                     rtfunc->funccolnames = lappend(rtfunc->funccolnames, makeString(pstrdup(attrname)));
                     rtfunc->funccoltypes = lappend_oid(rtfunc->funccoltypes, attrtype);
@@ -2328,7 +2328,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
             ereport(
                 ERROR,
                 (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
-                 errmsg("function \"%s\" in FROM has unsupported return type %s", funcname, type_provider->format_type_be(funcrettype).c_str()),
+                 errmsg("function \"%s\" in FROM has unsupported return type %s", funcname, TypeProvider::format_type_be(funcrettype).c_str()),
                  parser_errposition(pstate, exprLocation(funcexpr))));
 
         /* Finish off the RangeTblFunction and add it to the RTE's list */
@@ -2361,7 +2361,7 @@ PGRangeTblEntry * RelationParser::addRangeTableEntryForFunction(
 
         /* Add the ordinality column if needed */
         if (rangefunc->ordinality)
-            type_provider->PGTupleDescInitEntry(tupdesc, (PGAttrNumber)++natts, "ordinality", INT8OID, -1, 0);
+            TypeProvider::PGTupleDescInitEntry(tupdesc, (PGAttrNumber)++natts, "ordinality", INT8OID, -1, 0);
 
         Assert(natts == totalatts)
     }

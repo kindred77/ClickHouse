@@ -29,8 +29,8 @@ ClauseParser::ClauseParser(const ContextPtr& context_) : context(context_)
 	oper_parser = std::make_shared<OperParser>(context);
 	node_parser = std::make_shared<NodeParser>(context);
 	type_parser = std::make_shared<TypeParser>(context);
-	oper_provider = std::make_shared<OperProvider>(context);
-	function_provider = std::make_shared<FunctionProvider>(context);
+	//oper_provider = std::make_shared<OperProvider>(context);
+	//function_provider = std::make_shared<FunctionProvider>(context);
 }
 
 PGRangeTblEntry *
@@ -539,7 +539,7 @@ PGRangeTblEntry * ClauseParser::transformRangeFunction(PGParseState * pstate, PG
                     PGNode * arg = (PGNode *)lfirst(lc2);
                     PGFuncCall * newfc;
 
-                    newfc = makeFuncCall(function_provider->SystemFuncName("unnest"), list_make1(arg), fc->location);
+                    newfc = makeFuncCall(FunctionProvider::SystemFuncName("unnest"), list_make1(arg), fc->location);
 
                     funcexprs = lappend(funcexprs, expr_parser->transformExpr(pstate, (PGNode *)newfc, EXPR_KIND_FROM_FUNCTION));
 
@@ -1325,7 +1325,7 @@ ClauseParser::targetIsInSortList(PGTargetEntry *tle, PGOid sortop, PGList *sortL
 		if (scl->tleSortGroupRef == ref &&
 			(sortop == InvalidOid ||
 			 sortop == scl->sortop ||
-			 sortop == oper_provider->get_commutator(scl->sortop)))
+			 sortop == OperProvider::get_commutator(scl->sortop)))
 			return true;
 	}
 	return false;
@@ -1416,7 +1416,7 @@ ClauseParser::addTargetToSortList(PGParseState * pstate, PGTargetEntry * tle,
 			 * equality operator, and determine whether to consider it like
 			 * ASC or DESC.
 			 */
-            // eqop = oper_provider->get_equality_op_for_ordering_op(sortop, &reverse);
+            // eqop = OperProvider::get_equality_op_for_ordering_op(sortop, &reverse);
             // if (!OidIsValid(eqop))
             //     ereport(
             //         ERROR,
@@ -1427,7 +1427,7 @@ ClauseParser::addTargetToSortList(PGParseState * pstate, PGTargetEntry * tle,
             /*
 			 * Also see if the equality operator is hashable.
 			 */
-            // hashable = oper_provider->op_hashjoinable(eqop, restype);
+            // hashable = OperProvider::op_hashjoinable(eqop, restype);
 
 			elog(ERROR, "order by using not supported yet.");
             break;
@@ -2589,7 +2589,7 @@ PGNode * ClauseParser::transformFrameOffset(
             // if (OidIsValid(sortop))
             // {
             //     PGTypePtr typ = type_parser->typeidType(newrtype);
-            //     Oid funcoid = oper_provider->get_opcode(sortop);
+            //     Oid funcoid = OperProvider::get_opcode(sortop);
             //     Datum zero;
             //     Datum result;
 
@@ -2600,7 +2600,7 @@ PGNode * ClauseParser::transformFrameOffset(
 			// 	 * will have parsed the type into its internal format, we can
 			// 	 * just poke directly into the Const structure.
 			// 	 */
-            //     result = function_provider->OidFunctionCall2(funcoid, con->constvalue, zero);
+            //     result = FunctionProvider::OidFunctionCall2(funcoid, con->constvalue, zero);
 
             //     if (result)
             //         ereport(

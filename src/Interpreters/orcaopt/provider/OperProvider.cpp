@@ -8,7 +8,6 @@ using namespace duckdb_libpgquery;
 
 namespace DB
 {
-
 std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT2PL = std::pair<PGOid, PGOperatorPtr>(
     PGOid(550),
     std::make_shared<Form_pg_operator>(Form_pg_operator{
@@ -2033,100 +2032,191 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_DECIMAL64GE = std::pair<PGOid
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
-OperProvider::OperProvider(const ContextPtr& context_) : context(context_)
-{
-	oid_oper_map.insert(OPER_INT2PL);
-	oid_oper_map.insert(OPER_INT4PL);
-	oid_oper_map.insert(OPER_INT24PL);
-	oid_oper_map.insert(OPER_INT42PL);
-    oid_oper_map.insert(OPER_INT2MI);
-    oid_oper_map.insert(OPER_INT4MI);
-    oid_oper_map.insert(OPER_INT24MI);
-    oid_oper_map.insert(OPER_INT42MI);
-    oid_oper_map.insert(OPER_INT2MUL);
-    oid_oper_map.insert(OPER_INT4MUL);
-    oid_oper_map.insert(OPER_INT24MUL);
-    oid_oper_map.insert(OPER_INT42MUL);
-    oid_oper_map.insert(OPER_INT2DIV);
-    oid_oper_map.insert(OPER_INT4DIV);
-    oid_oper_map.insert(OPER_INT24DIV);
-    oid_oper_map.insert(OPER_INT42DIV);
-    oid_oper_map.insert(OPER_FLOAT32EQ);
-    oid_oper_map.insert(OPER_FLOAT32NE);
-    oid_oper_map.insert(OPER_FLOAT32LT);
-    oid_oper_map.insert(OPER_FLOAT32LE);
-    oid_oper_map.insert(OPER_FLOAT32GT);
-    oid_oper_map.insert(OPER_FLOAT32GE);
-    oid_oper_map.insert(OPER_FLOAT64EQ);
-    oid_oper_map.insert(OPER_FLOAT64NE);
-    oid_oper_map.insert(OPER_FLOAT64LT);
-    oid_oper_map.insert(OPER_FLOAT64LE);
-    oid_oper_map.insert(OPER_FLOAT64GT);
-    oid_oper_map.insert(OPER_FLOAT64GE);
-    oid_oper_map.insert(OPER_BOOLEQ);
-    oid_oper_map.insert(OPER_BOOLNE);
-    oid_oper_map.insert(OPER_BOOLLT);
-    oid_oper_map.insert(OPER_BOOLLE);
-    oid_oper_map.insert(OPER_BOOLGT);
-    oid_oper_map.insert(OPER_BOOLGE);
-    oid_oper_map.insert(OPER_INT16EQ);
-    oid_oper_map.insert(OPER_INT16NE);
-    oid_oper_map.insert(OPER_INT16LT);
-    oid_oper_map.insert(OPER_INT16LE);
-    oid_oper_map.insert(OPER_INT16GT);
-    oid_oper_map.insert(OPER_INT16GE);
-    oid_oper_map.insert(OPER_INT32EQ);
-    oid_oper_map.insert(OPER_INT32NE);
-    oid_oper_map.insert(OPER_INT32LT);
-    oid_oper_map.insert(OPER_INT32LE);
-    oid_oper_map.insert(OPER_INT32GT);
-    oid_oper_map.insert(OPER_INT32GE);
-    oid_oper_map.insert(OPER_INT64EQ);
-    oid_oper_map.insert(OPER_INT64NE);
-    oid_oper_map.insert(OPER_INT64LT);
-    oid_oper_map.insert(OPER_INT64LE);
-    oid_oper_map.insert(OPER_INT64GT);
-    oid_oper_map.insert(OPER_INT64GE);
-    oid_oper_map.insert(OPER_STRINGEQ);
-    oid_oper_map.insert(OPER_STRINGNE);
-    oid_oper_map.insert(OPER_STRINGLT);
-    oid_oper_map.insert(OPER_STRINGLE);
-    oid_oper_map.insert(OPER_STRINGGT);
-    oid_oper_map.insert(OPER_STRINGGE);
-    oid_oper_map.insert(OPER_FIXEDSTRINGEQ);
-    oid_oper_map.insert(OPER_FIXEDSTRINGNE);
-    oid_oper_map.insert(OPER_FIXEDSTRINGLT);
-    oid_oper_map.insert(OPER_FIXEDSTRINGLE);
-    oid_oper_map.insert(OPER_FIXEDSTRINGGT);
-    oid_oper_map.insert(OPER_FIXEDSTRINGGE);
-    oid_oper_map.insert(OPER_DATEEQ);
-    oid_oper_map.insert(OPER_DATENE);
-    oid_oper_map.insert(OPER_DATELT);
-    oid_oper_map.insert(OPER_DATELE);
-    oid_oper_map.insert(OPER_DATEGT);
-    oid_oper_map.insert(OPER_DATEGE);
-    oid_oper_map.insert(OPER_DATETIMEEQ);
-    oid_oper_map.insert(OPER_DATETIMENE);
-    oid_oper_map.insert(OPER_DATETIMELT);
-    oid_oper_map.insert(OPER_DATETIMELE);
-    oid_oper_map.insert(OPER_DATETIMEGT);
-    oid_oper_map.insert(OPER_DATETIMEGE);
-    oid_oper_map.insert(OPER_DATETIME64EQ);
-    oid_oper_map.insert(OPER_DATETIME64NE);
-    oid_oper_map.insert(OPER_DATETIME64LT);
-    oid_oper_map.insert(OPER_DATETIME64LE);
-    oid_oper_map.insert(OPER_DATETIME64GT);
-    oid_oper_map.insert(OPER_DATETIME64GE);
-    oid_oper_map.insert(OPER_DECIMAL64EQ);
-    oid_oper_map.insert(OPER_DECIMAL64NE);
-    oid_oper_map.insert(OPER_DECIMAL64LT);
-    oid_oper_map.insert(OPER_DECIMAL64LE);
-    oid_oper_map.insert(OPER_DECIMAL64GT);
-    oid_oper_map.insert(OPER_DECIMAL64GE);
+OperProvider::OidOperatorMap OperProvider::oid_oper_map = {
+    OperProvider::OPER_INT2PL,
+	OperProvider::OPER_INT4PL,
+	OperProvider::OPER_INT24PL,
+	OperProvider::OPER_INT42PL,
+    OperProvider::OPER_INT2MI,
+    OperProvider::OPER_INT4MI,
+    OperProvider::OPER_INT24MI,
+    OperProvider::OPER_INT42MI,
+    OperProvider::OPER_INT2MUL,
+    OperProvider::OPER_INT4MUL,
+    OperProvider::OPER_INT24MUL,
+    OperProvider::OPER_INT42MUL,
+    OperProvider::OPER_INT2DIV,
+    OperProvider::OPER_INT4DIV,
+    OperProvider::OPER_INT24DIV,
+    OperProvider::OPER_INT42DIV,
+    OperProvider::OPER_FLOAT32EQ,
+    OperProvider::OPER_FLOAT32NE,
+    OperProvider::OPER_FLOAT32LT,
+    OperProvider::OPER_FLOAT32LE,
+    OperProvider::OPER_FLOAT32GT,
+    OperProvider::OPER_FLOAT32GE,
+    OperProvider::OPER_FLOAT64EQ,
+    OperProvider::OPER_FLOAT64NE,
+    OperProvider::OPER_FLOAT64LT,
+    OperProvider::OPER_FLOAT64LE,
+    OperProvider::OPER_FLOAT64GT,
+    OperProvider::OPER_FLOAT64GE,
+    OperProvider::OPER_BOOLEQ,
+    OperProvider::OPER_BOOLNE,
+    OperProvider::OPER_BOOLLT,
+    OperProvider::OPER_BOOLLE,
+    OperProvider::OPER_BOOLGT,
+    OperProvider::OPER_BOOLGE,
+    OperProvider::OPER_INT16EQ,
+    OperProvider::OPER_INT16NE,
+    OperProvider::OPER_INT16LT,
+    OperProvider::OPER_INT16LE,
+    OperProvider::OPER_INT16GT,
+    OperProvider::OPER_INT16GE,
+    OperProvider::OPER_INT32EQ,
+    OperProvider::OPER_INT32NE,
+    OperProvider::OPER_INT32LT,
+    OperProvider::OPER_INT32LE,
+    OperProvider::OPER_INT32GT,
+    OperProvider::OPER_INT32GE,
+    OperProvider::OPER_INT64EQ,
+    OperProvider::OPER_INT64NE,
+    OperProvider::OPER_INT64LT,
+    OperProvider::OPER_INT64LE,
+    OperProvider::OPER_INT64GT,
+    OperProvider::OPER_INT64GE,
+    OperProvider::OPER_STRINGEQ,
+    OperProvider::OPER_STRINGNE,
+    OperProvider::OPER_STRINGLT,
+    OperProvider::OPER_STRINGLE,
+    OperProvider::OPER_STRINGGT,
+    OperProvider::OPER_STRINGGE,
+    OperProvider::OPER_FIXEDSTRINGEQ,
+    OperProvider::OPER_FIXEDSTRINGNE,
+    OperProvider::OPER_FIXEDSTRINGLT,
+    OperProvider::OPER_FIXEDSTRINGLE,
+    OperProvider::OPER_FIXEDSTRINGGT,
+    OperProvider::OPER_FIXEDSTRINGGE,
+    OperProvider::OPER_DATEEQ,
+    OperProvider::OPER_DATENE,
+    OperProvider::OPER_DATELT,
+    OperProvider::OPER_DATELE,
+    OperProvider::OPER_DATEGT,
+    OperProvider::OPER_DATEGE,
+    OperProvider::OPER_DATETIMEEQ,
+    OperProvider::OPER_DATETIMENE,
+    OperProvider::OPER_DATETIMELT,
+    OperProvider::OPER_DATETIMELE,
+    OperProvider::OPER_DATETIMEGT,
+    OperProvider::OPER_DATETIMEGE,
+    OperProvider::OPER_DATETIME64EQ,
+    OperProvider::OPER_DATETIME64NE,
+    OperProvider::OPER_DATETIME64LT,
+    OperProvider::OPER_DATETIME64LE,
+    OperProvider::OPER_DATETIME64GT,
+    OperProvider::OPER_DATETIME64GE,
+    OperProvider::OPER_DECIMAL64EQ,
+    OperProvider::OPER_DECIMAL64NE,
+    OperProvider::OPER_DECIMAL64LT,
+    OperProvider::OPER_DECIMAL64LE,
+    OperProvider::OPER_DECIMAL64GT,
+    OperProvider::OPER_DECIMAL64GE
 };
 
+// OperProvider::OperProvider(const ContextPtr& context_) : context(context_)
+// {
+	// oid_oper_map.insert(OPER_INT2PL);
+	// oid_oper_map.insert(OPER_INT4PL);
+	// oid_oper_map.insert(OPER_INT24PL);
+	// oid_oper_map.insert(OPER_INT42PL);
+    // oid_oper_map.insert(OPER_INT2MI);
+    // oid_oper_map.insert(OPER_INT4MI);
+    // oid_oper_map.insert(OPER_INT24MI);
+    // oid_oper_map.insert(OPER_INT42MI);
+    // oid_oper_map.insert(OPER_INT2MUL);
+    // oid_oper_map.insert(OPER_INT4MUL);
+    // oid_oper_map.insert(OPER_INT24MUL);
+    // oid_oper_map.insert(OPER_INT42MUL);
+    // oid_oper_map.insert(OPER_INT2DIV);
+    // oid_oper_map.insert(OPER_INT4DIV);
+    // oid_oper_map.insert(OPER_INT24DIV);
+    // oid_oper_map.insert(OPER_INT42DIV);
+    // oid_oper_map.insert(OPER_FLOAT32EQ);
+    // oid_oper_map.insert(OPER_FLOAT32NE);
+    // oid_oper_map.insert(OPER_FLOAT32LT);
+    // oid_oper_map.insert(OPER_FLOAT32LE);
+    // oid_oper_map.insert(OPER_FLOAT32GT);
+    // oid_oper_map.insert(OPER_FLOAT32GE);
+    // oid_oper_map.insert(OPER_FLOAT64EQ);
+    // oid_oper_map.insert(OPER_FLOAT64NE);
+    // oid_oper_map.insert(OPER_FLOAT64LT);
+    // oid_oper_map.insert(OPER_FLOAT64LE);
+    // oid_oper_map.insert(OPER_FLOAT64GT);
+    // oid_oper_map.insert(OPER_FLOAT64GE);
+    // oid_oper_map.insert(OPER_BOOLEQ);
+    // oid_oper_map.insert(OPER_BOOLNE);
+    // oid_oper_map.insert(OPER_BOOLLT);
+    // oid_oper_map.insert(OPER_BOOLLE);
+    // oid_oper_map.insert(OPER_BOOLGT);
+    // oid_oper_map.insert(OPER_BOOLGE);
+    // oid_oper_map.insert(OPER_INT16EQ);
+    // oid_oper_map.insert(OPER_INT16NE);
+    // oid_oper_map.insert(OPER_INT16LT);
+    // oid_oper_map.insert(OPER_INT16LE);
+    // oid_oper_map.insert(OPER_INT16GT);
+    // oid_oper_map.insert(OPER_INT16GE);
+    // oid_oper_map.insert(OPER_INT32EQ);
+    // oid_oper_map.insert(OPER_INT32NE);
+    // oid_oper_map.insert(OPER_INT32LT);
+    // oid_oper_map.insert(OPER_INT32LE);
+    // oid_oper_map.insert(OPER_INT32GT);
+    // oid_oper_map.insert(OPER_INT32GE);
+    // oid_oper_map.insert(OPER_INT64EQ);
+    // oid_oper_map.insert(OPER_INT64NE);
+    // oid_oper_map.insert(OPER_INT64LT);
+    // oid_oper_map.insert(OPER_INT64LE);
+    // oid_oper_map.insert(OPER_INT64GT);
+    // oid_oper_map.insert(OPER_INT64GE);
+    // oid_oper_map.insert(OPER_STRINGEQ);
+    // oid_oper_map.insert(OPER_STRINGNE);
+    // oid_oper_map.insert(OPER_STRINGLT);
+    // oid_oper_map.insert(OPER_STRINGLE);
+    // oid_oper_map.insert(OPER_STRINGGT);
+    // oid_oper_map.insert(OPER_STRINGGE);
+    // oid_oper_map.insert(OPER_FIXEDSTRINGEQ);
+    // oid_oper_map.insert(OPER_FIXEDSTRINGNE);
+    // oid_oper_map.insert(OPER_FIXEDSTRINGLT);
+    // oid_oper_map.insert(OPER_FIXEDSTRINGLE);
+    // oid_oper_map.insert(OPER_FIXEDSTRINGGT);
+    // oid_oper_map.insert(OPER_FIXEDSTRINGGE);
+    // oid_oper_map.insert(OPER_DATEEQ);
+    // oid_oper_map.insert(OPER_DATENE);
+    // oid_oper_map.insert(OPER_DATELT);
+    // oid_oper_map.insert(OPER_DATELE);
+    // oid_oper_map.insert(OPER_DATEGT);
+    // oid_oper_map.insert(OPER_DATEGE);
+    // oid_oper_map.insert(OPER_DATETIMEEQ);
+    // oid_oper_map.insert(OPER_DATETIMENE);
+    // oid_oper_map.insert(OPER_DATETIMELT);
+    // oid_oper_map.insert(OPER_DATETIMELE);
+    // oid_oper_map.insert(OPER_DATETIMEGT);
+    // oid_oper_map.insert(OPER_DATETIMEGE);
+    // oid_oper_map.insert(OPER_DATETIME64EQ);
+    // oid_oper_map.insert(OPER_DATETIME64NE);
+    // oid_oper_map.insert(OPER_DATETIME64LT);
+    // oid_oper_map.insert(OPER_DATETIME64LE);
+    // oid_oper_map.insert(OPER_DATETIME64GT);
+    // oid_oper_map.insert(OPER_DATETIME64GE);
+    // oid_oper_map.insert(OPER_DECIMAL64EQ);
+    // oid_oper_map.insert(OPER_DECIMAL64NE);
+    // oid_oper_map.insert(OPER_DECIMAL64LT);
+    // oid_oper_map.insert(OPER_DECIMAL64LE);
+    // oid_oper_map.insert(OPER_DECIMAL64GT);
+    // oid_oper_map.insert(OPER_DECIMAL64GE);
+// };
+
 PGOperatorPtr
-OperProvider::getOperByOID(PGOid oid) const
+OperProvider::getOperByOID(PGOid oid)
 {
 	auto it = oid_oper_map.find(oid);
 	if (it == oid_oper_map.end())
@@ -2135,7 +2225,7 @@ OperProvider::getOperByOID(PGOid oid) const
 };
 
 PGOid
-OperProvider::getOperByName(duckdb_libpgquery::PGList *names, PGOid oprleft, PGOid oprright) const
+OperProvider::getOperByName(duckdb_libpgquery::PGList *names, PGOid oprleft, PGOid oprright)
 {
     char * schemaname;
     char * opername;
@@ -2357,7 +2447,7 @@ PGSortGroupOperPtr OperProvider::get_sort_grp_oper_by_typeid(PGOid type_id)
 {
     auto result = std::make_shared<Sort_group_operator>();
 
-    auto type_entry = type_provider->getTypeByOid(type_id);
+    auto type_entry = TypeProvider::getTypeByOid(type_id);
 
     result->type_id = type_id;
     result->typlen = type_entry->typlen;

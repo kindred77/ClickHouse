@@ -30,10 +30,10 @@ FuncParser::FuncParser(const ContextPtr& context_) : context(context_)
     relation_parser = std::make_shared<RelationParser>(context);
 	target_parser = std::make_shared<TargetParser>(context);
     expr_parser = std::make_shared<ExprParser>(context);
-	type_provider = std::make_shared<TypeProvider>(context);
-	proc_provider = std::make_shared<ProcProvider>(context);
-	agg_provider = std::make_shared<AggProvider>(context);
-	func_provider = std::make_shared<FunctionProvider>(context);
+	// type_provider = std::make_shared<TypeProvider>(context);
+	// proc_provider = std::make_shared<ProcProvider>(context);
+	// agg_provider = std::make_shared<AggProvider>(context);
+	// func_provider = std::make_shared<FunctionProvider>(context);
 };
 
 PGNode *
@@ -184,7 +184,7 @@ FuncParser::func_select_candidate(int nargs,
 	for (i = 0; i < nargs; i++)
 	{
 		if (input_typeids[i] != UNKNOWNOID)
-			input_base_typeids[i] = type_provider->getBaseType(input_typeids[i]);
+			input_base_typeids[i] = TypeProvider::getBaseType(input_typeids[i]);
 		else
 		{
 			/* no need to call getBaseType on UNKNOWNOID */
@@ -331,7 +331,7 @@ FuncParser::func_select_candidate(int nargs,
 		{
 			current_typeids = current_candidate->args;
 			current_type = current_typeids[i];
-			type_provider->get_type_category_preferred(current_type,
+			TypeProvider::get_type_category_preferred(current_type,
 										&current_category,
 										&current_is_preferred);
 			if (slot_category[i] == TYPCATEGORY_INVALID)
@@ -389,7 +389,7 @@ FuncParser::func_select_candidate(int nargs,
 				if (input_base_typeids[i] != UNKNOWNOID)
 					continue;
 				current_type = current_typeids[i];
-				type_provider->get_type_category_preferred(current_type,
+				TypeProvider::get_type_category_preferred(current_type,
 											&current_category,
 											&current_is_preferred);
 				if (current_category != slot_category[i])
@@ -539,7 +539,7 @@ FuncParser::func_get_detail(PGList *funcname,
         *argdefaults = NIL;
 
     /* Get list of possible candidates from namespace search */
-    raw_candidates = func_provider->FuncnameGetCandidates(funcname, nargs, fargnames, expand_variadic, expand_defaults, false);
+    raw_candidates = FunctionProvider::FuncnameGetCandidates(funcname, nargs, fargnames, expand_variadic, expand_defaults, false);
 
     /*
 	 * Quickly check if there is an exact match to the input datatypes (there
@@ -721,7 +721,7 @@ FuncParser::func_get_detail(PGList *funcname,
             }
         }
 
-        PGProcPtr ftup = proc_provider->getProcByOid(best_candidate->oid);
+        PGProcPtr ftup = ProcProvider::getProcByOid(best_candidate->oid);
         if (ftup == NULL) /* should not happen */
             elog(ERROR, "cache lookup failed for function %u", best_candidate->oid);
         *rettype = ftup->prorettype;
@@ -841,7 +841,7 @@ FuncParser::funcname_signature_string(const char *funcname, int nargs,
 			lc = lnext(lc);
 		}
 		//appendStringInfoString(&argbuf, format_type_be(argtypes[i]));
-		result += type_provider->format_type_be(argtypes[i]);
+		result += TypeProvider::format_type_be(argtypes[i]);
 	}
 
 	//appendStringInfoChar(&argbuf, ')');
@@ -1186,7 +1186,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
         //Form_pg_aggregate classForm;
         int catDirectArgs;
 
-        PGAggPtr tup = agg_provider->getAggByFuncOid(funcid);
+        PGAggPtr tup = AggProvider::getAggByFuncOid(funcid);
         if (tup == NULL) /* should not happen */
             elog(ERROR, "cache lookup failed for aggregate %u", funcid);
         //classForm = (Form_pg_aggregate)GETSTRUCT(tup);
@@ -1458,12 +1458,12 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
         newa->elements = vargs;
         /* assume all the variadic arguments were coerced to the same type */
         newa->element_typeid = exprType((PGNode *)linitial(vargs));
-        newa->array_typeid = type_provider->get_array_type(newa->element_typeid);
+        newa->array_typeid = TypeProvider::get_array_type(newa->element_typeid);
         if (!OidIsValid(newa->array_typeid))
             ereport(
                 ERROR,
                 (errcode(PG_ERRCODE_UNDEFINED_OBJECT),
-                 errmsg("could not find array type for data type %s", type_provider->format_type_be(newa->element_typeid).c_str()),
+                 errmsg("could not find array type for data type %s", TypeProvider::format_type_be(newa->element_typeid).c_str()),
                  parser_errposition(pstate, exprLocation((PGNode *)vargs))));
         /* array_collid will be set by parse_collate.c */
         newa->multidims = false;
@@ -1485,7 +1485,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
     {
         PGOid va_arr_typid = actual_arg_types[nargs - 1];
 
-        if (!OidIsValid(type_provider->get_base_element_type(va_arr_typid)))
+        if (!OidIsValid(TypeProvider::get_base_element_type(va_arr_typid)))
             ereport(
                 ERROR,
                 (errcode(PG_ERRCODE_DATATYPE_MISMATCH),

@@ -31,8 +31,8 @@ ExprParser::ExprParser(const ContextPtr& context_) : context(context_)
 	oper_parser = std::make_shared<OperParser>(context);
 	node_parser = std::make_shared<NodeParser>(context);
 	agg_parser = std::make_shared<AggParser>(context);
-	type_provider = std::make_shared<TypeProvider>(context);
-	relation_provider = std::make_shared<RelationProvider>(context);
+	//type_provider = std::make_shared<TypeProvider>(context);
+	//relation_provider = std::make_shared<RelationProvider>(context);
 };
 
 bool
@@ -88,13 +88,13 @@ ExprParser::transformWholeRowRef(PGParseState *pstate, PGRangeTblEntry *rte, int
 	bool isRowType = false;
 	if (rte->rtekind == PG_RTE_RELATION)
 	{
-		relTypeOid = relation_provider->get_rel_type_id(rte->relid);
+		relTypeOid = RelationProvider::get_rel_type_id(rte->relid);
 	}
 	else if (rte->rtekind == PG_RTE_FUNCTION)
 	{
 		PGNode* fexpr = ((PGRangeTblFunction *) linitial(rte->functions))->funcexpr;
 		PGOid toid = exprType(fexpr);
-		isRowType = type_provider->type_is_rowtype(toid);
+		isRowType = TypeProvider::type_is_rowtype(toid);
 	}
 	
 	result = makeWholeRowVar(rte, vnum, sublevels_up, true, relTypeOid, isRowType);
@@ -300,7 +300,7 @@ ExprParser::transformColumnRef(PGParseState *pstate, PGColumnRef *cref)
             /*
 				 * We check the catalog name and then ignore it.
 				 */
-            if (strcmp(catname, relation_provider->get_database_name(MyDatabaseId).c_str()) != 0)
+            if (strcmp(catname, RelationProvider::get_database_name(MyDatabaseId).c_str()) != 0)
             {
                 crerr = CRERR_WRONG_DB;
                 break;
@@ -463,7 +463,7 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 			ereport(ERROR,
 					(errcode(PG_ERRCODE_UNDEFINED_COLUMN),
 					 errmsg("column \"%s\" not found in data type %s",
-							attname, type_provider->format_type_be(relTypeId).c_str())));
+							attname, TypeProvider::format_type_be(relTypeId).c_str())));
 		}
 		else if (relTypeId == RECORDOID)
 		{
@@ -480,7 +480,7 @@ ExprParser::unknown_attribute(PGParseState *pstate, PGNode *relref, const char *
 					(errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("column notation .%s applied to type %s, "
 							"which is not a composite type",
-							attname, type_provider->format_type_be(relTypeId).c_str())));
+							attname, TypeProvider::format_type_be(relTypeId).c_str())));
 		}
 	}
 };
@@ -588,7 +588,7 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 			 * Check for sub-array expressions, if we haven't already found
 			 * one.
 			 */
-			if (!newa->multidims && type_provider->get_element_type(exprType(newe)) != InvalidOid)
+			if (!newa->multidims && TypeProvider::get_element_type(exprType(newe)) != InvalidOid)
 				newa->multidims = true;
 		}
 
@@ -627,27 +627,27 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 		if (newa->multidims)
 		{
 			array_type = coerce_type;
-			element_type = type_provider->get_element_type(array_type);
+			element_type = TypeProvider::get_element_type(array_type);
 			if (!OidIsValid(element_type))
 			{
 				parser_errposition(pstate, a->location);
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find element type for data type %s",
-								type_provider->format_type_be(array_type).c_str())));
+								TypeProvider::format_type_be(array_type).c_str())));
 			}
 		}
 		else
 		{
 			element_type = coerce_type;
-			array_type = type_provider->get_array_type(element_type);
+			array_type = TypeProvider::get_array_type(element_type);
 			if (!OidIsValid(array_type))
 			{
 				parser_errposition(pstate, a->location);
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("could not find array type for data type %s",
-								type_provider->format_type_be(element_type).c_str())));
+								TypeProvider::format_type_be(element_type).c_str())));
 			}
 		}
 		coerce_hard = false;
@@ -683,8 +683,8 @@ ExprParser::transformArrayExpr(PGParseState *pstate, PGAArrayExpr *a,
 				ereport(ERROR,
 						(errcode(PG_ERRCODE_CANNOT_COERCE),
 						 errmsg("cannot cast type %s to %s",
-								type_provider->format_type_be(exprType(e)).c_str(),
-								type_provider->format_type_be(coerce_type).c_str())));
+								TypeProvider::format_type_be(exprType(e)).c_str(),
+								TypeProvider::format_type_be(coerce_type).c_str())));
 			}
 		}
 		else
@@ -746,8 +746,8 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 		 * will be a no-op.
 		 */
 		targetBaseTypmod = targetTypmod;
-		targetBaseType = type_provider->getBaseTypeAndTypmod(targetType, &targetBaseTypmod);
-		elementType = type_provider->get_element_type(targetBaseType);
+		targetBaseType = TypeProvider::getBaseTypeAndTypmod(targetType, &targetBaseTypmod);
+		elementType = TypeProvider::get_element_type(targetBaseType);
 		if (OidIsValid(elementType))
 		{
 			expr = transformArrayExpr(pstate,
@@ -786,8 +786,8 @@ ExprParser::transformTypeCast(PGParseState *pstate, PGTypeCast *tc)
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_CANNOT_COERCE),
 				 errmsg("cannot cast type %s to %s",
-						type_provider->format_type_be(inputType).c_str(),
-						type_provider->format_type_be(targetType).c_str())));
+						TypeProvider::format_type_be(inputType).c_str(),
+						TypeProvider::format_type_be(targetType).c_str())));
 	}
 
 	return result;
@@ -808,13 +808,13 @@ ExprParser::transformCollateClause(PGParseState *pstate, PGCollateClause *c)
 	 * The unknown type is not collatable, but coerce_type() takes care of it
 	 * separately, so we'll let it go here.
 	 */
-	if (!type_provider->type_is_collatable(argtype) && argtype != UNKNOWNOID)
+	if (!TypeProvider::type_is_collatable(argtype) && argtype != UNKNOWNOID)
 	{
 		parser_errposition(pstate, c->location);
 		ereport(ERROR,
 				(errcode(PG_ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("collations are not supported by type %s",
-						type_provider->format_type_be(argtype).c_str())));
+						TypeProvider::format_type_be(argtype).c_str())));
 	}
 
 	newc->collOid = type_parser->LookupCollation(pstate, c->collname, c->location);
@@ -1507,7 +1507,7 @@ ExprParser::transformAExprIn(PGParseState *pstate, PGAExpr *a)
 		 * with some cases of non-identical row types.
 		 */
         if (OidIsValid(scalar_type) && scalar_type != RECORDOID)
-            array_type = type_provider->get_array_type(scalar_type);
+            array_type = TypeProvider::get_array_type(scalar_type);
         else
             array_type = InvalidOid;
         if (array_type != InvalidOid)
@@ -2499,8 +2499,8 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 					 * array type to the domain.  In the usual case that the
 					 * target is not a domain, transformTypeCast is a no-op.
 					 */
-                    targetType = type_provider->getBaseTypeAndTypmod(targetType, &targetTypmod);
-                    elementType = type_provider->get_element_type(targetType);
+                    targetType = TypeProvider::getBaseTypeAndTypmod(targetType, &targetTypmod);
+                    elementType = TypeProvider::get_element_type(targetType);
                     if (OidIsValid(elementType))
                     {
                         tc = (PGTypeCast *)copyObject(tc);
@@ -2609,7 +2609,7 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 
             n->arg = (PGExpr *)transformExprRecurse(pstate, (PGNode *)n->arg);
             /* the argument can be any type, so don't coerce it */
-            n->argisrow = type_provider->type_is_rowtype(exprType((PGNode *)n->arg));
+            n->argisrow = TypeProvider::type_is_rowtype(exprType((PGNode *)n->arg));
             result = expr;
             break;
         }

@@ -19,11 +19,10 @@ using ContextPtr = std::shared_ptr<const Context>;
 class OperProvider
 {
 private:
-	using Map = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGOperatorPtr>;
-
-	Map oid_oper_map;
 	//ContextPtr context;
 	//gpos::CMemoryPool *mp;
+    using OidOperatorMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGOperatorPtr>;
+    static OidOperatorMap oid_oper_map;
 
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGOperatorPtr> OPER_INT2PL;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGOperatorPtr> OPER_INT4PL;
@@ -114,20 +113,20 @@ private:
     static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGOperatorPtr> OPER_DECIMAL64GT;
     static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGOperatorPtr> OPER_DECIMAL64GE;
 
-	TypeProviderPtr type_provider;
+	//TypeProviderPtr type_provider;
 
-    ContextPtr context;
+    //ContextPtr context;
 public:
 	//explicit OperProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit OperProvider(const ContextPtr& context_);
-	duckdb_libpgquery::PGOperatorPtr getOperByOID(duckdb_libpgquery::PGOid oid) const;
-	duckdb_libpgquery::PGOid getOperByName(duckdb_libpgquery::PGList *names, duckdb_libpgquery::PGOid oprleft, duckdb_libpgquery::PGOid oprright) const;
+	//explicit OperProvider(const ContextPtr& context_);
+	static duckdb_libpgquery::PGOperatorPtr getOperByOID(duckdb_libpgquery::PGOid oid);
+	static duckdb_libpgquery::PGOid getOperByName(duckdb_libpgquery::PGList *names, duckdb_libpgquery::PGOid oprleft, duckdb_libpgquery::PGOid oprright);
 
-    duckdb_libpgquery::FuncCandidateListPtr OpernameGetCandidates(duckdb_libpgquery::PGList * names, char oprkind, bool missing_schema_ok);
+    static duckdb_libpgquery::FuncCandidateListPtr OpernameGetCandidates(duckdb_libpgquery::PGList * names, char oprkind, bool missing_schema_ok);
 
-	duckdb_libpgquery::PGOid get_opcode(duckdb_libpgquery::PGOid opno);
+	static duckdb_libpgquery::PGOid get_opcode(duckdb_libpgquery::PGOid opno);
 
-	duckdb_libpgquery::PGOid get_commutator(duckdb_libpgquery::PGOid opno);
+	static duckdb_libpgquery::PGOid get_commutator(duckdb_libpgquery::PGOid opno);
 
     // Oid get_opfamily_member(Oid opfamily, Oid lefttype, Oid righttype, int16 strategy);
 
@@ -137,7 +136,7 @@ public:
 
     // bool op_hashjoinable(Oid opno, Oid inputtype);
 
-	duckdb_libpgquery::PGSortGroupOperPtr get_sort_grp_oper_by_typeid(duckdb_libpgquery::PGOid type_id);
+	static duckdb_libpgquery::PGSortGroupOperPtr get_sort_grp_oper_by_typeid(duckdb_libpgquery::PGOid type_id);
 };
 
 }

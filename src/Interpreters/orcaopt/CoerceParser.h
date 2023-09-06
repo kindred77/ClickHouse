@@ -16,10 +16,10 @@ class RelationProvider;
 using RelationParserPtr = std::shared_ptr<RelationParser>;
 using TypeParserPtr = std::shared_ptr<TypeParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
-using TypeProviderPtr = std::shared_ptr<TypeProvider>;
-using ProcProviderPtr = std::shared_ptr<ProcProvider>;
-using CastProviderPtr = std::shared_ptr<CastProvider>;
-using RelationProviderPtr = std::shared_ptr<RelationProvider>;
+//using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+//using ProcProviderPtr = std::shared_ptr<ProcProvider>;
+//using CastProviderPtr = std::shared_ptr<CastProvider>;
+//using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -30,10 +30,10 @@ private:
 	RelationParserPtr relation_parser;
 	NodeParserPtr node_parser;
 	TypeParserPtr type_parser;
-	TypeProviderPtr type_provider;
-	ProcProviderPtr proc_provider;
-	CastProviderPtr cast_provider;
-	RelationProviderPtr relation_provider;
+	// TypeProviderPtr type_provider;
+	// ProcProviderPtr proc_provider;
+	// CastProviderPtr cast_provider;
+	// RelationProviderPtr relation_provider;
 
 	ContextPtr context;
 public:

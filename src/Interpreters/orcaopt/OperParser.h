@@ -7,16 +7,16 @@ namespace DB
 class FuncParser;
 class NodeParser;
 class CoerceParser;
-class OperProvider;
-class TypeProvider;
-class ProcProvider;
+// class OperProvider;
+// class TypeProvider;
+// class ProcProvider;
 
 using FuncParserPtr = std::shared_ptr<FuncParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
 using CoerceParserPtr = std::shared_ptr<CoerceParser>;
-using OperProviderPtr = std::shared_ptr<OperProvider>;
-using TypeProviderPtr = std::shared_ptr<TypeProvider>;
-using ProcProviderPtr = std::shared_ptr<ProcProvider>;
+// using OperProviderPtr = std::shared_ptr<OperProvider>;
+// using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+// using ProcProviderPtr = std::shared_ptr<ProcProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -28,9 +28,9 @@ private:
 	NodeParserPtr node_parser;
 	CoerceParserPtr coerce_parser;
 
-	OperProviderPtr oper_provider;
-	TypeProviderPtr type_provider;
-	ProcProviderPtr proc_provider;
+	// OperProviderPtr oper_provider;
+	// TypeProviderPtr type_provider;
+	// ProcProviderPtr proc_provider;
 
 	ContextPtr context;
 public:

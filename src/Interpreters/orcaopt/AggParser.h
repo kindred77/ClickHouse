@@ -7,18 +7,6 @@
 namespace DB
 {
 
-struct check_agg_arguments_context
-{
-	duckdb_libpgquery::PGParseState *pstate;
-	int			min_varlevel;
-	int			min_agglevel;
-	int			sublevels_up;
-};
-
-extern bool
-check_agg_arguments_walker(duckdb_libpgquery::PGNode *node,
-						   check_agg_arguments_context *context);
-
 extern int
 cmp_list_len_asc(const void *a, const void *b);
 

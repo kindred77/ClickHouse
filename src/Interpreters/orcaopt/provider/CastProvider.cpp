@@ -309,38 +309,68 @@ std::pair<PGOid, PGCastPtr> CastProvider::DECIMAL64_TO_FLOAT64
 		   /*castcontext*/ 'i',
 		   /*castmethod*/ 'f'})};
 
-CastProvider::CastProvider(const ContextPtr& context_) : context(context_)
-{
-	oid_cast_map.insert(INT64_TO_INT16);
-	oid_cast_map.insert(INT64_TO_INT32);
-	oid_cast_map.insert(INT64_TO_FLOAT32);
-	oid_cast_map.insert(INT64_TO_FLOAT64);
-	oid_cast_map.insert(INT16_TO_INT64);
-	oid_cast_map.insert(INT16_TO_INT32);
-	oid_cast_map.insert(INT16_TO_FLOAT32);
-	oid_cast_map.insert(INT16_TO_FLOAT64);
-	oid_cast_map.insert(BOOL_TO_INT32);
-	oid_cast_map.insert(BOOL_TO_STRING);
-	oid_cast_map.insert(FLOAT32_TO_INT64);
-	oid_cast_map.insert(FLOAT32_TO_INT16);
-	oid_cast_map.insert(FLOAT32_TO_INT32);
-	oid_cast_map.insert(FLOAT32_TO_FLOAT64);
-	oid_cast_map.insert(FLOAT64_TO_INT64);
-	oid_cast_map.insert(FLOAT64_TO_INT16);
-	oid_cast_map.insert(FLOAT64_TO_INT32);
-	oid_cast_map.insert(FLOAT64_TO_FLOAT32);
-	oid_cast_map.insert(INT32_TO_INT64);
-	oid_cast_map.insert(INT32_TO_INT16);
-	oid_cast_map.insert(INT32_TO_FLOAT32);
-	oid_cast_map.insert(INT32_TO_FLOAT64);
-	oid_cast_map.insert(DECIMAL64_TO_INT64);
-	oid_cast_map.insert(DECIMAL64_TO_INT16);
-	oid_cast_map.insert(DECIMAL64_TO_INT32);
-	oid_cast_map.insert(DECIMAL64_TO_FLOAT32);
-	oid_cast_map.insert(DECIMAL64_TO_FLOAT64);
+CastProvider::OidCastMap CastProvider::oid_cast_map = {
+    CastProvider::INT64_TO_INT16,
+	CastProvider::INT64_TO_INT32,
+	CastProvider::INT64_TO_FLOAT32,
+	CastProvider::INT64_TO_FLOAT64,
+	CastProvider::INT16_TO_INT64,
+	CastProvider::INT16_TO_INT32,
+	CastProvider::INT16_TO_FLOAT32,
+	CastProvider::INT16_TO_FLOAT64,
+	CastProvider::BOOL_TO_INT32,
+	CastProvider::BOOL_TO_STRING,
+	CastProvider::FLOAT32_TO_INT64,
+	CastProvider::FLOAT32_TO_INT16,
+	CastProvider::FLOAT32_TO_INT32,
+	CastProvider::FLOAT32_TO_FLOAT64,
+	CastProvider::FLOAT64_TO_INT64,
+	CastProvider::FLOAT64_TO_INT16,
+	CastProvider::FLOAT64_TO_INT32,
+	CastProvider::FLOAT64_TO_FLOAT32,
+	CastProvider::INT32_TO_INT64,
+	CastProvider::INT32_TO_INT16,
+	CastProvider::INT32_TO_FLOAT32,
+	CastProvider::INT32_TO_FLOAT64,
+	CastProvider::DECIMAL64_TO_INT64,
+	CastProvider::DECIMAL64_TO_INT16,
+	CastProvider::DECIMAL64_TO_INT32,
+	CastProvider::DECIMAL64_TO_FLOAT32,
+	CastProvider::DECIMAL64_TO_FLOAT64
 };
 
-PGCastPtr CastProvider::getCastBySourceTypeAndTargetTypeOid(PGOid sourceTypeId, PGOid targetTypeId) const
+// CastProvider::CastProvider(const ContextPtr& context_) : context(context_)
+// {
+	// oid_cast_map.insert(INT64_TO_INT16);
+	// oid_cast_map.insert(INT64_TO_INT32);
+	// oid_cast_map.insert(INT64_TO_FLOAT32);
+	// oid_cast_map.insert(INT64_TO_FLOAT64);
+	// oid_cast_map.insert(INT16_TO_INT64);
+	// oid_cast_map.insert(INT16_TO_INT32);
+	// oid_cast_map.insert(INT16_TO_FLOAT32);
+	// oid_cast_map.insert(INT16_TO_FLOAT64);
+	// oid_cast_map.insert(BOOL_TO_INT32);
+	// oid_cast_map.insert(BOOL_TO_STRING);
+	// oid_cast_map.insert(FLOAT32_TO_INT64);
+	// oid_cast_map.insert(FLOAT32_TO_INT16);
+	// oid_cast_map.insert(FLOAT32_TO_INT32);
+	// oid_cast_map.insert(FLOAT32_TO_FLOAT64);
+	// oid_cast_map.insert(FLOAT64_TO_INT64);
+	// oid_cast_map.insert(FLOAT64_TO_INT16);
+	// oid_cast_map.insert(FLOAT64_TO_INT32);
+	// oid_cast_map.insert(FLOAT64_TO_FLOAT32);
+	// oid_cast_map.insert(INT32_TO_INT64);
+	// oid_cast_map.insert(INT32_TO_INT16);
+	// oid_cast_map.insert(INT32_TO_FLOAT32);
+	// oid_cast_map.insert(INT32_TO_FLOAT64);
+	// oid_cast_map.insert(DECIMAL64_TO_INT64);
+	// oid_cast_map.insert(DECIMAL64_TO_INT16);
+	// oid_cast_map.insert(DECIMAL64_TO_INT32);
+	// oid_cast_map.insert(DECIMAL64_TO_FLOAT32);
+	// oid_cast_map.insert(DECIMAL64_TO_FLOAT64);
+// };
+
+PGCastPtr CastProvider::getCastBySourceTypeAndTargetTypeOid(PGOid sourceTypeId, PGOid targetTypeId)
 {
 	for (auto pair : oid_cast_map)
 	{

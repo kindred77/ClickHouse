@@ -27,14 +27,14 @@ private:
     //using Map = std::map<OID, IMDFunctionPtr>;
 
     //Map oid_fun_map;
-    ContextPtr context;
-    gpos::CMemoryPool * mp;
-    ProcProviderPtr proc_provider;
-    gpmd::CMDName * CreateMDName(const char * name_str);
+    //ContextPtr context;
+    //gpos::CMemoryPool * mp;
+    //ProcProviderPtr proc_provider;
+    //static gpmd::CMDName * CreateMDName(const char * name_str);
 
 public:
     //explicit FunctionProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-    explicit FunctionProvider(const ContextPtr& context_);
+    //explicit FunctionProvider(const ContextPtr& context_);
     //IMDFunctionPtr getFunctionByOID(OID oid) const;
 
     // Datum OidFunctionCall2(Oid functionId, Datum arg1, Datum arg2);
@@ -45,13 +45,13 @@ public:
 
     // Datum OidFunctionCall1_DatumArr(Oid functionId, Datum * datums);
 
-    duckdb_libpgquery::PGDatum OidInputFunctionCall(duckdb_libpgquery::PGOid functionId, const char * str, duckdb_libpgquery::PGOid typioparam, duckdb_libpgquery::int32 typmod);
+    static duckdb_libpgquery::PGDatum OidInputFunctionCall(duckdb_libpgquery::PGOid functionId, const char * str, duckdb_libpgquery::PGOid typioparam, duckdb_libpgquery::int32 typmod);
 
-    int get_func_arg_info(const duckdb_libpgquery::PGProcPtr& procTup, std::vector<duckdb_libpgquery::PGOid>& p_argtypes, std::vector<String>& p_argnames, std::vector<char>& p_argmodes);
+    static int get_func_arg_info(const duckdb_libpgquery::PGProcPtr& procTup, std::vector<duckdb_libpgquery::PGOid>& p_argtypes, std::vector<String>& p_argnames, std::vector<char>& p_argmodes);
 
-    bool MatchNamedCall(const duckdb_libpgquery::PGProcPtr& proctup, int nargs, duckdb_libpgquery::PGList * argnames, int ** argnumbers);
+    static bool MatchNamedCall(const duckdb_libpgquery::PGProcPtr& proctup, int nargs, duckdb_libpgquery::PGList * argnames, int ** argnumbers);
 
-    duckdb_libpgquery::FuncCandidateListPtr FuncnameGetCandidates(
+    static duckdb_libpgquery::FuncCandidateListPtr FuncnameGetCandidates(
         duckdb_libpgquery::PGList * names,
         int nargs,
         duckdb_libpgquery::PGList * argnames,
@@ -59,9 +59,9 @@ public:
         bool expand_defaults,
         bool missing_ok);
 
-    duckdb_libpgquery::PGList * SystemFuncName(const char * name);
+    static duckdb_libpgquery::PGList * SystemFuncName(const char * name);
 
-    String get_func_result_name(duckdb_libpgquery::PGOid functionId);
+    static String get_func_result_name(duckdb_libpgquery::PGOid functionId);
 };
 
 }

@@ -15,8 +15,8 @@ using RelationParserPtr = std::shared_ptr<RelationParser>;
 using ExprParserPtr = std::shared_ptr<ExprParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
 using CoerceParserPtr = std::shared_ptr<CoerceParser>;
-using TypeProviderPtr = std::shared_ptr<TypeProvider>;
-using RelationProviderPtr = std::shared_ptr<RelationProvider>;
+// using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+// using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -28,8 +28,8 @@ private:
     ExprParserPtr expr_parser;
     NodeParserPtr node_parser;
     CoerceParserPtr coerce_parser;
-    TypeProviderPtr type_provider;
-    RelationProviderPtr relation_provider;
+    // TypeProviderPtr type_provider;
+    // RelationProviderPtr relation_provider;
 
     ContextPtr context;
 public:

@@ -13,7 +13,7 @@ class TypeProvider;
 using RelationParserPtr = std::shared_ptr<RelationParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
 using SelectParserPtr = std::shared_ptr<SelectParser>;
-using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+//using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -24,7 +24,7 @@ private:
 	RelationParserPtr relation_parser;
 	NodeParserPtr node_parser;
 	SelectParserPtr select_parser;
-	TypeProviderPtr type_provider;
+	//TypeProviderPtr type_provider;
 	ContextPtr context;
 public:
 	explicit CTEParser(const ContextPtr& context_);

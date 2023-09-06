@@ -17,9 +17,9 @@ TypeParser::TypeParser(const ContextPtr& context_) : context(context_)
 {
     relation_parser = std::make_shared<RelationParser>(context);
     node_parser = std::make_shared<NodeParser>(context);
-    type_provider = std::make_shared<TypeProvider>(context);
-    relation_provider = std::make_shared<RelationProvider>(context);
-    function_provider = std::make_shared<FunctionProvider>(context);
+    // type_provider = std::make_shared<TypeProvider>(context);
+    // relation_provider = std::make_shared<RelationProvider>(context);
+    // function_provider = std::make_shared<FunctionProvider>(context);
 };
 
 void
@@ -63,7 +63,7 @@ TypeParser::TypeNameToString(const PGTypeName *typeName)
 		/* Look up internally-specified type */
 		//appendStringInfoString(string, format_type_be(typeName->typeOid));
 
-		result += std::string(type_provider->format_type_be(typeName->typeOid));
+		result += std::string(TypeProvider::format_type_be(typeName->typeOid));
 	}
 
 	/*
@@ -151,8 +151,8 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
 		 * concurrent DDL.  But taking a lock would carry a performance
 		 * penalty and would also require a permissions check.
 		 */
-        relid = relation_provider->RangeVarGetRelidExtended(rel, NoLock, missing_ok, false, NULL, NULL);
-        attnum = relation_provider->get_attnum(relid, field);
+        relid = RelationProvider::RangeVarGetRelidExtended(rel, NoLock, missing_ok, false, NULL, NULL);
+        attnum = RelationProvider::get_attnum(relid, field);
         if (attnum == InvalidAttrNumber)
         {
             if (missing_ok)
@@ -166,13 +166,13 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
         }
         else
         {
-            typoid = relation_provider->get_atttype(relid, attnum);
+            typoid = RelationProvider::get_atttype(relid, attnum);
 
             /* this construct should never have an array indicator */
             Assert(typeName->arrayBounds == NIL)
 
             /* emit nuisance notice (intentionally not errposition'd) */
-            ereport(NOTICE, (errmsg("type reference %s converted to %s", TypeNameToString(typeName).c_str(), type_provider->format_type_be(typoid).c_str())));
+            ereport(NOTICE, (errmsg("type reference %s converted to %s", TypeNameToString(typeName).c_str(), TypeProvider::format_type_be(typoid).c_str())));
         }
     }
     else
@@ -189,10 +189,10 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
             /* Look in specific schema only */
             PGOid namespaceId;
 
-            namespaceId = relation_provider->LookupExplicitNamespace(schemaname, missing_ok);
+            namespaceId = RelationProvider::LookupExplicitNamespace(schemaname, missing_ok);
             if (OidIsValid(namespaceId))
 			{
-				typoid = type_provider->get_typeoid_by_typename_namespaceoid(typname, namespaceId);
+				typoid = TypeProvider::get_typeoid_by_typename_namespaceoid(typname, namespaceId);
 			}
             else
                 typoid = InvalidOid;
@@ -200,12 +200,12 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
         else
         {
             /* Unqualified type name, so search the search path */
-            typoid = type_provider->TypenameGetTypidExtended(typname, temp_ok);
+            typoid = TypeProvider::TypenameGetTypidExtended(typname, temp_ok);
         }
 
         /* If an array reference, return the array type instead */
         if (typeName->arrayBounds != NIL)
-            typoid = type_provider->get_array_type(typoid);
+            typoid = TypeProvider::get_array_type(typoid);
     }
 
     if (!OidIsValid(typoid))
@@ -215,7 +215,7 @@ PGTypePtr TypeParser::LookupTypeNameExtended(PGParseState * pstate, const PGType
         return NULL;
     }
 
-    PGTypePtr tup = type_provider->getTypeByOid(typoid);
+    PGTypePtr tup = TypeProvider::getTypeByOid(typoid);
     if (tup == NULL) /* should not happen */
         elog(ERROR, "cache lookup failed for type %u", typoid);
 
@@ -323,7 +323,7 @@ TypeParser::typenameTypeMod(PGParseState *pstate, const PGTypeName *typeName, PG
 	// /* arrange to report location if type's typmodin function fails */
 	// setup_parser_errposition_callback(&pcbstate, pstate, typeName->location);
 
-	// result = DatumGetInt32(function_provider->OidFunctionCall1Coll(typmodin,InvalidOid,
+	// result = DatumGetInt32(FunctionProvider::OidFunctionCall1Coll(typmodin,InvalidOid,
 	// 										PointerGetDatum(arrtypmod)));
 
 	// cancel_parser_errposition_callback(&pcbstate);
@@ -360,7 +360,7 @@ TypeParser::typenameType(PGParseState *pstate, const PGTypeName *typeName, int32
 PGTypePtr
 TypeParser::typeidType(PGOid id)
 {
-	PGTypePtr tup = type_provider->getTypeByOid(id);
+	PGTypePtr tup = TypeProvider::getTypeByOid(id);
 	if (tup == NULL)
 		elog(ERROR, "cache lookup failed for type %u", id);
 	return tup;
@@ -370,7 +370,7 @@ PGOid TypeParser::typeidTypeRelid(PGOid type_id)
 {
     PGOid result;
 
-	PGTypePtr typeTuple = type_provider->getTypeByOid(type_id);
+	PGTypePtr typeTuple = TypeProvider::getTypeByOid(type_id);
     if (typeTuple == NULL)
         elog(ERROR, "cache lookup failed for type %u", type_id);
 
@@ -403,9 +403,9 @@ TypeParser::stringTypeDatum(PGTypePtr tp, const char *str, int32 atttypmod)
     elog(ERROR, "OidInputFunctionCall is not implemented yet!");
 
 	PGOid			typinput = tp->typinput;
-	PGOid			typioparam = type_provider->getTypeIOParam(tp);
+	PGOid			typioparam = TypeProvider::getTypeIOParam(tp);
 
-	return function_provider->OidInputFunctionCall(typinput, str, typioparam, atttypmod);
+	return FunctionProvider::OidInputFunctionCall(typinput, str, typioparam, atttypmod);
 };
 
 PGOid
@@ -416,7 +416,7 @@ TypeParser::typeOrDomainTypeRelid(PGOid type_id)
 
 	for (;;)
 	{
-		typeTuple = type_provider->getTypeByOid(type_id);
+		typeTuple = TypeProvider::getTypeByOid(type_id);
 		if (typeTuple == nullptr)
 			elog(ERROR, "cache lookup failed for type %u", type_id);
 		if (typeTuple->typtype != TYPTYPE_DOMAIN)

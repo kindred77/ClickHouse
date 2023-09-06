@@ -21,7 +21,7 @@ using RelationParserPtr = std::shared_ptr<RelationParser>;
 using CTEParserPtr = std::shared_ptr<CTEParser>;
 using FuncParserPtr = std::shared_ptr<FuncParser>;
 using AggParserPtr = std::shared_ptr<AggParser>;
-using RelationProviderPtr = std::shared_ptr<RelationProvider>;
+// using RelationProviderPtr = std::shared_ptr<RelationProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -38,7 +38,7 @@ private:
     //CollationParserPtr collation_parser;
     AggParserPtr agg_parser;
     FuncParserPtr func_parser;
-    RelationProviderPtr relation_provider;
+    // RelationProviderPtr relation_provider;
 
     ContextPtr context;
 public:

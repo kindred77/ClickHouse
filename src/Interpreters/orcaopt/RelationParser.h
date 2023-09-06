@@ -11,16 +11,16 @@ namespace DB
 class CoerceParser;
 class NodeParser;
 class TypeParser;
-class RelationProvider;
-class TypeProvider;
-class FunctionProvider;
+// class RelationProvider;
+// class TypeProvider;
+// class FunctionProvider;
 
 using CoerceParserPtr = std::shared_ptr<CoerceParser>;
 using NodeParserPtr = std::shared_ptr<NodeParser>;
 using TypeParserPtr = std::shared_ptr<TypeParser>;
-using RelationProviderPtr = std::shared_ptr<RelationProvider>;
-using TypeProviderPtr = std::shared_ptr<TypeProvider>;
-using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
+// using RelationProviderPtr = std::shared_ptr<RelationProvider>;
+// using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+// using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -35,9 +35,9 @@ private:
 	NodeParserPtr node_parser;
 	TypeParserPtr type_parser;
 
-	RelationProviderPtr relation_provider;
-	TypeProviderPtr type_provider;
-	FunctionProviderPtr function_provider;
+	// RelationProviderPtr relation_provider;
+	// TypeProviderPtr type_provider;
+	// FunctionProviderPtr function_provider;
 	//ENRParser enr_parser;
 
     //int specialAttNum(const char * attname);

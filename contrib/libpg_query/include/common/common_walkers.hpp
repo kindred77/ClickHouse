@@ -333,4 +333,16 @@ struct pg_find_nodes_context
 extern bool
 pg_find_nodes_walker(duckdb_libpgquery::PGNode *node, pg_find_nodes_context *context);
 
+struct check_agg_arguments_context
+{
+	duckdb_libpgquery::PGParseState *pstate;
+	int			min_varlevel;
+	int			min_agglevel;
+	int			sublevels_up;
+};
+
+extern bool
+check_agg_arguments_walker(duckdb_libpgquery::PGNode *node,
+						   check_agg_arguments_context *context);
+
 }

@@ -26,9 +26,9 @@ using ContextPtr = std::shared_ptr<const Context>;
 class CastProvider
 {
 private:
-	using Map = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGCastPtr>;
 
-	Map oid_cast_map;
+	using OidCastMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGCastPtr>;
+    static OidCastMap oid_cast_map;
 
 	ContextPtr context;
 
@@ -61,9 +61,9 @@ private:
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGCastPtr> DECIMAL64_TO_FLOAT64;
 public:
 	//explicit CastProvider(gpos::CMemoryPool *mp_, ContextPtr context);
-	explicit CastProvider(const ContextPtr& context_);
+	//explicit CastProvider(const ContextPtr& context_);
 	
-	duckdb_libpgquery::PGCastPtr getCastBySourceTypeAndTargetTypeOid(duckdb_libpgquery::PGOid sourceTypeId, duckdb_libpgquery::PGOid targetTypeId) const;
+	static duckdb_libpgquery::PGCastPtr getCastBySourceTypeAndTargetTypeOid(duckdb_libpgquery::PGOid sourceTypeId, duckdb_libpgquery::PGOid targetTypeId);
 
 	static int CAST_OID_ID;
 };

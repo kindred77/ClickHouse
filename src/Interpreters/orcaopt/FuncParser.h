@@ -13,10 +13,10 @@ class NodeParser;
 class TypeParser;
 class AggParser;
 class ClauseParser;
-class TypeProvider;
-class ProcProvider;
-class AggProvider;
-class FunctionProvider;
+// class TypeProvider;
+// class ProcProvider;
+// class AggProvider;
+// class FunctionProvider;
 
 using RelationParserPtr = std::shared_ptr<RelationParser>;
 using CoerceParserPtr = std::shared_ptr<CoerceParser>;
@@ -26,10 +26,10 @@ using NodeParserPtr = std::shared_ptr<NodeParser>;
 using TypeParserPtr = std::shared_ptr<TypeParser>;
 using AggParserPtr = std::shared_ptr<AggParser>;
 using ClauseParserPtr = std::shared_ptr<ClauseParser>;
-using TypeProviderPtr = std::shared_ptr<TypeProvider>;
-using ProcProviderPtr = std::shared_ptr<ProcProvider>;
-using AggProviderPtr = std::shared_ptr<AggProvider>;
-using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
+// using TypeProviderPtr = std::shared_ptr<TypeProvider>;
+// using ProcProviderPtr = std::shared_ptr<ProcProvider>;
+// using AggProviderPtr = std::shared_ptr<AggProvider>;
+// using FunctionProviderPtr = std::shared_ptr<FunctionProvider>;
 
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
@@ -45,10 +45,10 @@ private:
     RelationParserPtr relation_parser;
 	TargetParserPtr target_parser;
     ExprParserPtr expr_parser;
-	TypeProviderPtr type_provider;
-	ProcProviderPtr proc_provider;
-	AggProviderPtr agg_provider;
-	FunctionProviderPtr func_provider;
+	// TypeProviderPtr type_provider;
+	// ProcProviderPtr proc_provider;
+	// AggProviderPtr agg_provider;
+	// FunctionProviderPtr func_provider;
 
 	ContextPtr context;
 public:

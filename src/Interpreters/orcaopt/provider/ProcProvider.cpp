@@ -1086,52 +1086,98 @@ std::pair<PGOid, PGProcPtr> ProcProvider::PROC_DECIMAL64TOFLOAT64 = std::pair<PG
         /*prorettype*/ .prorettype = PGOid(701),
         /*proargtypes*/ .proargtypes = {PGOid(1700)}}));
 
-ProcProvider::ProcProvider(const ContextPtr& context_) : context(context_)
-{
-	oid_proc_map.insert(PROC_INT2PL);
-	oid_proc_map.insert(PROC_INT4PL);
-	oid_proc_map.insert(PROC_INT24PL);
-	oid_proc_map.insert(PROC_INT42PL);
-    oid_proc_map.insert(PROC_INT2MI);
-    oid_proc_map.insert(PROC_INT4MI);
-    oid_proc_map.insert(PROC_INT24MI);
-    oid_proc_map.insert(PROC_INT42MI);
-    oid_proc_map.insert(PROC_INT2MUL);
-    oid_proc_map.insert(PROC_INT4MUL);
-    oid_proc_map.insert(PROC_INT24MUL);
-    oid_proc_map.insert(PROC_INT42MUL);
-    oid_proc_map.insert(PROC_INT2DIV);
-    oid_proc_map.insert(PROC_INT4DIV);
-    oid_proc_map.insert(PROC_INT24DIV);
-    oid_proc_map.insert(PROC_INT42DIV);
+ProcProvider::OidProcMap ProcProvider::oid_proc_map = {
+    ProcProvider::PROC_INT2PL,
+	ProcProvider::PROC_INT4PL,
+	ProcProvider::PROC_INT24PL,
+	ProcProvider::PROC_INT42PL,
+    ProcProvider::PROC_INT2MI,
+    ProcProvider::PROC_INT4MI,
+    ProcProvider::PROC_INT24MI,
+    ProcProvider::PROC_INT42MI,
+    ProcProvider::PROC_INT2MUL,
+    ProcProvider::PROC_INT4MUL,
+    ProcProvider::PROC_INT24MUL,
+    ProcProvider::PROC_INT42MUL,
+    ProcProvider::PROC_INT2DIV,
+    ProcProvider::PROC_INT4DIV,
+    ProcProvider::PROC_INT24DIV,
+    ProcProvider::PROC_INT42DIV,
 
-    oid_proc_map.insert(PROC_INT64TOINT16);
-	oid_proc_map.insert(PROC_INT64TOINT32);
-	oid_proc_map.insert(PROC_INT64TOFLOAT32);
-	oid_proc_map.insert(PROC_INT64TOFLOAT64);
-	oid_proc_map.insert(PROC_INT16TOINT64);
-	oid_proc_map.insert(PROC_INT16TOINT32);
-	oid_proc_map.insert(PROC_INT16TOFLOAT32);
-	oid_proc_map.insert(PROC_INT16TOFLOAT64);
-	oid_proc_map.insert(PROC_BOOLTOINT32);
-	oid_proc_map.insert(PROC_BOOLTOSTRING);
-	oid_proc_map.insert(PROC_FLOAT32TOINT64);
-	oid_proc_map.insert(PROC_FLOAT32TOINT16);
-	oid_proc_map.insert(PROC_FLOAT32TOINT32);
-	oid_proc_map.insert(PROC_FLOAT32TOFLOAT64);
-	oid_proc_map.insert(PROC_FLOAT64TOINT64);
-	oid_proc_map.insert(PROC_FLOAT64TOINT16);
-	oid_proc_map.insert(PROC_FLOAT64TOINT32);
-	oid_proc_map.insert(PROC_FLOAT64TOFLOAT32);
-	oid_proc_map.insert(PROC_INT32TOINT64);
-	oid_proc_map.insert(PROC_INT32TOINT16);
-	oid_proc_map.insert(PROC_INT32TOFLOAT32);
-	oid_proc_map.insert(PROC_INT32TOFLOAT64);
-	oid_proc_map.insert(PROC_DECIMAL64TOINT64);
-	oid_proc_map.insert(PROC_DECIMAL64TOINT16);
-	oid_proc_map.insert(PROC_DECIMAL64TOINT32);
-	oid_proc_map.insert(PROC_DECIMAL64TOFLOAT64);
+    ProcProvider::PROC_INT64TOINT16,
+	ProcProvider::PROC_INT64TOINT32,
+	ProcProvider::PROC_INT64TOFLOAT32,
+	ProcProvider::PROC_INT64TOFLOAT64,
+	ProcProvider::PROC_INT16TOINT64,
+	ProcProvider::PROC_INT16TOINT32,
+	ProcProvider::PROC_INT16TOFLOAT32,
+	ProcProvider::PROC_INT16TOFLOAT64,
+	ProcProvider::PROC_BOOLTOINT32,
+	ProcProvider::PROC_BOOLTOSTRING,
+	ProcProvider::PROC_FLOAT32TOINT64,
+	ProcProvider::PROC_FLOAT32TOINT16,
+	ProcProvider::PROC_FLOAT32TOINT32,
+	ProcProvider::PROC_FLOAT32TOFLOAT64,
+	ProcProvider::PROC_FLOAT64TOINT64,
+	ProcProvider::PROC_FLOAT64TOINT16,
+	ProcProvider::PROC_FLOAT64TOINT32,
+	ProcProvider::PROC_FLOAT64TOFLOAT32,
+	ProcProvider::PROC_INT32TOINT64,
+	ProcProvider::PROC_INT32TOINT16,
+	ProcProvider::PROC_INT32TOFLOAT32,
+	ProcProvider::PROC_INT32TOFLOAT64,
+	ProcProvider::PROC_DECIMAL64TOINT64,
+	ProcProvider::PROC_DECIMAL64TOINT16,
+	ProcProvider::PROC_DECIMAL64TOINT32,
+	ProcProvider::PROC_DECIMAL64TOFLOAT64
 };
+
+// ProcProvider::ProcProvider(const ContextPtr& context_) : context(context_)
+// {
+	// oid_proc_map.insert(PROC_INT2PL);
+	// oid_proc_map.insert(PROC_INT4PL);
+	// oid_proc_map.insert(PROC_INT24PL);
+	// oid_proc_map.insert(PROC_INT42PL);
+    // oid_proc_map.insert(PROC_INT2MI);
+    // oid_proc_map.insert(PROC_INT4MI);
+    // oid_proc_map.insert(PROC_INT24MI);
+    // oid_proc_map.insert(PROC_INT42MI);
+    // oid_proc_map.insert(PROC_INT2MUL);
+    // oid_proc_map.insert(PROC_INT4MUL);
+    // oid_proc_map.insert(PROC_INT24MUL);
+    // oid_proc_map.insert(PROC_INT42MUL);
+    // oid_proc_map.insert(PROC_INT2DIV);
+    // oid_proc_map.insert(PROC_INT4DIV);
+    // oid_proc_map.insert(PROC_INT24DIV);
+    // oid_proc_map.insert(PROC_INT42DIV);
+
+    // oid_proc_map.insert(PROC_INT64TOINT16);
+	// oid_proc_map.insert(PROC_INT64TOINT32);
+	// oid_proc_map.insert(PROC_INT64TOFLOAT32);
+	// oid_proc_map.insert(PROC_INT64TOFLOAT64);
+	// oid_proc_map.insert(PROC_INT16TOINT64);
+	// oid_proc_map.insert(PROC_INT16TOINT32);
+	// oid_proc_map.insert(PROC_INT16TOFLOAT32);
+	// oid_proc_map.insert(PROC_INT16TOFLOAT64);
+	// oid_proc_map.insert(PROC_BOOLTOINT32);
+	// oid_proc_map.insert(PROC_BOOLTOSTRING);
+	// oid_proc_map.insert(PROC_FLOAT32TOINT64);
+	// oid_proc_map.insert(PROC_FLOAT32TOINT16);
+	// oid_proc_map.insert(PROC_FLOAT32TOINT32);
+	// oid_proc_map.insert(PROC_FLOAT32TOFLOAT64);
+	// oid_proc_map.insert(PROC_FLOAT64TOINT64);
+	// oid_proc_map.insert(PROC_FLOAT64TOINT16);
+	// oid_proc_map.insert(PROC_FLOAT64TOINT32);
+	// oid_proc_map.insert(PROC_FLOAT64TOFLOAT32);
+	// oid_proc_map.insert(PROC_INT32TOINT64);
+	// oid_proc_map.insert(PROC_INT32TOINT16);
+	// oid_proc_map.insert(PROC_INT32TOFLOAT32);
+	// oid_proc_map.insert(PROC_INT32TOFLOAT64);
+	// oid_proc_map.insert(PROC_DECIMAL64TOINT64);
+	// oid_proc_map.insert(PROC_DECIMAL64TOINT16);
+	// oid_proc_map.insert(PROC_DECIMAL64TOINT32);
+	// oid_proc_map.insert(PROC_DECIMAL64TOFLOAT64);
+// };
 
 std::unique_ptr<std::vector<PGProcPtr>> ProcProvider::search_procs_by_name(const std::string & func_name)
 {
@@ -1147,7 +1193,7 @@ std::unique_ptr<std::vector<PGProcPtr>> ProcProvider::search_procs_by_name(const
     return procs;
 };
 
-PGProcPtr ProcProvider::getProcByOid(PGOid oid) const
+PGProcPtr ProcProvider::getProcByOid(PGOid oid)
 {
 	auto it = oid_proc_map.find(oid);
 	if (it == oid_proc_map.end())
