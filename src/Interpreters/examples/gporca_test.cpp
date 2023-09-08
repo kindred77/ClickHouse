@@ -4,11 +4,17 @@
 #include <Interpreters/Context.h>
 #include <postgres_parser.hpp>
 #include <Interpreters/orcaopt/translator/CTranslatorQueryToDXL.h>
+#include <Interpreters/orcaopt/translator/CTranslatorRelcacheToDXL.h>
 #include <gpos/common/CAutoP.h>
 #include <gpos/memory/CAutoMemoryPool.h>
+#include <gpopt/mdcache/CMDCache.h>
 #include <naucrates/dxl/CDXLUtils.h>
+#include <naucrates/md/IMDProvider.h>
 
 using namespace duckdb_libpgquery;
+using namespace gpmd;
+using namespace gpdxl;
+using namespace gpopt;
 
 class CMDProviderRelcache : public IMDProvider
 {
@@ -78,7 +84,9 @@ void optimize(PGQuery * query)
     CMDAccessor mda(mp, CMDCache::Pcache(), default_sysid,
 		relcache_provider);
 
-	CAutoP<CTranslatorQueryToDXL> query_to_dxl_translator = 
+	//CAutoP<CTranslatorQueryToDXL> query_to_dxl_translator = 
+    //    CTranslatorQueryToDXL::QueryToDXLInstance(mp, &mda, query);
+    auto query_to_dxl_translator = 
         CTranslatorQueryToDXL::QueryToDXLInstance(mp, &mda, query);
     
     CDXLNode *query_dxl =

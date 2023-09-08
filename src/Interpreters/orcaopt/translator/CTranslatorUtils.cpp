@@ -71,22 +71,14 @@
 #include "naucrates/md/IMDTypeOid.h"
 #include "naucrates/traceflags/traceflags.h"
 
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wcovered-switch-default"
-#pragma clang diagnostic ignored "-Wunreachable-code-return"
-#else
-#pragma GCC diagnostic ignored "-Wcovered-switch-default"
-#pragma GCC diagnostic ignored "-Wunreachable-code-return"
-#endif
-
 using namespace gpdxl;
 using namespace gpmd;
 using namespace gpos;
 using namespace gpopt;
 using namespace duckdb_libpgquery;
 
-extern bool optimizer_enable_master_only_queries;
-extern bool optimizer_multilevel_partitioning;
+bool optimizer_enable_master_only_queries = true;
+bool optimizer_multilevel_partitioning = false;
 
 //---------------------------------------------------------------------------
 //	@function:

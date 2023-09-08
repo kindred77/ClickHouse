@@ -31,6 +31,8 @@ using namespace duckdb_libpgquery;
 // {
 // 	return NULL;
 // };
+namespace gpdxl
+{
 
 PGListCell *
 ListHead(PGList *l)
@@ -795,3 +797,5 @@ PGList *GetOpFamiliesForScOp(PGOid opno)
 {
 	return NULL;
 };
+
+}

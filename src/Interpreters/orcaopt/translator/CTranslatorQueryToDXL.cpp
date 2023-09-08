@@ -60,11 +60,11 @@ using namespace gpnaucrates;
 using namespace gpmd;
 using namespace duckdb_libpgquery;
 
-extern bool optimizer_enable_ctas;
-extern bool optimizer_enable_dml;
-extern bool optimizer_enable_dml_triggers;
-extern bool optimizer_enable_dml_constraints;
-extern bool optimizer_enable_multiple_distinct_aggs;
+bool optimizer_enable_ctas = false;
+bool optimizer_enable_dml = false;
+bool optimizer_enable_dml_triggers = false;
+bool optimizer_enable_dml_constraints = false;
+bool optimizer_enable_multiple_distinct_aggs = true;
 
 // OIDs of variants of LEAD window function
 static const OID lead_func_oids[] = {
