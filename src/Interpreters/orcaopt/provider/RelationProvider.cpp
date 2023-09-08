@@ -38,6 +38,7 @@ bool RelationProvider::is_init = false;
 
 void RelationProvider::initDb()
 {
+    if (is_init) return;
     rocksdb_dir = context->getPath() + relative_data_path_;
 
     rocksdb::Options options;
@@ -67,6 +68,7 @@ void RelationProvider::initDb()
 
 void RelationProvider::initAttrs(PGRelationPtr & relation)
 {
+    if (is_init) return;
     PGAttrNumber attr_num = 1;
     IStorage* storage = relation->storage_ptr.get();
     auto all_cols = storage->getInMemoryMetadataPtr()->getColumns().getAll();
@@ -81,11 +83,107 @@ void RelationProvider::initAttrs(PGRelationPtr & relation)
     }
 };
 
+void RelationProvider::mockTestData()
+{
+    auto db_ptr = std::make_shared<PGDatabase>(PGDatabase{static_cast<PGOid>(999999), "test"});
+    oid_database_map.insert({db_ptr->oid, db_ptr});
+
+    auto table_oid = 9999;
+    auto table_name = "test";
+    std::map<String, String> cols = {{"String", "col1"}, {"Int64", "col2"}, {"DateTime", "col3"}, {"Int8", "col4"}, {"Date", "col5"}};
+    auto tab_class = std::make_shared<Form_pg_class>(Form_pg_class{
+        /*oid*/ PGOid(table_oid),
+        /*relname*/ table_name,
+        /*relnamespace*/ db_ptr->oid,
+        /*reltype*/ InvalidOid,
+        /*reloftype*/ InvalidOid,
+        /*relowner*/ InvalidOid,
+        /*relam*/ InvalidOid,
+        /*relfilenode*/ InvalidOid,
+        /*reltablespace*/ InvalidOid,
+        /*relpages*/ 0,
+        /*reltuples*/ 0,
+        /*relallvisible*/ 0,
+        /*reltoastrelid*/ InvalidOid,
+        /*relhasindex*/ false,
+        /*relisshared*/ false,
+        /*relpersistence*/ 'p',
+        /*relkind*/ 'r',
+        /*relstorage*/ 'a',
+        /*relnatts*/ static_cast<int16>(cols.size()),
+        /*relchecks*/ 0,
+        /*relhasoids*/ false,
+        /*relhaspkey*/ false,
+        /*relhasrules*/ false,
+        /*relhastriggers*/ false,
+        /*relhassubclass*/ false,
+        /*relispopulated*/ false,
+        /*relreplident*/ 'd',
+        /*relfrozenxid*/ 0,
+        /*relminmxid*/ 0
+    });
+
+    // oid of class and oid of relation is the same
+    auto tab_rel = std::make_shared<PGRelation>(PGRelation{
+        /*oid*/ .oid = tab_class->oid,
+        // /*rd_node*/ {},
+        // /*rd_refcnt*/ 0,
+        // /*rd_backend*/ 0,
+        // /*rd_islocaltemp*/ false,
+        // /*rd_isnailed*/ false,
+        // /*rd_isvalid*/ false,
+        // /*rd_indexvalid*/ false,
+        // /*rd_createSubid*/ 0,
+        // /*rd_newRelfilenodeSubid*/ 0,
+        /*rd_rel*/ .rd_rel = tab_class,
+        /*rd_att*/ .rd_att = PGCreateTemplateTupleDesc(tab_class->relnatts, tab_class->relhasoids),
+         /*rd_id*/ tab_class->oid,
+        // /*rd_lockInfo*/ {},
+        // /*rd_cdbpolicy*/ {},
+        // /*rd_cdbDefaultStatsWarningIssued*/ false,
+        // /*rd_indexlist*/ NULL,
+        // /*rd_oidindex*/ InvalidOid,
+        // /*rd_replidindex*/ InvalidOid,
+        // /*rd_indexattr*/ NULL,
+        // /*rd_keyattr*/ NULL,
+        // /*rd_idattr*/ NULL,
+        // /*rd_options*/ NULL,
+        // /*rd_opfamily*/ NULL,
+        // /*rd_opcintype*/ NULL,
+        // /*rd_indoption*/ NULL,
+        // /*rd_indexprs*/ NULL,
+        // /*rd_indpred*/ NULL,
+        // /*rd_exclops*/ NULL,
+        // /*rd_exclprocs*/ NULL,
+        // /*rd_exclstrats*/ NULL,
+        // /*rd_amcache*/ NULL,
+        // /*rd_indcollation*/ NULL,
+        // /*rd_toastoid*/ InvalidOid
+    });
+
+    PGAttrNumber attr_num = 1;
+    for (auto type_and_name : cols)
+    {
+        auto type_ptr = TypeProvider::get_type_by_typename_namespaceoid(type_and_name.first);
+        if (!type_ptr)
+        {
+            elog(ERROR, "Unknow type: %s.", type_and_name.first.c_str());
+            return;
+        }
+        TypeProvider::PGTupleDescInitEntry(tab_rel->rd_att, attr_num,
+            type_and_name.second, /*oidtypeid*/ type_ptr->oid, /*typmod*/ type_ptr->typtypmod, /*attdim*/ 0);
+        attr_num++;
+    }
+
+    oid_relation_map.insert({tab_rel->oid, tab_rel});
+};
+
 void RelationProvider::Init(ContextPtr& context_)
 {
+    if (is_init) return;
     context = context_;
     initDb();
-
+    
     for (const auto & pair : DatabaseCatalog::instance().getDatabases())
     {
         const auto & database_name = pair.first;
@@ -173,7 +271,7 @@ void RelationProvider::Init(ContextPtr& context_)
                 // /*rd_newRelfilenodeSubid*/ 0,
                 /*rd_rel*/ .rd_rel = tab_class,
                 /*rd_att*/ .rd_att = PGCreateTemplateTupleDesc(tab_class->relnatts, tab_class->relhasoids),
-                // /*rd_id*/ InvalidOid,
+                /*rd_id*/ tab_class->oid,
                 // /*rd_lockInfo*/ {},
                 // /*rd_cdbpolicy*/ {},
                 // /*rd_cdbDefaultStatsWarningIssued*/ false,
@@ -203,6 +301,7 @@ void RelationProvider::Init(ContextPtr& context_)
         }
     }
 
+    SCOPE_EXIT({rocksdb_ptr->Close();});
     is_init = true;
 };
 
@@ -590,6 +689,7 @@ PGRelationPtr RelationProvider::relation_open(PGOid relationId, LOCKMODE lockmod
         elog(ERROR, "LockMode do not supported yet %u", lockmode);
         return nullptr;
     }
+    
     auto it = oid_relation_map.find(relationId);
 	if (it == oid_relation_map.end())
     {
@@ -854,8 +954,13 @@ PGRelationPtr RelationProvider::heap_open(PGOid relationId, LOCKMODE lockmode)
     if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
 
     PGRelationPtr r;
-
+    
     r = relation_open(relationId, lockmode);
+    if (!r)
+    {
+        elog(ERROR, "Table not find, Oid: %d.", relationId);
+        return nullptr;
+    }
 
     if (r->rd_rel->relkind == PG_RELKIND_INDEX)
         ereport(ERROR, (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is an index", RelationGetRelationName(r))));

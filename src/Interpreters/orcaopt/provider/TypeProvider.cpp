@@ -1948,7 +1948,6 @@ void TypeProvider::PGTupleDescInitEntry(
 {
 	//HeapTuple tuple;
     //Form_pg_type typeForm;
-    PGAttrPtr att;
 
     /*
 	 * sanity checks
@@ -1956,12 +1955,11 @@ void TypeProvider::PGTupleDescInitEntry(
     Assert(PointerIsValid(desc.get()))
     Assert(attributeNumber >= 1)
     Assert(attributeNumber <= desc->natts)
-
     /*
 	 * initialize the attribute fields
 	 */
-    att = desc->attrs[attributeNumber - 1];
-
+    PGAttrPtr & att = desc->attrs[attributeNumber - 1];
+    att = std::make_shared<Form_pg_attribute>();
     att->attrelid = 0; /* dummy value */
 
     /*
@@ -1993,19 +1991,17 @@ void TypeProvider::PGTupleDescInitEntry(
     att->attislocal = true;
     att->attinhcount = 0;
     /* attacl, attoptions and attfdwoptions are not present in tupledescs */
-
     PGTypePtr tuple = getTypeByOid(oidtypeid);
     if (tuple == NULL)
         elog(ERROR, "cache lookup failed for type %u", oidtypeid);
     //typeForm = (Form_pg_type)GETSTRUCT(tuple);
-
+    
     att->atttypid = oidtypeid;
     att->attlen = tuple->typlen;
     att->attbyval = tuple->typbyval;
     att->attalign = tuple->typalign;
     att->attstorage = tuple->typstorage;
     //att->attcollation = tuple->typcollation;
-
     //ReleaseSysCache(tuple);
 };
 

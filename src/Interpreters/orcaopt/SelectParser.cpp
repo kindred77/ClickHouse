@@ -398,10 +398,8 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 
     /* process the FROM clause */
     ClauseParser::transformFromClause(pstate, stmt->fromClause);
-
     /* transform targetlist */
     qry->targetList = TargetParser::transformTargetList(pstate, stmt->targetList, EXPR_KIND_SELECT_TARGET);
-
     /* mark column origins */
     markTargetListOrigins(pstate, qry->targetList);
 

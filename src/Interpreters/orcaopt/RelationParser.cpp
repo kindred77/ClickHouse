@@ -570,6 +570,11 @@ RelationParser::expandRelation(PGOid relid, PGAlias *eref, int rtindex, int subl
 {
 	/* Get the tupledesc and turn it over to expandTupleDesc */
 	PGRelationPtr rel = RelationProvider::relation_open(relid, AccessShareLock);
+	if (!rel)
+	{
+		elog(ERROR, "Can not get table. oid: %u", relid);
+		return;
+	}
 	expandTupleDesc(rel->rd_att, eref, rel->rd_att->natts, 0,
 					rtindex, sublevels_up,
 					location, include_dropped,
@@ -943,6 +948,11 @@ PGRelationPtr RelationParser::parserOpenTable(PGParseState * pstate, const PGRan
     /* Look up the appropriate relation using namespace search */
     PGOid relid = RelationProvider::RangeVarGetRelidExtended(relation, NoLock, true, false, NULL, NULL);
     
+	if (relid == InvalidOid)
+	{
+		elog(ERROR, "Table not found, %s.", relation->relname);
+		return nullptr;
+	}
     /*
 	 * CdbTryOpenRelation might return NULL (for example, if the table
 	 * is dropped by another transaction). Every time we invoke function

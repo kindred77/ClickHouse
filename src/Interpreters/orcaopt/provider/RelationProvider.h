@@ -58,7 +58,9 @@ private:
     static void initDb();
 
     static void initAttrs(duckdb_libpgquery::PGRelationPtr & relation);
+
 public:
+    static void mockTestData();
 	//explicit RelationProvider(gpos::CMemoryPool *mp_, ContextPtr context);
     static void Init(ContextPtr& context_);
 	//StoragePtr getStorageByOID(duckdb_libpgquery::PGOid oid) const;

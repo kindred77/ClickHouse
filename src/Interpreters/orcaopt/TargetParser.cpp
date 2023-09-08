@@ -273,12 +273,15 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 	PGList	   *target = NIL;
 	bool		found_table = false;
 	PGListCell   *l;
-
 	foreach(l, pstate->p_namespace)
 	{
 		PGParseNamespaceItem *nsitem = (PGParseNamespaceItem *) lfirst(l);
 		PGRangeTblEntry *rte = nsitem->p_rte;
-
+		if (!rte || rte->relid == InvalidOid)
+		{
+			elog(ERROR, "Can not search table in PGParseNamespaceItem or invalid relid.");
+			return NULL;
+		}
 		/* Ignore table-only items */
 		if (!nsitem->p_cols_visible)
 			continue;
@@ -286,7 +289,6 @@ TargetParser::ExpandAllTables(PGParseState *pstate, int location)
 		Assert(!nsitem->p_lateral_only)
 		/* Remember we found a p_cols_visible item */
 		found_table = true;
-
 		target = list_concat(target,
 							 RelationParser::expandRelAttrs(pstate,
 											rte,
@@ -597,7 +599,6 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 {
 	PGList	   *fields = cref->fields;
 	int			numnames = list_length(fields);
-
 	if (numnames == 1)
 	{
 		/*
@@ -610,7 +611,6 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 		 */
 		if (!make_target_entry)
 			elog(ERROR, "invalid use of *");
-
 		return ExpandAllTables(pstate, cref->location);
 	}
 	else
@@ -722,6 +722,7 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 		 */
 		if (rte == NULL)
 		{
+			elog(ERROR, "Can not get table: %s", relname);
 			switch (crserr)
 			{
 				case CRSERR_NO_RTE:
@@ -744,7 +745,6 @@ TargetParser::ExpandColumnRefStar(PGParseState *pstate, PGColumnRef *cref,
 					break;
 			}
 		}
-
 		/*
 		 * OK, expand the RTE into fields.
 		 */
@@ -777,7 +777,7 @@ TargetParser::transformTargetList(PGParseState *pstate, PGList *targetlist,
     PGList	   *p_target = NIL;
 	bool		expand_star;
 	PGListCell   *o_target;
-
+	
 	/* Shouldn't have any leftover multiassign items at start */
 	Assert(pstate->p_multiassign_exprs == NIL)
 
@@ -825,7 +825,7 @@ TargetParser::transformTargetList(PGParseState *pstate, PGList *targetlist,
 				}
 			}
 		}
-
+		
 		/*
 		 * Not "something.*", or we want to treat that as a plain whole-row
 		 * variable, so transform as a single expression
@@ -837,6 +837,7 @@ TargetParser::transformTargetList(PGParseState *pstate, PGList *targetlist,
 												exprKind,
 												res->name,
 												false));
+
 	}
 
 	/*

@@ -112,7 +112,12 @@ int ereport(int code, ...) {
 	throw std::runtime_error(err);
 }
 void elog(int code, const char *fmt, ...) {
-	throw std::runtime_error("elog NOT IMPLEMENTED");
+	char buf[BUFSIZ];
+	va_list argptr;
+	va_start(argptr, fmt);
+	vsnprintf(buf, BUFSIZ, fmt, argptr);
+	va_end(argptr);
+	throw std::runtime_error(buf);
 }
 int errcode(int sqlerrcode) {
 	pg_parser_state.pg_err_code = sqlerrcode;
