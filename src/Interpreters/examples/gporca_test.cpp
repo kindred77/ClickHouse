@@ -71,6 +71,18 @@ CMDProviderRelcache::GetMDObjDXLStr(CMemoryPool *mp, CMDAccessor *md_accessor,
 
 void optimize(PGQuery * query)
 {
+    if (CMemoryPoolManager::Init() != GPOS_OK)
+    {
+        std::cout << "can not init memory pool manager!" << std::endl;
+        return;
+    }
+    auto mem_pool_mgr = CMemoryPoolManager::GetMemoryPoolMgr();
+    if (!mem_pool_mgr)
+    {
+        std::cout << "can not get memory pool manager!" << std::endl;
+        return;
+    }
+
     // create memory pool
 	CAutoMemoryPool amp;
 	CMemoryPool *mp = amp.Pmp();
