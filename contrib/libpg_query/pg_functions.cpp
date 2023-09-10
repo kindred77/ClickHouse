@@ -190,9 +190,9 @@ void *repalloc(void *ptr, size_t n) {
 char *NameListToString(PGList *names) {
 	throw std::runtime_error("NameListToString NOT IMPLEMENTED");
 }
-void *copyObject(const void *from) {
-    throw std::runtime_error("copyObject NOT IMPLEMENTED");
-}
+// void *copyObject(const void *from) {
+//     throw std::runtime_error("copyObject NOT IMPLEMENTED");
+// }
 bool equal(const void *a, const void *b) {
 	throw std::runtime_error("equal NOT IMPLEMENTED");
 }

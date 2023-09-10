@@ -9,7 +9,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 add_library(duckdb_pg_query STATIC
             "${LIBPGQUERY_SOURCE_DIR}/postgres_parser.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/pg_functions.cpp"
-#            "${LIBPGQUERY_SOURCE_DIR}/pg_copyfuncs.cpp"
+            "${LIBPGQUERY_SOURCE_DIR}/pg_copyfuncs.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_nodes_bitmapset.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_parser_parser.cpp"
             "${LIBPGQUERY_SOURCE_DIR}/src_backend_parser_gram.cpp"
