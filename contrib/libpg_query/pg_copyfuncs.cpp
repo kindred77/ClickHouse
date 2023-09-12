@@ -16,7 +16,7 @@ namespace duckdb_libpgquery {
 	(newnode->fldname = from->fldname)
 
 /* Copy a field that is a pointer to some kind of Node or Node tree */
-#define COPY_NODE_FIELD(fldname) \
+//#define COPY_NODE_FIELD(fldname) \
 	(newnode->fldname = copyObject(from->fldname))
 
 /* Copy a field that is a pointer to a Bitmapset */
@@ -156,18 +156,24 @@ CopyPlanFields(const PGPlan *from, PGPlan *newnode)
 	//COPY_SCALAR_FIELD(total_cost);
 	COPY_SCALAR_FIELD(plan_rows);
 	COPY_SCALAR_FIELD(plan_width);
-	// COPY_NODE_FIELD(targetlist);
-	// COPY_NODE_FIELD(qual);
-	// COPY_NODE_FIELD(lefttree);
-	// COPY_NODE_FIELD(righttree);
-	// COPY_NODE_FIELD(initPlan);
+	//COPY_NODE_FIELD(targetlist);
+    newnode->targetlist = (PGList*)copyObject(from->targetlist);
+	//COPY_NODE_FIELD(qual);
+    newnode->qual = (PGList*)copyObject(from->qual);
+	//COPY_NODE_FIELD(lefttree);
+    newnode->lefttree = (PGPlan*)copyObject(from->lefttree);
+	//COPY_NODE_FIELD(righttree);
+    newnode->righttree = (PGPlan*)copyObject(from->righttree);
+	//COPY_NODE_FIELD(initPlan);
+    newnode->initPlan = (PGList*)copyObject(from->initPlan);
 	COPY_BITMAPSET_FIELD(extParam);
 	COPY_BITMAPSET_FIELD(allParam);
-	// COPY_NODE_FIELD(flow);
+	//COPY_NODE_FIELD(flow);
 	// COPY_SCALAR_FIELD(dispatch);
 	COPY_SCALAR_FIELD(nMotionNodes);
 	COPY_SCALAR_FIELD(nInitPlans);
 	//COPY_NODE_FIELD(sliceTable);
+    newnode->sliceTable = (PGNode*)copyObject(from->sliceTable);
 
 	//COPY_SCALAR_FIELD(directDispatch.isDirectDispatch);
 	//COPY_NODE_FIELD(directDispatch.contentIds);
@@ -1420,6 +1426,7 @@ _copyAlias(const PGAlias *from)
 
 	COPY_STRING_FIELD(aliasname);
 	//COPY_NODE_FIELD(colnames);
+    newnode->colnames = (PGList*)copyObject(from->colnames);
 
 	return newnode;
 }
@@ -1439,6 +1446,7 @@ _copyRangeVar(const PGRangeVar *from)
 	//COPY_SCALAR_FIELD(inhOpt);
 	COPY_SCALAR_FIELD(relpersistence);
 	//COPY_NODE_FIELD(alias);
+    newnode->alias = (PGAlias*)copyObject(from->alias);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -1453,11 +1461,15 @@ _copyIntoClause(const PGIntoClause *from)
 	PGIntoClause *newnode = makeNode(PGIntoClause);
 
 	//COPY_NODE_FIELD(rel);
+    newnode->rel = (PGRangeVar*)copyObject(from->rel);
 	//COPY_NODE_FIELD(colNames);
+    newnode->colNames = (PGList*)copyObject(from->colNames);
 	//COPY_NODE_FIELD(options);
+    newnode->options = (PGList*)copyObject(from->options);
 	COPY_SCALAR_FIELD(onCommit);
 	//COPY_STRING_FIELD(tableSpaceName);
 	//COPY_NODE_FIELD(viewQuery);
+    newnode->viewQuery = (PGNode*)copyObject(from->viewQuery);
 	COPY_SCALAR_FIELD(skipData);
 	//COPY_NODE_FIELD(distributedBy);
 
@@ -1591,11 +1603,16 @@ _copyAggref(const PGAggref *from)
 	COPY_SCALAR_FIELD(aggtype);
 	COPY_SCALAR_FIELD(aggcollid);
 	COPY_SCALAR_FIELD(inputcollid);
-	// COPY_NODE_FIELD(aggdirectargs);
-	// COPY_NODE_FIELD(args);
+	//COPY_NODE_FIELD(aggdirectargs);
+    newnode->aggdirectargs = (PGList*)copyObject(from->aggdirectargs);
+	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	// COPY_NODE_FIELD(aggorder);
+    newnode->aggorder = (PGList*)copyObject(from->aggorder);
 	// COPY_NODE_FIELD(aggdistinct);
+    newnode->aggdistinct = (PGList*)copyObject(from->aggdistinct);
 	// COPY_NODE_FIELD(aggfilter);
+    newnode->aggfilter = (PGExpr*)copyObject(from->aggfilter);
 	COPY_SCALAR_FIELD(aggstar);
 	COPY_SCALAR_FIELD(aggvariadic);
 	COPY_SCALAR_FIELD(aggkind);
@@ -1619,7 +1636,9 @@ _copyWindowFunc(const PGWindowFunc *from)
 	COPY_SCALAR_FIELD(wincollid);
 	COPY_SCALAR_FIELD(inputcollid);
 	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	//COPY_NODE_FIELD(aggfilter);
+    newnode->aggfilter = (PGExpr*)copyObject(from->aggfilter);
 	COPY_SCALAR_FIELD(winref);
 	COPY_SCALAR_FIELD(winstar);
 	COPY_SCALAR_FIELD(winagg);
@@ -1642,9 +1661,13 @@ _copyArrayRef(const PGArrayRef *from)
 	COPY_SCALAR_FIELD(reftypmod);
 	COPY_SCALAR_FIELD(refcollid);
 	// COPY_NODE_FIELD(refupperindexpr);
+    newnode->refupperindexpr = (PGList*)copyObject(from->refupperindexpr);
 	// COPY_NODE_FIELD(reflowerindexpr);
+    newnode->reflowerindexpr = (PGList*)copyObject(from->reflowerindexpr);
 	// COPY_NODE_FIELD(refexpr);
+    newnode->refexpr = (PGExpr*)copyObject(from->refexpr);
 	// COPY_NODE_FIELD(refassgnexpr);
+    newnode->refassgnexpr = (PGExpr*)copyObject(from->refassgnexpr);
 
 	return newnode;
 }
@@ -1665,6 +1688,7 @@ _copyFuncExpr(const PGFuncExpr *from)
 	COPY_SCALAR_FIELD(funccollid);
 	COPY_SCALAR_FIELD(inputcollid);
 	// COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	// COPY_SCALAR_FIELD(is_tablefunc);
 	COPY_LOCATION_FIELD(location);
 
@@ -1680,6 +1704,7 @@ _copyNamedArgExpr(const PGNamedArgExpr *from)
 	PGNamedArgExpr *newnode = makeNode(PGNamedArgExpr);
 
 	// COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	// COPY_STRING_FIELD(name);
 	COPY_SCALAR_FIELD(argnumber);
 	COPY_LOCATION_FIELD(location);
@@ -1702,6 +1727,7 @@ _copyOpExpr(const PGOpExpr *from)
 	COPY_SCALAR_FIELD(opcollid);
 	COPY_SCALAR_FIELD(inputcollid);
 	// COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -1722,6 +1748,7 @@ _copyDistinctExpr(const PGDistinctExpr *from)
 	COPY_SCALAR_FIELD(opcollid);
 	COPY_SCALAR_FIELD(inputcollid);
 	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -1742,6 +1769,7 @@ _copyNullIfExpr(const PGNullIfExpr *from)
 	COPY_SCALAR_FIELD(opcollid);
 	COPY_SCALAR_FIELD(inputcollid);
 	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -1760,6 +1788,7 @@ _copyScalarArrayOpExpr(const PGScalarArrayOpExpr *from)
 	COPY_SCALAR_FIELD(useOr);
 	COPY_SCALAR_FIELD(inputcollid);
 	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -1775,6 +1804,7 @@ _copyBoolExpr(const PGBoolExpr *from)
 
 	COPY_SCALAR_FIELD(boolop);
 	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -1790,8 +1820,11 @@ _copySubLink(const PGSubLink *from)
 
 	COPY_SCALAR_FIELD(subLinkType);
 	// COPY_NODE_FIELD(testexpr);
+    newnode->testexpr = (PGNode*)copyObject(from->testexpr);
 	// COPY_NODE_FIELD(operName);
+    newnode->operName = (PGList*)copyObject(from->operName);
 	// COPY_NODE_FIELD(subselect);
+    newnode->subselect = (PGNode*)copyObject(from->subselect);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -1808,7 +1841,9 @@ _copySubPlan(const PGSubPlan *from)
 	COPY_SCALAR_FIELD(subLinkType);
 	// COPY_SCALAR_FIELD(qDispSliceId);    /*CDB*/
 	// COPY_NODE_FIELD(testexpr);
+    newnode->testexpr = (PGNode*)copyObject(from->testexpr);
 	// COPY_NODE_FIELD(paramIds);
+    newnode->paramIds = (PGList*)copyObject(from->paramIds);
 	COPY_SCALAR_FIELD(plan_id);
 	//COPY_STRING_FIELD(plan_name);
 	COPY_SCALAR_FIELD(firstColType);
@@ -1819,8 +1854,11 @@ _copySubPlan(const PGSubPlan *from)
 	//COPY_SCALAR_FIELD(is_initplan);	/*CDB*/
 	// COPY_SCALAR_FIELD(is_multirow);	/*CDB*/
 	// COPY_NODE_FIELD(setParam);
+    newnode->setParam = (PGList*)copyObject(from->setParam);
 	// COPY_NODE_FIELD(parParam);
+    newnode->parParam = (PGList*)copyObject(from->parParam);
 	// COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	// COPY_NODE_FIELD(extParam);
 	COPY_SCALAR_FIELD(startup_cost);
 	COPY_SCALAR_FIELD(per_call_cost);
@@ -1838,6 +1876,7 @@ _copyAlternativeSubPlan(const PGAlternativeSubPlan *from)
 	PGAlternativeSubPlan *newnode = makeNode(PGAlternativeSubPlan);
 
 	//COPY_NODE_FIELD(subplans);
+    newnode->subplans = (PGList*)copyObject(from->subplans);
 
 	return newnode;
 }
@@ -1851,6 +1890,7 @@ _copyFieldSelect(const PGFieldSelect *from)
 	PGFieldSelect *newnode = makeNode(PGFieldSelect);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(fieldnum);
 	COPY_SCALAR_FIELD(resulttype);
 	COPY_SCALAR_FIELD(resulttypmod);
@@ -1868,8 +1908,11 @@ _copyFieldStore(const PGFieldStore *from)
 	PGFieldStore *newnode = makeNode(PGFieldStore);
 
 	// COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	// COPY_NODE_FIELD(newvals);
+    newnode->newvals = (PGList*)copyObject(from->newvals);
 	// COPY_NODE_FIELD(fieldnums);
+    newnode->fieldnums = (PGList*)copyObject(from->fieldnums);
 	COPY_SCALAR_FIELD(resulttype);
 
 	return newnode;
@@ -1884,6 +1927,7 @@ _copyRelabelType(const PGRelabelType *from)
 	PGRelabelType *newnode = makeNode(PGRelabelType);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(resulttype);
 	COPY_SCALAR_FIELD(resulttypmod);
 	COPY_SCALAR_FIELD(resultcollid);
@@ -1902,6 +1946,7 @@ _copyCoerceViaIO(const PGCoerceViaIO *from)
 	PGCoerceViaIO *newnode = makeNode(PGCoerceViaIO);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(resulttype);
 	COPY_SCALAR_FIELD(resultcollid);
 	COPY_SCALAR_FIELD(coerceformat);
@@ -1919,6 +1964,7 @@ _copyArrayCoerceExpr(const PGArrayCoerceExpr *from)
 	PGArrayCoerceExpr *newnode = makeNode(PGArrayCoerceExpr);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(elemfuncid);
 	COPY_SCALAR_FIELD(resulttype);
 	COPY_SCALAR_FIELD(resulttypmod);
@@ -1939,6 +1985,7 @@ _copyConvertRowtypeExpr(const PGConvertRowtypeExpr *from)
 	PGConvertRowtypeExpr *newnode = makeNode(PGConvertRowtypeExpr);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(resulttype);
 	COPY_SCALAR_FIELD(convertformat);
 	COPY_LOCATION_FIELD(location);
@@ -1955,6 +2002,7 @@ _copyCollateExpr(const PGCollateExpr *from)
 	PGCollateExpr *newnode = makeNode(PGCollateExpr);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(collOid);
 	COPY_LOCATION_FIELD(location);
 
@@ -1972,8 +2020,11 @@ _copyCaseExpr(const PGCaseExpr *from)
 	COPY_SCALAR_FIELD(casetype);
 	COPY_SCALAR_FIELD(casecollid);
 	// COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	// COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	// COPY_NODE_FIELD(defresult);
+    newnode->defresult = (PGExpr*)copyObject(from->defresult);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -1988,7 +2039,9 @@ _copyCaseWhen(const PGCaseWhen *from)
 	PGCaseWhen   *newnode = makeNode(PGCaseWhen);
 
 	// COPY_NODE_FIELD(expr);
+    newnode->expr = (PGExpr*)copyObject(from->expr);
 	// COPY_NODE_FIELD(result);
+    newnode->result = (PGExpr*)copyObject(from->result);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2021,6 +2074,7 @@ _copyArrayExpr(const PGArrayExpr *from)
 	COPY_SCALAR_FIELD(array_collid);
 	COPY_SCALAR_FIELD(element_typeid);
 	//COPY_NODE_FIELD(elements);
+    newnode->elements = (PGList*)copyObject(from->elements);
 	COPY_SCALAR_FIELD(multidims);
 	COPY_LOCATION_FIELD(location);
 
@@ -2036,9 +2090,11 @@ _copyRowExpr(const PGRowExpr *from)
 	PGRowExpr    *newnode = makeNode(PGRowExpr);
 
 	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	COPY_SCALAR_FIELD(row_typeid);
 	COPY_SCALAR_FIELD(row_format);
 	//COPY_NODE_FIELD(colnames);
+    newnode->colnames = (PGList*)copyObject(from->colnames);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2054,10 +2110,15 @@ _copyRowCompareExpr(const PGRowCompareExpr *from)
 
 	COPY_SCALAR_FIELD(rctype);
 	// COPY_NODE_FIELD(opnos);
+    newnode->opnos = (PGList*)copyObject(from->opnos);
 	// COPY_NODE_FIELD(opfamilies);
+    newnode->opfamilies = (PGList*)copyObject(from->opfamilies);
 	// COPY_NODE_FIELD(inputcollids);
+    newnode->inputcollids = (PGList*)copyObject(from->inputcollids);
 	// COPY_NODE_FIELD(largs);
+    newnode->largs = (PGList*)copyObject(from->largs);
 	// COPY_NODE_FIELD(rargs);
+    newnode->rargs = (PGList*)copyObject(from->rargs);
 
 	return newnode;
 }
@@ -2073,6 +2134,7 @@ _copyCoalesceExpr(const PGCoalesceExpr *from)
 	COPY_SCALAR_FIELD(coalescetype);
 	COPY_SCALAR_FIELD(coalescecollid);
 	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2091,6 +2153,7 @@ _copyMinMaxExpr(const PGMinMaxExpr *from)
 	COPY_SCALAR_FIELD(inputcollid);
 	COPY_SCALAR_FIELD(op);
 	//COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2126,6 +2189,7 @@ _copyNullTest(const PGNullTest *from)
 	PGNullTest   *newnode = makeNode(PGNullTest);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(nulltesttype);
 	COPY_SCALAR_FIELD(argisrow);
 
@@ -2141,6 +2205,7 @@ _copyBooleanTest(const PGBooleanTest *from)
 	PGBooleanTest *newnode = makeNode(PGBooleanTest);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(booltesttype);
 
 	return newnode;
@@ -2155,6 +2220,7 @@ _copyCoerceToDomain(const PGCoerceToDomain *from)
 	PGCoerceToDomain *newnode = makeNode(PGCoerceToDomain);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGExpr*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(resulttype);
 	COPY_SCALAR_FIELD(resulttypmod);
 	COPY_SCALAR_FIELD(resultcollid);
@@ -2221,6 +2287,7 @@ _copyTargetEntry(const PGTargetEntry *from)
 	PGTargetEntry *newnode = makeNode(PGTargetEntry);
 
 	//COPY_NODE_FIELD(expr);
+    newnode->expr = (PGExpr*)copyObject(from->expr);
 	COPY_SCALAR_FIELD(resno);
 	//COPY_STRING_FIELD(resname);
 	COPY_SCALAR_FIELD(ressortgroupref);
@@ -2255,10 +2322,15 @@ _copyJoinExpr(const PGJoinExpr *from)
 	COPY_SCALAR_FIELD(jointype);
 	COPY_SCALAR_FIELD(isNatural);
 	// COPY_NODE_FIELD(larg);
+    newnode->larg = (PGNode*)copyObject(from->larg);
 	// COPY_NODE_FIELD(rarg);
+    newnode->rarg = (PGNode*)copyObject(from->rarg);
 	// COPY_NODE_FIELD(usingClause);
+    newnode->usingClause = (PGList*)copyObject(from->usingClause);
 	// COPY_NODE_FIELD(quals);
+    newnode->quals = (PGNode*)copyObject(from->quals);
 	// COPY_NODE_FIELD(alias);
+    newnode->alias = (PGAlias*)copyObject(from->alias);
 	COPY_SCALAR_FIELD(rtindex);
 
 	return newnode;
@@ -2273,7 +2345,9 @@ _copyFromExpr(const PGFromExpr *from)
 	PGFromExpr   *newnode = makeNode(PGFromExpr);
 
 	//COPY_NODE_FIELD(fromlist);
+    newnode->fromlist = (PGList*)copyObject(from->fromlist);
 	//COPY_NODE_FIELD(quals);
+    newnode->quals = (PGNode*)copyObject(from->quals);
 
 	return newnode;
 }
@@ -2499,12 +2573,16 @@ _copyRangeTblEntry(const PGRangeTblEntry *from)
 	COPY_SCALAR_FIELD(relid);
 	COPY_SCALAR_FIELD(relkind);
 	//COPY_NODE_FIELD(subquery);
+    newnode->subquery = (PGQuery*)copyObject(from->subquery);
 	//COPY_SCALAR_FIELD(security_barrier);
 	COPY_SCALAR_FIELD(jointype);
 	//COPY_NODE_FIELD(joinaliasvars);
+    newnode->joinaliasvars = (PGList*)copyObject(from->joinaliasvars);
 	//COPY_NODE_FIELD(functions);
+    newnode->functions = (PGList*)copyObject(from->functions);
 	COPY_SCALAR_FIELD(funcordinality);
 	//COPY_NODE_FIELD(values_lists);
+    newnode->values_lists = (PGList*)copyObject(from->values_lists);
 	//COPY_NODE_FIELD(values_collations);
 	//COPY_STRING_FIELD(ctename);
 	COPY_SCALAR_FIELD(ctelevelsup);
@@ -2513,7 +2591,9 @@ _copyRangeTblEntry(const PGRangeTblEntry *from)
 	// COPY_NODE_FIELD(ctecoltypmods);
 	// COPY_NODE_FIELD(ctecolcollations);
 	// COPY_NODE_FIELD(alias);
+    newnode->alias = (PGAlias*)copyObject(from->alias);
 	// COPY_NODE_FIELD(eref);
+    newnode->eref = (PGAlias*)copyObject(from->eref);
 	COPY_SCALAR_FIELD(lateral);
 	COPY_SCALAR_FIELD(inh);
 	COPY_SCALAR_FIELD(inFromCl);
@@ -2541,11 +2621,16 @@ _copyRangeTblFunction(const PGRangeTblFunction *from)
 	PGRangeTblFunction *newnode = makeNode(PGRangeTblFunction);
 
 	//COPY_NODE_FIELD(funcexpr);
+    newnode->funcexpr = (PGNode*)copyObject(from->funcexpr);
 	COPY_SCALAR_FIELD(funccolcount);
 	// COPY_NODE_FIELD(funccolnames);
+    newnode->funccolnames = (PGList*)copyObject(from->funccolnames);
 	// COPY_NODE_FIELD(funccoltypes);
+    newnode->funccoltypes = (PGList*)copyObject(from->funccoltypes);
 	// COPY_NODE_FIELD(funccoltypmods);
+    newnode->funccoltypmods = (PGList*)copyObject(from->funccoltypmods);
 	// COPY_NODE_FIELD(funccolcollations);
+    newnode->funccolcollations = (PGList*)copyObject(from->funccolcollations);
 	// COPY_VARLENA_FIELD(funcuserdata, -1);
 	COPY_BITMAPSET_FIELD(funcparams);
 
@@ -2594,6 +2679,7 @@ _copyGroupingFunc(const PGGroupingFunc *from)
 	PGGroupingFunc *newnode = makeNode(PGGroupingFunc);
 
 	// COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	// COPY_SCALAR_FIELD(ngrpcols);
 
 	return newnode;
@@ -2623,10 +2709,14 @@ _copyWindowClause(const PGWindowClause *from)
 	//COPY_STRING_FIELD(name);
 	//COPY_STRING_FIELD(refname);
 	//COPY_NODE_FIELD(partitionClause);
+    newnode->partitionClause = (PGList*)copyObject(from->partitionClause);
 	//COPY_NODE_FIELD(orderClause);
+    newnode->orderClause = (PGList*)copyObject(from->orderClause);
 	COPY_SCALAR_FIELD(frameOptions);
 	//COPY_NODE_FIELD(startOffset);
+    newnode->startOffset = (PGNode*)copyObject(from->startOffset);
 	//COPY_NODE_FIELD(endOffset);
+    newnode->endOffset = (PGNode*)copyObject(from->endOffset);
 	COPY_SCALAR_FIELD(winref);
 	COPY_SCALAR_FIELD(copiedOrder);
 
@@ -2652,6 +2742,7 @@ _copyWithClause(const PGWithClause *from)
 	PGWithClause *newnode = makeNode(PGWithClause);
 
 	//COPY_NODE_FIELD(ctes);
+    newnode->ctes = (PGList*)copyObject(from->ctes);
 	COPY_SCALAR_FIELD(recursive);
 	COPY_LOCATION_FIELD(location);
 
@@ -2665,14 +2756,20 @@ _copyCommonTableExpr(const PGCommonTableExpr *from)
 
 	//COPY_STRING_FIELD(ctename);
 	//COPY_NODE_FIELD(aliascolnames);
+    newnode->aliascolnames = (PGList*)copyObject(from->aliascolnames);
 	//COPY_NODE_FIELD(ctequery);
+    newnode->ctequery = (PGNode*)copyObject(from->ctequery);
 	COPY_LOCATION_FIELD(location);
 	COPY_SCALAR_FIELD(cterecursive);
 	COPY_SCALAR_FIELD(cterefcount);
 	// COPY_NODE_FIELD(ctecolnames);
+    newnode->ctecolnames = (PGList*)copyObject(from->ctecolnames);
 	// COPY_NODE_FIELD(ctecoltypes);
+    newnode->ctecoltypes = (PGList*)copyObject(from->ctecoltypes);
 	// COPY_NODE_FIELD(ctecoltypmods);
+    newnode->ctecoltypmods = (PGList*)copyObject(from->ctecoltypmods);
 	// COPY_NODE_FIELD(ctecolcollations);
+    newnode->ctecolcollations = (PGList*)copyObject(from->ctecolcollations);
 
 	return newnode;
 }
@@ -2684,8 +2781,11 @@ _copyAExpr(const PGAExpr *from)
 
 	COPY_SCALAR_FIELD(kind);
 	// COPY_NODE_FIELD(name);
+    newnode->name = (PGList*)copyObject(from->name);
 	// COPY_NODE_FIELD(lexpr);
+    newnode->lexpr = (PGNode*)copyObject(from->lexpr);
 	// COPY_NODE_FIELD(rexpr);
+    newnode->rexpr = (PGNode*)copyObject(from->rexpr);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2697,6 +2797,7 @@ _copyColumnRef(const PGColumnRef *from)
 	PGColumnRef  *newnode = makeNode(PGColumnRef);
 
 	//COPY_NODE_FIELD(fields);
+    newnode->fields = (PGList*)copyObject(from->fields);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2750,14 +2851,19 @@ _copyFuncCall(const PGFuncCall *from)
 	PGFuncCall   *newnode = makeNode(PGFuncCall);
 
 	// COPY_NODE_FIELD(funcname);
+    newnode->funcname = (PGList*)copyObject(from->funcname);
 	// COPY_NODE_FIELD(args);
+    newnode->args = (PGList*)copyObject(from->args);
 	// COPY_NODE_FIELD(agg_order);
+    newnode->agg_order = (PGList*)copyObject(from->agg_order);
 	// COPY_NODE_FIELD(agg_filter);
+    newnode->agg_filter = (PGNode*)copyObject(from->agg_filter);
 	COPY_SCALAR_FIELD(agg_within_group);
 	COPY_SCALAR_FIELD(agg_star);
 	COPY_SCALAR_FIELD(agg_distinct);
 	COPY_SCALAR_FIELD(func_variadic);
 	//COPY_NODE_FIELD(over);
+    newnode->over = (PGWindowDef*)copyObject(from->over);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2777,7 +2883,9 @@ _copyAIndices(const PGAIndices *from)
 	PGAIndices  *newnode = makeNode(PGAIndices);
 
 	//COPY_NODE_FIELD(lidx);
+    newnode->lidx = (PGNode*)copyObject(from->lidx);
 	//COPY_NODE_FIELD(uidx);
+    newnode->uidx = (PGNode*)copyObject(from->uidx);
 
 	return newnode;
 }
@@ -2788,7 +2896,9 @@ _copyA_Indirection(const PGAIndirection *from)
 	PGAIndirection *newnode = makeNode(PGAIndirection);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGNode*)copyObject(from->arg);
 	//COPY_NODE_FIELD(indirection);
+    newnode->indirection = (PGList*)copyObject(from->indirection);
 
 	return newnode;
 }
@@ -2799,6 +2909,7 @@ _copyA_ArrayExpr(const PGAArrayExpr *from)
 	PGAArrayExpr *newnode = makeNode(PGAArrayExpr);
 
 	//COPY_NODE_FIELD(elements);
+    newnode->elements = (PGList*)copyObject(from->elements);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2811,7 +2922,9 @@ _copyResTarget(const PGResTarget *from)
 
 	COPY_STRING_FIELD(name);
 	//COPY_NODE_FIELD(indirection);
+    newnode->indirection = (PGList*)copyObject(from->indirection);
 	//COPY_NODE_FIELD(val);
+    newnode->val = (PGNode*)copyObject(from->val);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2823,12 +2936,15 @@ _copyTypeName(const PGTypeName *from)
 	PGTypeName   *newnode = makeNode(PGTypeName);
 
 	//COPY_NODE_FIELD(names);
+    newnode->names = (PGList*)copyObject(from->names);
 	COPY_SCALAR_FIELD(typeOid);
 	COPY_SCALAR_FIELD(setof);
 	COPY_SCALAR_FIELD(pct_type);
 	//COPY_NODE_FIELD(typmods);
+    newnode->typmods = (PGList*)copyObject(from->typmods);
 	COPY_SCALAR_FIELD(typemod);
 	//COPY_NODE_FIELD(arrayBounds);
+    newnode->arrayBounds = (PGList*)copyObject(from->arrayBounds);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2840,10 +2956,13 @@ _copySortBy(const PGSortBy *from)
 	PGSortBy	   *newnode = makeNode(PGSortBy);
 
 	//COPY_NODE_FIELD(node);
+    newnode->node = (PGNode*)copyObject(from->node);
 	COPY_SCALAR_FIELD(sortby_dir);
 	COPY_SCALAR_FIELD(sortby_nulls);
 	//COPY_NODE_FIELD(useOp);
+    newnode->useOp = (PGList*)copyObject(from->useOp);
 	//COPY_NODE_FIELD(node);
+    newnode->node = (PGNode*)copyObject(from->node);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2857,10 +2976,14 @@ _copyWindowDef(const PGWindowDef *from)
 	COPY_STRING_FIELD(name);
 	COPY_STRING_FIELD(refname);
 	//COPY_NODE_FIELD(partitionClause);
+    newnode->partitionClause = (PGList*)copyObject(from->partitionClause);
 	//COPY_NODE_FIELD(orderClause);
+    newnode->orderClause = (PGList*)copyObject(from->orderClause);
 	COPY_SCALAR_FIELD(frameOptions);
 	//COPY_NODE_FIELD(startOffset);
+    newnode->startOffset = (PGNode*)copyObject(from->startOffset);
 	//COPY_NODE_FIELD(endOffset);
+    newnode->endOffset = (PGNode*)copyObject(from->endOffset);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2873,7 +2996,9 @@ _copyRangeSubselect(const PGRangeSubselect *from)
 
 	COPY_SCALAR_FIELD(lateral);
 	//COPY_NODE_FIELD(subquery);
+    newnode->subquery = (PGNode*)copyObject(from->subquery);
 	//COPY_NODE_FIELD(alias);
+    newnode->alias = (PGAlias*)copyObject(from->alias);
 
 	return newnode;
 }
@@ -2887,8 +3012,11 @@ _copyRangeFunction(const PGRangeFunction *from)
 	COPY_SCALAR_FIELD(ordinality);
 	COPY_SCALAR_FIELD(is_rowsfrom);
 	//COPY_NODE_FIELD(functions);
+    newnode->functions = (PGList*)copyObject(from->functions);
 	//COPY_NODE_FIELD(alias);
+    newnode->alias = (PGAlias*)copyObject(from->alias);
 	//COPY_NODE_FIELD(coldeflist);
+    newnode->coldeflist = (PGList*)copyObject(from->coldeflist);
 
 	return newnode;
 }
@@ -2899,7 +3027,9 @@ _copyTypeCast(const PGTypeCast *from)
 	PGTypeCast   *newnode = makeNode(PGTypeCast);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGNode*)copyObject(from->arg);
 	//COPY_NODE_FIELD(typeName);
+    newnode->typeName = (PGTypeName*)copyObject(from->typeName);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2911,7 +3041,9 @@ _copyCollateClause(const PGCollateClause *from)
 	PGCollateClause *newnode = makeNode(PGCollateClause);
 
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGNode*)copyObject(from->arg);
 	//COPY_NODE_FIELD(collname);
+    newnode->collname = (PGList*)copyObject(from->collname);
 	COPY_LOCATION_FIELD(location);
 
 	return newnode;
@@ -2924,9 +3056,12 @@ _copyIndexElem(const PGIndexElem *from)
 
 	COPY_STRING_FIELD(name);
 	//COPY_NODE_FIELD(expr);
+    newnode->expr = (PGNode*)copyObject(from->expr);
 	COPY_STRING_FIELD(indexcolname);
 	//COPY_NODE_FIELD(collation);
+    newnode->collation = (PGList*)copyObject(from->collation);
 	//COPY_NODE_FIELD(opclass);
+    newnode->opclass = (PGList*)copyObject(from->opclass);
 	COPY_SCALAR_FIELD(ordering);
 	COPY_SCALAR_FIELD(nulls_ordering);
 
@@ -2940,6 +3075,7 @@ _copyColumnDef(const PGColumnDef *from)
 
 	COPY_STRING_FIELD(colname);
 	//COPY_NODE_FIELD(typeName);
+    newnode->typeName = (PGTypeName*)copyObject(from->typeName);
 	COPY_SCALAR_FIELD(inhcount);
 	COPY_SCALAR_FIELD(is_local);
 	COPY_SCALAR_FIELD(is_not_null);
@@ -2947,11 +3083,16 @@ _copyColumnDef(const PGColumnDef *from)
 	//COPY_SCALAR_FIELD(attnum);
 	COPY_SCALAR_FIELD(storage);
 	//COPY_NODE_FIELD(raw_default);
+    newnode->raw_default = (PGNode*)copyObject(from->raw_default);
 	//COPY_NODE_FIELD(cooked_default);
+    newnode->cooked_default = (PGNode*)copyObject(from->cooked_default);
 	//COPY_NODE_FIELD(collClause);
+    newnode->collClause = (PGCollateClause*)copyObject(from->collClause);
 	COPY_SCALAR_FIELD(collOid);
 	//COPY_NODE_FIELD(constraints);
+    newnode->constraints = (PGList*)copyObject(from->constraints);
 	//COPY_NODE_FIELD(fdwoptions);
+    newnode->fdwoptions = (PGList*)copyObject(from->fdwoptions);
 	//COPY_NODE_FIELD(encoding);
 	COPY_LOCATION_FIELD(location);
 
@@ -2983,21 +3124,30 @@ _copyConstraint(const PGConstraint *from)
 	COPY_LOCATION_FIELD(location);
 	COPY_SCALAR_FIELD(is_no_inherit);
 	//COPY_NODE_FIELD(raw_expr);
+    newnode->raw_expr = (PGNode*)copyObject(from->raw_expr);
 	COPY_STRING_FIELD(cooked_expr);
 	//COPY_NODE_FIELD(keys);
+    newnode->keys = (PGList*)copyObject(from->keys);
 	//COPY_NODE_FIELD(exclusions);
+    newnode->exclusions = (PGList*)copyObject(from->exclusions);
 	//COPY_NODE_FIELD(options);
+    newnode->options = (PGList*)copyObject(from->options);
 	COPY_STRING_FIELD(indexname);
 	COPY_STRING_FIELD(indexspace);
 	COPY_STRING_FIELD(access_method);
 	//COPY_NODE_FIELD(where_clause);
+    newnode->where_clause = (PGNode*)copyObject(from->where_clause);
 	//COPY_NODE_FIELD(pktable);
+    newnode->pktable = (PGRangeVar*)copyObject(from->pktable);
 	//COPY_NODE_FIELD(fk_attrs);
+    newnode->fk_attrs = (PGList*)copyObject(from->fk_attrs);
 	//COPY_NODE_FIELD(pk_attrs);
+    newnode->pk_attrs = (PGList*)copyObject(from->pk_attrs);
 	COPY_SCALAR_FIELD(fk_matchtype);
 	COPY_SCALAR_FIELD(fk_upd_action);
 	COPY_SCALAR_FIELD(fk_del_action);
 	//COPY_NODE_FIELD(old_conpfeqop);
+    newnode->old_conpfeqop = (PGList*)copyObject(from->old_conpfeqop);
 	COPY_SCALAR_FIELD(old_pktable_oid);
 	COPY_SCALAR_FIELD(skip_validation);
 	COPY_SCALAR_FIELD(initially_valid);
@@ -3018,6 +3168,7 @@ _copyDefElem(const PGDefElem *from)
 	COPY_STRING_FIELD(defnamespace);
 	COPY_STRING_FIELD(defname);
 	//COPY_NODE_FIELD(arg);
+    newnode->arg = (PGNode*)copyObject(from->arg);
 	COPY_SCALAR_FIELD(defaction);
 
 	return newnode;
@@ -3029,6 +3180,7 @@ _copyLockingClause(const PGLockingClause *from)
 	PGLockingClause *newnode = makeNode(PGLockingClause);
 
 	//COPY_NODE_FIELD(lockedRels);
+    newnode->lockedRels = (PGList*)copyObject(from->lockedRels);
 	COPY_SCALAR_FIELD(strength);
 	//COPY_SCALAR_FIELD(noWait);
 
@@ -3137,6 +3289,7 @@ _copyQuery(const PGQuery *from)
 	COPY_SCALAR_FIELD(queryId);
 	COPY_SCALAR_FIELD(canSetTag);
 	//COPY_NODE_FIELD(utilityStmt);
+    newnode->utilityStmt = (PGNode*)copyObject(from->utilityStmt);
 	COPY_SCALAR_FIELD(resultRelation);
 	COPY_SCALAR_FIELD(hasAggs);
 	COPY_SCALAR_FIELD(hasWindowFuncs);
@@ -3148,23 +3301,39 @@ _copyQuery(const PGQuery *from)
 	COPY_SCALAR_FIELD(hasModifyingCTE);
 	COPY_SCALAR_FIELD(hasForUpdate);
 	// COPY_NODE_FIELD(cteList);
+    newnode->cteList = (PGList*)copyObject(from->cteList);
 	// COPY_NODE_FIELD(rtable);
+    newnode->rtable = (PGList*)copyObject(from->rtable);
 	// COPY_NODE_FIELD(jointree);
+    newnode->jointree = (PGFromExpr*)copyObject(from->jointree);
 	// COPY_NODE_FIELD(targetList);
+    newnode->targetList = (PGList*)copyObject(from->targetList);
 	// COPY_NODE_FIELD(withCheckOptions);
+    newnode->withCheckOptions = (PGList*)copyObject(from->withCheckOptions);
 	// COPY_NODE_FIELD(returningList);
+    newnode->returningList = (PGList*)copyObject(from->returningList);
 	// COPY_NODE_FIELD(groupClause);
+    newnode->groupClause = (PGList*)copyObject(from->groupClause);
 	// COPY_NODE_FIELD(havingQual);
+    newnode->havingQual = (PGNode*)copyObject(from->havingQual);
 	// COPY_NODE_FIELD(windowClause);
+    newnode->windowClause = (PGList*)copyObject(from->windowClause);
 	// COPY_NODE_FIELD(distinctClause);
+    newnode->distinctClause = (PGList*)copyObject(from->distinctClause);
 	// COPY_NODE_FIELD(sortClause);
+    newnode->sortClause = (PGList*)copyObject(from->sortClause);
 	// COPY_NODE_FIELD(scatterClause);
 	// COPY_SCALAR_FIELD(isTableValueSelect);
 	// COPY_NODE_FIELD(limitOffset);
+    newnode->limitOffset = (PGNode*)copyObject(from->limitOffset);
 	// COPY_NODE_FIELD(limitCount);
+    newnode->limitCount = (PGNode*)copyObject(from->limitCount);
 	// COPY_NODE_FIELD(rowMarks);
+    newnode->rowMarks = (PGList*)copyObject(from->rowMarks);
 	// COPY_NODE_FIELD(setOperations);
+    newnode->setOperations = (PGNode*)copyObject(from->setOperations);
 	// COPY_NODE_FIELD(constraintDeps);
+    newnode->constraintDeps = (PGList*)copyObject(from->constraintDeps);
 	// COPY_NODE_FIELD(intoPolicy);
 	// COPY_SCALAR_FIELD(parentStmtType);
 
@@ -3177,10 +3346,15 @@ _copyInsertStmt(const PGInsertStmt *from)
 	PGInsertStmt *newnode = makeNode(PGInsertStmt);
 
 	// COPY_NODE_FIELD(relation);
+    newnode->relation = (PGRangeVar*)copyObject(from->relation);
 	// COPY_NODE_FIELD(cols);
+    newnode->cols = (PGList*)copyObject(from->cols);
 	// COPY_NODE_FIELD(selectStmt);
+    newnode->selectStmt = (PGNode*)copyObject(from->selectStmt);
 	// COPY_NODE_FIELD(returningList);
+    newnode->returningList = (PGList*)copyObject(from->returningList);
 	// COPY_NODE_FIELD(withClause);
+    newnode->withClause = (PGWithClause*)copyObject(from->withClause);
 
 	return newnode;
 }
@@ -3191,10 +3365,15 @@ _copyDeleteStmt(const PGDeleteStmt *from)
 	PGDeleteStmt *newnode = makeNode(PGDeleteStmt);
 
 	// COPY_NODE_FIELD(relation);
+    newnode->relation = (PGRangeVar*)copyObject(from->relation);
 	// COPY_NODE_FIELD(usingClause);
+    newnode->usingClause = (PGList*)copyObject(from->usingClause);
 	// COPY_NODE_FIELD(whereClause);
+    newnode->whereClause = (PGNode*)copyObject(from->whereClause);
 	// COPY_NODE_FIELD(returningList);
+    newnode->returningList = (PGList*)copyObject(from->returningList);
 	// COPY_NODE_FIELD(withClause);
+    newnode->withClause = (PGWithClause*)copyObject(from->withClause);
 
 	return newnode;
 }
@@ -3205,11 +3384,17 @@ _copyUpdateStmt(const PGUpdateStmt *from)
 	PGUpdateStmt *newnode = makeNode(PGUpdateStmt);
 
 	// COPY_NODE_FIELD(relation);
+    newnode->relation = (PGRangeVar*)copyObject(from->relation);
 	// COPY_NODE_FIELD(targetList);
+    newnode->targetList = (PGList*)copyObject(from->targetList);
 	// COPY_NODE_FIELD(whereClause);
+    newnode->whereClause = (PGNode*)copyObject(from->whereClause);
 	// COPY_NODE_FIELD(fromClause);
+    newnode->fromClause = (PGList*)copyObject(from->fromClause);
 	// COPY_NODE_FIELD(returningList);
+    newnode->returningList = (PGList*)copyObject(from->returningList);
 	// COPY_NODE_FIELD(withClause);
+    newnode->withClause = (PGWithClause*)copyObject(from->withClause);
 
 	return newnode;
 }
@@ -3220,24 +3405,40 @@ _copySelectStmt(const PGSelectStmt *from)
 	PGSelectStmt *newnode = makeNode(PGSelectStmt);
 
 	// COPY_NODE_FIELD(distinctClause);
+    newnode->distinctClause = (PGList*)copyObject(from->distinctClause);
 	// COPY_NODE_FIELD(intoClause);
+    newnode->intoClause = (PGIntoClause*)copyObject(from->intoClause);
 	// COPY_NODE_FIELD(targetList);
+    newnode->targetList = (PGList*)copyObject(from->targetList);
 	// COPY_NODE_FIELD(fromClause);
+    newnode->fromClause = (PGList*)copyObject(from->fromClause);
 	// COPY_NODE_FIELD(whereClause);
+    newnode->whereClause = (PGNode*)copyObject(from->whereClause);
 	// COPY_NODE_FIELD(groupClause);
+    newnode->groupClause = (PGList*)copyObject(from->groupClause);
 	// COPY_NODE_FIELD(havingClause);
+    newnode->havingClause = (PGNode*)copyObject(from->havingClause);
 	// COPY_NODE_FIELD(windowClause);
+    newnode->windowClause = (PGList*)copyObject(from->windowClause);
 	// COPY_NODE_FIELD(valuesLists);
+    newnode->valuesLists = (PGList*)copyObject(from->valuesLists);
 	// COPY_NODE_FIELD(sortClause);
+    newnode->sortClause = (PGList*)copyObject(from->sortClause);
 	// COPY_NODE_FIELD(scatterClause);
 	// COPY_NODE_FIELD(limitOffset);
+    newnode->limitOffset = (PGNode*)copyObject(from->limitOffset);
 	// COPY_NODE_FIELD(limitCount);
+    newnode->limitCount = (PGNode*)copyObject(from->limitCount);
 	// COPY_NODE_FIELD(lockingClause);
+    newnode->lockingClause = (PGList*)copyObject(from->lockingClause);
 	// COPY_NODE_FIELD(withClause);
+    newnode->withClause = (PGWithClause*)copyObject(from->withClause);
 	COPY_SCALAR_FIELD(op);
 	COPY_SCALAR_FIELD(all);
 	//COPY_NODE_FIELD(larg);
+    newnode->larg = (PGSelectStmt*)copyObject(from->larg);
 	//COPY_NODE_FIELD(rarg);
+    newnode->rarg = (PGSelectStmt*)copyObject(from->rarg);
 
 	return newnode;
 }
@@ -3265,7 +3466,9 @@ _copyAlterTableStmt(const PGAlterTableStmt *from)
 	PGAlterTableStmt *newnode = makeNode(PGAlterTableStmt);
 
 	//COPY_NODE_FIELD(relation);
+    newnode->relation = (PGRangeVar*)copyObject(from->relation);
 	//COPY_NODE_FIELD(cmds);
+    newnode->cmds = (PGList*)copyObject(from->cmds);
 	COPY_SCALAR_FIELD(relkind);
 	COPY_SCALAR_FIELD(missing_ok);
 
@@ -3280,11 +3483,13 @@ _copyAlterTableCmd(const PGAlterTableCmd *from)
 	COPY_SCALAR_FIELD(subtype);
 	COPY_STRING_FIELD(name);
 	//COPY_NODE_FIELD(def);
+    newnode->def = (PGNode*)copyObject(from->def);
 	COPY_SCALAR_FIELD(behavior);
 	//COPY_SCALAR_FIELD(part_expanded);
 
 	/* Need to copy AT workspace since process uses copy internally. */
 	//COPY_NODE_FIELD(partoids);
+
 	COPY_SCALAR_FIELD(missing_ok);
 
 	return newnode;
@@ -3499,13 +3704,19 @@ static void
 CopyCreateStmtFields(const PGCreateStmt *from, PGCreateStmt *newnode)
 {
 	// COPY_NODE_FIELD(relation);
+    newnode->relation = (PGRangeVar*)copyObject(from->relation);
 	// COPY_NODE_FIELD(tableElts);
+    newnode->tableElts = (PGList*)copyObject(from->tableElts);
 	// COPY_NODE_FIELD(inhRelations);
+    newnode->inhRelations = (PGList*)copyObject(from->inhRelations);
 	// COPY_NODE_FIELD(inhOids);
 	// COPY_SCALAR_FIELD(parentOidCount);
 	// COPY_NODE_FIELD(ofTypename);
+    newnode->ofTypename = (PGTypeName*)copyObject(from->ofTypename);
 	// COPY_NODE_FIELD(constraints);
+    newnode->constraints = (PGList*)copyObject(from->constraints);
 	// COPY_NODE_FIELD(options);
+    newnode->options = (PGList*)copyObject(from->options);
 	COPY_SCALAR_FIELD(oncommit);
 	COPY_STRING_FIELD(tablespacename);
 	//COPY_SCALAR_FIELD(if_not_exists);

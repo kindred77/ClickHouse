@@ -116,7 +116,6 @@ CTranslatorUtils::GetTableDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
 {
 	// generate an MDId for the table desc.
 	PGOid rel_oid = rte->relid;
-
 	if (!GPOS_FTRACE(EopttraceEnableExternalPartitionedTables) &&
 		HasExternalPartition(rel_oid))
 	{
@@ -125,7 +124,6 @@ CTranslatorUtils::GetTableDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature,
 				   GPOS_WSZ_LIT("Query over external partitions"));
 	}
-
 	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(rel_oid);
 
 	const IMDRelation *rel = md_accessor->RetrieveRel(mdid);
@@ -145,7 +143,6 @@ CTranslatorUtils::GetTableDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
 
 	IMDRelation::Ereldistrpolicy distribution_policy =
 		rel->GetRelDistribution();
-
 	if (NULL != is_distributed_table &&
 		(IMDRelation::EreldistrHash == distribution_policy ||
 		 IMDRelation::EreldistrRandom == distribution_policy ||
@@ -167,7 +164,6 @@ CTranslatorUtils::GetTableDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
 				ExsevDebug1,  // ulSeverityLevel mapped to GPDB severity level
 			GPOS_WSZ_LIT("Queries on master-only tables"));
 	}
-
 	// add columns from md cache relation object to table descriptor
 	for (ULONG ul = 0; ul < len; ul++)
 	{
@@ -189,7 +185,6 @@ CTranslatorUtils::GetTableDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
 						 md_col->Length());
 		table_descr->AddColumnDescr(dxl_col_descr);
 	}
-
 	return table_descr;
 }
 

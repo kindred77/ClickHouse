@@ -118,7 +118,6 @@ CTranslatorRelcacheToDXL::RetrieveObject(CMemoryPool *mp,
 {
 	IMDCacheObject *md_obj = NULL;
 	GPOS_ASSERT(NULL != md_accessor);
-
 #ifdef FAULT_INJECTOR
 	gpdb::InjectFaultInOptTasks("opt_relcache_translator_catalog_access");
 #endif	// FAULT_INJECTOR
@@ -148,7 +147,7 @@ CTranslatorRelcacheToDXL::RetrieveObject(CMemoryPool *mp,
 		default:
 			break;
 	}
-
+	
 	if (NULL == md_obj)
 	{
 		// no match found
@@ -173,11 +172,8 @@ CTranslatorRelcacheToDXL::RetrieveObjectGPDB(CMemoryPool *mp,
 											 IMDId *mdid)
 {
 	GPOS_ASSERT(mdid->MdidType() == CMDIdGPDB::EmdidGPDB);
-
 	OID oid = CMDIdGPDB::CastMdid(mdid)->Oid();
-
 	GPOS_ASSERT(0 != oid);
-
 	// find out what type of object this oid stands for
 
 	// if (IndexExists(oid))

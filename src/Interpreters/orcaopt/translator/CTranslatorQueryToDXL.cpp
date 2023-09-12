@@ -654,9 +654,8 @@ CTranslatorQueryToDXL::TranslateSelectProjectJoinForGrpSetsToDXL(
 CDXLNode *
 CTranslatorQueryToDXL::TranslateQueryToDXL()
 {
-	CAutoTimer at("\n[OPT]: Query To DXL Translation Time",
-				  GPOS_FTRACE(EopttracePrintOptimizationStatistics));
-
+	//CAutoTimer at("\n[OPT]: Query To DXL Translation Time",
+	//			  GPOS_FTRACE(EopttracePrintOptimizationStatistics));
 	switch (m_query->commandType)
 	{
 		case PG_CMD_SELECT:
@@ -3024,7 +3023,6 @@ CDXLNode *
 CTranslatorQueryToDXL::TranslateFromExprToDXL(PGFromExpr *from_expr)
 {
 	CDXLNode *dxlnode = NULL;
-
 	if (0 == ListLength(from_expr->fromlist))
 	{
 		dxlnode = DXLDummyConstTableGet();
@@ -3045,7 +3043,6 @@ CTranslatorQueryToDXL::TranslateFromExprToDXL(PGFromExpr *from_expr)
 
 			dxlnode = GPOS_NEW(m_mp) CDXLNode(
 				m_mp, GPOS_NEW(m_mp) CDXLLogicalJoin(m_mp, EdxljtInner));
-
 			PGListCell *lc = NULL;
 			foreach(lc, from_expr->fromlist)
 			{
@@ -3086,7 +3083,6 @@ CTranslatorQueryToDXL::TranslateFromExprToDXL(PGFromExpr *from_expr)
 
 		dxlnode->AddChild(condition_dxlnode);
 	}
-
 	return dxlnode;
 }
 
@@ -3232,7 +3228,7 @@ CTranslatorQueryToDXL::TranslateRTEToDXLLogicalGet(const PGRangeTblEntry *rte,
 				   GPOS_WSZ_LIT("ONLY in the FROM clause"));
 	}
 
-	// construct table descriptor for the scan node from the range table entry
+ 	// construct table descriptor for the scan node from the range table entry
 	CDXLTableDescr *dxl_table_descr = CTranslatorUtils::GetTableDescr(
 		m_mp, m_md_accessor, m_context->m_colid_counter, rte,
 		&m_context->m_has_distributed_tables);

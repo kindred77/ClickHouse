@@ -4,8 +4,9 @@
  *--------------------------------------------------------------------
  */
 
-#include "nodes/bitmapset.hpp"
-#include "pg_functions.hpp"
+#include <nodes/bitmapset.hpp>
+#include <pg_functions.hpp>
+#include <memory>
 
 #define WORDNUM(x)	((x) / BITS_PER_BITMAPWORD)
 #define BITNUM(x)	((x) % BITS_PER_BITMAPWORD)
@@ -159,6 +160,23 @@ bool bms_equal(const PGBitmapset *a, const PGBitmapset *b)
 			return false;
 	}
 	return true;
-}
+};
+
+/*
+ * bms_copy - make a palloc'd copy of a bitmapset
+ */
+PGBitmapset *
+bms_copy(const PGBitmapset *a)
+{
+	PGBitmapset  *result;
+	size_t		size;
+
+	if (a == NULL)
+		return NULL;
+	size = BITMAPSET_SIZE(a->nwords);
+	result = (PGBitmapset *) palloc(size);
+	memcpy(result, a, size);
+	return result;
+};
 
 }
