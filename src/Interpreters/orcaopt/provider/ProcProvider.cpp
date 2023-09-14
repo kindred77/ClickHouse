@@ -1201,6 +1201,16 @@ PGProcPtr ProcProvider::getProcByOid(PGOid oid)
 	return it->second;
 };
 
+std::optional<std::string> ProcProvider::get_func_name(duckdb_libpgquery::PGOid oid)
+{
+    auto proc = getProcByOid(oid);
+    if (proc != nullptr)
+    {
+        return proc->proname;
+    }
+    return std::nullopt;
+};
+
 bool ProcProvider::get_func_retset(PGOid funcid)
 {
 	PGProcPtr tp = getProcByOid(funcid);

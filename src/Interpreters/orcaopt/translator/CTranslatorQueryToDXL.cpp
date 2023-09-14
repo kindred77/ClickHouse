@@ -39,6 +39,7 @@
 #include <Interpreters/orcaopt/translator/CTranslatorRelcacheToDXL.h>
 #include <Interpreters/orcaopt/translator/CTranslatorUtils.h>
 #include <Interpreters/orcaopt/translator/wrappers.h>
+#include <Interpreters/orcaopt/provider/RelationProvider.h>
 #include "naucrates/dxl/CDXLUtils.h"
 #include "naucrates/dxl/operators/CDXLDatumInt8.h"
 #include "naucrates/dxl/operators/CDXLScalarBooleanTest.h"
@@ -59,6 +60,7 @@ using namespace gpopt;
 using namespace gpnaucrates;
 using namespace gpmd;
 using namespace duckdb_libpgquery;
+using namespace DB;
 
 bool optimizer_enable_ctas = false;
 bool optimizer_enable_dml = false;
@@ -3294,13 +3296,15 @@ CTranslatorQueryToDXL::NoteDistributionPolicyOpclasses(const PGRangeTblEntry *rt
 	// ones, for all hashing within the query.
 	if (rte->rtekind == PG_RTE_RELATION)
 	{
-		auto rel = GetRelation(rte->relid);
+		//auto rel = GetRelation(rte->relid);
+		PGRelationPtr rel = RelationProvider::relation_open(rte->relid, NoLock);
 		PGPolicyPtr policy = rel->rd_cdbpolicy;
 
 		// master-only tables
 		if (NULL == policy)
 		{
-			CloseRelation(rel);
+			//CloseRelation(rel);
+			RelationProvider::relation_close(rel, NoLock);
 			return;
 		}
 
@@ -3336,7 +3340,8 @@ CTranslatorQueryToDXL::NoteDistributionPolicyOpclasses(const PGRangeTblEntry *rt
 					contains_nondefault_hashops = true;
 			}
 		}
-		CloseRelation(rel);
+		//CloseRelation(rel);
+		RelationProvider::relation_close(rel, NoLock);
 
 		if (contains_nondefault_hashops)
 		{

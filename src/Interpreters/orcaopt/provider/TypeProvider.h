@@ -50,6 +50,7 @@ public:
 	//static void Init();
 	//IMDTypePtr getTypeByOID(PGOid oid);
 	static duckdb_libpgquery::PGTypePtr getTypeByOid(duckdb_libpgquery::PGOid oid);
+	static std::optional<std::string> get_type_name(duckdb_libpgquery::PGOid oid);
 	//IMDTypePtr getType(Field::Types::Which which);
 
     static duckdb_libpgquery::PGOid getBaseType(duckdb_libpgquery::PGOid typid);

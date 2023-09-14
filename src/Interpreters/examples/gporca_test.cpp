@@ -164,7 +164,7 @@ void * OptimizeTask(void *ptr)
 
             CDXLUtils::SerializeQuery(mp, oss, query_dxl, query_output_dxlnode_array, cte_dxlnode_array, true, true);
 
-            GPOS_TRACE(str.GetBuffer());
+			std::wcout << std::wstring(str.GetBuffer()) << std::endl;
 
 
 			// BOOL is_master_only =

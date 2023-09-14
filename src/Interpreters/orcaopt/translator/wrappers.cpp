@@ -227,17 +227,17 @@ PGNode* GetLeafPartContraints(PGOid rel_oid, PGList **default_levels)
 	return NULL;
 };
 
-PGRelationPtr
-GetRelation(PGOid rel_oid)
-{
-	return NULL;
-};
+// PGRelationPtr
+// GetRelation(PGOid rel_oid)
+// {
+// 	return NULL;
+// };
 
-void
-CloseRelation(PGRelationPtr rel)
-{
+// void
+// CloseRelation(PGRelationPtr rel)
+// {
 
-};
+// };
 
 PGList *
 GetRelationIndexes(PGRelationPtr relation)
@@ -478,10 +478,10 @@ bool IsTextRelatedType(PGOid typid)
 	return false;
 };
 
-PGTypePtr LookupTypeCache(PGOid type_id/* , int flags */)
-{
-	return NULL;
-};
+// PGTypePtr LookupTypeCache(PGOid type_id/* , int flags */)
+// {
+// 	return NULL;
+// };
 
 PGOid GetTypeRelid(PGOid typid)
 {
@@ -588,10 +588,10 @@ bool IsFuncAllowedForPartitionSelection(PGOid funcid)
 	return false;
 };
 
-char * GetFuncName(PGOid funcid)
-{
-	return NULL;
-}
+// char * GetFuncName(PGOid funcid)
+// {
+// 	return NULL;
+// }
 
 PGList * GetFuncOutputArgTypes(PGOid funcid)
 {
@@ -608,10 +608,10 @@ bool IsAggPartialCapable(PGOid aggid)
 	return false;
 };
 
-char * WrapperGetTypeName(PGOid typid)
-{
-	return NULL;
-};
+// char * WrapperGetTypeName(PGOid typid)
+// {
+// 	return NULL;
+// };
 
 PGOid GetAggIntermediateResultType(PGOid aggid)
 {

@@ -120,11 +120,11 @@ RelPartIsRoot(duckdb_libpgquery::PGOid relid);
 
 duckdb_libpgquery::PGNode* GetLeafPartContraints(duckdb_libpgquery::PGOid rel_oid, duckdb_libpgquery::PGList **default_levels);
 
-duckdb_libpgquery::PGRelationPtr
-GetRelation(duckdb_libpgquery::PGOid rel_oid);
+// duckdb_libpgquery::PGRelationPtr
+// GetRelation(duckdb_libpgquery::PGOid rel_oid);
 
-void
-CloseRelation(duckdb_libpgquery::PGRelationPtr rel);
+// void
+// CloseRelation(duckdb_libpgquery::PGRelationPtr rel);
 
 duckdb_libpgquery::PGList *
 GetRelationIndexes(duckdb_libpgquery::PGRelationPtr relation);
@@ -243,7 +243,7 @@ bool IsCompositeType(duckdb_libpgquery::PGOid typid);
 
 bool IsTextRelatedType(duckdb_libpgquery::PGOid typid);
 
-duckdb_libpgquery::PGTypePtr LookupTypeCache(duckdb_libpgquery::PGOid type_id/* , int flags */);
+// duckdb_libpgquery::PGTypePtr LookupTypeCache(duckdb_libpgquery::PGOid type_id/* , int flags */);
 
 duckdb_libpgquery::PGOid GetTypeRelid(duckdb_libpgquery::PGOid typid);
 
@@ -287,7 +287,7 @@ bool IsFuncNDVPreserving(duckdb_libpgquery::PGOid funcid);
 
 bool IsFuncAllowedForPartitionSelection(duckdb_libpgquery::PGOid funcid);
 
-char * GetFuncName(duckdb_libpgquery::PGOid funcid);
+// char * GetFuncName(duckdb_libpgquery::PGOid funcid);
 
 duckdb_libpgquery::PGList * GetFuncOutputArgTypes(duckdb_libpgquery::PGOid funcid);
 
@@ -295,7 +295,7 @@ bool IsOrderedAgg(duckdb_libpgquery::PGOid aggid);
 
 bool IsAggPartialCapable(duckdb_libpgquery::PGOid aggid);
 
-char * WrapperGetTypeName(duckdb_libpgquery::PGOid typid);
+// char * WrapperGetTypeName(duckdb_libpgquery::PGOid typid);
 
 duckdb_libpgquery::PGOid GetAggIntermediateResultType(duckdb_libpgquery::PGOid aggid);
 
