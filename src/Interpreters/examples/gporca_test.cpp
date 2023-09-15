@@ -11,14 +11,25 @@
 #include <gpos/_api.h>
 #include <gpopt/mdcache/CMDCache.h>
 #include <gpopt/init.h>
+#include <gpopt/search/CSearchStage.h>
+#include <gpopt/engine/CEnumeratorConfig.h>
+#include <gpopt/engine/CCTEConfig.h>
+#include <gpopt/engine/CHint.h>
+#include <gpopt/optimizer/COptimizer.h>
+#include <gpopt/optimizer/COptimizerConfig.h>
+#include <gpopt/base/CWindowOids.h>
+#include <gpdbcost/CCostModelParamsGPDB.h>
+#include <gpdbcost/CCostModelGPDB.h>
 #include <naucrates/init.h>
 #include <naucrates/dxl/CDXLUtils.h>
+#include <naucrates/dxl/parser/CParseHandlerDXL.h>
 #include <naucrates/md/IMDProvider.h>
 
 using namespace duckdb_libpgquery;
 using namespace gpmd;
 using namespace gpdxl;
 using namespace gpopt;
+using namespace gpdbcost;
 
 #define GPOPT_ERROR_BUFFER_SIZE 10 * 1024 * 1024
 #define AUTO_MEM_POOL(amp) CAutoMemoryPool amp(CAutoMemoryPool::ElcExc)
@@ -76,6 +87,147 @@ CMDProviderRelcache::GetMDObjDXLStr(CMemoryPool *mp, CMDAccessor *md_accessor,
 	return str;
 };
 
+CSearchStageArray *
+LoadSearchStrategy(CMemoryPool *mp, char *path)
+{
+	CSearchStageArray *search_strategy_arr = NULL;
+	CParseHandlerDXL *dxl_parse_handler = NULL;
+
+	GPOS_TRY
+	{
+		if (NULL != path)
+		{
+			std::cout << "LoadSearchStrategy--00" << std::endl;
+			dxl_parse_handler =
+				CDXLUtils::GetParseHandlerForDXLFile(mp, path, NULL);
+			std::cout << "LoadSearchStrategy--11" << std::endl;
+			if (NULL != dxl_parse_handler)
+			{
+				elog(DEBUG2, "\n[OPT]: Using search strategy in (%s)", path);
+
+				search_strategy_arr = dxl_parse_handler->GetSearchStageArray();
+				search_strategy_arr->AddRef();
+			}
+		}
+	}
+	GPOS_CATCH_EX(ex)
+	{
+		if (GPOS_MATCH_EX(ex, gpdxl::ExmaGPDB, gpdxl::ExmiGPDBError))
+		{
+			GPOS_RETHROW(ex);
+		}
+		elog(DEBUG2, "\n[OPT]: Using default search strategy");
+		GPOS_RESET_EX;
+	}
+	GPOS_CATCH_END;
+
+	GPOS_DELETE(dxl_parse_handler);
+
+	return search_strategy_arr;
+};
+
+double optimizer_nestloop_factor = 1.0;
+double optimizer_sort_factor = 1.0;
+
+void SetCostModelParams(ICostModel *cost_model)
+{
+	GPOS_ASSERT(NULL != cost_model);
+
+	if (optimizer_nestloop_factor > 1.0)
+	{
+		// change NLJ cost factor
+		ICostModelParams::SCostParam *cost_param =
+			cost_model->GetCostModelParams()->PcpLookup(
+				CCostModelParamsGPDB::EcpNLJFactor);
+		CDouble nlj_factor(optimizer_nestloop_factor);
+		cost_model->GetCostModelParams()->SetParam(
+			cost_param->Id(), nlj_factor, nlj_factor - 0.5, nlj_factor + 0.5);
+	}
+
+	if (optimizer_sort_factor > 1.0 || optimizer_sort_factor < 1.0)
+	{
+		// change sort cost factor
+		ICostModelParams::SCostParam *cost_param =
+			cost_model->GetCostModelParams()->PcpLookup(
+				CCostModelParamsGPDB::EcpSortTupWidthCostUnit);
+
+		CDouble sort_factor(optimizer_sort_factor);
+		cost_model->GetCostModelParams()->SetParam(
+			cost_param->Id(), cost_param->Get() * optimizer_sort_factor,
+			cost_param->GetLowerBoundVal() * optimizer_sort_factor,
+			cost_param->GetUpperBoundVal() * optimizer_sort_factor);
+	}
+};
+
+ICostModel *
+GetCostModel(CMemoryPool *mp, ULONG num_segments)
+{
+	ICostModel *cost_model = GPOS_NEW(mp) CCostModelGPDB(mp, num_segments);
+
+	SetCostModelParams(cost_model);
+
+	return cost_model;
+};
+
+int optimizer_plan_id = 1;
+int optimizer_samples_number =1;
+double optimizer_cost_threshold = 1.0;
+double optimizer_damping_factor_filter = 1.0;
+double optimizer_damping_factor_join = 1.0;
+double optimizer_damping_factor_groupby = 1.0;
+int optimizer_cte_inlining_bound =1;
+int optimizer_join_arity_for_associativity_commutativity = 1;
+int optimizer_array_expansion_threshold =1;
+int optimizer_join_order_threshold = 1;
+int optimizer_penalize_broadcast_threshold = 1;
+int optimizer_push_group_by_below_setop_threshold = 1;
+int optimizer_xform_bind_threshold = 1;
+
+#define F_WINDOW_ROW_NUMBER 3100
+#define F_WINDOW_RANK 3101
+
+
+COptimizerConfig *
+CreateOptimizerConfig(CMemoryPool *mp, ICostModel *cost_model)
+{
+	// get chosen plan number, cost threshold
+	ULLONG plan_id = (ULLONG) optimizer_plan_id;
+	ULLONG num_samples = (ULLONG) optimizer_samples_number;
+	DOUBLE cost_threshold = (DOUBLE) optimizer_cost_threshold;
+
+	DOUBLE damping_factor_filter = (DOUBLE) optimizer_damping_factor_filter;
+	DOUBLE damping_factor_join = (DOUBLE) optimizer_damping_factor_join;
+	DOUBLE damping_factor_groupby = (DOUBLE) optimizer_damping_factor_groupby;
+
+	ULONG cte_inlining_cutoff = (ULONG) optimizer_cte_inlining_bound;
+	ULONG join_arity_for_associativity_commutativity =
+		(ULONG) optimizer_join_arity_for_associativity_commutativity;
+	ULONG array_expansion_threshold =
+		(ULONG) optimizer_array_expansion_threshold;
+	ULONG join_order_threshold = (ULONG) optimizer_join_order_threshold;
+	ULONG broadcast_threshold = (ULONG) optimizer_penalize_broadcast_threshold;
+	ULONG push_group_by_below_setop_threshold =
+		(ULONG) optimizer_push_group_by_below_setop_threshold;
+	ULONG xform_bind_threshold = (ULONG) optimizer_xform_bind_threshold;
+
+	return GPOS_NEW(mp) COptimizerConfig(
+		GPOS_NEW(mp)
+			CEnumeratorConfig(mp, plan_id, num_samples, cost_threshold),
+		GPOS_NEW(mp)
+			CStatisticsConfig(mp, damping_factor_filter, damping_factor_join,
+							  damping_factor_groupby, MAX_STATS_BUCKETS),
+		GPOS_NEW(mp) CCTEConfig(cte_inlining_cutoff), cost_model,
+		GPOS_NEW(mp)
+			CHint(gpos::int_max /* optimizer_parts_to_force_sort_on_insert */,
+				  join_arity_for_associativity_commutativity,
+				  array_expansion_threshold, join_order_threshold,
+				  broadcast_threshold,
+				  false, /* don't create Assert nodes for constraints, we'll
+								      * enforce them ourselves in the executor */
+				  push_group_by_below_setop_threshold, xform_bind_threshold),
+		GPOS_NEW(mp) CWindowOids(OID(F_WINDOW_ROW_NUMBER), OID(F_WINDOW_RANK)));
+};
+
 void * OptimizeTask(void *ptr)
 {
     CSystemId default_sysid(IMDId::EmdidGPDB, GPOS_WSZ_STR_LENGTH("GPDB"));
@@ -102,10 +254,10 @@ void * OptimizeTask(void *ptr)
 	{
 		CMDCache::SetCacheQuota(optimizer_mdcache_size * 1024L);
 	}
-
+	
     // load search strategy
 	// CSearchStageArray *search_strategy_arr =
-	// 	LoadSearchStrategy(mp, optimizer_search_strategy_path);
+	// 	LoadSearchStrategy(mp, "default");
 
 	//CBitSet *trace_flags = NULL;
 	//CBitSet *enabled_trace_flags = NULL;
@@ -138,14 +290,14 @@ void * OptimizeTask(void *ptr)
 			{
 				num_segments_for_costing = num_segments;
 			}
-
 			CAutoP<CTranslatorQueryToDXL> query_to_dxl_translator;
 			query_to_dxl_translator = CTranslatorQueryToDXL::QueryToDXLInstance(
 				mp, &mda, (PGQuery *) ptr);
 
-			// ICostModel *cost_model = GetCostModel(mp, num_segments_for_costing);
-			// COptimizerConfig *optimizer_config =
-			// 	CreateOptimizerConfig(mp, cost_model);
+			ICostModel *cost_model = GetCostModel(mp, num_segments_for_costing);
+			COptimizerConfig *optimizer_config =
+				CreateOptimizerConfig(mp, cost_model);
+
 			// CConstExprEvaluatorProxy expr_eval_proxy(mp, &mda);
 			// IConstExprEvaluator *expr_evaluator =
 			// 	GPOS_NEW(mp) CConstExprEvaluatorDXL(mp, &mda, &expr_eval_proxy);
@@ -158,12 +310,10 @@ void * OptimizeTask(void *ptr)
 				query_to_dxl_translator->GetCTEs();
 			GPOS_ASSERT(NULL != query_output_dxlnode_array);
 
-
             CWStringDynamic str(mp);
 	        COstreamString oss(&str);
 
             CDXLUtils::SerializeQuery(mp, oss, query_dxl, query_output_dxlnode_array, cte_dxlnode_array, true, true);
-
 			std::wcout << std::wstring(str.GetBuffer()) << std::endl;
 
 
@@ -178,6 +328,13 @@ void * OptimizeTask(void *ptr)
 			// CAutoTraceFlag atf1(EopttraceDisableMotions, is_master_only);
 			// CAutoTraceFlag atf2(EopttraceUseLegacyOpfamilies,
 			// 					use_legacy_opfamilies);
+
+			int gp_command_count = 1;
+
+			plan_dxl = COptimizer::PdxlnOptimize(
+				mp, &mda, query_dxl, query_output_dxlnode_array,
+				cte_dxlnode_array, NULL, num_segments, 1985,
+				gp_command_count, NULL, optimizer_config);
 
 			// plan_dxl = COptimizer::PdxlnOptimize(
 			// 	mp, &mda, query_dxl, query_output_dxlnode_array,
@@ -222,7 +379,7 @@ void * OptimizeTask(void *ptr)
 			//expr_evaluator->Release();
 			query_dxl->Release();
 			//optimizer_config->Release();
-			//plan_dxl->Release();
+			plan_dxl->Release();
 		}
 	}
 	GPOS_CATCH_EX(ex)
@@ -420,10 +577,8 @@ int main(int argc, char ** argv)
         if (query_node->type == T_PGRawStmt)
         {
             auto raw_stmt = (PGRawStmt *)query_node;
-            std::cout << "---nodeTag: " << nodeTag(raw_stmt->stmt) << std::endl;
             auto ps_stat = std::make_shared<PGParseState>();
             auto query = DB::SelectParser::transformStmt(ps_stat.get(), raw_stmt->stmt);
-            std::cout << "----type: " << query->commandType << "---nodeTag: " << nodeTag(raw_stmt->stmt) << std::endl;
             optimize2(query);
         }
         else
