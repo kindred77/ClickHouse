@@ -519,7 +519,7 @@ CMDAccessor::GetImdObj(IMDId *mdid)
 			}
 			CAutoP<CWStringBase> a_pstr;
 			a_pstr = pmdp->GetMDObjDXLStr(m_mp, this, mdid);
-
+			std::wcout << "0----" << a_pstr.Value()->GetBuffer() << std::endl;
 			GPOS_ASSERT(NULL != a_pstr.Value());
 			CMemoryPool *mp = m_mp;
 
@@ -574,6 +574,7 @@ CMDAccessor::GetImdObj(IMDId *mdid)
 			// store in local hashtable
 			GPOS_ASSERT(NULL != pmdobjNew);
 			IMDId *pmdidNew = pmdobjNew->MDId();
+			std::cout << "000----" << typeid(*pmdidNew).name() << std::endl;
 			pmdidNew->AddRef();
 
 			CAutoP<SMDAccessorElem> a_pmdaccelem;
@@ -583,6 +584,7 @@ CMDAccessor::GetImdObj(IMDId *mdid)
 
 			if (NULL == mdhtacc.Find())
 			{
+				std::cout << "1111----" << typeid(*pmdidNew).name() << std::endl;
 				// object has not been inserted in the meantime
 				mdhtacc.Insert(a_pmdaccelem.Value());
 
@@ -596,6 +598,11 @@ CMDAccessor::GetImdObj(IMDId *mdid)
 	// requested object must be in local hashtable already: retrieve it
 	MDHTAccessor mdhtacc(m_shtCacheAccessors, mdid);
 	SMDAccessorElem *pmdaccelem = mdhtacc.Find();
+	std::cout << "2222----" << typeid(*mdid).name() << std::endl;
+	if (pmdaccelem == NULL)
+	{
+		std::cout << "pmdaccelem is null" << std::endl;
+	}
 
 	GPOS_ASSERT(NULL != pmdaccelem);
 

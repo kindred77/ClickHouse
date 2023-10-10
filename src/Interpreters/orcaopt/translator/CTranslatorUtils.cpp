@@ -46,8 +46,8 @@
 #include <Interpreters/orcaopt/translator/CTranslatorScalarToDXL.h>
 #include <Interpreters/orcaopt/translator/CTranslatorUtils.h>
 #include <Interpreters/orcaopt/translator/wrappers.h>
-#include <Interpreters/orcaopt/translator/CMDIdCKDB.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
+#include "naucrates/md/CMDIdCKDB.h"
 #include "naucrates/dxl/CDXLUtils.h"
 #include "naucrates/dxl/gpdb_types.h"
 #include "naucrates/dxl/operators/CDXLColDescr.h"

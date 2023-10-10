@@ -29,6 +29,7 @@
 #include "naucrates/dxl/operators/dxlops.h"
 #include "naucrates/md/CMDIdCast.h"
 #include "naucrates/md/CMDIdColStats.h"
+#include "naucrates/md/CMDIdCKDB.h"
 #include "naucrates/md/CMDIdGPDB.h"
 #include "naucrates/md/CMDIdGPDBCtas.h"
 #include "naucrates/md/CMDIdRelStats.h"
@@ -2282,22 +2283,50 @@ CDXLOperatorFactory::GetGPDBMdId(CDXLMemoryManager *dxl_memory_manager,
 {
 	GPOS_ASSERT(GPDXL_GPDB_MDID_COMPONENTS <= remaining_tokens->Size());
 
-	XMLCh *xml_oid = (*remaining_tokens)[0];
-	ULONG oid_colid = ConvertAttrValueToUlong(dxl_memory_manager, xml_oid,
-											  target_attr, target_elem);
+	if (GPDXL_GPDB_MDID_COMPONENTS == remaining_tokens->Size())
+	{
+		XMLCh *xml_oid = (*remaining_tokens)[0];
+		ULONG oid_colid = ConvertAttrValueToUlong(dxl_memory_manager, xml_oid,
+												target_attr, target_elem);
 
-	XMLCh *version_major_xml = (*remaining_tokens)[1];
-	ULONG version_major = ConvertAttrValueToUlong(
-		dxl_memory_manager, version_major_xml, target_attr, target_elem);
+		XMLCh *version_major_xml = (*remaining_tokens)[1];
+		ULONG version_major = ConvertAttrValueToUlong(
+			dxl_memory_manager, version_major_xml, target_attr, target_elem);
 
-	XMLCh *xmlszVersionMinor = (*remaining_tokens)[2];
-	;
-	ULONG version_minor = ConvertAttrValueToUlong(
-		dxl_memory_manager, xmlszVersionMinor, target_attr, target_elem);
+		XMLCh *xmlszVersionMinor = (*remaining_tokens)[2];
+		;
+		ULONG version_minor = ConvertAttrValueToUlong(
+			dxl_memory_manager, xmlszVersionMinor, target_attr, target_elem);
 
-	// construct metadata id object
-	return GPOS_NEW(dxl_memory_manager->Pmp())
-		CMDIdGPDB(oid_colid, version_major, version_minor);
+		// construct metadata id object
+		return GPOS_NEW(dxl_memory_manager->Pmp())
+			CMDIdGPDB(oid_colid, version_major, version_minor);
+	}
+	//add CKDBMdId support
+	else
+	{
+		XMLCh *xml_oid_type = (*remaining_tokens)[0];
+		SINT oid_type = ConvertAttrValueToShortInt(dxl_memory_manager, xml_oid_type,
+												target_attr, target_elem);
+
+		XMLCh *xml_oid = (*remaining_tokens)[1];
+		ULONG oid_colid = ConvertAttrValueToUlong(dxl_memory_manager, xml_oid,
+												target_attr, target_elem);
+
+		XMLCh *version_major_xml = (*remaining_tokens)[2];
+		ULONG version_major = ConvertAttrValueToUlong(
+			dxl_memory_manager, version_major_xml, target_attr, target_elem);
+
+		XMLCh *xmlszVersionMinor = (*remaining_tokens)[3];
+		;
+		ULONG version_minor = ConvertAttrValueToUlong(
+			dxl_memory_manager, xmlszVersionMinor, target_attr, target_elem);
+
+		// construct metadata id object
+		return GPOS_NEW(dxl_memory_manager->Pmp())
+			CMDIdCKDB(oid_type, oid_colid, version_major, version_minor);
+	}
+	
 }
 
 //---------------------------------------------------------------------------
