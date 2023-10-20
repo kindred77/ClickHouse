@@ -1,0 +1,1 @@
+rsync服务器在linux上，windows往linux同步文件
