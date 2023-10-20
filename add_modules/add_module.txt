@@ -1,0 +1,74 @@
+git submodule add -b clickhouse git@github.com:ClickHouse-Extras/poco.git contrib/poco
+git submodule add  git@github.com:facebook/zstd.git contrib/zstd
+git submodule add  git@github.com:lz4/lz4.git contrib/lz4
+git submodule add  git@github.com:ClickHouse-Extras/librdkafka.git contrib/librdkafka
+git submodule add  git@github.com:ClickHouse-Extras/cctz.git contrib/cctz
+git submodule add -b clickhouse-new git@github.com:ClickHouse-Extras/zlib-ng.git contrib/zlib-ng
+git submodule add  git@github.com:google/googletest.git contrib/googletest
+git submodule add  git@github.com:capnproto/capnproto.git contrib/capnproto
+git submodule add  git@github.com:google/double-conversion.git contrib/double-conversion
+git submodule add  git@github.com:google/re2.git contrib/re2
+git submodule add  git@github.com:ClickHouse-Extras/llvm contrib/llvm
+git submodule add  git@github.com:ClickHouse-Extras/mariadb-connector-c.git contrib/mariadb-connector-c
+git submodule add  git@github.com:ClickHouse-Extras/jemalloc.git contrib/jemalloc
+git submodule add  git@github.com:ClickHouse-Extras/UnixODBC.git contrib/unixodbc
+git submodule add -b v3.13.0.1 git@github.com:ClickHouse-Extras/protobuf.git contrib/protobuf
+git submodule add  git@github.com:ClickHouse-Extras/boost.git contrib/boost
+git submodule add  git@github.com:ClickHouse-Extras/Turbo-Base64.git contrib/base64
+git submodule add -b clickhouse-arrow-2.0.0 git@github.com:ClickHouse-Extras/arrow contrib/arrow
+git submodule add  git@github.com:apache/thrift.git contrib/thrift
+git submodule add  git@github.com:ClickHouse-Extras/libhdfs3.git contrib/libhdfs3
+git submodule add  git@github.com:GNOME/libxml2.git contrib/libxml2
+git submodule add  git@github.com:ClickHouse-Extras/libgsasl.git contrib/libgsasl
+git submodule add  git@github.com:ClickHouse-Extras/libcxx.git contrib/libcxx
+git submodule add  git@github.com:ClickHouse-Extras/libcxxabi.git contrib/libcxxabi
+git submodule add  git@github.com:google/snappy contrib/snappy
+git submodule add  git@github.com:mfontanini/cppkafka.git contrib/cppkafka
+git submodule add  git@github.com:google/brotli.git contrib/brotli
+git submodule add  git@github.com:ClickHouse-Extras/h3 contrib/h3
+git submodule add  git@github.com:ClickHouse-Extras/hyperscan.git contrib/hyperscan
+git submodule add  git@github.com:ClickHouse-Extras/libunwind.git contrib/libunwind
+git submodule add  git@github.com:simdjson/simdjson.git contrib/simdjson
+git submodule add  git@github.com:ClickHouse-Extras/rapidjson contrib/rapidjson
+git submodule add  git@github.com:ClickHouse-Extras/fastops contrib/fastops
+git submodule add  git@github.com:ClickHouse-Extras/orc contrib/orc
+git submodule add  git@github.com:sparsehash/sparsehash-c11.git contrib/sparsehash-c11
+git submodule add -b v1.33.2 git@github.com:ClickHouse-Extras/grpc.git contrib/grpc
+git submodule add  git@github.com:ClickHouse-Extras/aws-sdk-cpp.git contrib/aws
+git submodule add  git@github.com:ClickHouse-Extras/aws-c-event-stream.git contrib/aws-c-event-stream
+git submodule add  git@github.com:ClickHouse-Extras/aws-c-common.git contrib/aws-c-common
+git submodule add  git@github.com:ClickHouse-Extras/aws-checksums.git contrib/aws-checksums
+git submodule add  git@github.com:curl/curl.git contrib/curl
+git submodule add  git@github.com:ClickHouse-Extras/icudata.git contrib/icudata
+git submodule add  git@github.com:unicode-org/icu.git contrib/icu
+git submodule add  git@github.com:ClickHouse-Extras/flatbuffers.git contrib/flatbuffers
+git submodule add  git@github.com:ClickHouse-Extras/libc-headers.git contrib/libc-headers
+git submodule add  git@github.com:ClickHouse-Extras/replxx.git contrib/replxx
+git submodule add  git@github.com:ClickHouse-Extras/avro.git contrib/avro
+git submodule add  git@github.com:msgpack/msgpack-c contrib/msgpack-c
+git submodule add  git@github.com:ClickHouse-Extras/libcpuid.git contrib/libcpuid
+git submodule add  git@github.com:ClickHouse-Extras/openldap.git contrib/openldap
+git submodule add  git@github.com:ClickHouse-Extras/AMQP-CPP.git contrib/AMQP-CPP
+git submodule add -b clickhouse git@github.com:ClickHouse-Extras/cpp-driver.git contrib/cassandra
+git submodule add -b clickhouse git@github.com:ClickHouse-Extras/libuv.git contrib/libuv
+git submodule add  git@github.com:fmtlib/fmt.git contrib/fmtlib
+git submodule add  git@github.com:ClickHouse-Extras/sentry-native.git contrib/sentry-native
+git submodule add  git@github.com:kthohr/gcem.git contrib/gcem
+git submodule add  git@github.com:kthohr/stats.git contrib/stats
+git submodule add  git@github.com:ClickHouse-Extras/krb5 contrib/krb5
+git submodule add -b cyrus-sasl-2.1 git@github.com:ClickHouse-Extras/cyrus-sasl contrib/cyrus-sasl
+git submodule add -b v0.2.66 git@github.com:RoaringBitmap/CRoaring contrib/croaring
+git submodule add  git@github.com:danlark1/miniselect contrib/miniselect
+git submodule add  git@github.com:ClickHouse-Extras/rocksdb.git contrib/rocksdb
+git submodule add  git@github.com:xz-mirror/xz contrib/xz
+git submodule add -b lts_2020_02_25 git@github.com:ClickHouse-Extras/abseil-cpp.git contrib/abseil-cpp
+git submodule add  git@github.com:ClickHouse-Extras/dragonbox.git contrib/dragonbox
+git submodule add  git@github.com:fastfloat/fast_float contrib/fast_float
+git submodule add  git@github.com:ClickHouse-Extras/libpq contrib/libpq
+git submodule add  git@github.com:ClickHouse-Extras/boringssl.git contrib/boringssl
+git submodule add  git@github.com:ClickHouse-Extras/NuRaft.git contrib/NuRaft
+git submodule add  git@github.com:ClickHouse-Extras/nanodbc.git contrib/nanodbc
+git submodule add  git@github.com:ClickHouse-Extras/datasketches-cpp.git contrib/datasketches-cpp
+git submodule add  git@github.com:ClickHouse-Extras/yaml-cpp.git contrib/yaml-cpp
+git submodule add  git@github.com:ClickHouse-Extras/libpqxx.git contrib/libpqxx
+git submodule add  git@github.com:azadkuh/sqlite-amalgamation contrib/sqlite-amalgamation
