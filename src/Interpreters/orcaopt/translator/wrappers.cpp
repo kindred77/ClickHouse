@@ -95,11 +95,11 @@ GPDBFree(void *ptr)
 	return;
 };
 
-// bool
-// IndexExists(PGOid oid)
-// {
-// 	return false;
-// };
+bool
+IndexExists(PGOid oid)
+{
+	return false;
+};
 
 bool
 TypeExists(PGOid oid)
@@ -540,7 +540,16 @@ bool IsOpStrict(PGOid opno)
 
 bool IsOpNDVPreserving(PGOid opno)
 {
-	return false;
+	switch (opno)
+	{
+		// for now, we consider only the concatenation op as NDV-preserving
+		// (note that we do additional checks later, e.g. col || 'const' is
+		// NDV-preserving, while col1 || col2 is not)
+		case PGOIDTextConcatenateOperator:
+			return true;
+		default:
+			return false;
+	}
 };
 
 PGOid GetCompatibleHashOpFamily(PGOid opno)

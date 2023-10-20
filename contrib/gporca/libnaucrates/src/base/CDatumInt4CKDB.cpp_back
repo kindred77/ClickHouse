@@ -1,0 +1,248 @@
+#include "naucrates/base/CDatumInt4CKDB.h"
+
+#include "gpos/base.h"
+#include "gpos/string/CWStringDynamic.h"
+
+#include "gpopt/base/CAutoOptCtxt.h"
+#include "gpopt/mdcache/CMDAccessor.h"
+#include "naucrates/dxl/gpdb_types.h"
+#include "naucrates/md/CMDIdCKDB.h"
+#include "naucrates/md/IMDType.h"
+#include "naucrates/md/IMDTypeInt4.h"
+
+using namespace gpnaucrates;
+using namespace gpmd;
+using namespace gpopt;
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::CDatumInt4CKDB
+//
+//	@doc:
+//		Ctor
+//
+//---------------------------------------------------------------------------
+CDatumInt4CKDB::CDatumInt4CKDB(CSystemId sysid, INT val, BOOL is_null)
+	: m_mdid(NULL), m_val(val), m_is_null(is_null)
+{
+	CMDAccessor *md_accessor = COptCtxt::PoctxtFromTLS()->Pmda();
+	IMDId *mdid = dynamic_cast<const CMDTypeInt4CKDB *>(
+					  md_accessor->PtMDType<IMDTypeInt4>(sysid))
+					  ->MDId();
+	mdid->AddRef();
+
+	m_mdid = mdid;
+
+	if (IsNull())
+	{
+		// needed for hash computation
+		m_val = gpos::int_max;
+	}
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::CDatumInt4CKDB
+//
+//	@doc:
+//		Ctor
+//
+//---------------------------------------------------------------------------
+CDatumInt4CKDB::CDatumInt4CKDB(IMDId *mdid, INT val, BOOL is_null)
+	: m_mdid(mdid), m_val(val), m_is_null(is_null)
+{
+	GPOS_ASSERT(NULL != m_mdid);
+	GPOS_ASSERT(GPDB_INT4_OID == CMDIdCKDB::CastMdid(m_mdid)->Oid());
+
+	if (IsNull())
+	{
+		// needed for hash computation
+		m_val = gpos::int_max;
+	}
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::~CDatumInt4CKDB
+//
+//	@doc:
+//		Dtor
+//
+//---------------------------------------------------------------------------
+CDatumInt4CKDB::~CDatumInt4CKDB()
+{
+	m_mdid->Release();
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::Value
+//
+//	@doc:
+//		Accessor of integer value
+//
+//---------------------------------------------------------------------------
+INT
+CDatumInt4CKDB::Value() const
+{
+	return m_val;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::IsNull
+//
+//	@doc:
+//		Accessor of is null
+//
+//---------------------------------------------------------------------------
+BOOL
+CDatumInt4CKDB::IsNull() const
+{
+	return m_is_null;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::Size
+//
+//	@doc:
+//		Accessor of size
+//
+//---------------------------------------------------------------------------
+ULONG
+CDatumInt4CKDB::Size() const
+{
+	return 4;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::MDId
+//
+//	@doc:
+//		Accessor of type information
+//
+//---------------------------------------------------------------------------
+IMDId *
+CDatumInt4CKDB::MDId() const
+{
+	return m_mdid;
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::HashValue
+//
+//	@doc:
+//		Hash function
+//
+//---------------------------------------------------------------------------
+ULONG
+CDatumInt4CKDB::HashValue() const
+{
+	return gpos::CombineHashes(m_mdid->HashValue(),
+							   gpos::HashValue<INT>(&m_val));
+}
+
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::GetMDName
+//
+//	@doc:
+//		Return string representation
+//
+//---------------------------------------------------------------------------
+const CWStringConst *
+CDatumInt4CKDB::GetStrRepr(CMemoryPool *mp) const
+{
+	CWStringDynamic str(mp);
+	if (!IsNull())
+	{
+		str.AppendFormat(GPOS_WSZ_LIT("%d"), m_val);
+	}
+	else
+	{
+		str.AppendFormat(GPOS_WSZ_LIT("null"));
+	}
+
+	return GPOS_NEW(mp) CWStringConst(mp, str.GetBuffer());
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::Matches
+//
+//	@doc:
+//		Matches the values of datums
+//
+//---------------------------------------------------------------------------
+BOOL
+CDatumInt4CKDB::Matches(const IDatum *datum) const
+{
+	if (!datum->MDId()->Equals(m_mdid))
+	{
+		return false;
+	}
+
+	const CDatumInt4CKDB *datum_cast =
+		dynamic_cast<const CDatumInt4CKDB *>(datum);
+
+	if (!datum_cast->IsNull() && !IsNull())
+	{
+		return (datum_cast->Value() == Value());
+	}
+
+	if (datum_cast->IsNull() && IsNull())
+	{
+		return true;
+	}
+
+	return false;
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::MakeCopy
+//
+//	@doc:
+//		Returns a copy of the datum
+//
+//---------------------------------------------------------------------------
+IDatum *
+CDatumInt4CKDB::MakeCopy(CMemoryPool *mp) const
+{
+	m_mdid->AddRef();
+	return GPOS_NEW(mp) CDatumInt4CKDB(m_mdid, m_val, m_is_null);
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		CDatumInt4CKDB::OsPrint
+//
+//	@doc:
+//		Debug print
+//
+//---------------------------------------------------------------------------
+IOstream &
+CDatumInt4CKDB::OsPrint(IOstream &os) const
+{
+	if (!IsNull())
+	{
+		os << m_val;
+	}
+	else
+	{
+		os << "null";
+	}
+
+	return os;
+}
+
+// EOF

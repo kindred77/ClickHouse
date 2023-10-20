@@ -1,0 +1,73 @@
+#ifndef GPNAUCRATES_CDatumOidCKDB_H
+#define GPNAUCRATES_CDatumOidCKDB_H
+
+#include "gpos/base.h"
+
+#include "naucrates/base/IDatumOid.h"
+
+namespace gpnaucrates
+{
+//---------------------------------------------------------------------------
+//	@class:
+//		CDatumOidCKDB
+//
+//	@doc:
+//		GPDB-specific oid representation
+//
+//---------------------------------------------------------------------------
+class CDatumOidCKDB : public IDatumOid
+{
+private:
+	// type information
+	IMDId *m_mdid;
+
+	// oid value
+	OID m_val;
+
+	// is null
+	BOOL m_is_null;
+
+	// private copy ctor
+	CDatumOidCKDB(const CDatumOidCKDB &);
+
+public:
+	// ctors
+	CDatumOidCKDB(CSystemId sysid, OID oid_val, BOOL is_null = false);
+	CDatumOidCKDB(IMDId *mdid, OID oid_val, BOOL is_null = false);
+
+	// dtor
+	virtual ~CDatumOidCKDB();
+
+	// accessor of metadata type id
+	virtual IMDId *MDId() const;
+
+	// accessor of size
+	virtual ULONG Size() const;
+
+	// accessor of oid value
+	virtual OID OidValue() const;
+
+	// accessor of is null
+	virtual BOOL IsNull() const;
+
+	// return string representation
+	virtual const CWStringConst *GetStrRepr(CMemoryPool *mp) const;
+
+	// hash function
+	virtual ULONG HashValue() const;
+
+	// match function for datums
+	virtual BOOL Matches(const IDatum *) const;
+
+	// copy datum
+	virtual IDatum *MakeCopy(CMemoryPool *mp) const;
+
+	// print function
+	virtual IOstream &OsPrint(IOstream &os) const;
+
+};	// class CDatumOidCKDB
+}  // namespace gpnaucrates
+
+#endif	// !GPNAUCRATES_CDatumOidCKDB_H
+
+// EOF

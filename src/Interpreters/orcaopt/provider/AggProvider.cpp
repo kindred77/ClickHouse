@@ -21,8 +21,16 @@ PGAggPtr AggProvider::getAggByFuncOid(PGOid func_oid)
 	//TODO kindred
 	auto it = oid_agg_map.find(func_oid);
 	if (it == oid_agg_map.end())
-	    return {};
+	    return nullptr;
 	return it->second;
+};
+
+bool AggProvider::AggregateExists(PGOid func_oid)
+{
+	auto it = oid_agg_map.find(func_oid);
+	if (it == oid_agg_map.end())
+	    return false;
+	return true;
 };
 
 }

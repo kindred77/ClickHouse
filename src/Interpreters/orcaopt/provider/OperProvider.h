@@ -126,7 +126,11 @@ public:
 
 	static duckdb_libpgquery::PGOid get_opcode(duckdb_libpgquery::PGOid opno);
 
+    static bool OperatorExists(duckdb_libpgquery::PGOid oid);
+
 	static duckdb_libpgquery::PGOid get_commutator(duckdb_libpgquery::PGOid opno);
+
+    static duckdb_libpgquery::PGOid get_negator(duckdb_libpgquery::PGOid opno);
 
     // Oid get_opfamily_member(Oid opfamily, Oid lefttype, Oid righttype, int16 strategy);
 

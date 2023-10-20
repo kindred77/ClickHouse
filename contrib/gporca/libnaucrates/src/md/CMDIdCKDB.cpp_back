@@ -1,0 +1,151 @@
+#include "naucrates/md/CMDIdCKDB.h"
+
+#include "naucrates/dxl/xml/CXMLSerializer.h"
+#include "gpos/types.h"
+
+namespace gpmd
+{
+using namespace gpos;
+
+// initialize static members
+// invalid key
+CMDIdCKDB CMDIdCKDB::m_mdid_invalid_key(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeInvalid, 0, 0, 0);
+
+// int2 mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_int2(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_INT2);
+
+// int4 mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_int4(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_INT4);
+
+// int8 mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_int8(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_INT8);
+
+// bool mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_bool(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_BOOL);
+
+// oid mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_oid(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_OID);
+
+// numeric mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_numeric(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_NUMERIC);
+
+// date mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_date(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_DATE);
+
+// time mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_time(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_TIME);
+
+// time with time zone mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_timeTz(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_TIMETZ);
+
+// timestamp mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_timestamp(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_TIMESTAMP);
+
+// timestamp with time zone mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_timestampTz(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_TIMESTAMPTZ);
+
+// absolute time mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_abs_time(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_ABSTIME);
+
+// relative time mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_relative_time(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_RELTIME);
+
+// interval mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_interval(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_INTERVAL);
+
+// time interval mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_time_interval(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_TIMEINTERVAL);
+
+// char mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_char(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_SINGLE_CHAR);
+
+// bpchar mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_bpchar(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_CHAR);
+
+// varchar mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_varchar(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_VARCHAR);
+
+// text mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_text(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_TEXT);
+
+// text mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_name(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_NAME);
+
+// float4 mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_float4(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_FLOAT4);
+
+// float8 mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_float8(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_FLOAT8);
+
+// cash mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_cash(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_CASH);
+
+// inet mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_inet(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_INET);
+
+// cidr mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_cidr(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_CIDR);
+
+// macaddr mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_macaddr(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_MACADDR);
+
+// count(*) mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_count_star(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeAggregate, GPDB_COUNT_STAR);
+
+// count(Any) mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_count_any(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeAggregate, GPDB_COUNT_ANY);
+
+// uuid mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_uuid(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, GPDB_UUID);
+
+// unknown mdid
+CMDIdCKDB CMDIdCKDB::m_mdid_unknown(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeInvalid, GPDB_UNKNOWN);
+
+CMDIdCKDB::CMDIdCKDB(const ECKDBMDOIdType oid_type, OID oid) : 
+	mdoid_type(oid_type)
+	,CMDIdGPDB(oid)
+{
+    Serialize();
+};
+
+CMDIdCKDB::CMDIdCKDB(const SINT type, OID oid, ULONG version_major, ULONG version_minor) :
+	mdoid_type(ECKDBMDOIdType(type))
+    , CMDIdGPDB(oid, version_major, version_minor)
+{
+	Serialize();
+};
+
+void
+CMDIdCKDB::Serialize()
+{
+	m_str.Reset();
+	// serialize mdid as SystemType.Oid.Major.Minor
+	m_str.AppendFormat(GPOS_WSZ_LIT("%d.%d.%d.%d.%d"), MdidType(), MDOIdType(), m_oid,
+					   m_major_version, m_minor_version);
+}
+
+BOOL
+CMDIdCKDB::Equals(const IMDId *mdid) const
+{
+	if (NULL == mdid || EmdidGPDB != mdid->MdidType())
+	{
+		return false;
+	}
+
+	const CMDIdCKDB *mdidCKDB =
+		static_cast<CMDIdCKDB *>(const_cast<IMDId *>(mdid));
+
+	return (mdoid_type == mdidCKDB->MDOIdType() &&
+            m_oid == mdidCKDB->Oid() &&
+			m_major_version == mdidCKDB->VersionMajor() &&
+			m_minor_version == mdidCKDB->VersionMinor());
+}
+
+IOstream &
+CMDIdCKDB::OsPrint(IOstream &os) const
+{
+	os << "(" << MDOIdType() << "," << Oid() << "," << VersionMajor() << "." << VersionMinor() << ")";
+	return os;
+}
+
+}

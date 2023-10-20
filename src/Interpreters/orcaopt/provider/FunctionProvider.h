@@ -51,6 +51,8 @@ public:
 
     static bool MatchNamedCall(const duckdb_libpgquery::PGProcPtr& proctup, int nargs, duckdb_libpgquery::PGList * argnames, int ** argnumbers);
 
+    static bool FunctionExists(duckdb_libpgquery::PGOid functionId);
+
     static duckdb_libpgquery::FuncCandidateListPtr FuncnameGetCandidates(
         duckdb_libpgquery::PGList * names,
         int nargs,

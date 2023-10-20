@@ -1201,7 +1201,7 @@ PGProcPtr ProcProvider::getProcByOid(PGOid oid)
 	return it->second;
 };
 
-std::optional<std::string> ProcProvider::get_func_name(duckdb_libpgquery::PGOid oid)
+std::optional<std::string> ProcProvider::get_func_name(PGOid oid)
 {
     auto proc = getProcByOid(oid);
     if (proc != nullptr)
@@ -1209,6 +1209,30 @@ std::optional<std::string> ProcProvider::get_func_name(duckdb_libpgquery::PGOid 
         return proc->proname;
     }
     return std::nullopt;
+};
+
+bool ProcProvider::func_strict(PGOid funcid)
+{
+    PGProcPtr tp = getProcByOid(funcid);
+	if (tp == NULL)
+	{
+		elog(ERROR, "cache lookup failed for function %u", funcid);
+        return InvalidOid;
+	}
+
+	return tp->proisstrict;
+};
+
+PGOid ProcProvider::get_func_rettype(PGOid funcid)
+{
+    PGProcPtr tp = getProcByOid(funcid);
+	if (tp == NULL)
+	{
+		elog(ERROR, "cache lookup failed for function %u", funcid);
+        return InvalidOid;
+	}
+
+	return tp->prorettype;
 };
 
 bool ProcProvider::get_func_retset(PGOid funcid)

@@ -1163,7 +1163,15 @@ PGTypePtr TypeProvider::getTypeByOid(PGOid oid)
 	return it->second;
 };
 
-std::optional<std::string> TypeProvider::get_type_name(duckdb_libpgquery::PGOid oid)
+bool TypeProvider::TypeExists(PGOid oid)
+{
+    auto it = oid_type_map.find(oid);
+	if (it == oid_type_map.end())
+	    return false;
+	return true;
+};
+
+std::optional<std::string> TypeProvider::get_type_name(PGOid oid)
 {
     auto type = getTypeByOid(oid);
     if (type != nullptr)

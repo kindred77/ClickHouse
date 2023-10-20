@@ -322,3 +322,5 @@
 #define PG_NUMERIC_FLAGBITS(n) ((n)->choice.n_header & PG_NUMERIC_SIGN_MASK)
 #define PG_NUMERIC_IS_NAN(n)		(PG_NUMERIC_FLAGBITS(n) == PG_NUMERIC_NAN)
 #define PG_NUMERIC_IS_SHORT(n)		(PG_NUMERIC_FLAGBITS(n) == PG_NUMERIC_SHORT)
+
+#define PGOIDTextConcatenateOperator 654

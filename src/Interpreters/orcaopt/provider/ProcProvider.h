@@ -75,6 +75,10 @@ public:
 
 	static std::optional<std::string> get_func_name(duckdb_libpgquery::PGOid oid);
 
+	static duckdb_libpgquery::PGOid get_func_rettype(duckdb_libpgquery::PGOid funcid);
+
+	static bool func_strict(duckdb_libpgquery::PGOid funcid);
+
 	static std::unique_ptr<std::vector<duckdb_libpgquery::PGProcPtr>> search_procs_by_name(const std::string & func_name);
 
     static bool get_func_retset(duckdb_libpgquery::PGOid funcid);

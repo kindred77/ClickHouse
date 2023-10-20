@@ -54,8 +54,8 @@ CopyObject(void *from);
 void
 GPDBFree(void *ptr);
 
-// bool
-// IndexExists(Oid oid);
+bool
+IndexExists(duckdb_libpgquery::PGOid oid);
 
 bool
 TypeExists(duckdb_libpgquery::PGOid oid);

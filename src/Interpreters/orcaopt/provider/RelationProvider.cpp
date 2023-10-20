@@ -701,6 +701,17 @@ PGRelationPtr RelationProvider::relation_open(PGOid relationId, LOCKMODE lockmod
 	return it->second;
 };
 
+bool RelationProvider::RelationExists(PGOid oid)
+{
+    auto it = oid_relation_map.find(oid);
+	if (it == oid_relation_map.end())
+    {
+	    return false;
+    }
+
+	return true;
+};
+
 void RelationProvider::relation_close(PGRelationPtr relation, LOCKMODE lockmode)
 {
     if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");

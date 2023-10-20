@@ -90,6 +90,8 @@ public:
 
     static duckdb_libpgquery::PGRelationPtr relation_open(duckdb_libpgquery::PGOid relationId, LOCKMODE lockmode);
 
+    static bool RelationExists(duckdb_libpgquery::PGOid oid);
+
     static void relation_close(duckdb_libpgquery::PGRelationPtr relation, LOCKMODE lockmode);
 
     static duckdb_libpgquery::PGRelationPtr heap_open(duckdb_libpgquery::PGOid relationId, LOCKMODE lockmode);

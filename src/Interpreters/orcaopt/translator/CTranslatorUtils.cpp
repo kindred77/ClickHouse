@@ -47,7 +47,7 @@
 #include <Interpreters/orcaopt/translator/CTranslatorUtils.h>
 #include <Interpreters/orcaopt/translator/wrappers.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
-#include "naucrates/md/CMDIdCKDB.h"
+//#include "naucrates/md/CMDIdCKDB.h"
 #include "naucrates/dxl/CDXLUtils.h"
 #include "naucrates/dxl/gpdb_types.h"
 #include "naucrates/dxl/operators/CDXLColDescr.h"
@@ -128,7 +128,7 @@ CTranslatorUtils::GetTableDescr(CMemoryPool *mp, CMDAccessor *md_accessor,
 				   GPOS_WSZ_LIT("Query over external partitions"));
 	}
 
-	CMDIdCKDB *mdid = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeRelation, rel_oid);
+	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(rel_oid);
 
 	const IMDRelation *rel = md_accessor->RetrieveRel(mdid);
 
@@ -213,8 +213,8 @@ CTranslatorUtils::IsSirvFunc(CMemoryPool *mp, CMDAccessor *md_accessor,
 		return false;
 	}
 
-	//CMDIdGPDB *mdid_func = GPOS_NEW(mp) CMDIdGPDB(func_oid);
-	CMDIdCKDB *mdid_func = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeFunction, func_oid);
+	CMDIdGPDB *mdid_func = GPOS_NEW(mp) CMDIdGPDB(func_oid);
+	//CMDIdCKDB *mdid_func = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeFunction, func_oid);
 	const IMDFunction *func = md_accessor->RetrieveFunc(mdid_func);
 
 	BOOL is_sirv = (!func->ReturnsSet() &&
@@ -279,9 +279,9 @@ CTranslatorUtils::ConvertToCDXLLogicalTVF(CMemoryPool *mp,
 	{
 		PGConst *constExpr = (PGConst *) rtfunc->funcexpr;
 
-		//CMDIdGPDB *mdid_return_type =
-		//	GPOS_NEW(mp) CMDIdGPDB(constExpr->consttype);
-		CMDIdCKDB *mdid_return_type = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, constExpr->consttype);
+		CMDIdGPDB *mdid_return_type =
+			GPOS_NEW(mp) CMDIdGPDB(constExpr->consttype);
+		//CMDIdCKDB *mdid_return_type = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, constExpr->consttype);
 
 		const IMDType *type = md_accessor->RetrieveType(mdid_return_type);
 		CDXLColDescrArray *column_descrs = GetColumnDescriptorsFromComposite(
@@ -307,11 +307,11 @@ CTranslatorUtils::ConvertToCDXLLogicalTVF(CMemoryPool *mp,
 				   GPOS_WSZ_LIT("SIRV functions"));
 	}
 	// get function id
-	//CMDIdGPDB *mdid_func = GPOS_NEW(mp) CMDIdGPDB(funcexpr->funcid);
-	CMDIdCKDB *mdid_func = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeFunction, funcexpr->funcid);
-	//CMDIdGPDB *mdid_return_type =
-	//	GPOS_NEW(mp) CMDIdGPDB(funcexpr->funcresulttype);
-	CMDIdCKDB *mdid_return_type = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, funcexpr->funcresulttype);
+	CMDIdGPDB *mdid_func = GPOS_NEW(mp) CMDIdGPDB(funcexpr->funcid);
+	//CMDIdCKDB *mdid_func = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeFunction, funcexpr->funcid);
+	CMDIdGPDB *mdid_return_type =
+		GPOS_NEW(mp) CMDIdGPDB(funcexpr->funcresulttype);
+	//CMDIdCKDB *mdid_return_type = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, funcexpr->funcresulttype);
 	const IMDType *type = md_accessor->RetrieveType(mdid_return_type);
 
 	// get function from MDcache
@@ -433,8 +433,8 @@ CTranslatorUtils::ResolvePolymorphicTypes(CMemoryPool *mp,
 	for (ULONG ul = num_args; ul < total_args; ul++)
 	{
 		IMDId *resolved_mdid = NULL;
-		//resolved_mdid = GPOS_NEW(mp) CMDIdGPDB(arg_types[ul]);
-		resolved_mdid = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, arg_types[ul]);
+		resolved_mdid = GPOS_NEW(mp) CMDIdGPDB(arg_types[ul]);
+		//resolved_mdid = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, arg_types[ul]);
 		resolved_types->Append(resolved_mdid);
 	}
 
@@ -2620,8 +2620,8 @@ CTranslatorUtils::IsCompositeConst(CMemoryPool *mp, CMDAccessor *md_accessor,
 
 	PGConst *constExpr = (PGConst *) rtfunc->funcexpr;
 
-	//CMDIdGPDB *mdid_return_type = GPOS_NEW(mp) CMDIdGPDB(constExpr->consttype);
-	CMDIdGPDB * mdid_return_type = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, constExpr->consttype);
+	CMDIdGPDB *mdid_return_type = GPOS_NEW(mp) CMDIdGPDB(constExpr->consttype);
+	//CMDIdGPDB * mdid_return_type = GPOS_NEW(mp) CMDIdCKDB(CMDIdCKDB::ECKDBMDOIdType::ECKDBMDOIdTypeType, constExpr->consttype);
 
 	const IMDType *type = md_accessor->RetrieveType(mdid_return_type);
 

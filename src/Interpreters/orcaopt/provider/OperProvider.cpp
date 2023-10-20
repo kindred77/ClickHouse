@@ -2243,6 +2243,14 @@ OperProvider::getOperByName(duckdb_libpgquery::PGList *names, PGOid oprleft, PGO
 	return InvalidOid;
 };
 
+bool OperProvider::OperatorExists(duckdb_libpgquery::PGOid oid)
+{
+    auto it = oid_oper_map.find(oid);
+	if (it == oid_oper_map.end())
+	    return false;
+	return true;
+};
+
 FuncCandidateListPtr
 OperProvider::OpernameGetCandidates(PGList * names, char oprkind, bool missing_schema_ok)
 {
@@ -2326,6 +2334,17 @@ PGOid OperProvider::get_commutator(PGOid opno)
     if (op != NULL)
     {
         return op->oprcom;
+    }
+    else
+        return InvalidOid;
+};
+
+PGOid OperProvider::get_negator(PGOid opno)
+{
+    PGOperatorPtr op = getOperByOID(opno);
+    if (op != NULL)
+    {
+        return op->oprnegate;
     }
     else
         return InvalidOid;

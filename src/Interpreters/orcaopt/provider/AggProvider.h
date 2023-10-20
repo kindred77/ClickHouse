@@ -24,6 +24,8 @@ public:
 	//explicit AggProvider(const ContextPtr& context_);
 	
 	static duckdb_libpgquery::PGAggPtr getAggByFuncOid(duckdb_libpgquery::PGOid func_oid);
+
+	static bool AggregateExists(duckdb_libpgquery::PGOid func_oid);
 };
 
 }

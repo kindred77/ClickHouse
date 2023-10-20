@@ -228,6 +228,31 @@ CreateOptimizerConfig(CMemoryPool *mp, ICostModel *cost_model)
 		GPOS_NEW(mp) CWindowOids(OID(F_WINDOW_ROW_NUMBER), OID(F_WINDOW_RANK)));
 };
 
+void * testDXL(void *ptr)
+{
+	CAutoMemoryPool amp(CAutoMemoryPool::ElcNone);
+	CMemoryPool *mp = amp.Pmp();
+
+	CWStringConst a_pstr = L"<?xml version=\"1.0\" encoding=\"UTF-8\"?><dxl:DXLMessage xmlns:dxl=\"http://greenplum.com/dxl/2010/12/\"><dxl:Metadata><dxl:Type Mdid=\"0.1.1114.1.0\" Name=\"DateTime\" IsRedistributable=\"false\" IsHashable=\"false\" IsMergeJoinable=\"false\" IsComposite=\"false\" IsTextRelated=\"false\" IsFixedLength=\"true\" Length=\"8\" PassByValue=\"true\"><dxl:EqualityOp Mdid=\"0.3.2060.1.0\"/><dxl:InequalityOp Mdid=\"0.3.0.0.0\"/><dxl:LessThanOp Mdid=\"0.3.2062.1.0\"/><dxl:LessThanEqualsOp Mdid=\"0.3.0.0.0\"/><dxl:GreaterThanOp Mdid=\"0.3.2064.1.0\"/><dxl:GreaterThanEqualsOp Mdid=\"0.3.0.0.0\"/><dxl:ComparisonOp Mdid=\"0.3.0.0.0\"/><dxl:ArrayType Mdid=\"0.1.0.0.0\"/></dxl:Type></dxl:Metadata></dxl:DXLMessage>";
+	CWStringConst a_pstr2 = L"<?xml version=\"1.0\" encoding=\"UTF-8\"?><dxl:DXLMessage xmlns:dxl=\"http://greenplum.com/dxl/2010/12/\"><dxl:Metadata><dxl:Type Mdid=\"0.1.20.1.0\" Name=\"Int8\" IsRedistributable=\"true\" IsHashable=\"true\" IsMergeJoinable=\"true\" IsComposite=\"false\" IsTextRelated=\"false\" IsFixedLength=\"true\" Length=\"8\" PassByValue=\"true\"><dxl:EqualityOp Mdid=\"0.3.410.1.0\"/><dxl:InequalityOp Mdid=\"0.3.411.1.0\"/><dxl:LessThanOp Mdid=\"0.3.412.1.0\"/><dxl:LessThanEqualsOp Mdid=\"0.3.414.1.0\"/><dxl:GreaterThanOp Mdid=\"0.3.413.1.0\"/><dxl:GreaterThanEqualsOp Mdid=\"0.3.415.1.0\"/><dxl:ComparisonOp Mdid=\"0.3.351.1.0\"/><dxl:ArrayType Mdid=\"0.1.1016.1.0\"/></dxl:Type></dxl:Metadata></dxl:DXLMessage>";
+	//CWStringConst a_pstr2 = L"<?xml version=\"1.0\" encoding=\"UTF-8\"?><dxl:DXLMessage xmlns:dxl=\"http://greenplum.com/dxl/2010/12/\"><dxl:Metadata><dxl:Type Mdid=\"0.1.1114.1.0\" Name=\"Int8\" IsRedistributable=\"true\" IsHashable=\"true\" IsMergeJoinable=\"true\" IsComposite=\"false\" IsTextRelated=\"false\" IsFixedLength=\"true\" Length=\"8\" PassByValue=\"true\"><dxl:EqualityOp Mdid=\"0.3.0.0.0\"/><dxl:InequalityOp Mdid=\"0.3.0.0.0\"/><dxl:LessThanOp Mdid=\"0.3.412.1.0\"/><dxl:LessThanEqualsOp Mdid=\"0.3.414.1.0\"/><dxl:GreaterThanOp Mdid=\"0.3.413.1.0\"/><dxl:GreaterThanEqualsOp Mdid=\"0.3.415.1.0\"/><dxl:ComparisonOp Mdid=\"0.3.351.1.0\"/><dxl:ArrayType Mdid=\"0.1.1016.1.0\"/></dxl:Type></dxl:Metadata></dxl:DXLMessage>";
+	auto pmdobjNew = gpdxl::CDXLUtils::ParseDXLToIMDIdCacheObj(
+				mp, &a_pstr, NULL /* XSD path */);
+
+	auto pmdobjNew2 = gpdxl::CDXLUtils::ParseDXLToIMDIdCacheObj(
+				mp, &a_pstr2, NULL /* XSD path */);
+	if (NULL == pmdobjNew || NULL == pmdobjNew2)
+	{
+		std::cout << "pmdobjNew or pmdobjNew2 is NULL" << std::endl;
+		return NULL;
+	}
+	IMDId *pmdidNew = pmdobjNew->MDId();
+	IMDId *pmdidNew2 = pmdobjNew2->MDId();
+	std::cout << "----" << typeid(*pmdidNew).name() << "----" << typeid(*pmdidNew2).name() << std::endl;
+
+	return NULL;
+};
+
 void * OptimizeTask(void *ptr)
 {
     CSystemId default_sysid(IMDId::EmdidGPDB, GPOS_WSZ_STR_LENGTH("GPDB"));
@@ -330,11 +355,22 @@ void * OptimizeTask(void *ptr)
 			// 					use_legacy_opfamilies);
 
 			int gp_command_count = 1;
-
+			
 			plan_dxl = COptimizer::PdxlnOptimize(
 				mp, &mda, query_dxl, query_output_dxlnode_array,
 				cte_dxlnode_array, NULL, num_segments, 1985,
 				gp_command_count, NULL, optimizer_config);
+
+			
+			CWStringDynamic plan_str(mp);
+			COstreamString oss2(&plan_str);
+			CDXLUtils::SerializePlan(
+				mp, oss2, plan_dxl,
+				optimizer_config->GetEnumeratorCfg()->GetPlanId(),
+				optimizer_config->GetEnumeratorCfg()->GetPlanSpaceSize(),
+				true /*serialize_header_footer*/, true /*indentation*/);
+
+			std::wcout << std::wstring(plan_str.GetBuffer()) << std::endl;
 
 			// plan_dxl = COptimizer::PdxlnOptimize(
 			// 	mp, &mda, query_dxl, query_output_dxlnode_array,
@@ -482,6 +518,8 @@ void InitGPOPT()
 void optimize2(PGQuery * query)
 {
     Execute(&OptimizeTask, query);
+
+	//Execute(&testDXL, NULL);
 };
 
 // void optimize(PGQuery * query)
@@ -546,11 +584,11 @@ void optimize2(PGQuery * query)
 
 //     GPOS_TRACE(str.GetBuffer());
 
-// }
+// }s
 
 int main(int argc, char ** argv)
 {
-    std::string query_str = "select * from test.test;";
+    std::string query_str = "select col1,col2 from test.test;";
     duckdb::PostgresParser::SetPreserveIdentifierCase(false);
 
     auto shared_context = DB::Context::createShared();
