@@ -30,7 +30,7 @@ int ereport(int code, ...);
 void elog(int code, const char *fmt, ...);
 int errcode(int sqlerrcode);
 int errmsg(const char *fmt, ...);
-int errhint(const char *msg);
+int errhint(const char *fmt, ...);
 int errmsg_internal(const char *fmt, ...);
 int errdetail(const char *fmt, ...);
 int errposition(int cursorpos);

@@ -180,6 +180,12 @@ private:
 	// static std::pair<PGOid, PGTypePtr> TYPE_MAP;
 	// static std::pair<PGOid, PGTypePtr> TYPE_UUID;
 
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_ANY;
+
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERNAL;
+
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_OID;
+
 	using OidTypeMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr>;
 	static OidTypeMap oid_type_map;
 

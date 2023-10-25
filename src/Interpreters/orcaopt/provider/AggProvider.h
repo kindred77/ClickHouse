@@ -19,6 +19,10 @@ private:
 	using OidAggMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGAggPtr>;
     static OidAggMap oid_agg_map;
 	//ContextPtr context;
+
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGAggPtr> AGG_COUNTANY;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGAggPtr> AGG_COUNTSTAR;
+
 public:
 	//explicit AggProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	//explicit AggProvider(const ContextPtr& context_);

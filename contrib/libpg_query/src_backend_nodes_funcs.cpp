@@ -135,6 +135,374 @@ expression_returns_set_walker(PGNode *node, void *context)
 }
 
 /*
+ * leftmostLoc - support for exprLocation
+ *
+ * Take the minimum of two parse location values, but ignore unknowns
+ */
+static int
+leftmostLoc(int loc1, int loc2)
+{
+	if (loc1 < 0)
+		return loc2;
+	else if (loc2 < 0)
+		return loc1;
+	else
+		return Min(loc1, loc2);
+}
+
+/*
+ *	exprLocation -
+ *	  returns the parse location of an expression tree, for error reports
+ *
+ * -1 is returned if the location can't be determined.
+ *
+ * For expressions larger than a single token, the intent here is to
+ * return the location of the expression's leftmost token, not necessarily
+ * the topmost Node's location field.  For example, an OpExpr's location
+ * field will point at the operator name, but if it is not a prefix operator
+ * then we should return the location of the left-hand operand instead.
+ * The reason is that we want to reference the entire expression not just
+ * that operator, and pointing to its start seems to be the most natural way.
+ *
+ * The location is not perfect --- for example, since the grammar doesn't
+ * explicitly represent parentheses in the parsetree, given something that
+ * had been written "(a + b) * c" we are going to point at "a" not "(".
+ * But it should be plenty good enough for error reporting purposes.
+ *
+ * You might think that this code is overly general, for instance why check
+ * the operands of a FuncExpr node, when the function name can be expected
+ * to be to the left of them?  There are a couple of reasons.  The grammar
+ * sometimes builds expressions that aren't quite what the user wrote;
+ * for instance x IS NOT BETWEEN ... becomes a NOT-expression whose keyword
+ * pointer is to the right of its leftmost argument.  Also, nodes that were
+ * inserted implicitly by parse analysis (such as FuncExprs for implicit
+ * coercions) will have location -1, and so we can have odd combinations of
+ * known and unknown locations in a tree.
+ */
+int
+exprLocation(const PGNode *expr)
+{
+	int			loc;
+
+	if (expr == NULL)
+		return -1;
+	switch (nodeTag(expr))
+	{
+		case T_PGRangeVar:
+			loc = ((const PGRangeVar *) expr)->location;
+			break;
+		case T_PGVar:
+			loc = ((const PGVar *) expr)->location;
+			break;
+		case T_PGConst:
+			loc = ((const PGConst *) expr)->location;
+			break;
+		case T_PGParam:
+			loc = ((const PGParam *) expr)->location;
+			break;
+		case T_PGAggref:
+			/* function name should always be the first thing */
+			loc = ((const PGAggref *) expr)->location;
+			break;
+		case T_PGWindowFunc:
+			/* function name should always be the first thing */
+			loc = ((const PGWindowFunc *) expr)->location;
+			break;
+		case T_PGArrayRef:
+			/* just use array argument's location */
+			loc = exprLocation((PGNode *) ((const PGArrayRef *) expr)->refexpr);
+			break;
+		case T_PGFuncExpr:
+			{
+				const PGFuncExpr *fexpr = (const PGFuncExpr *) expr;
+
+				/* consider both function name and leftmost arg */
+				loc = leftmostLoc(fexpr->location,
+								  exprLocation((PGNode *) fexpr->args));
+			}
+			break;
+		case T_PGNamedArgExpr:
+			{
+				const PGNamedArgExpr *na = (const PGNamedArgExpr *) expr;
+
+				/* consider both argument name and value */
+				loc = leftmostLoc(na->location,
+								  exprLocation((PGNode *) na->arg));
+			}
+			break;
+		case T_PGOpExpr:
+		case T_PGDistinctExpr:	/* struct-equivalent to OpExpr */
+		case T_PGNullIfExpr:		/* struct-equivalent to OpExpr */
+			{
+				const PGOpExpr *opexpr = (const PGOpExpr *) expr;
+
+				/* consider both operator name and leftmost arg */
+				loc = leftmostLoc(opexpr->location,
+								  exprLocation((PGNode *) opexpr->args));
+			}
+			break;
+		case T_PGScalarArrayOpExpr:
+			{
+				const PGScalarArrayOpExpr *saopexpr = (const PGScalarArrayOpExpr *) expr;
+
+				/* consider both operator name and leftmost arg */
+				loc = leftmostLoc(saopexpr->location,
+								  exprLocation((PGNode *) saopexpr->args));
+			}
+			break;
+		case T_PGBoolExpr:
+			{
+				const PGBoolExpr *bexpr = (const PGBoolExpr *) expr;
+
+				/*
+				 * Same as above, to handle either NOT or AND/OR.  We can't
+				 * special-case NOT because of the way that it's used for
+				 * things like IS NOT BETWEEN.
+				 */
+				loc = leftmostLoc(bexpr->location,
+								  exprLocation((PGNode *) bexpr->args));
+			}
+			break;
+		case T_PGSubLink:
+			{
+				const PGSubLink *sublink = (const PGSubLink *) expr;
+
+				/* check the testexpr, if any, and the operator/keyword */
+				loc = leftmostLoc(exprLocation(sublink->testexpr),
+								  sublink->location);
+			}
+			break;
+		case T_PGFieldSelect:
+			/* just use argument's location */
+			loc = exprLocation((PGNode *) ((const PGFieldSelect *) expr)->arg);
+			break;
+		case T_PGFieldStore:
+			/* just use argument's location */
+			loc = exprLocation((PGNode *) ((const PGFieldStore *) expr)->arg);
+			break;
+		case T_PGRelabelType:
+			{
+				const PGRelabelType *rexpr = (const PGRelabelType *) expr;
+
+				/* Much as above */
+				loc = leftmostLoc(rexpr->location,
+								  exprLocation((PGNode *) rexpr->arg));
+			}
+			break;
+		case T_PGCoerceViaIO:
+			{
+				const PGCoerceViaIO *cexpr = (const PGCoerceViaIO *) expr;
+
+				/* Much as above */
+				loc = leftmostLoc(cexpr->location,
+								  exprLocation((PGNode *) cexpr->arg));
+			}
+			break;
+		case T_PGArrayCoerceExpr:
+			{
+				const PGArrayCoerceExpr *cexpr = (const PGArrayCoerceExpr *) expr;
+
+				/* Much as above */
+				loc = leftmostLoc(cexpr->location,
+								  exprLocation((PGNode *) cexpr->arg));
+			}
+			break;
+		case T_PGConvertRowtypeExpr:
+			{
+				const PGConvertRowtypeExpr *cexpr = (const PGConvertRowtypeExpr *) expr;
+
+				/* Much as above */
+				loc = leftmostLoc(cexpr->location,
+								  exprLocation((PGNode *) cexpr->arg));
+			}
+			break;
+		case T_PGCollateExpr:
+			/* just use argument's location */
+			loc = exprLocation((PGNode *) ((const PGCollateExpr *) expr)->arg);
+			break;
+		case T_PGCaseExpr:
+			/* CASE keyword should always be the first thing */
+			loc = ((const PGCaseExpr *) expr)->location;
+			break;
+		case T_PGCaseWhen:
+			/* WHEN keyword should always be the first thing */
+			loc = ((const PGCaseWhen *) expr)->location;
+			break;
+		case T_PGArrayExpr:
+			/* the location points at ARRAY or [, which must be leftmost */
+			loc = ((const PGArrayExpr *) expr)->location;
+			break;
+		case T_PGRowExpr:
+			/* the location points at ROW or (, which must be leftmost */
+			loc = ((const PGRowExpr *) expr)->location;
+			break;
+		// case T_TableValueExpr:
+		// 	/* the location points at TABLE, which must be leftmost */
+		// 	loc = ((TableValueExpr *) expr)->location;
+		// 	break;
+		case T_PGRowCompareExpr:
+			/* just use leftmost argument's location */
+			loc = exprLocation((PGNode *) ((const PGRowCompareExpr *) expr)->largs);
+			break;
+		case T_PGCoalesceExpr:
+			/* COALESCE keyword should always be the first thing */
+			loc = ((const PGCoalesceExpr *) expr)->location;
+			break;
+		case T_PGMinMaxExpr:
+			/* GREATEST/LEAST keyword should always be the first thing */
+			loc = ((const PGMinMaxExpr *) expr)->location;
+			break;
+		// case T_XmlExpr:
+		// 	{
+		// 		const XmlExpr *xexpr = (const XmlExpr *) expr;
+
+		// 		/* consider both function name and leftmost arg */
+		// 		loc = leftmostLoc(xexpr->location,
+		// 						  exprLocation((Node *) xexpr->args));
+		// 	}
+		// 	break;
+		case T_PGNullTest:
+			/* just use argument's location */
+			loc = exprLocation((PGNode *) ((const PGNullTest *) expr)->arg);
+			break;
+		case T_PGBooleanTest:
+			/* just use argument's location */
+			loc = exprLocation((PGNode *) ((const PGBooleanTest *) expr)->arg);
+			break;
+		case T_PGCoerceToDomain:
+			{
+				const PGCoerceToDomain *cexpr = (const PGCoerceToDomain *) expr;
+
+				/* Much as above */
+				loc = leftmostLoc(cexpr->location,
+								  exprLocation((PGNode *) cexpr->arg));
+			}
+			break;
+		case T_PGCoerceToDomainValue:
+			loc = ((const PGCoerceToDomainValue *) expr)->location;
+			break;
+		case T_PGSetToDefault:
+			loc = ((const PGSetToDefault *) expr)->location;
+			break;
+		case T_PGTargetEntry:
+			/* just use argument's location */
+			loc = exprLocation((PGNode *) ((const PGTargetEntry *) expr)->expr);
+			break;
+		case T_PGIntoClause:
+			/* use the contained RangeVar's location --- close enough */
+			loc = exprLocation((PGNode *) ((const PGIntoClause *) expr)->rel);
+			break;
+		case T_PGList:
+			{
+				/* report location of first list member that has a location */
+				PGListCell   *lc;
+
+				loc = -1;		/* just to suppress compiler warning */
+				foreach(lc, (const PGList *) expr)
+				{
+					loc = exprLocation((PGNode *) lfirst(lc));
+					if (loc >= 0)
+						break;
+				}
+			}
+			break;
+		case T_PGAExpr:
+			{
+				const PGAExpr *aexpr = (const PGAExpr *) expr;
+
+				/* use leftmost of operator or left operand (if any) */
+				/* we assume right operand can't be to left of operator */
+				loc = leftmostLoc(aexpr->location,
+								  exprLocation(aexpr->lexpr));
+			}
+			break;
+		case T_PGColumnRef:
+			loc = ((const PGColumnRef *) expr)->location;
+			break;
+		case T_PGParamRef:
+			loc = ((const PGParamRef *) expr)->location;
+			break;
+		case T_PGAConst:
+			loc = ((const PGAConst *) expr)->location;
+			break;
+		case T_PGFuncCall:
+			{
+				const PGFuncCall *fc = (const PGFuncCall *) expr;
+
+				/* consider both function name and leftmost arg */
+				/* (we assume any ORDER BY nodes must be to right of name) */
+				loc = leftmostLoc(fc->location,
+								  exprLocation((PGNode *) fc->args));
+			}
+			break;
+		case T_PGAArrayExpr:
+			/* the location points at ARRAY or [, which must be leftmost */
+			loc = ((const PGAArrayExpr *) expr)->location;
+			break;
+		case T_PGResTarget:
+			/* we need not examine the contained expression (if any) */
+			loc = ((const PGResTarget *) expr)->location;
+			break;
+		case T_PGTypeCast:
+			{
+				const PGTypeCast *tc = (const PGTypeCast *) expr;
+
+				/*
+				 * This could represent CAST(), ::, or TypeName 'literal', so
+				 * any of the components might be leftmost.
+				 */
+				loc = exprLocation(tc->arg);
+				loc = leftmostLoc(loc, tc->typeName->location);
+				loc = leftmostLoc(loc, tc->location);
+			}
+			break;
+		case T_PGCollateClause:
+			/* just use argument's location */
+			loc = exprLocation(((const PGCollateClause *) expr)->arg);
+			break;
+		case T_PGSortBy:
+			/* just use argument's location (ignore operator, if any) */
+			loc = exprLocation(((const PGSortBy *) expr)->node);
+			break;
+		case T_PGWindowDef:
+			loc = ((const PGWindowDef *) expr)->location;
+			break;
+		case T_PGTypeName:
+			loc = ((const PGTypeName *) expr)->location;
+			break;
+		case T_PGColumnDef:
+			loc = ((const PGColumnDef *) expr)->location;
+			break;
+		case T_PGConstraint:
+			loc = ((const PGConstraint *) expr)->location;
+			break;
+		// case T_FunctionParameter:
+		// 	/* just use typename's location */
+		// 	loc = exprLocation((PGNode *) ((const FunctionParameter *) expr)->argType);
+		// 	break;
+		// case T_XmlSerialize:
+		// 	/* XMLSERIALIZE keyword should always be the first thing */
+		// 	loc = ((const XmlSerialize *) expr)->location;
+		// 	break;
+		case T_PGWithClause:
+			loc = ((const PGWithClause *) expr)->location;
+			break;
+		case T_PGCommonTableExpr:
+			loc = ((const PGCommonTableExpr *) expr)->location;
+			break;
+		// case T_PlaceHolderVar:
+		// 	/* just use argument's location */
+		// 	loc = exprLocation((Node *) ((const PlaceHolderVar *) expr)->phexpr);
+		// 	break;
+		default:
+			/* for any other node type it's just unknown... */
+			loc = -1;
+			break;
+	}
+	return loc;
+}
+
+/*
  * expression_returns_set
  *	  Test whether an expression returns a set result.
  *

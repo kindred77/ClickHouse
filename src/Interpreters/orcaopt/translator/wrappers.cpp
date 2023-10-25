@@ -189,6 +189,17 @@ ExtractNodesExpression(PGNode *node, int node_tag,
 PGTargetEntry *
 FindFirstMatchingMemberInTargetList(PGNode *node, PGList *targetlist)
 {
+	PGListCell   *temp;
+
+	foreach(temp, targetlist)
+	{
+		PGTargetEntry *tlentry = (PGTargetEntry *) lfirst(temp);
+
+        Assert(IsA(tlentry, PGTargetEntry));
+
+		if (pg_equal(node, tlentry->expr))
+			return tlentry;
+	}
 	return NULL;
 };
 
@@ -775,7 +786,22 @@ CoerceToCommonType(PGParseState *pstate, PGNode *node, PGOid target_type,
 PGList *
 FindMatchingMembersInTargetList(PGNode *node, PGList *targetlist)
 {
-	return NULL;
+	PGList *tlist = NIL;
+	PGListCell   *temp = NULL;
+
+	foreach(temp, targetlist)
+	{
+		PGTargetEntry *tlentry = (PGTargetEntry *) lfirst(temp);
+
+        Assert(IsA(tlentry, PGTargetEntry));
+
+		if (pg_equal(node, tlentry->expr))
+		{
+			tlist = lappend(tlist, tlentry);
+		}
+	}
+
+	return tlist;
 };
 
 void * GPDBAlloc(size_t size)

@@ -66,6 +66,32 @@ private:
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_DECIMAL64TOINT32;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_DECIMAL64TOFLOAT64;
 
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_COUNTANY;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_COUNTSTAR;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_INT64INCANY;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_INT64INC;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_INT64PL;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_INT64DEC;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_INT64DECANY;
+
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_TEXTLT;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_SCALARLTSEL;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_SCALARLTJOINSEL;
+
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT32EQ;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT32NE;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT32LT;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT32GT;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT32LE;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT32GE;
+
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT64EQ;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT64NE;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT64LT;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT64GT;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT64LE;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_FLOAT64GE;
+
 	//ContextPtr context;
 public:
 	//explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);

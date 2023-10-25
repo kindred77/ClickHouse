@@ -361,7 +361,6 @@ void * OptimizeTask(void *ptr)
 				cte_dxlnode_array, NULL, num_segments, 1985,
 				gp_command_count, NULL, optimizer_config);
 
-			
 			CWStringDynamic plan_str(mp);
 			COstreamString oss2(&plan_str);
 			CDXLUtils::SerializePlan(
@@ -588,7 +587,8 @@ void optimize2(PGQuery * query)
 
 int main(int argc, char ** argv)
 {
-    std::string query_str = "select col1,col2 from test.test;";
+    //std::string query_str = "select col1,col2 from test.test;";
+	std::string query_str = "select count(*) from (select distinct col1 from (select col1,col2 from test.test group by col1,col2) t1) t2;";
     duckdb::PostgresParser::SetPreserveIdentifierCase(false);
 
     auto shared_context = DB::Context::createShared();

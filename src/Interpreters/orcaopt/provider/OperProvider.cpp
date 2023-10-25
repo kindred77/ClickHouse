@@ -395,7 +395,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT32EQ = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(287),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -418,7 +418,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT32NE = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(288),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -441,7 +441,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT32LT = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(289),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -464,7 +464,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT32GT = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(291),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -487,7 +487,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT32LE = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(290),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -510,7 +510,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT32GE = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(292),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -533,7 +533,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT64EQ = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(293),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -556,7 +556,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT64NE = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(294),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -579,7 +579,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT64LT = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(295),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -602,7 +602,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT64LE = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(296),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -625,7 +625,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT64GT = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(297),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -648,7 +648,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_FLOAT64GE = std::pair<PGOid, 
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(298),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -671,7 +671,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_BOOLEQ = std::pair<PGOid, PGO
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(60),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -694,7 +694,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_BOOLNE = std::pair<PGOid, PGO
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(84),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -717,7 +717,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_BOOLLT = std::pair<PGOid, PGO
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(56),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -740,7 +740,7 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_BOOLGT = std::pair<PGOid, PGO
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
+        /*oprcode*/ .oprcode = PGOid(57),
         /*oprrest*/ .oprrest = PGOid(0),
         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
@@ -1269,9 +1269,9 @@ std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_STRINGLT = std::pair<PGOid, P
         /*oprrsortop*/ .oprrsortop = PGOid(0),
         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(0),
-        /*oprrest*/ .oprrest = PGOid(0),
-        /*oprjoin*/ .oprjoin = PGOid(0)}));
+        /*oprcode*/ .oprcode = PGOid(740),//text_lt
+        /*oprrest*/ .oprrest = PGOid(103),//scalarltsel
+        /*oprjoin*/ .oprjoin = PGOid(107)}));//scalarltjoinsel
 
 std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_STRINGLE = std::pair<PGOid, PGOperatorPtr>(
     PGOid(665),

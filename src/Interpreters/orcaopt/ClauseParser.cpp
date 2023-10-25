@@ -1087,7 +1087,7 @@ ClauseParser::findTargetlistEntrySQL99(PGParseState *pstate, PGNode *node, PGLis
 		 */
 		texpr = strip_implicit_coercions((PGNode *) tle->expr);
 
-		if (equal(expr, texpr))
+		if (pg_equal(expr, texpr))
 			return tle;
 	}
 
@@ -1234,7 +1234,7 @@ ClauseParser::findTargetlistEntrySQL92(PGParseState *pstate, PGNode *node, PGLis
 				{
 					if (target_result != NULL)
 					{
-						if (!equal(target_result->expr, tle->expr))
+						if (!pg_equal(target_result->expr, tle->expr))
 						{
 							parser_errposition(pstate, location);
 							ereport(ERROR,

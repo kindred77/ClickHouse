@@ -16,6 +16,24 @@ using TypeProviderPtr = std::shared_ptr<TypeProvider>;
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
 
+/*
+ *
+select op.oid,op.oprname,op.oprkind,op.oprcanmerge,
+op.oprcanhash,
+(select pt.typname from pg_type pt where pt.oid=op.oprleft) as left_type,
+(select pt.typname from pg_type pt where pt.oid=op.oprright) as right_type,
+(select pt.typname from pg_type pt where pt.oid=op.oprresult) as result_type,
+op.oprcom,op.oprnegate,
+(select pr.proname from pg_proc pr where pr.oid=op.oprcode) as proc_name,
+(select pr.proretset from pg_proc pr where pr.oid=op.oprcode) as is_return_set,
+(select pr.proisstrict from pg_proc pr where pr.oid=op.oprcode) as is_strict,
+op.oprcom,
+(select pa.amopmethod from pg_amop pa where op.oid=pa.amopopr and pa.amopmethod=403 limit 1)
+from pg_operator op
+where op.oprname in ('+','-','*','/','%','==','!=','<>','<=','>=','<','>','=')
+order by 2,3,4,5,6,7,8,9,10,11,12;
+ */
+
 class OperProvider
 {
 private:

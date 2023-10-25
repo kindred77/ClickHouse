@@ -1380,6 +1380,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                  parser_errposition(pstate, location)));
         }
         else
+        {
             ereport(
                 ERROR,
                 (errcode(PG_ERRCODE_UNDEFINED_FUNCTION),
@@ -1387,6 +1388,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                  errhint("No function matches the given name and argument types. "
                          "You might need to add explicit type casts."),
                  parser_errposition(pstate, location)));
+        }
     }
 
     /*

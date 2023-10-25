@@ -4,6 +4,7 @@
 #include <mutex>
 #include "pg_functions.hpp"
 #include "parser/parser.hpp"
+#include "common/common_equalfuncs.hpp"
 #include <stdarg.h>
 #include <mutex>
 #include <cstring>
@@ -130,8 +131,13 @@ int errmsg(const char *fmt, ...) {
 	va_end(argptr);
 	return 1;
 }
-int errhint(const char *msg) {
-	throw std::runtime_error("errhint NOT IMPLEMENTED");
+int errhint(const char *fmt, ...) {
+	//throw std::runtime_error("errhint NOT IMPLEMENTED");
+	va_list argptr;
+	va_start(argptr, fmt);
+	vsnprintf(pg_parser_state.pg_err_msg, BUFSIZ, fmt, argptr);
+	va_end(argptr);
+	return 1;
 }
 int errmsg_internal(const char *fmt, ...) {
 	throw std::runtime_error("errmsg_internal NOT IMPLEMENTED");
@@ -194,11 +200,12 @@ char *NameListToString(PGList *names) {
 //     throw std::runtime_error("copyObject NOT IMPLEMENTED");
 // }
 bool equal(const void *a, const void *b) {
-	throw std::runtime_error("equal NOT IMPLEMENTED");
+	//throw std::runtime_error("equal NOT IMPLEMENTED");
+	return pg_equal(a, b);
 }
-int exprLocation(const PGNode *expr) {
-	throw std::runtime_error("exprLocation NOT IMPLEMENTED");
-}
+// int exprLocation(const PGNode *expr) {
+// 	throw std::runtime_error("exprLocation NOT IMPLEMENTED");
+// }
 bool pg_verifymbstr(const char *mbstr, int len, bool noError) {
 	throw std::runtime_error("pg_verifymbstr NOT IMPLEMENTED");
 }
