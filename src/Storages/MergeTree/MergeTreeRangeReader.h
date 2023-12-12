@@ -68,12 +68,14 @@ public:
         /// Returns the number of rows added to block.
         /// NOTE: have to return number of rows because block has broken invariant:
         ///       some columns may have different size (for example, default columns may be zero size).
-        size_t read(Columns & columns, size_t from_mark, size_t offset, size_t num_rows);
+        size_t read(Columns & columns, size_t from_mark, size_t offset, size_t num_rows, bool generating_mark_info = false);
 
         /// Skip extra rows to current_offset and perform actual reading
         size_t finalize(Columns & columns);
 
         bool isFinished() const { return is_finished; }
+
+        MutableColumnPtr addInfo[3];
 
     private:
         size_t current_mark = 0;
@@ -102,7 +104,7 @@ public:
         Stream(size_t from_mark, size_t to_mark, IMergeTreeReader * merge_tree_reader);
 
         /// Returns the number of rows added to block.
-        size_t read(Columns & columns, size_t num_rows, bool skip_remaining_rows_in_current_granule);
+        size_t read(Columns & columns, size_t num_rows, bool skip_remaining_rows_in_current_granule, bool generating_mark_info = false);
         size_t finalize(Columns & columns);
         void skip(size_t num_rows);
 
@@ -133,7 +135,7 @@ public:
 
         void checkNotFinished() const;
         void checkEnoughSpaceInCurrentGranule(size_t num_rows) const;
-        size_t readRows(Columns & columns, size_t num_rows);
+        size_t readRows(Columns & columns, size_t num_rows, bool generating_mark_info = false);
         void toNextMark();
         size_t ceilRowsToCompleteGranules(size_t rows_num) const;
     };
@@ -189,6 +191,17 @@ public:
 
         size_t countBytesInResultFilter(const IColumn::Filter & filter);
 
+        void dump()
+        {
+            LOG_INFO(&Poco::Logger::get("ReadResult::dump"),"--------------start-----------------");
+            LOG_INFO(&Poco::Logger::get("ReadResult::dump"),"--------------started_ranges.size: {}-----------------", started_ranges.size());
+            LOG_INFO(&Poco::Logger::get("ReadResult::dump"),"--------------rows_per_granule.size: {}-----------------", rows_per_granule.size());
+            LOG_INFO(&Poco::Logger::get("ReadResult::dump"),"--------------num_read_rows: {}-----------------", num_read_rows);
+            LOG_INFO(&Poco::Logger::get("ReadResult::dump"),"--------------num_rows: {}-----------------", num_rows);
+            LOG_INFO(&Poco::Logger::get("ReadResult::dump"),"--------------end-----------------");
+            
+        };
+
         Columns columns;
         size_t num_rows = 0;
         bool need_filter = false;
@@ -227,6 +240,9 @@ public:
 
     const Block & getSampleBlock() const { return sample_block; }
 
+    //MutableColumnPtr addInfo[3];
+    Columns appInfoNew;
+
 private:
 
     ReadResult startReadingChain(size_t max_rows, MarkRanges & ranges);
@@ -244,6 +260,8 @@ private:
 
     bool last_reader_in_chain = false;
     bool is_initialized = false;
+
+    void append_addInfo(Stream & stream_addinfo);
 };
 
 }

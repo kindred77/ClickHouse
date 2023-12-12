@@ -98,21 +98,24 @@ void MergeTreeBaseSelectProcessor::initializeRangeReaders(MergeTreeReadTask & cu
         if (reader->getColumns().empty())
         {
             current_task.range_reader = MergeTreeRangeReader(pre_reader.get(), nullptr, prewhere_actions.get(), true);
+            LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader"),"----000000-----");
         }
         else
         {
             MergeTreeRangeReader * pre_reader_ptr = nullptr;
             if (pre_reader != nullptr)
             {
+                LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader"),"----1111111-----");
                 current_task.pre_range_reader = MergeTreeRangeReader(pre_reader.get(), nullptr, prewhere_actions.get(), false);
                 pre_reader_ptr = &current_task.pre_range_reader;
             }
-
+            LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader"),"----2222222-----");
             current_task.range_reader = MergeTreeRangeReader(reader.get(), pre_reader_ptr, nullptr, true);
         }
     }
     else
     {
+        LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader"),"----3333333-----");
         current_task.range_reader = MergeTreeRangeReader(reader.get(), nullptr, nullptr, true);
     }
 }
@@ -309,6 +312,45 @@ static void injectVirtualColumnsImpl(
                     inserter.insertPartitionValueColumn(rows, task->data_part->partition.value, partition_value_type, virtual_column_name);
                 else
                     inserter.insertPartitionValueColumn(rows, {}, partition_value_type, virtual_column_name);
+            }
+            else if (virtual_column_name == "_mark")
+            {
+                ColumnPtr column;
+                if (rows)
+                {
+                    column = task->range_reader.appInfoNew[0];
+                }
+                else
+                {
+                    column = DataTypeUInt64().createColumn();
+                }
+                inserter.insertUInt64Column(column, virtual_column_name);
+            }
+            else if (virtual_column_name == "_offset_in_mark")
+            {
+                ColumnPtr column;
+                if (rows)
+                {
+                    column = task->range_reader.appInfoNew[1];
+                }
+                else
+                {
+                    column = DataTypeUInt64().createColumn();
+                }
+                inserter.insertUInt64Column(column, virtual_column_name);
+            }
+            else if (virtual_column_name == "_valid_flag")
+            {
+                ColumnPtr column;
+                if (rows)
+                {
+                    column = task->range_reader.appInfoNew[2];
+                }
+                else
+                {
+                    column = DataTypeUInt64().createColumn();
+                }
+                inserter.insertUInt64Column(column, virtual_column_name);
             }
         }
     }

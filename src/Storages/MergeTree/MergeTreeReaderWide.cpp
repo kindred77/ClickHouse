@@ -131,6 +131,8 @@ size_t MergeTreeReaderWide::readRows(size_t from_mark, bool continue_reading, si
         throw;
     }
 
+    LOG_INFO(&Poco::Logger::get("MergeTreeReaderWide::readRows"),"----from_mark:{}-------max_rows_to_read:{}----read_rows:{}", from_mark, max_rows_to_read, read_rows);
+
     return read_rows;
 }
 

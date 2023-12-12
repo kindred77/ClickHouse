@@ -53,6 +53,39 @@ static void filterColumns(Columns & columns, const ColumnPtr & filter)
     filterColumns(columns, *descr.data);
 }
 
+// static void filterColumnsArray(MutableColumnPtr columns[3], const ColumnPtr & filter)
+// {
+//     ConstantFilterDescription const_descr(*filter);
+//     if (const_descr.always_true)
+//         return;
+
+//     if (const_descr.always_false)
+//     {
+//         for (auto i = 0; i < 3; ++i)
+//             if (columns[i])
+//                 columns[i] = columns[i]->cloneEmpty();
+
+//         return;
+//     }
+
+//     FilterDescription descr(*filter);
+    
+//     for (auto i = 0; i < 3; ++i)
+//     {
+//         if (columns[i])
+//         {
+//             columns[i] = std::move(columns[i]->filter(*descr.data, -1));
+//             columns[i]->
+
+//             //if (columns[i]->empty())
+//             //{
+//             //    columns[i]->;
+//             //    return;
+//             //}
+//         }
+//     }
+// }
+
 
 MergeTreeRangeReader::DelayedStream::DelayedStream(
         size_t from_mark, IMergeTreeReader * merge_tree_reader_)
@@ -89,8 +122,37 @@ size_t MergeTreeRangeReader::DelayedStream::readRows(Columns & columns, size_t n
     return 0;
 }
 
-size_t MergeTreeRangeReader::DelayedStream::read(Columns & columns, size_t from_mark, size_t offset, size_t num_rows)
+size_t MergeTreeRangeReader::DelayedStream::read(Columns & columns, size_t from_mark, size_t offset, size_t num_rows, bool generating_mark_info)
 {
+    if (generating_mark_info)
+    {
+        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"----from_mark:{}----offset:{}-------num_rows:{}", from_mark, offset, num_rows);
+        //auto mutable_col = addInfo[0]->assumeMutable();
+        auto col1 = DataTypeUInt64().createColumnConst(num_rows, from_mark)->convertToFullColumnIfConst();
+        if (!addInfo[0])
+        {
+            addInfo[0] = DataTypeUInt64().createColumn();
+        }
+        
+        addInfo[0]->insertManyFrom(*col1, 0, num_rows);
+
+        if (!addInfo[1])
+        {
+            addInfo[1] = DataTypeUInt64().createColumn();
+        }
+        for (auto i : collections::range(offset, num_rows + offset))
+        {
+            addInfo[1]->insert(i);
+        }
+
+        col1 = DataTypeUInt64().createColumnConst(num_rows, 1)->convertToFullColumnIfConst();
+        if (!addInfo[2])
+        {
+            addInfo[2] = DataTypeUInt64().createColumn();
+        }
+        addInfo[2]->insertManyFrom(*col1, 0, num_rows);
+    }
+
     size_t num_rows_before_from_mark = index_granularity->getMarkStartingRow(from_mark);
     /// We already stand accurately in required position,
     /// so because stream is lazy, we don't read anything
@@ -102,6 +164,7 @@ size_t MergeTreeRangeReader::DelayedStream::read(Columns & columns, size_t from_
     }
     else
     {
+        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"----from_mark:{}----offset:{}-------num_rows:{}--------num_rows_before_from_mark:{}", from_mark, offset, num_rows, num_rows_before_from_mark);
         size_t read_rows = finalize(columns);
 
         continue_reading = false;
@@ -121,6 +184,7 @@ size_t MergeTreeRangeReader::DelayedStream::finalize(Columns & columns)
         for (size_t mark_num : collections::range(current_mark, index_granularity->getMarksCount()))
         {
             size_t mark_index_granularity = index_granularity->getMarkRows(mark_num);
+            
             if (current_offset >= mark_index_granularity)
             {
                 current_offset -= mark_index_granularity;
@@ -177,13 +241,14 @@ void MergeTreeRangeReader::Stream::checkNotFinished() const
 
 void MergeTreeRangeReader::Stream::checkEnoughSpaceInCurrentGranule(size_t num_rows) const
 {
+    LOG_INFO(&Poco::Logger::get("checkEnoughSpaceInCurrentGranule"),"----num_rows:{}-------offset_after_current_mark:{}----read_rows:{}", num_rows, offset_after_current_mark, current_mark_index_granularity);
     if (num_rows + offset_after_current_mark > current_mark_index_granularity)
         throw Exception("Cannot read from granule more than index_granularity.", ErrorCodes::LOGICAL_ERROR);
 }
 
-size_t MergeTreeRangeReader::Stream::readRows(Columns & columns, size_t num_rows)
+size_t MergeTreeRangeReader::Stream::readRows(Columns & columns, size_t num_rows, bool generating_mark_info)
 {
-    size_t rows_read = stream.read(columns, current_mark, offset_after_current_mark, num_rows);
+    size_t rows_read = stream.read(columns, current_mark, offset_after_current_mark, num_rows, generating_mark_info);
 
     if (stream.isFinished())
         finish();
@@ -206,7 +271,7 @@ void MergeTreeRangeReader::Stream::toNextMark()
     offset_after_current_mark = 0;
 }
 
-size_t MergeTreeRangeReader::Stream::read(Columns & columns, size_t num_rows, bool skip_remaining_rows_in_current_granule)
+size_t MergeTreeRangeReader::Stream::read(Columns & columns, size_t num_rows, bool skip_remaining_rows_in_current_granule, bool generating_mark_info)
 {
     checkEnoughSpaceInCurrentGranule(num_rows);
 
@@ -214,7 +279,7 @@ size_t MergeTreeRangeReader::Stream::read(Columns & columns, size_t num_rows, bo
     {
         checkNotFinished();
 
-        size_t read_rows = readRows(columns, num_rows);
+        size_t read_rows = readRows(columns, num_rows, generating_mark_info);
 
         offset_after_current_mark += num_rows;
 
@@ -621,10 +686,24 @@ bool MergeTreeRangeReader::isCurrentRangeFinished() const
 
 MergeTreeRangeReader::ReadResult MergeTreeRangeReader::read(size_t max_rows, MarkRanges & ranges)
 {
+    LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader::read"),"----max_rows:{}----ranges.size:{}", max_rows, ranges.size());
+    if (ranges.size() > 0)
+    {
+        LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader::read"),"----ranges: end-begin: {}", ranges[0].end-ranges[0].begin);
+    }
+
     if (max_rows == 0)
         throw Exception("Expected at least 1 row to read, got 0.", ErrorCodes::LOGICAL_ERROR);
 
     ReadResult read_result;
+
+    if (appInfoNew.empty())
+    {
+        appInfoNew.resize(3);
+    }
+    appInfoNew[0] = DataTypeUInt64().createColumn();
+    appInfoNew[1] = DataTypeUInt64().createColumn();
+    appInfoNew[2] = DataTypeUInt64().createColumn();
 
     if (prev_reader)
     {
@@ -661,7 +740,11 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::read(size_t max_rows, Mar
             merge_tree_reader->fillMissingColumns(columns, should_evaluate_missing_defaults, num_read_rows);
 
             if (read_result.getFilter())
+            {
+                LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader::read"),"--0000000--appInfoNew[0].size:{}------read_result.getFilter:{}------columns[0].size:{}--------num_read_rows:{}", appInfoNew[0]->size(), read_result.getFilter()->size(), columns[0]->size(), num_read_rows);
                 filterColumns(columns, read_result.getFilter()->getData());
+                filterColumns(appInfoNew, read_result.getFilter()->getData());
+            }
         }
         else
         {
@@ -691,7 +774,9 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::read(size_t max_rows, Mar
                     if (read_result.need_filter)
                     {
                         auto old_columns = block_before_prewhere.getColumns();
+                        LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader::read"),"--222222--appInfoNew[0].size:{}------read_result.getFilterOriginal:{}", appInfoNew[0]->size(), read_result.getFilterOriginal()->size());
                         filterColumns(old_columns, read_result.getFilterOriginal()->getData());
+                        filterColumns(appInfoNew, read_result.getFilter()->getData());
                         block_before_prewhere.setColumns(std::move(old_columns));
                     }
 
@@ -710,9 +795,11 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::read(size_t max_rows, Mar
     }
     else
     {
+        LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader::read"),"----1111----");
         read_result = startReadingChain(max_rows, ranges);
         read_result.num_rows = read_result.numReadRows();
-
+        LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader::read"),"----after startReadingChain----");
+        read_result.dump();
         if (read_result.num_rows)
         {
             bool should_evaluate_missing_defaults;
@@ -740,10 +827,43 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::read(size_t max_rows, Mar
         return read_result;
 
     executePrewhereActionsAndFilterColumns(read_result);
-
+    
     return read_result;
 }
 
+
+void MergeTreeRangeReader::append_addInfo(Stream & stream_addinfo)
+{
+
+    LOG_INFO(&Poco::Logger::get("append_addInfo"),"----0000------");
+    if (!stream_addinfo.stream.addInfo[0])
+    {
+        LOG_INFO(&Poco::Logger::get("append_addInfo"),"----null------");
+        return;
+    }
+    auto add_size = stream_addinfo.stream.addInfo[0]->size();
+    auto orig_size = appInfoNew[0]->size();
+    LOG_INFO(&Poco::Logger::get("append_addInfo"),"----add_size:{}----orig_size:{}", add_size, orig_size);
+    auto mutable_0 = appInfoNew[0]->assumeMutable();
+    auto mutable_1 = appInfoNew[1]->assumeMutable();
+    auto mutable_2 = appInfoNew[2]->assumeMutable();
+    //addInfo[0]->reserve(orig_size + add_size);
+    mutable_0->reserve(orig_size + add_size);
+    //addInfo[1]->reserve(orig_size + add_size);
+    mutable_1->reserve(orig_size + add_size);
+    //addInfo[2]->reserve(orig_size + add_size);
+    mutable_2->reserve(orig_size + add_size);
+    //addInfo[0]->insertRangeFrom(*stream_addinfo.stream.addInfo[0], 0, add_size);
+    mutable_0->insertRangeFrom(*stream_addinfo.stream.addInfo[0], 0, add_size);
+    //addInfo[1]->insertRangeFrom(*stream_addinfo.stream.addInfo[1], 0, add_size);
+    mutable_1->insertRangeFrom(*stream_addinfo.stream.addInfo[1], 0, add_size);
+    //addInfo[2]->insertRangeFrom(*stream_addinfo.stream.addInfo[2], 0, add_size);
+    mutable_2->insertRangeFrom(*stream_addinfo.stream.addInfo[2], 0, add_size);
+
+    stream_addinfo.stream.addInfo[0] = DataTypeUInt64().createColumn();
+    stream_addinfo.stream.addInfo[1] = DataTypeUInt64().createColumn();
+    stream_addinfo.stream.addInfo[2] = DataTypeUInt64().createColumn();
+}
 
 MergeTreeRangeReader::ReadResult MergeTreeRangeReader::startReadingChain(size_t max_rows, MarkRanges & ranges)
 {
@@ -759,6 +879,10 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::startReadingChain(size_t 
         {
             if (stream.isFinished())
             {
+                if (last_reader_in_chain)
+                {
+                    append_addInfo(stream);
+                }
                 result.addRows(stream.finalize(result.columns));
                 stream = Stream(ranges.front().begin, ranges.front().end, merge_tree_reader);
                 result.addRange(ranges.front());
@@ -766,22 +890,26 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::startReadingChain(size_t 
             }
 
             size_t current_space = space_left;
-
             /// If reader can't read part of granule, we have to increase number of reading rows
             ///  to read complete granules and exceed max_rows a bit.
             if (!merge_tree_reader->canReadIncompleteGranules())
                 current_space = stream.ceilRowsToCompleteGranules(space_left);
 
             auto rows_to_read = std::min(current_space, stream.numPendingRowsInCurrentGranule());
-
             bool last = rows_to_read == space_left;
-            result.addRows(stream.read(result.columns, rows_to_read, !last));
+            result.addRows(stream.read(result.columns, rows_to_read, !last, last_reader_in_chain));
             result.addGranule(rows_to_read);
             space_left = (rows_to_read > space_left ? 0 : space_left - rows_to_read);
         }
     }
-
-    result.addRows(stream.finalize(result.columns));
+    if (last_reader_in_chain)
+    {
+        append_addInfo(stream);
+    }
+    auto rows = stream.finalize(result.columns);
+    result.addRows(rows);
+    LOG_INFO(&Poco::Logger::get("startReadingChain"),"----rows:{}------result.num_rows:{}-----result.num_read_rows:{}", rows, result.num_rows, result.numReadRows());
+    
 
     /// Last granule may be incomplete.
     result.adjustLastGranule();
@@ -815,6 +943,10 @@ Columns MergeTreeRangeReader::continueReadingChain(ReadResult & result, size_t &
         if (next_range_to_start < started_ranges.size()
             && i == started_ranges[next_range_to_start].num_granules_read_before_start)
         {
+            if (last_reader_in_chain)
+            {
+                append_addInfo(stream);
+            }
             num_rows += stream.finalize(columns);
             const auto & range = started_ranges[next_range_to_start].range;
             ++next_range_to_start;
@@ -822,10 +954,15 @@ Columns MergeTreeRangeReader::continueReadingChain(ReadResult & result, size_t &
         }
 
         bool last = i + 1 == size;
-        num_rows += stream.read(columns, rows_per_granule[i], !last);
+        LOG_INFO(&Poco::Logger::get("continueReadingChain"),"----rows_per_granule[i]:{}------last_reader_in_chain:{}", rows_per_granule[i], last_reader_in_chain);
+        num_rows += stream.read(columns, rows_per_granule[i], !last, last_reader_in_chain);
     }
 
     stream.skip(result.numRowsToSkipInLastGranule());
+    if (last_reader_in_chain)
+    {
+        append_addInfo(stream);
+    }
     num_rows += stream.finalize(columns);
 
     /// added_rows may be zero if all columns were read in prewhere and it's ok.
@@ -945,6 +1082,7 @@ void MergeTreeRangeReader::executePrewhereActionsAndFilterColumns(ReadResult & r
 
             auto columns = block.getColumns();
             filterColumns(columns, row_level_filter);
+            
             if (columns.empty())
                 block = block.cloneEmpty();
             else
@@ -1008,9 +1146,13 @@ void MergeTreeRangeReader::executePrewhereActionsAndFilterColumns(ReadResult & r
             const auto * result_filter = result.getFilterOriginal();
 
             if (row_level_filter)
+            {
                 filterColumns(result.columns, filter);
+            }
             else
+            {
                 filterColumns(result.columns, result_filter->getData());
+            }
 
             result.need_filter = true;
 

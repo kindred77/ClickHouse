@@ -4850,6 +4850,9 @@ NamesAndTypesList MergeTreeData::getVirtuals() const
         NameAndTypePair("_part_uuid", std::make_shared<DataTypeUUID>()),
         NameAndTypePair("_partition_id", std::make_shared<DataTypeString>()),
         NameAndTypePair("_partition_value", getPartitionValueType()),
+        NameAndTypePair("_mark", std::make_shared<DataTypeUInt64>()),
+        NameAndTypePair("_offset_in_mark", std::make_shared<DataTypeUInt64>()),
+        NameAndTypePair("_valid_flag", std::make_shared<DataTypeUInt64>()),
         NameAndTypePair("_sample_factor", std::make_shared<DataTypeFloat64>()),
     };
 }

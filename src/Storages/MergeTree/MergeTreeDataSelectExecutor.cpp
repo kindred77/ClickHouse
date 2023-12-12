@@ -1057,6 +1057,18 @@ static void selectColumnNames(
         {
             virt_column_names.push_back(name);
         }
+        else if (name == "_mark")
+        {
+            virt_column_names.push_back(name);
+        }
+        else if (name == "_offset_in_mark")
+        {
+            virt_column_names.push_back(name);
+        }
+        else if (name == "_valid_flag")
+        {
+            virt_column_names.push_back(name);
+        }
         else if (name == "_partition_value")
         {
             if (!typeid_cast<const DataTypeTuple *>(data.getPartitionValueType().get()))
