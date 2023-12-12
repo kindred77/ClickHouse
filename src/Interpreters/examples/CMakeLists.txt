@@ -41,3 +41,6 @@ target_link_libraries (jit_example PRIVATE dbms)
 
 add_executable (gporca_test gporca_test.cpp)
 target_link_libraries (gporca_test PRIVATE dbms)
+
+add_executable (gp_meta_gen gp_meta_gen.cpp)
+target_link_libraries (gp_meta_gen PRIVATE dbms)
