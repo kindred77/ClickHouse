@@ -140,22 +140,21 @@ size_t MergeTreeRangeReader::DelayedStream::read(Columns & columns, size_t from_
 
         if (!addInfo[1])
         {
-            addInfo[1] = DataTypeUInt64().createColumn();
+            addInfo[1] = DataTypeUInt32().createColumn();
         }
         for (auto i : collections::range(offset, num_rows + offset))
         {
-            addInfo[1]->insert(i);
+            addInfo[1]->insert(UInt32(i));
         }
         LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"111--------addInfo[1]: {}", addInfo[1]->size());
 
         const ColumnPtr & flags_column = merge_tree_reader->storage.getFlagColumn(merge_tree_reader->data_part->name, from_mark, num_rows);
         if (!addInfo[2])
         {
-            addInfo[2] = DataTypeUInt64().createColumn();
+            addInfo[2] = DataTypeUInt8().createColumn();
         }
-        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"222--------flags_column.size():{}", flags_column->size());
         addInfo[2]->insertManyFrom(*flags_column, 0, num_rows);
-        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"333--------addInfo[2]: {}, value:{}", addInfo[2]->size(), flags_column->size() > 0 ? std::to_string(flags_column->get64(0)) : "NULL");
+        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"222--------addInfo[2]: {}", addInfo[2]->size());
     }
 
     size_t num_rows_before_from_mark = index_granularity->getMarkStartingRow(from_mark);
@@ -707,8 +706,8 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::read(size_t max_rows, Mar
         appInfoNew.resize(3);
     }
     appInfoNew[0] = DataTypeUInt64().createColumn();
-    appInfoNew[1] = DataTypeUInt64().createColumn();
-    appInfoNew[2] = DataTypeUInt64().createColumn();
+    appInfoNew[1] = DataTypeUInt32().createColumn();
+    appInfoNew[2] = DataTypeUInt8().createColumn();
 
     if (prev_reader)
     {
@@ -877,8 +876,8 @@ void MergeTreeRangeReader::append_addInfo(Stream & stream_addinfo)
 
     //clear
     stream_addinfo.stream.addInfo[0] = DataTypeUInt64().createColumn();
-    stream_addinfo.stream.addInfo[1] = DataTypeUInt64().createColumn();
-    stream_addinfo.stream.addInfo[2] = DataTypeUInt64().createColumn();
+    stream_addinfo.stream.addInfo[1] = DataTypeUInt32().createColumn();
+    stream_addinfo.stream.addInfo[2] = DataTypeUInt8().createColumn();
 }
 
 MergeTreeRangeReader::ReadResult MergeTreeRangeReader::startReadingChain(size_t max_rows, MarkRanges & ranges)

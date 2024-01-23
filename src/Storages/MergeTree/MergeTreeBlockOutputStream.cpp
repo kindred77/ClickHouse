@@ -193,15 +193,15 @@ void MergeTreeBlockOutputStream::writePrefix()
 //     LOG_INFO(log, "Upsert processed in {} sec", watch.elapsedSeconds());
 // }
 
-void MergeTreeBlockOutputStream::insertMarks(const MergeTreeData::MutableDataPartPtr & part)
-{
-    const auto & index_granu = part->index_granularity;
-    const auto & part_name = part->name;
-    //StoragePtr storage_ptr = DatabaseCatalog::instance().getTable(storage.getStorageID(), context);
-    //StorageMergeTree * mergetree_storage = dynamic_cast<StorageMergeTree *>(storage_ptr.get());
-    //mergetree_storage->newMarks(part_name, index_granu);
-    storage.newMarks(part_name, index_granu);
-}
+// void MergeTreeBlockOutputStream::insertMarks(const MergeTreeData::MutableDataPartPtr & part)
+// {
+//     const auto & index_granu = part->index_granularity;
+//     const auto & part_name = part->name;
+//     //StoragePtr storage_ptr = DatabaseCatalog::instance().getTable(storage.getStorageID(), context);
+//     //StorageMergeTree * mergetree_storage = dynamic_cast<StorageMergeTree *>(storage_ptr.get());
+//     //mergetree_storage->newMarks(part_name, index_granu);
+//     storage.newMarks(part_name, index_granu);
+// }
 
 void MergeTreeBlockOutputStream::write(const Block & block)
 {
@@ -246,7 +246,7 @@ void MergeTreeBlockOutputStream::write(const Block & block)
                 watch.stop();
                 LOG_INFO(&Poco::Logger::get("MergeTreeBlockOutputStream::write"), "-----renameTempPartAndAdd processed in {} sec.", watch.elapsedSeconds());
                 watch.restart();
-                insertMarks(part);
+                storage.newMarks(part);
                 watch.stop();
                 LOG_INFO(&Poco::Logger::get("MergeTreeBlockOutputStream::write"), "-----insertMarks processed in {} sec.", watch.elapsedSeconds());
             }

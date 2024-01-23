@@ -97,6 +97,8 @@ void MergedBlockOutputStream::writeSuffixAndFinalizePart(
     if (default_codec != nullptr)
         new_part->default_codec = default_codec;
     new_part->storage.lockSharedData(*new_part);
+
+    new_part->storage.newMarks(new_part);
 }
 
 void MergedBlockOutputStream::finalizePartOnDisk(

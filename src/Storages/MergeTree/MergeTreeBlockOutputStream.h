@@ -29,7 +29,7 @@ public:
 
     Block getHeader() const override;
 
-    void insertMarks(const MergeTreeData::MutableDataPartPtr & part);
+    //void insertMarks(const MergeTreeData::MutableDataPartPtr & part);
     //void upsert(const String & part_name, const Block & block);
     void write(const Block & block) override;
     void writePrefix() override;

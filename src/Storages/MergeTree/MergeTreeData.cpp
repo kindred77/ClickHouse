@@ -400,7 +400,7 @@ bool MergeTreeData::getMarkAndOffsetCols(DataPartsVector & parts, const String &
     mark_offset_cols = {
         ColumnWithTypeAndName(std::move(part_name_col), std::make_shared<DataTypeString>(), "_part_name"),
         ColumnWithTypeAndName(std::move(mark_col), std::make_shared<DataTypeUInt64>(), "_mark"),
-        ColumnWithTypeAndName(std::move(offset_col), std::make_shared<DataTypeUInt16>(), "_offset_in_mark")
+        ColumnWithTypeAndName(std::move(offset_col), std::make_shared<DataTypeUInt32>(), "_offset_in_mark")
     };
 
     return true;
@@ -468,11 +468,37 @@ void MergeTreeData::markDeleted(const ColumnPtr & part_name_col,
         throw Exception("Can not update marks bitmap in rocksDB, write error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
 }
 
-void MergeTreeData::newMarks(const String & part_name, const MergeTreeIndexGranularity & mark_col)
+// void MergeTreeData::newMarks(const String & part_name, const MergeTreeIndexGranularity & mark_col)
+// {
+//     LOG_INFO(log, "newMarks------------0000---mark_col.getMarksCountWithoutFinal():{}", mark_col.getMarksCountWithoutFinal());
+//     rocksdb::WriteBatch batch;
+//     for (size_t i = 0; i < mark_col.getMarksCountWithoutFinal(); ++i)
+//     {
+//         //records in bitmap means invalid
+//         roaring::Roaring r;
+//         r.runOptimize();
+//         std::vector<char> buf(r.getSizeInBytes());
+//         const auto writen_size = r.write(buf.data());
+//         //const rocksdb::Slice & key = part_name + "_" + std::to_string(i);
+//         const String & key = part_name + "_" + std::to_string(i);
+//         const auto & val = std::string_view(buf.data(), writen_size);
+//         LOG_INFO(log, "newMarks------------1111---key:{}", key);
+//         batch.Put(rocksdb_ptr->DefaultColumnFamily(), rocksdb::Slice(key), val);
+//     }
+//     LOG_INFO(log, "newMarks------------2222---");
+//     const auto & status = rocksdb_ptr->Write(rocksdb::WriteOptions(), &batch);
+//     if (!status.ok())
+//         throw Exception("Can not new marks for partition "+part_name+" to RocksDB, write error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+// }
+
+void MergeTreeData::newMarks(const MutableDataPartPtr & part) const
 {
-    LOG_INFO(log, "newMarks------------0000---mark_col.getMarksCountWithoutFinal():{}", mark_col.getMarksCountWithoutFinal());
+    const auto & index_granu = part->index_granularity;
+    const auto & part_name = part->name;
+
+    LOG_INFO(log, "newMarks------------0000---mark_col.getMarksCountWithoutFinal():{}", index_granu.getMarksCountWithoutFinal());
     rocksdb::WriteBatch batch;
-    for (size_t i = 0; i < mark_col.getMarksCountWithoutFinal(); ++i)
+    for (size_t i = 0; i < index_granu.getMarksCountWithoutFinal(); ++i)
     {
         //records in bitmap means invalid
         roaring::Roaring r;
@@ -501,7 +527,7 @@ ColumnPtr MergeTreeData::getFlagColumn(const String & part_name, const size_t & 
         throw DB::Exception("Can not read bitmap for key " + key + " , error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
     LOG_INFO(log, "getFlagColumn------------111---single_val.size: {}, num_rows:{}", single_val.size(), num_rows);
     const roaring::Roaring & r = roaring::Roaring::readSafe(single_val.data(), single_val.size());
-    auto result = DataTypeUInt64().createColumnConst(num_rows, UInt64(1))->convertToFullColumnIfConst()->assumeMutable();
+    auto result = DataTypeUInt8().createColumnConst(num_rows, UInt8(1))->convertToFullColumnIfConst()->assumeMutable();
     const auto card_in_bitmap = r.cardinality();
     LOG_INFO(log, "getFlagColumn------------2222---card_in_bitmap: {}", card_in_bitmap);
     if (!card_in_bitmap)
@@ -512,7 +538,7 @@ ColumnPtr MergeTreeData::getFlagColumn(const String & part_name, const size_t & 
     std::vector<UInt32> v;
     v.resize(card_in_bitmap);
     r.toUint32Array(v.data());
-    auto & flag_data = typeid_cast<DB::ColumnUInt64 *>(result.get())->getData();
+    auto & flag_data = typeid_cast<DB::ColumnUInt8 *>(result.get())->getData();
     for (auto i : v)
     {
         //records in bitmap is deleted

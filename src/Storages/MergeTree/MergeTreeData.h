@@ -131,7 +131,7 @@ public:
     void markDeleted(const ColumnPtr & part_name_col, 
         const ColumnPtr & mark_col,
         const ColumnPtr & offset_col);
-    void newMarks(const String & part_name, const MergeTreeIndexGranularity & mark_col);
+    //void newMarks(const String & part_name, const MergeTreeIndexGranularity & mark_col);
     ColumnPtr getFlagColumn(const String & part_name, const size_t & mark, const size_t & num_rows) const;
 
     /// Function to call if the part is suspected to contain corrupt data.
@@ -142,7 +142,7 @@ public:
     using MutableDataPartsVector = std::vector<MutableDataPartPtr>;
     /// After the DataPart is added to the working set, it cannot be changed.
     using DataPartPtr = std::shared_ptr<const DataPart>;
-
+    void newMarks(const MutableDataPartPtr & part) const;
     using DataPartState = IMergeTreeDataPart::State;
     using DataPartStates = std::initializer_list<DataPartState>;
     using DataPartStateVector = std::vector<DataPartState>;
