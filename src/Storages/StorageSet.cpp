@@ -137,9 +137,10 @@ StorageSet::StorageSet(
     const ColumnsDescription & columns_,
     const ConstraintsDescription & constraints_,
     const String & comment,
-    bool persistent_)
+    bool persistent_,
+    bool fill_set_elements_)
     : StorageSetOrJoinBase{disk_, relative_path_, table_id_, columns_, constraints_, comment, persistent_}
-    , set(std::make_shared<Set>(SizeLimits(), false, true))
+    , set(std::make_shared<Set>(SizeLimits(), fill_set_elements_, true))
 {
 
     Block header = getInMemoryMetadataPtr()->getSampleBlock();

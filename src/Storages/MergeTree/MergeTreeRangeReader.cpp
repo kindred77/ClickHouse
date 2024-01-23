@@ -127,7 +127,7 @@ size_t MergeTreeRangeReader::DelayedStream::read(Columns & columns, size_t from_
     if (generating_mark_info)
     {
         LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"----from_mark:{}----offset:{}-------num_rows:{}", from_mark, offset, num_rows);
-        //auto mutable_col = addInfo[0]->assumeMutable();
+
         auto col1 = DataTypeUInt64().createColumnConst(num_rows, from_mark)->convertToFullColumnIfConst();
         if (!addInfo[0])
         {
@@ -135,6 +135,8 @@ size_t MergeTreeRangeReader::DelayedStream::read(Columns & columns, size_t from_
         }
         
         addInfo[0]->insertManyFrom(*col1, 0, num_rows);
+
+        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"000--------addInfo[0]: {}", addInfo[0]->size());
 
         if (!addInfo[1])
         {
@@ -144,13 +146,16 @@ size_t MergeTreeRangeReader::DelayedStream::read(Columns & columns, size_t from_
         {
             addInfo[1]->insert(i);
         }
+        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"111--------addInfo[1]: {}", addInfo[1]->size());
 
-        col1 = DataTypeUInt64().createColumnConst(num_rows, 1)->convertToFullColumnIfConst();
+        const ColumnPtr & flags_column = merge_tree_reader->storage.getFlagColumn(merge_tree_reader->data_part->name, from_mark, num_rows);
         if (!addInfo[2])
         {
             addInfo[2] = DataTypeUInt64().createColumn();
         }
-        addInfo[2]->insertManyFrom(*col1, 0, num_rows);
+        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"222--------flags_column.size():{}", flags_column->size());
+        addInfo[2]->insertManyFrom(*flags_column, 0, num_rows);
+        LOG_INFO(&Poco::Logger::get("DelayedStream::read"),"333--------addInfo[2]: {}, value:{}", addInfo[2]->size(), flags_column->size() > 0 ? std::to_string(flags_column->get64(0)) : "NULL");
     }
 
     size_t num_rows_before_from_mark = index_granularity->getMarkStartingRow(from_mark);
@@ -848,18 +853,29 @@ void MergeTreeRangeReader::append_addInfo(Stream & stream_addinfo)
     auto mutable_1 = appInfoNew[1]->assumeMutable();
     auto mutable_2 = appInfoNew[2]->assumeMutable();
     //addInfo[0]->reserve(orig_size + add_size);
-    mutable_0->reserve(orig_size + add_size);
+    //mutable_0->reserve(orig_size + add_size);
     //addInfo[1]->reserve(orig_size + add_size);
-    mutable_1->reserve(orig_size + add_size);
+    //mutable_1->reserve(orig_size + add_size);
     //addInfo[2]->reserve(orig_size + add_size);
-    mutable_2->reserve(orig_size + add_size);
+    //mutable_2->reserve(orig_size + add_size);
     //addInfo[0]->insertRangeFrom(*stream_addinfo.stream.addInfo[0], 0, add_size);
+    if (add_size != stream_addinfo.stream.addInfo[1]->size()
+        || add_size != stream_addinfo.stream.addInfo[2]->size())
+    {
+        throw Exception("Appending info does not match the size, "
+            + toString(add_size) + " expected.", ErrorCodes::LOGICAL_ERROR);
+    }
+    LOG_INFO(&Poco::Logger::get("append_addInfo"),"----1111------addInfo[0]: {}", stream_addinfo.stream.addInfo[0]->size());
     mutable_0->insertRangeFrom(*stream_addinfo.stream.addInfo[0], 0, add_size);
+    LOG_INFO(&Poco::Logger::get("append_addInfo"),"----2222------addInfo[1]: {}", stream_addinfo.stream.addInfo[1]->size());
     //addInfo[1]->insertRangeFrom(*stream_addinfo.stream.addInfo[1], 0, add_size);
     mutable_1->insertRangeFrom(*stream_addinfo.stream.addInfo[1], 0, add_size);
+    LOG_INFO(&Poco::Logger::get("append_addInfo"),"----3333------addInfo[2]: {}", stream_addinfo.stream.addInfo[2]->size());
     //addInfo[2]->insertRangeFrom(*stream_addinfo.stream.addInfo[2], 0, add_size);
     mutable_2->insertRangeFrom(*stream_addinfo.stream.addInfo[2], 0, add_size);
+    LOG_INFO(&Poco::Logger::get("append_addInfo"),"----4444------");
 
+    //clear
     stream_addinfo.stream.addInfo[0] = DataTypeUInt64().createColumn();
     stream_addinfo.stream.addInfo[1] = DataTypeUInt64().createColumn();
     stream_addinfo.stream.addInfo[2] = DataTypeUInt64().createColumn();

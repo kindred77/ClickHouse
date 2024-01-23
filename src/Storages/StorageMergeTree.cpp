@@ -258,6 +258,12 @@ void StorageMergeTree::truncate(const ASTPtr &, const StorageMetadataPtr &, Cont
 
     clearOldMutations(true);
     clearOldPartsFromFilesystem();
+
+    if (getSettings()->enable_unique_mode)
+    {
+        clearUpsertMetaDataDB();
+        initUpsertMetaDataDB();
+    }
 }
 
 

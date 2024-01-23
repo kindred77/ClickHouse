@@ -31,6 +31,8 @@
 #include <Parsers/parseQuery.h>
 #include <Parsers/queryToString.h>
 #include <Processors/Formats/InputStreamFromInputFormat.h>
+#include <Processors/QueryPlan/Optimizations/QueryPlanOptimizationSettings.h>
+#include <Processors/Executors/PullingAsyncPipelineExecutor.h>
 #include <Storages/AlterCommands.h>
 #include <Storages/MergeTree/MergeTreeData.h>
 #include <Storages/MergeTree/MergeTreeDataPartCompact.h>
@@ -44,6 +46,7 @@
 #include <Storages/StorageMergeTree.h>
 #include <Storages/StorageReplicatedMergeTree.h>
 #include <Storages/VirtualColumnUtils.h>
+#include <Storages/StorageSet.h>
 #include <Common/Increment.h>
 #include <Common/SimpleIncrement.h>
 #include <Common/Stopwatch.h>
@@ -76,6 +79,8 @@ namespace ProfileEvents
     extern const Event DelayedInserts;
     extern const Event DelayedInsertsMilliseconds;
     extern const Event DuplicatedInsertedBlocks;
+
+    extern const int ROCKSDB_ERROR;
 }
 
 namespace CurrentMetrics
@@ -123,6 +128,8 @@ namespace ErrorCodes
     extern const int ALTER_OF_COLUMN_IS_FORBIDDEN;
     extern const int SUPPORT_IS_DISABLED;
     extern const int TOO_MANY_SIMULTANEOUS_QUERIES;
+
+    extern const int ROCKSDB_ERROR;
 }
 
 
@@ -131,6 +138,394 @@ static void checkSampleExpression(const StorageInMemoryMetadata & metadata, bool
     const auto & pk_sample_block = metadata.getPrimaryKey().sample_block;
     if (!pk_sample_block.has(metadata.sampling_key.column_names[0]) && !allow_sampling_expression_not_in_primary_key)
         throw Exception("Sampling expression must be present in the primary key", ErrorCodes::BAD_ARGUMENTS);
+}
+
+String MergeTreeData::rocksdb_dir = "";
+MergeTreeData::RocksDBPtr MergeTreeData::rocksdb_ptr = nullptr;
+bool MergeTreeData::is_upsert_metadata_init=false;
+
+void MergeTreeData::initUpsertMetaDataDB()
+{
+    LOG_INFO(log, "initUpsertMetaDataDB------------00000");
+    if (is_upsert_metadata_init) return;
+    const auto & default_disk = getContext()->getDisk("default");
+    if (!default_disk)
+    {
+        throw Exception("Can not get default disk.", ErrorCodes::ROCKSDB_ERROR);
+    }
+    auto relative_path = fs::path(relative_data_path) / MergeTreeData::UPSERT_METADATA_PATH;
+    if (!default_disk->exists(relative_path))
+    {
+        default_disk->createDirectories(relative_path);
+    }
+    rocksdb_dir = default_disk->getPath() / relative_path;
+    LOG_INFO(log, "initUpsertMetaDataDB------------1111---{}", rocksdb_dir);
+    rocksdb::Options options;
+    rocksdb::DB * db;
+    options.create_if_missing = true;
+    options.compression = rocksdb::CompressionType::kZSTD;
+    rocksdb::Status status = rocksdb::DB::Open(options, rocksdb_dir, &db);
+
+    if (status != rocksdb::Status::OK())
+        throw Exception("Fail to open rocksdb path at: " +  rocksdb_dir + ": " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+    rocksdb_ptr = std::shared_ptr<rocksdb::DB>(db);
+
+    // // get max database oid
+    // String max_oid;
+    // status = rocksdb_ptr->Get(rocksdb::ReadOptions(), rocksdb::Slice(max_database_oid_rocksdb_key), &max_oid);
+    // if (status.ok())
+    // {
+    //     DATABASE_OID_ID = PGOid(std::stoi(max_oid));
+    // }
+    // // get max table oid
+    // status = rocksdb_ptr->Get(rocksdb::ReadOptions(), rocksdb::Slice(max_table_oid_rocksdb_key), &max_oid);
+    // if (status.ok())
+    // {
+    //     RELATION_OID_ID = PGOid(std::stoi(max_oid));
+    // }
+
+    is_upsert_metadata_init = true;
+}
+
+void MergeTreeData::clearUpsertMetaDataDB()
+{
+    if (is_upsert_metadata_init)
+    {
+        rocksdb::WriteBatch batch;
+        rocksdb::WriteOptions opt;
+        opt.sync = true;
+        rocksdb::Status status = rocksdb_ptr->Write(opt, &batch);
+        if (!status.ok())
+        {
+            throw Exception("Can not sync rocksdb: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+        }
+        status = rocksdb_ptr->Close();
+        if (!status.ok())
+        {
+            throw Exception("Can not close rocksdb: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+        }
+    }
+    const auto & default_disk = getContext()->getDisk("default");
+    if (!default_disk)
+    {
+        throw Exception("Can not get default disk.", ErrorCodes::ROCKSDB_ERROR);
+    }
+    auto relative_path = fs::path(relative_data_path) / MergeTreeData::UPSERT_METADATA_PATH;
+    if (default_disk->exists(relative_path))
+    {
+        default_disk->removeRecursive(relative_path);
+    }
+    is_upsert_metadata_init = false;
+}
+
+//TODO partition_id is for optimizing
+bool MergeTreeData::getMarkAndOffsetCols(DataPartsVector & parts, const String & partition_id, const Block & block_pk, Block & mark_offset_cols)
+{
+    LOG_INFO(log, "getMarkAndOffsetCols-----00000------------");
+    // if (parts.size() == 0)
+    // {
+    //     LOG_INFO(log, "getMarkAndOffsetCols-----1111------------");
+    //     return false;
+    // }
+    Stopwatch watch;
+    //Poco::Logger * log = &Poco::Logger::get("MergeTreeBlockOutputStream::upsert");
+    LOG_INFO(log, "getMarkAndOffsetCols-----22222------------");
+    auto query_context = Context::createCopy(context);
+    const Settings & settings = query_context->getSettingsRef();
+    //select list
+    const auto select_ast_ptr = std::make_shared<ASTSelectQuery>();
+    select_ast_ptr->setExpression(ASTSelectQuery::Expression::SELECT, std::make_shared<ASTExpressionList>());
+    const auto select_expression_list = select_ast_ptr->select();
+    Names real_column_names = {"id"};
+    Names virt_column_names = {"_part", "_mark", "_offset_in_mark", "_valid_flag"};
+    select_expression_list->children.reserve(real_column_names.size() + virt_column_names.size());
+    for (const auto & name : real_column_names)
+        select_expression_list->children.emplace_back(std::make_shared<ASTIdentifier>(name));
+    for (const auto & name : virt_column_names)
+        select_expression_list->children.emplace_back(std::make_shared<ASTIdentifier>(name));
+    LOG_INFO(log, "getMarkAndOffsetCols-----3333------------");
+    //from table
+    //StoragePtr storage_ptr = DatabaseCatalog::instance().getTable(getStorageID(), query_context);
+    //if (!storage_ptr)
+    //{
+        //throw Exception("Table not exists, may be it's a bug.", ErrorCodes::UNKNOWN_TABLE);
+    //}
+    //StorageMergeTree * mergetree_storage = dynamic_cast<StorageMergeTree *>(storage_ptr.get());
+
+    if(merging_params.mode != MergingParams::Ordinary
+        && merging_params.mode != MergingParams::Replacing
+        && merging_params.mode != MergingParams::VersionedCollapsing)
+    {
+        throw Exception("Support MergeTree family table only.", ErrorCodes::UNKNOWN_TABLE);
+    }
+    select_ast_ptr->replaceDatabaseAndTable(getStorageID());
+    
+    //prewhere
+    String tmp_tab_name = "_tmp_table_1";
+    String prewhere_sql = "id in(" + tmp_tab_name + ")";
+
+    //prepare and add temporary table for in expr
+    NamesAndTypesList columns = block_pk.getNamesAndTypesList();
+    DiskPtr disk = query_context->getDisk("default");
+    //auto table_uuid = storage.getStorageID().
+    TemporaryTableHolder external_storage_holder(
+        query_context,
+        [&disk, &columns](const StorageID & table_id)
+        {
+            //escapeForFileName
+            auto storage_set = StorageSet::create(disk, "notexists/", table_id, ColumnsDescription{columns}, ConstraintsDescription{}, String{}, false, true);
+            return storage_set;
+        },
+        nullptr);
+
+    StoragePtr external_table = external_storage_holder.getTable();
+    auto table_out = external_table->write({}, external_table->getInMemoryMetadataPtr(), query_context);
+    table_out->writePrefix();
+    table_out->write(block_pk);
+    table_out->writeSuffix();
+    query_context->addExternalTable(tmp_tab_name, std::move(external_storage_holder));
+
+    const char * begin_prewhere = prewhere_sql.c_str();
+    const char * end_prewhere = prewhere_sql.c_str() + prewhere_sql.size();
+    ParserExpressionWithOptionalAlias parser_prewhere(false);
+    auto prewhere_ast = parseQuery(parser_prewhere,
+                    begin_prewhere,
+                    end_prewhere, "",
+                    settings.max_query_size,
+                    settings.max_parser_depth);
+    auto metadata_snapshot = getInMemoryMetadataPtr();
+    auto syntax_reulst_prewhere = TreeRewriter(query_context).analyze(prewhere_ast, metadata_snapshot->getSampleBlock().getNamesAndTypesList());
+    select_ast_ptr->setExpression(ASTSelectQuery::Expression::PREWHERE,
+            std::move(prewhere_ast));
+    LOG_INFO(log, "getMarkAndOffsetCols-----44444------------");
+    WriteBufferFromOwnString write_buf;
+    formatAST(*select_ast_ptr, write_buf, false, false);
+    LOG_INFO(log, "getMarkAndOffsetCols-----generated query is : {}", write_buf.str());
+
+    ASTPtr query_ast = std::move(select_ast_ptr);
+    SelectQueryInfo query_info;
+    query_info.query = query_ast;
+    query_info.syntax_analyzer_result = TreeRewriter(query_context)
+            .analyzeSelect(query_ast, TreeRewriterResult({}, shared_from_this(), metadata_snapshot));
+    LOG_INFO(log, "getMarkAndOffsetCols-----5555------------");
+    ExpressionAnalyzer analyzer(prewhere_ast, syntax_reulst_prewhere, query_context);
+    //SelectQueryExpressionAnalyzer analyzer(prewhere_ast, syntax_reulst_prewhere, query_context, metadata_snapshot, {}, false, {}, {}, std::move(prepared_sets));
+    LOG_INFO(log, "getMarkAndOffsetCols-----6666------------");
+    query_info.prewhere_info = std::make_shared<PrewhereInfo>(analyzer.getActionsDAG(false), prewhere_ast->getColumnName());
+    query_info.sets = analyzer.getPreparedSets();
+    // query_info.sets = prepared_sets;
+    LOG_INFO(log, "getMarkAndOffsetCols-----7777------------query_info.sets.size(): {}", query_info.sets.size());
+    
+    //auto parts = getDataPartsVector();
+    LOG_INFO(log, "getMarkAndOffsetCols-----888------------parts.size:{}-----block_pk.rows():{}", parts.size(), block_pk.rows());
+    auto read_from_merge_tree = std::make_unique<ReadFromMergeTree>(
+        parts,
+        real_column_names,
+        virt_column_names,
+        *this,
+        query_info,
+        metadata_snapshot,
+        metadata_snapshot,
+        query_context,
+        block_pk.rows(),
+        2,
+        false,
+        nullptr,
+        &Poco::Logger::get("ReadFromMergeTree")
+    );
+    LOG_INFO(log, "getMarkAndOffsetCols-----9999------------");
+    QueryPlanPtr plan = std::make_unique<QueryPlan>();
+    plan->addStep(std::move(read_from_merge_tree));
+
+    auto pipeline = plan->buildQueryPipeline(
+                            QueryPlanOptimizationSettings::fromContext(query_context), 
+                            BuildQueryPipelineSettings::fromContext(query_context));
+    LOG_INFO(log, "getMarkAndOffsetCols-----aaaa------------");
+    //TODO order by _part,_mark
+    PullingAsyncPipelineExecutor executor(*pipeline);
+    LOG_INFO(log, "getMarkAndOffsetCols-----bbbb------------");
+    Block block_res;
+    MutableColumnPtr part_name_col;
+    MutableColumnPtr mark_col;
+    MutableColumnPtr offset_col;
+    while (executor.pull(block_res))
+    {
+        LOG_INFO(log, "getMarkAndOffsetCols-----ccccc------------");
+        if (block_res.rows() == 0)
+        {
+            continue;
+        }
+        auto id_col = block_res.getByName("id").column;
+        auto _part_col = block_res.getByName("_part").column;
+
+        //check part name consistency
+        // for (size_t i = 0; i < _part_col->size(); ++i)
+        // {
+        //     const auto & got_part_name = _part_col->operator[](i);
+        //     if (part_name != got_part_name)
+        //     {
+        //         throw Exception("Partition name is not consistency, it is a bug, got: " + got_part_name.get<String>() + ", expected: " + part_name, ErrorCodes::NO_SUCH_COLUMN_IN_TABLE);
+        //    
+        // }
+
+        auto _mark_col = block_res.getByName("_mark").column;
+        auto _offset_in_mark_col = block_res.getByName("_offset_in_mark").column;
+        if (!part_name_col)
+        {
+            part_name_col = IColumn::mutate(_part_col);
+            mark_col = IColumn::mutate(_mark_col);
+            offset_col = IColumn::mutate(_offset_in_mark_col);
+        }
+        else
+        {
+            part_name_col->insertRangeFrom(*_part_col, 0, _part_col->size());
+            mark_col->insertRangeFrom(*_mark_col, 0, _mark_col->size());
+            offset_col->insertRangeFrom(*_offset_in_mark_col, 0, _offset_in_mark_col->size());
+        }
+        auto _valid_flag_col = block_res.getByName("_valid_flag").column;
+        LOG_INFO(log, "getMarkAndOffsetCols-----dddd------------");
+        for (size_t i : collections::range(0, block_res.rows()))
+        {
+            LOG_INFO(log, "getMarkAndOffsetCols-----eeee------------");
+            LOG_INFO(log, "-----id:{}, _part_name: {}, _mark:{}, _offset_in_mark:{}, _valid_flag:{}------------",
+                id_col->operator [](i), _part_col->operator [](i), _mark_col->operator [](i),
+                _offset_in_mark_col->operator [](i), _valid_flag_col->operator [](i));
+            LOG_INFO(log, "getMarkAndOffsetCols-----ffff------------");
+        }
+    }
+    LOG_INFO(log, "getMarkAndOffsetCols-----gggg------------");
+    watch.stop();
+    LOG_INFO(log, "getMarkAndOffsetCols processed in {} sec", watch.elapsedSeconds());
+
+    mark_offset_cols = {
+        ColumnWithTypeAndName(std::move(part_name_col), std::make_shared<DataTypeString>(), "_part_name"),
+        ColumnWithTypeAndName(std::move(mark_col), std::make_shared<DataTypeUInt64>(), "_mark"),
+        ColumnWithTypeAndName(std::move(offset_col), std::make_shared<DataTypeUInt16>(), "_offset_in_mark")
+    };
+
+    return true;
+}
+
+void MergeTreeData::markDeleted(const ColumnPtr & part_name_col, 
+        const ColumnPtr & mark_col,
+        const ColumnPtr & offset_col)
+{
+    LOG_INFO(log, "markDeleted------------0000---");
+    //TODO lock
+    const auto rows = part_name_col->size();
+    LOG_INFO(log, "markDeleted------------1111---{}", rows);
+    std::vector<rocksdb::Slice> key_slices;
+    std::vector<String> key_strs;
+    key_strs.reserve(rows);
+    key_slices.reserve(rows);
+    std::vector<rocksdb::PinnableSlice> values(rows);
+    std::vector<rocksdb::Status> statuses(rows);
+    //String key;
+    Field part_name_field;
+    Field mark_field;
+    
+    //generating keys
+    for (size_t i = 0; i < rows; ++i)
+    {
+        LOG_INFO(log, "markDeleted------------222---");
+        mark_col->get(i, mark_field);
+        part_name_col->get(i, part_name_field);
+        LOG_INFO(log, "markDeleted------------333---{}");
+        LOG_INFO(log, "markDeleted------------444---{}--{}", mark_field.get<UInt32>(), part_name_field.get<String>());
+        key_strs.emplace_back(part_name_field.get<String>() + "_" + std::to_string(mark_field.get<UInt32>()));
+        LOG_INFO(log, "markDeleted------------555---{}", key_strs.back());
+        key_slices.emplace_back(key_strs.back());
+    }
+    
+    rocksdb_ptr->MultiGet(rocksdb::ReadOptions(), rocksdb_ptr->DefaultColumnFamily(), rows, key_slices.data(), values.data(), statuses.data());
+    LOG_INFO(log, "markDeleted------------666---{}", values.size());
+    if (rows != values.size())
+    {
+        throw Exception("Data not consistency, it is a bug, rows: " + std::to_string(rows) + ", " + std::to_string(values.size()) + " rows in rocksdb.", ErrorCodes::ROCKSDB_ERROR);
+    }
+    rocksdb::WriteBatch batch;
+    for (size_t i = 0; i < rows; ++i)
+    {
+        if (statuses[i].ok())
+        {
+            roaring::Roaring r = roaring::Roaring::readSafe(values[i].data(), values[i].size());
+            //records in bitmap means invalid
+            r.add(offset_col->operator[](i).get<UInt32>());
+            r.runOptimize();
+            std::vector<char> buf(r.getSizeInBytes());
+            const auto writen_size = r.write(buf.data());
+            batch.Put(rocksdb_ptr->DefaultColumnFamily(), key_slices[i], std::string_view(buf.data(), writen_size));
+        }
+        else
+        {
+            //key = part_name + "_" + mark_field.get<String>();
+            throw Exception("Fail to read bitmap in rocksdb, it is a bug, key: " + key_slices[i].ToString() + ",msg: " + statuses[i].ToString(), ErrorCodes::ROCKSDB_ERROR);
+        }
+    }
+    LOG_INFO(log, "markDeleted------------777---");
+    const auto & status = rocksdb_ptr->Write(rocksdb::WriteOptions(), &batch);
+    if (!status.ok())
+        throw Exception("Can not update marks bitmap in rocksDB, write error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+}
+
+void MergeTreeData::newMarks(const String & part_name, const MergeTreeIndexGranularity & mark_col)
+{
+    LOG_INFO(log, "newMarks------------0000---mark_col.getMarksCountWithoutFinal():{}", mark_col.getMarksCountWithoutFinal());
+    rocksdb::WriteBatch batch;
+    for (size_t i = 0; i < mark_col.getMarksCountWithoutFinal(); ++i)
+    {
+        //records in bitmap means invalid
+        roaring::Roaring r;
+        r.runOptimize();
+        std::vector<char> buf(r.getSizeInBytes());
+        const auto writen_size = r.write(buf.data());
+        //const rocksdb::Slice & key = part_name + "_" + std::to_string(i);
+        const String & key = part_name + "_" + std::to_string(i);
+        const auto & val = std::string_view(buf.data(), writen_size);
+        LOG_INFO(log, "newMarks------------1111---key:{}", key);
+        batch.Put(rocksdb_ptr->DefaultColumnFamily(), rocksdb::Slice(key), val);
+    }
+    LOG_INFO(log, "newMarks------------2222---");
+    const auto & status = rocksdb_ptr->Write(rocksdb::WriteOptions(), &batch);
+    if (!status.ok())
+        throw Exception("Can not new marks for partition "+part_name+" to RocksDB, write error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+}
+
+ColumnPtr MergeTreeData::getFlagColumn(const String & part_name, const size_t & mark, const size_t & num_rows) const
+{
+    const String & key = part_name + "_" + std::to_string(mark);
+    LOG_INFO(log, "getFlagColumn------------0000---key: {}", key);
+    String single_val;
+    const rocksdb::Status & status = rocksdb_ptr->Get(rocksdb::ReadOptions(), rocksdb::Slice(key), &single_val);
+    if (!status.ok())
+        throw DB::Exception("Can not read bitmap for key " + key + " , error: " + status.ToString(), ErrorCodes::ROCKSDB_ERROR);
+    LOG_INFO(log, "getFlagColumn------------111---single_val.size: {}, num_rows:{}", single_val.size(), num_rows);
+    const roaring::Roaring & r = roaring::Roaring::readSafe(single_val.data(), single_val.size());
+    auto result = DataTypeUInt64().createColumnConst(num_rows, UInt64(1))->convertToFullColumnIfConst()->assumeMutable();
+    const auto card_in_bitmap = r.cardinality();
+    LOG_INFO(log, "getFlagColumn------------2222---card_in_bitmap: {}", card_in_bitmap);
+    if (!card_in_bitmap)
+    {
+        LOG_INFO(log, "getFlagColumn------------3333---result.size(): {}", result->size());
+        return std::move(result);
+    }
+    std::vector<UInt32> v;
+    v.resize(card_in_bitmap);
+    r.toUint32Array(v.data());
+    auto & flag_data = typeid_cast<DB::ColumnUInt64 *>(result.get())->getData();
+    for (auto i : v)
+    {
+        //records in bitmap is deleted
+        if (i < num_rows)
+            flag_data[i] = 0;
+        //numbers iterating from bitmap are sorted
+        else
+            break;
+    }
+
+    LOG_INFO(log, "getFlagColumn------------4444---flag_data.size(): {}", flag_data.size());
+
+    return std::move(result);
 }
 
 MergeTreeData::MergeTreeData(
@@ -261,6 +656,11 @@ MergeTreeData::MergeTreeData(
     if (!canUsePolymorphicParts(*settings, &reason) && !reason.empty())
         LOG_WARNING(log, "{} Settings 'min_rows_for_wide_part', 'min_bytes_for_wide_part', "
             "'min_rows_for_compact_part' and 'min_bytes_for_compact_part' will be ignored.", reason);
+
+    if (settings->enable_unique_mode)
+    {
+        initUpsertMetaDataDB();
+    }
 }
 
 StoragePolicyPtr MergeTreeData::getStoragePolicy() const
@@ -2124,16 +2524,17 @@ MergeTreeData::DataPartsVector MergeTreeData::getActivePartsToReplace(
 }
 
 
-bool MergeTreeData::renameTempPartAndAdd(MutableDataPartPtr & part, SimpleIncrement * increment, Transaction * out_transaction, MergeTreeDeduplicationLog * deduplication_log)
+bool MergeTreeData::renameTempPartAndAdd(MutableDataPartPtr & part, SimpleIncrement * increment, Transaction * out_transaction, MergeTreeDeduplicationLog * deduplication_log, Block * mark_and_offset_cols, const Block & block_pk)
 {
     if (out_transaction && &out_transaction->data != this)
         throw Exception("MergeTreeData::Transaction for one table cannot be used with another. It is a bug.",
             ErrorCodes::LOGICAL_ERROR);
 
     DataPartsVector covered_parts;
+    auto parts_snapshot = getDataPartsVector();
     {
         auto lock = lockParts();
-        if (!renameTempPartAndReplace(part, increment, out_transaction, lock, &covered_parts, deduplication_log))
+        if (!renameTempPartAndReplace(part, increment, out_transaction, lock, &covered_parts, deduplication_log, mark_and_offset_cols, block_pk, &parts_snapshot))
             return false;
     }
     if (!covered_parts.empty())
@@ -2146,7 +2547,7 @@ bool MergeTreeData::renameTempPartAndAdd(MutableDataPartPtr & part, SimpleIncrem
 
 bool MergeTreeData::renameTempPartAndReplace(
     MutableDataPartPtr & part, SimpleIncrement * increment, Transaction * out_transaction,
-    std::unique_lock<std::mutex> & lock, DataPartsVector * out_covered_parts, MergeTreeDeduplicationLog * deduplication_log)
+    std::unique_lock<std::mutex> & lock, DataPartsVector * out_covered_parts, MergeTreeDeduplicationLog * deduplication_log, Block * mark_and_offset_cols, const Block & block_pk, DataPartsVector * parts_snapshot)
 {
     if (out_transaction && &out_transaction->data != this)
         throw Exception("MergeTreeData::Transaction for one table cannot be used with another. It is a bug.",
@@ -2214,6 +2615,19 @@ bool MergeTreeData::renameTempPartAndReplace(
             LOG_INFO(log, "Block with ID {} already exists as part {}; ignoring it", block_id, res.first.getPartName());
             return false;
         }
+    }
+
+    if (mark_and_offset_cols && parts_snapshot->size() > 0)
+    {
+        LOG_INFO(log, "renameTempPartAndReplace-----------00000----------partition_id:{}", part_info.partition_id);
+        if(!getMarkAndOffsetCols(*parts_snapshot, part_info.partition_id, block_pk, *mark_and_offset_cols))
+        {
+            LOG_INFO(log, "renameTempPartAndReplace-----------1111----------");
+            throw Exception(
+                "Can not get mark and offset.",
+                ErrorCodes::CORRUPTED_DATA);
+        }
+        LOG_INFO(log, "renameTempPartAndReplace-----------2222----------");
     }
 
     /// All checks are passed. Now we can rename the part on disk.

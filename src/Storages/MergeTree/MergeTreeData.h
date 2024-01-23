@@ -32,6 +32,9 @@
 #include <boost/multi_index/global_fun.hpp>
 #include <boost/range/iterator_range_core.hpp>
 
+#include <rocksdb/db.h>
+#include <rocksdb/table.h>
+#include <roaring.hh>
 
 namespace DB
 {
@@ -117,6 +120,20 @@ namespace ErrorCodes
 class MergeTreeData : public IStorage, public WithMutableContext
 {
 public:
+
+    using RocksDBPtr = std::shared_ptr<rocksdb::DB>;
+    static RocksDBPtr rocksdb_ptr;
+    static String rocksdb_dir;
+    static const String upsert_metadata_path;
+    static bool is_upsert_metadata_init;
+    void initUpsertMetaDataDB();
+    void clearUpsertMetaDataDB();
+    void markDeleted(const ColumnPtr & part_name_col, 
+        const ColumnPtr & mark_col,
+        const ColumnPtr & offset_col);
+    void newMarks(const String & part_name, const MergeTreeIndexGranularity & mark_col);
+    ColumnPtr getFlagColumn(const String & part_name, const size_t & mark, const size_t & num_rows) const;
+
     /// Function to call if the part is suspected to contain corrupt data.
     using BrokenPartCallback = std::function<void (const String &)>;
     using DataPart = IMergeTreeDataPart;
@@ -134,6 +151,7 @@ public:
 
     constexpr static auto FORMAT_VERSION_FILE_NAME = "format_version.txt";
     constexpr static auto DETACHED_DIR_NAME = "detached";
+    constexpr static auto UPSERT_METADATA_PATH = "upsert_metadata_path";
 
     /// Auxiliary structure for index comparison. Keep in mind lifetime of MergeTreePartInfo.
     struct DataPartStateAndInfo
@@ -211,6 +229,8 @@ public:
 
     using DataParts = std::set<DataPartPtr, LessDataPart>;
     using DataPartsVector = std::vector<DataPartPtr>;
+
+    bool getMarkAndOffsetCols(DataPartsVector & parts, const String & partition_id, const Block & block_pk, Block & mark_offset_cols);
 
     using DataPartsLock = std::unique_lock<std::mutex>;
     DataPartsLock lockParts() const { return DataPartsLock(data_parts_mutex); }
@@ -467,7 +487,7 @@ public:
     /// active set later with out_transaction->commit()).
     /// Else, commits the part immediately.
     /// Returns true if part was added. Returns false if part is covered by bigger part.
-    bool renameTempPartAndAdd(MutableDataPartPtr & part, SimpleIncrement * increment = nullptr, Transaction * out_transaction = nullptr, MergeTreeDeduplicationLog * deduplication_log = nullptr);
+    bool renameTempPartAndAdd(MutableDataPartPtr & part, SimpleIncrement * increment = nullptr, Transaction * out_transaction = nullptr, MergeTreeDeduplicationLog * deduplication_log = nullptr, Block * mark_and_offset_cols = nullptr, const Block & block_pk = {});
 
     /// The same as renameTempPartAndAdd but the block range of the part can contain existing parts.
     /// Returns all parts covered by the added part (in ascending order).
@@ -478,7 +498,7 @@ public:
     /// Low-level version of previous one, doesn't lock mutex
     bool renameTempPartAndReplace(
             MutableDataPartPtr & part, SimpleIncrement * increment, Transaction * out_transaction, DataPartsLock & lock,
-            DataPartsVector * out_covered_parts = nullptr, MergeTreeDeduplicationLog * deduplication_log = nullptr);
+            DataPartsVector * out_covered_parts = nullptr, MergeTreeDeduplicationLog * deduplication_log = nullptr, Block * mark_and_offset_cols = nullptr, const Block & block_pk = {}, DataPartsVector * parts_snapshot = nullptr);
 
 
     /// Remove parts from working set immediately (without wait for background
