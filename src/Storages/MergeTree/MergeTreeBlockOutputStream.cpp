@@ -236,7 +236,7 @@ void MergeTreeBlockOutputStream::write(const Block & block)
             Block block_pk;
             for (const auto & pk_col_name : pk_cols.value())
             {
-                block_pk.insert(block.getByName(pk_col_name));
+                block_pk.insert(current_block.block.getByName(pk_col_name));
             }
             LOG_INFO(&Poco::Logger::get("MergeTreeBlockOutputStream::upsert"), "-----1111------------");
             watch.restart();

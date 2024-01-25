@@ -622,6 +622,8 @@ MergeTreeRangeReader::MergeTreeRangeReader(
         if (prewhere_info->remove_prewhere_column)
             sample_block.erase(prewhere_info->prewhere_column_name);
     }
+
+    invalid_record_filtering = merge_tree_reader->data_part->storage.getSettings()->enable_unique_mode;
 }
 
 bool MergeTreeRangeReader::isReadingFinished() const
@@ -894,7 +896,7 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::startReadingChain(size_t 
         {
             if (stream.isFinished())
             {
-                if (last_reader_in_chain)
+                if (invalid_record_filtering && last_reader_in_chain)
                 {
                     append_addInfo(stream);
                 }
@@ -912,12 +914,12 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::startReadingChain(size_t 
 
             auto rows_to_read = std::min(current_space, stream.numPendingRowsInCurrentGranule());
             bool last = rows_to_read == space_left;
-            result.addRows(stream.read(result.columns, rows_to_read, !last, last_reader_in_chain));
+            result.addRows(stream.read(result.columns, rows_to_read, !last, invalid_record_filtering && last_reader_in_chain));
             result.addGranule(rows_to_read);
             space_left = (rows_to_read > space_left ? 0 : space_left - rows_to_read);
         }
     }
-    if (last_reader_in_chain)
+    if (invalid_record_filtering && last_reader_in_chain)
     {
         append_addInfo(stream);
     }
@@ -958,7 +960,7 @@ Columns MergeTreeRangeReader::continueReadingChain(ReadResult & result, size_t &
         if (next_range_to_start < started_ranges.size()
             && i == started_ranges[next_range_to_start].num_granules_read_before_start)
         {
-            if (last_reader_in_chain)
+            if (invalid_record_filtering && last_reader_in_chain)
             {
                 append_addInfo(stream);
             }
@@ -970,11 +972,11 @@ Columns MergeTreeRangeReader::continueReadingChain(ReadResult & result, size_t &
 
         bool last = i + 1 == size;
         LOG_INFO(&Poco::Logger::get("continueReadingChain"),"----rows_per_granule[i]:{}------last_reader_in_chain:{}", rows_per_granule[i], last_reader_in_chain);
-        num_rows += stream.read(columns, rows_per_granule[i], !last, last_reader_in_chain);
+        num_rows += stream.read(columns, rows_per_granule[i], !last, invalid_record_filtering && last_reader_in_chain);
     }
 
     stream.skip(result.numRowsToSkipInLastGranule());
-    if (last_reader_in_chain)
+    if (invalid_record_filtering && last_reader_in_chain)
     {
         append_addInfo(stream);
     }

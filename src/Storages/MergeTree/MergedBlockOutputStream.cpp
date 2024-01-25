@@ -98,7 +98,10 @@ void MergedBlockOutputStream::writeSuffixAndFinalizePart(
         new_part->default_codec = default_codec;
     new_part->storage.lockSharedData(*new_part);
 
-    new_part->storage.newMarks(new_part);
+    if (new_part->storage.getSettings()->enable_unique_mode)
+    {
+        new_part->storage.newMarks(new_part);
+    }   
 }
 
 void MergedBlockOutputStream::finalizePartOnDisk(

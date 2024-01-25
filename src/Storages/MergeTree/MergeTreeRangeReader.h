@@ -261,6 +261,7 @@ private:
     bool last_reader_in_chain = false;
     bool is_initialized = false;
 
+    bool invalid_record_filtering = false;
     void append_addInfo(Stream & stream_addinfo);
 };
 

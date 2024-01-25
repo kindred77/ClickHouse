@@ -3,15 +3,27 @@
 #include <common/range.h>
 #include <Columns/IColumn.h>
 #include <Columns/ColumnsNumber.h>
+#include <Columns/ColumnString.h>
 #include <DataTypes/DataTypesNumber.h>
+#include <DataTypes/DataTypeString.h>
 #include <iostream>
 #include <AggregateFunctions/AggregateFunctionGroupBitmapData.h>
 #include <boost/dynamic_bitset.hpp>
+#include <Parsers/parseQuery.h>
+#include <Parsers/ExpressionListParsers.h>
+#include <Interpreters/TreeRewriter.h>
+#include <Interpreters/Context.h>
+#include <Interpreters/ExpressionAnalyzer.h>
+#include <Functions/registerFunctions.h>
+#include <Functions/IFunctionAdaptors.h>
+#include <Functions/FunctionsLogical.h>
 
 #include <rocksdb/db.h>
 #include <rocksdb/table.h>
 
 static const size_t rows = 60000;
+
+using namespace DB;
 
 void testDynamicBitSet()
 {
@@ -270,6 +282,228 @@ void testRange()
     }
 }
 
+void createTestBlock(Block & test_block)
+{
+    test_block = {ColumnWithTypeAndName(ColumnUInt64::create(), std::make_shared<DataTypeUInt64>(), "id"),
+            ColumnWithTypeAndName(ColumnString::create(), std::make_shared<DataTypeString>(), "name"),
+            ColumnWithTypeAndName(ColumnString::create(), std::make_shared<DataTypeString>(), "addr"),
+            //ColumnWithTypeAndName(ColumnUInt8::create(), std::make_shared<DataTypeUInt8>(), "first_filter")
+    };
+    MutableColumns columns = test_block.mutateColumns();
+    columns[0]->insert(1);
+    columns[0]->insert(2);
+    columns[1]->insert("name1");
+    columns[1]->insert("name2");
+    columns[2]->insert("addr1");
+    columns[2]->insert("addr2");
+    //columns[3]->insert(0);
+    //columns[3]->insert(0);
+
+    test_block.setColumns(std::move(columns));
+}
+
+void dumpBlock(WriteBuffer & out, Block block)
+{
+    for(auto col : block)
+    {
+        out << "-----------------------------" << col.name << "-----------------------------\n";
+        if(col.column == nullptr)
+        {
+            out << "----column is null----\n";
+        }
+        else
+        {
+            out << "---column is not null---size: " << col.column->size() << "\n";
+        }
+        if(col.column && col.column->size() > 0)
+        {
+            for(auto i : collections::range(col.column->size()))
+            {
+                out << "----i: " << i << " ----data: " << (col.column->isNumeric() ? std::to_string(col.column->get64(i)) : String(col.column->getDataAt(i))) << "\n";
+            }
+        }
+
+        out << "-----------------------------" << col.name << "-----------------------------end" << "\n";
+    }
+}
+
+struct ContextHolder
+{
+    DB::SharedContextHolder shared_context;
+    DB::ContextMutablePtr context;
+
+    ContextHolder()
+        : shared_context(DB::Context::createShared())
+        , context(DB::Context::createGlobal(shared_context.get()))
+    {
+        context->makeGlobalContext();
+        context->setPath("./");
+    }
+
+    ContextHolder(ContextHolder &&) = default;
+};
+
+const ContextHolder & getContext()
+{
+    static ContextHolder holder;
+    return holder;
+}
+
+void filterColumns(Columns & columns, const IColumn::Filter & filter)
+{
+    for (auto & column : columns)
+    {
+        if (column)
+        {
+            column = column->filter(filter, -1);
+            if (column->empty())
+            {
+                columns.clear();
+                return;
+            }
+        }
+    }
+}
+
+// void filterColumns(ColumnsWithTypeAndName & columns, const ColumnPtr & filter)
+// {
+//     FilterDescription descr(*filter);
+//     auto filter_data = descr.data;
+//     std::cout << "filterColumns---00000-----" << columns.size() << std::endl;
+//     for (auto & column : columns)
+//     {
+//         std::cout << "filterColumns---111-----" << column.column->size() << "----" << column.name << std::endl;
+//         if (column.column)
+//         {
+//             column.column = column.column->filter(*filter_data, -1);
+//             std::cout << "filterColumns---222-----" << column.column->size() << std::endl;
+//             if (column.column->empty())
+//             {
+//                 columns.clear();
+//                 return;
+//             }
+//         }
+//     }
+// }
+
+void filterColumns(Columns & columns, const ColumnPtr & filter)
+{
+    ConstantFilterDescription const_descr(*filter);
+    if (const_descr.always_true)
+    {
+        //std::cout << "filterColumns1---00000-----" << std::endl;
+        return;
+    }
+
+    if (const_descr.always_false)
+    {
+        for (auto & col : columns)
+            if (col)
+                col = col->cloneEmpty();
+        //std::cout << "filterColumns1---1111-----" << std::endl;
+        return;
+    }
+
+    FilterDescription descr(*filter);
+    filterColumns(columns, *descr.data);
+}
+
+ExpressionActionsPtr generateNewExpressionActions(const ContextHolder & context_holder, const NamesAndTypesList & header)
+{
+    String prewhere_sql = "id = 1 as first_filter";
+    const Settings & settings = context_holder.context->getSettingsRef();
+    const char * begin_prewhere = prewhere_sql.c_str();
+    const char * end_prewhere = prewhere_sql.c_str() + prewhere_sql.size();
+    ParserExpressionWithOptionalAlias parser_prewhere(false);
+    auto prewhere_ast = parseQuery(parser_prewhere,
+                    begin_prewhere,
+                    end_prewhere, "",
+                    settings.max_query_size,
+                    settings.max_parser_depth);
+    auto syntax_reulst_prewhere = TreeRewriter(context_holder.context).analyze(prewhere_ast, header);
+    ExpressionAnalyzer analyzer(prewhere_ast, syntax_reulst_prewhere, context_holder.context);
+
+
+    String prewhere_sql2 = "name = 'name2' as second_filter";
+    const char * begin_prewhere2 = prewhere_sql2.c_str();
+    const char * end_prewhere2 = prewhere_sql2.c_str() + prewhere_sql2.size();
+    ParserExpressionWithOptionalAlias parser_prewhere2(false);
+    auto prewhere_ast2 = parseQuery(parser_prewhere2,
+                    begin_prewhere2,
+                    end_prewhere2, "",
+                    settings.max_query_size,
+                    settings.max_parser_depth);
+    auto syntax_reulst_prewhere2 = TreeRewriter(context_holder.context).analyze(prewhere_ast2, header);
+    ExpressionAnalyzer analyzer2(prewhere_ast2, syntax_reulst_prewhere2, context_holder.context);
+
+    //FunctionOverloadResolverPtr func_builder_replicate = FunctionFactory::instance().get("replicate", context);
+
+    auto actions_dag1 = analyzer.getActionsDAG(true, false);
+    const auto & last_node1 = actions_dag1->getIndex().back();
+    std::cout << "index size: " << actions_dag1->getIndex().size() << "------ last node1: " << last_node1->result_name << std::endl;
+
+    auto actions_dag2 = analyzer2.getActionsDAG(true, false);
+    const auto & last_node2 = actions_dag2->getIndex().back();
+    std::cout << "index size: " << actions_dag2->getIndex().size() << "------ last node2: " << last_node2->result_name << std::endl;
+    
+    //auto actions_dag2 = analyzer2.getActionsDAG(true, false);
+    FunctionOverloadResolverPtr func_builder_and = std::make_unique<FunctionToOverloadResolverAdaptor>(std::make_shared<FunctionAnd>());
+    ActionsDAG::NodeRawConstPtrs inputs(2);
+    inputs[0] = last_node1;
+    inputs[1] = last_node2;
+    
+    auto actions_dag_final = ActionsDAG::merge(std::move(*actions_dag1), std::move(*actions_dag2));
+
+    auto & index = actions_dag_final->getIndex();
+    index.push_back(&actions_dag_final->addFunction(func_builder_and, inputs, "final_filter"));
+
+    std::cout << "----------result_name: " << index.back()->result_name << std::endl;
+
+    return std::make_shared<ExpressionActions>(actions_dag_final);
+}
+
+void testFilter()
+{
+    const auto & context_holder = getContext();
+    registerFunctions();
+
+    Block block_data;
+    createTestBlock(block_data);
+
+    
+    auto actions = generateNewExpressionActions(context_holder, block_data.getNamesAndTypesList());
+    //auto actions2 = generateNewExpressionActions(context_holder, "name = 'name1' as second_filter", block_data.getNamesAndTypesList());
+
+    WriteBufferFromOwnString out;
+    dumpBlock(out, block_data);
+    std::cout << out.str() << std::endl;
+    std::cout << "*******************************after execution*******************************" << std::endl << std::endl;
+    actions->execute(block_data);
+
+    WriteBufferFromOwnString out2;
+    dumpBlock(out2, block_data);
+
+    std::cout << out2.str() << std::endl;
+
+    std::cout << "*******************************after filter*******************************" << std::endl << std::endl;
+    auto filter_col_pos = block_data.getPositionByName("first_filter");
+    auto filter_col = block_data.getByPosition(filter_col_pos).column;
+
+    block_data.erase(filter_col_pos);
+    auto columns = block_data.getColumns();
+    filterColumns(columns, filter_col);
+    //std::cout << "------after filter-----" << columns. << std::endl;
+    if (columns.empty())
+        block_data = block_data.cloneEmpty();
+    else
+        block_data.setColumns(columns);
+    WriteBufferFromOwnString out3;
+    dumpBlock(out3, block_data);
+
+    std::cout << out3.str() << std::endl;
+
+}
+
 int main(int, char **)
 {
     //testDynamicBitSet();
@@ -279,6 +513,8 @@ int main(int, char **)
 
     //testRocksDB();
 
-    testRange();
+    //testRange();
+
+    testFilter();
     
 }
