@@ -9,6 +9,7 @@
 #include <Storages/MergeTree/MergeAlgorithm.h>
 #include <Storages/MergeTree/MergeType.h>
 #include <Storages/MergeTree/IMergedBlockOutputStream.h>
+#include <Processors/Sources/SourceWithProgress.h>
 
 
 namespace DB
@@ -54,6 +55,7 @@ struct FutureMergedMutatedPart
     void updatePath(const MergeTreeData & storage, const ReservationPtr & reservation);
 };
 
+using SourceWithProgressPtr = std::shared_ptr<SourceWithProgress>;
 
 /** Can select parts for background processes and do them.
  * Currently helps with merges, mutations and moves
@@ -110,6 +112,14 @@ public:
         String * out_disable_reason = nullptr,
         bool optimize_skip_merged_partitions = false);
 
+    SourceWithProgressPtr createSource(const MergeTreeData & storage_,
+        const StorageMetadataPtr & metadata_snapshot_,
+        MergeTreeData::DataPartPtr data_part_,
+        Names & columns_to_read_,
+        bool read_with_direct_io_,
+        bool take_column_types_from_storage,
+        ContextPtr context,
+        size_t part_index_in_query = 0);
     /** Merge the parts.
       * If `reservation != nullptr`, now and then reduces the size of the reserved space
       *  is approximately proportional to the amount of data already written.

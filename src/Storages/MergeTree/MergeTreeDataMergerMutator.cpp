@@ -1,6 +1,7 @@
 #include "MergeTreeDataMergerMutator.h"
 
 #include <Storages/MergeTree/MergeTreeSequentialSource.h>
+#include <Storages/MergeTree/MergeTreeSelectProcessor.h>
 #include <Storages/MergeTree/MergedBlockOutputStream.h>
 #include <Storages/MergeTree/MergedColumnOnlyOutputStream.h>
 #include <Storages/MergeTree/SimpleMergeSelector.h>
@@ -672,6 +673,66 @@ static bool needSyncPart(size_t input_rows, size_t input_bytes, const MergeTreeS
         || (settings.min_compressed_bytes_to_fsync_after_merge && input_bytes >= settings.min_compressed_bytes_to_fsync_after_merge));
 }
 
+static MergeTreeReaderSettings getMergeTreeReaderSettings(const ContextPtr & context)
+{
+    const auto & settings = context->getSettingsRef();
+    return {
+        .min_bytes_to_use_direct_io = settings.min_bytes_to_use_direct_io,
+        .min_bytes_to_use_mmap_io = settings.min_bytes_to_use_mmap_io,
+        .mmap_cache = context->getMMappedFileCache(),
+        .max_read_buffer_size = settings.max_read_buffer_size,
+        .save_marks_in_cache = true,
+        .checksum_on_read = settings.checksum_on_read,
+    };
+}
+
+SourceWithProgressPtr MergeTreeDataMergerMutator::createSource(const MergeTreeData & storage_,
+    const StorageMetadataPtr & metadata_snapshot_,
+    MergeTreeData::DataPartPtr data_part_,
+    Names & columns_to_read_,
+    [[maybe_unused]] bool read_with_direct_io_,
+    bool take_column_types_from_storage,
+    [[maybe_unused]] ContextPtr context,
+    [[maybe_unused]] size_t part_index_in_query)
+{
+    if (storage_.getSettings()->enable_unique_mode)
+    {
+        LOG_DEBUG(log, "Will merge parts with MergeTreeSelectProcessor");
+        String prewhere_sql = "_valid_flag";
+        const Settings & settings = context->getSettingsRef();
+        const char * begin_prewhere = prewhere_sql.c_str();
+        const char * end_prewhere = prewhere_sql.c_str() + prewhere_sql.size();
+        ParserExpressionWithOptionalAlias parser_prewhere(false);
+        auto prewhere_ast = parseQuery(parser_prewhere,
+                        begin_prewhere,
+                        end_prewhere, "",
+                        settings.max_query_size,
+                        settings.max_parser_depth);
+        NamesAndTypesList name_and_types = metadata_snapshot_->getSampleBlock().getNamesAndTypesList();
+        name_and_types.push_back({"_valid_flag", std::make_shared<DataTypeUInt8>()});
+        auto syntax_reulst_prewhere = TreeRewriter(context).analyze(prewhere_ast, name_and_types);
+        ExpressionAnalyzer analyzer(prewhere_ast, syntax_reulst_prewhere, context);
+        auto prewhre_info = std::make_shared<PrewhereInfo>(analyzer.getActionsDAG(false), prewhere_ast->getColumnName());
+
+        //NamesAndTypesList columns_for_reader = metadata_snapshot_->getColumns().getByNames(ColumnsDescription::AllPhysical, columns_to_read_, false);
+        auto ptr = new MergeTreeSelectProcessor(
+            storage_, metadata_snapshot_, data_part_, context->getSettingsRef().max_block_size, 
+            context->getSettingsRef().preferred_block_size_bytes,
+            context->getSettingsRef().preferred_max_column_in_block_size_bytes,
+            columns_to_read_, MarkRanges{MarkRange{0, data_part_->index_granularity.getMarksCountWithoutFinal()}}, 
+            context->getSettingsRef().use_uncompressed_cache,
+            prewhre_info, ExpressionActionsSettings::fromContext(context), true,
+            getMergeTreeReaderSettings(context), {}, part_index_in_query);
+        return std::shared_ptr<MergeTreeSelectProcessor>(ptr);
+    }
+    else
+    {
+        auto ptr = new MergeTreeSequentialSource(
+            data, metadata_snapshot_, data_part_, columns_to_read_, read_with_direct_io_, take_column_types_from_storage);
+        return std::shared_ptr<MergeTreeSequentialSource>(ptr);
+    }
+    
+}
 
 /// parts should be sorted.
 MergeTreeData::MutableDataPartPtr MergeTreeDataMergerMutator::mergePartsToTemporaryPart(
@@ -847,16 +908,17 @@ MergeTreeData::MutableDataPartPtr MergeTreeDataMergerMutator::mergePartsToTempor
 
     MergeStageProgress horizontal_stage_progress(
         column_sizes ? column_sizes->keyColumnsWeight() : 1.0);
-
-    for (const auto & part : parts)
+        
+    for (size_t part_index = 0; part_index < parts.size(); ++part_index)
     {
-        auto input = std::make_unique<MergeTreeSequentialSource>(
-            data, metadata_snapshot, part, merging_column_names, read_with_direct_io, true);
+        auto & part = parts[part_index];
 
-        input->setProgressCallback(
+        auto source = createSource(data, metadata_snapshot, part, merging_column_names, read_with_direct_io, true, context, part_index);
+
+        source->setProgressCallback(
             MergeProgressCallback(merge_entry, watch_prev_elapsed, horizontal_stage_progress));
 
-        Pipe pipe(std::move(input));
+        Pipe pipe(std::move(source));
 
         if (metadata_snapshot->hasSortingKey())
         {
@@ -1050,8 +1112,10 @@ MergeTreeData::MutableDataPartPtr MergeTreeDataMergerMutator::mergePartsToTempor
             MergeStageProgress column_progress(progress_before, column_sizes->columnWeight(column_name));
             for (size_t part_num = 0; part_num < parts.size(); ++part_num)
             {
-                auto column_part_source = std::make_shared<MergeTreeSequentialSource>(
-                    data, metadata_snapshot, parts[part_num], column_names, read_with_direct_io, true);
+                // auto column_part_source = std::make_shared<MergeTreeSequentialSource>(
+                //     data, metadata_snapshot, parts[part_num], column_names, read_with_direct_io, true);
+                
+                auto column_part_source = createSource(data, metadata_snapshot, parts[part_num], merging_column_names, read_with_direct_io, true, context, part_num);
 
                 column_part_source->setProgressCallback(
                     MergeProgressCallback(merge_entry, watch_prev_elapsed, column_progress));

@@ -10,6 +10,7 @@
 #include <DataTypes/DataTypeUUID.h>
 #include <DataTypes/DataTypeArray.h>
 #include <Processors/Transforms/AggregatingTransform.h>
+#include <Interpreters/ExpressionAnalyzer.h>
 
 
 namespace DB
@@ -48,12 +49,33 @@ MergeTreeBaseSelectProcessor::MergeTreeBaseSelectProcessor(
 {
     header_without_virtual_columns = getPort().getHeader();
 
+    bool valid_flag_col_selected = false;
     for (auto it = virt_column_names.rbegin(); it != virt_column_names.rend(); ++it)
+    {
         if (header_without_virtual_columns.has(*it))
             header_without_virtual_columns.erase(*it);
+        // if ("_valid_flag" == *it)
+        //     valid_flag_col_selected = true;
+    }
 
-    if (prewhere_info)
+    //don't filter when user select _valid_flag virtual column
+    if (prewhere_info /* || (!valid_flag_col_selected && storage.getSettings()->enable_unique_mode) */)
     {
+        // if (!prewhere_info) prewhere_info = std::make_unique<PrewhereInfo>();
+
+        // String prewhere_sql = "_valid_flag";
+        // const Settings & settings = context->getSettingsRef();
+        // const char * begin_prewhere = prewhere_sql.c_str();
+        // const char * end_prewhere = prewhere_sql.c_str() + prewhere_sql.size();
+        // ParserExpressionWithOptionalAlias parser_prewhere(false);
+        // auto prewhere_ast = parseQuery(parser_prewhere,
+        //                 begin_prewhere,
+        //                 end_prewhere, "",
+        //                 settings.max_query_size,
+        //                 settings.max_parser_depth);
+        // auto syntax_reulst_prewhere = TreeRewriter(context).analyze(prewhere_ast, metadata_snapshot_->getSampleBlock().getNamesAndTypesList());
+        // ExpressionAnalyzer analyzer(prewhere_ast, syntax_reulst_prewhere, context);
+
         prewhere_actions = std::make_unique<PrewhereExprInfo>();
         if (prewhere_info->alias_actions)
             prewhere_actions->alias_actions = std::make_shared<ExpressionActions>(prewhere_info->alias_actions, actions_settings);

@@ -623,7 +623,7 @@ MergeTreeRangeReader::MergeTreeRangeReader(
             sample_block.erase(prewhere_info->prewhere_column_name);
     }
 
-    invalid_record_filtering = merge_tree_reader->data_part->storage.getSettings()->enable_unique_mode;
+    do_deleted_record_filter = merge_tree_reader->data_part->storage.getSettings()->enable_unique_mode;
 }
 
 bool MergeTreeRangeReader::isReadingFinished() const
@@ -749,7 +749,8 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::read(size_t max_rows, Mar
             {
                 LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader::read"),"--0000000--appInfoNew[0].size:{}------read_result.getFilter:{}------columns[0].size:{}--------num_read_rows:{}", appInfoNew[0]->size(), read_result.getFilter()->size(), columns[0]->size(), num_read_rows);
                 filterColumns(columns, read_result.getFilter()->getData());
-                filterColumns(appInfoNew, read_result.getFilter()->getData());
+                if (do_deleted_record_filter)
+                    filterColumns(appInfoNew, read_result.getFilter()->getData());
             }
         }
         else
@@ -782,7 +783,8 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::read(size_t max_rows, Mar
                         auto old_columns = block_before_prewhere.getColumns();
                         LOG_INFO(&Poco::Logger::get("MergeTreeRangeReader::read"),"--222222--appInfoNew[0].size:{}------read_result.getFilterOriginal:{}", appInfoNew[0]->size(), read_result.getFilterOriginal()->size());
                         filterColumns(old_columns, read_result.getFilterOriginal()->getData());
-                        filterColumns(appInfoNew, read_result.getFilter()->getData());
+                        if (do_deleted_record_filter)
+                            filterColumns(appInfoNew, read_result.getFilterOriginal()->getData());
                         block_before_prewhere.setColumns(std::move(old_columns));
                     }
 
@@ -896,7 +898,7 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::startReadingChain(size_t 
         {
             if (stream.isFinished())
             {
-                if (invalid_record_filtering && last_reader_in_chain)
+                if (do_deleted_record_filter && last_reader_in_chain)
                 {
                     append_addInfo(stream);
                 }
@@ -914,12 +916,12 @@ MergeTreeRangeReader::ReadResult MergeTreeRangeReader::startReadingChain(size_t 
 
             auto rows_to_read = std::min(current_space, stream.numPendingRowsInCurrentGranule());
             bool last = rows_to_read == space_left;
-            result.addRows(stream.read(result.columns, rows_to_read, !last, invalid_record_filtering && last_reader_in_chain));
+            result.addRows(stream.read(result.columns, rows_to_read, !last, do_deleted_record_filter && last_reader_in_chain));
             result.addGranule(rows_to_read);
             space_left = (rows_to_read > space_left ? 0 : space_left - rows_to_read);
         }
     }
-    if (invalid_record_filtering && last_reader_in_chain)
+    if (do_deleted_record_filter && last_reader_in_chain)
     {
         append_addInfo(stream);
     }
@@ -960,7 +962,7 @@ Columns MergeTreeRangeReader::continueReadingChain(ReadResult & result, size_t &
         if (next_range_to_start < started_ranges.size()
             && i == started_ranges[next_range_to_start].num_granules_read_before_start)
         {
-            if (invalid_record_filtering && last_reader_in_chain)
+            if (do_deleted_record_filter && last_reader_in_chain)
             {
                 append_addInfo(stream);
             }
@@ -972,11 +974,11 @@ Columns MergeTreeRangeReader::continueReadingChain(ReadResult & result, size_t &
 
         bool last = i + 1 == size;
         LOG_INFO(&Poco::Logger::get("continueReadingChain"),"----rows_per_granule[i]:{}------last_reader_in_chain:{}", rows_per_granule[i], last_reader_in_chain);
-        num_rows += stream.read(columns, rows_per_granule[i], !last, invalid_record_filtering && last_reader_in_chain);
+        num_rows += stream.read(columns, rows_per_granule[i], !last, do_deleted_record_filter && last_reader_in_chain);
     }
 
     stream.skip(result.numRowsToSkipInLastGranule());
-    if (invalid_record_filtering && last_reader_in_chain)
+    if (do_deleted_record_filter && last_reader_in_chain)
     {
         append_addInfo(stream);
     }
@@ -1053,7 +1055,9 @@ static ColumnPtr combineFilters(ColumnPtr first, ColumnPtr second)
 void MergeTreeRangeReader::executePrewhereActionsAndFilterColumns(ReadResult & result)
 {
     if (!prewhere_info)
+    {
         return;
+    }
 
     const auto & header = merge_tree_reader->getColumns();
     size_t num_columns = header.size();

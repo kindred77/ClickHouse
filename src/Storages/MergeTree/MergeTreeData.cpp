@@ -294,7 +294,9 @@ bool MergeTreeData::getMarkAndOffsetCols(DataPartsVector & parts, const String &
                     settings.max_query_size,
                     settings.max_parser_depth);
     auto metadata_snapshot = getInMemoryMetadataPtr();
-    auto syntax_reulst_prewhere = TreeRewriter(query_context).analyze(prewhere_ast, metadata_snapshot->getSampleBlock().getNamesAndTypesList());
+    NamesAndTypesList name_and_types = metadata_snapshot->getSampleBlock().getNamesAndTypesList();
+    name_and_types.push_back({"_valid_flag", std::make_shared<DataTypeUInt8>()});
+    auto syntax_reulst_prewhere = TreeRewriter(query_context).analyze(prewhere_ast, name_and_types);
     select_ast_ptr->setExpression(ASTSelectQuery::Expression::PREWHERE,
             std::move(prewhere_ast));
     LOG_INFO(log, "getMarkAndOffsetCols-----44444------------");
@@ -5291,8 +5293,8 @@ NamesAndTypesList MergeTreeData::getVirtuals() const
         NameAndTypePair("_partition_id", std::make_shared<DataTypeString>()),
         NameAndTypePair("_partition_value", getPartitionValueType()),
         NameAndTypePair("_mark", std::make_shared<DataTypeUInt64>()),
-        NameAndTypePair("_offset_in_mark", std::make_shared<DataTypeUInt64>()),
-        NameAndTypePair("_valid_flag", std::make_shared<DataTypeUInt64>()),
+        NameAndTypePair("_offset_in_mark", std::make_shared<DataTypeUInt32>()),
+        NameAndTypePair("_valid_flag", std::make_shared<DataTypeUInt8>()),
         NameAndTypePair("_sample_factor", std::make_shared<DataTypeFloat64>()),
     };
 }
