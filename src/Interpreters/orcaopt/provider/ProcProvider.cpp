@@ -4,32 +4,58 @@
 
 using namespace duckdb_libpgquery;
 
+#define NEW_PROC(PROCVARNM, OID, PRONAME, PRONAMESPACE, PROOWNER, PROLANG, PROCOST, PROROWS, PROVARIADIC, PROTRANSFORM, PROISAGG, PROISWINDOW, PROSECDEF, PROLEAKPROOF, PROISSTRICT, PRORETSET, PROVOLATILE, PRONARGS, PRONARGDEFAULTS, PRORETTYPE, ...) \
+    std::pair<PGOid, PGProcPtr> ProcProvider::PROC_##PROCVARNM = {PGOid(OID), \
+        std::make_shared<Form_pg_proc>(Form_pg_proc{ \
+            .oid = PGOid(OID), \
+            /*proname*/ .proname = PRONAME, \
+            /*pronamespace*/ .pronamespace = PGOid(PRONAMESPACE), \
+            /*proowner*/ .proowner = PGOid(PROOWNER), \
+            /*prolang*/ .prolang = PGOid(PROLANG), \
+            /*procost*/ .procost = PROCOST, \
+            /*prorows*/ .prorows = PROROWS, \
+            /*provariadic*/ .provariadic = PGOid(PROVARIADIC), \
+            /*protransform*/ .protransform = PGOid(PROTRANSFORM), \
+            /*proisagg*/ .proisagg = PROISAGG, \
+            /*proiswindow*/ .proiswindow = PROISWINDOW, \
+            /*prosecdef*/ .prosecdef = PROSECDEF, \
+            /*proleakproof*/ .proleakproof = PROLEAKPROOF, \
+            /*proisstrict*/ .proisstrict = PROISSTRICT, \
+            /*proretset*/ .proretset = PRORETSET, \
+            /*provolatile*/ .provolatile = PROVOLATILE, \
+            /*pronargs*/ .pronargs = PRONARGS, \
+            /*pronargdefaults*/ .pronargdefaults = PRONARGDEFAULTS, \
+            /*prorettype*/ .prorettype = PGOid(PRORETTYPE), \
+            /*proargtypes*/ .proargtypes = __VA_ARGS__})};
+
 namespace DB
 {
 
-std::pair<PGOid, PGProcPtr> ProcProvider::PROC_INT2PL = std::pair<PGOid, PGProcPtr>(
-    PGOid(176),
-    std::make_shared<Form_pg_proc>(Form_pg_proc{
-        .oid = PGOid(176),
-        /*proname*/ .proname = "plus",
-        /*pronamespace*/ .pronamespace = PGOid(1),
-        /*proowner*/ .proowner = PGOid(1),
-        /*prolang*/ .prolang = PGOid(12),
-        /*procost*/ .procost = 1,
-        /*prorows*/ .prorows = 0.0,
-        /*provariadic*/ .provariadic = PGOid(0),
-        /*protransform*/ .protransform = PGOid(0),
-        /*proisagg*/ .proisagg = false,
-        /*proiswindow*/ .proiswindow = false,
-        /*prosecdef*/ .prosecdef = false,
-        /*proleakproof*/ .proleakproof = false,
-        /*proisstrict*/ .proisstrict = true,
-        /*proretset*/ .proretset = false,
-        /*provolatile*/ .provolatile = 'i',
-        /*pronargs*/ .pronargs = 2,
-        /*pronargdefaults*/ .pronargdefaults = 0,
-        /*prorettype*/ .prorettype = PGOid(21),
-        /*proargtypes*/ .proargtypes = {PGOid(21), PGOid(21)}}));
+NEW_PROC(INT2PL, 176, "plus", 1, 1, 12, 1, 0.0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 21, {PGOid(21), PGOid(21)})
+
+// std::pair<PGOid, PGProcPtr> ProcProvider::PROC_INT2PL = std::pair<PGOid, PGProcPtr>(
+//     PGOid(176),
+//     std::make_shared<Form_pg_proc>(Form_pg_proc{
+//         .oid = PGOid(176),
+//         /*proname*/ .proname = "plus",
+//         /*pronamespace*/ .pronamespace = PGOid(1),
+//         /*proowner*/ .proowner = PGOid(1),
+//         /*prolang*/ .prolang = PGOid(12),
+//         /*procost*/ .procost = 1,
+//         /*prorows*/ .prorows = 0.0,
+//         /*provariadic*/ .provariadic = PGOid(0),
+//         /*protransform*/ .protransform = PGOid(0),
+//         /*proisagg*/ .proisagg = false,
+//         /*proiswindow*/ .proiswindow = false,
+//         /*prosecdef*/ .prosecdef = false,
+//         /*proleakproof*/ .proleakproof = false,
+//         /*proisstrict*/ .proisstrict = true,
+//         /*proretset*/ .proretset = false,
+//         /*provolatile*/ .provolatile = 'i',
+//         /*pronargs*/ .pronargs = 2,
+//         /*pronargdefaults*/ .pronargdefaults = 0,
+//         /*prorettype*/ .prorettype = PGOid(21),
+//         /*proargtypes*/ .proargtypes = {PGOid(21), PGOid(21)}}));
 
 std::pair<PGOid, PGProcPtr> ProcProvider::PROC_INT4PL = std::pair<PGOid, PGProcPtr>(
     PGOid(177),

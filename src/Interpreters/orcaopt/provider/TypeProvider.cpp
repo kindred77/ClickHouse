@@ -14,6 +14,43 @@
 
 using namespace duckdb_libpgquery;
 
+#define NEW_TYPE(TYPEVARNM, OID, TYPNAME, TYPNAMESPACE, TYPOWNER, TYPLEN, TYPBYVAL, TYPTYPE, TYPCATEGORY, TYPISPREFERRED, TYPISDEFINED, TYPDELIM, TYPRELID, TYPELEM, TYPARRAY, TYPINPUT, TYPOUTPUT, TYPRECEIVE, TYPSEND, TYPMODIN, TYPMODOUT, TYPANALYZE, TYPALIGN, TYPSTORAGE, TYPNOTNULL, TYPBASETYPE, TYPTYPMOD, TYPNDIMS, TYPCOLLATION, LT_OPR, EQ_OPR, GT_OPR, HASH_PROC, CMP_PROC) \
+    std::pair<PGOid, PGTypePtr> TypeProvider::TYPE_##TYPEVARNM = {PGOid(OID), \
+       std::make_shared<Form_pg_type>(Form_pg_type{ \
+           /*oid*/ PGOid(OID), \
+           /*typname*/ TYPNAME, \
+		   /*typnamespace*/ PGOid(TYPNAMESPACE), \
+		   /*typowner*/ PGOid(TYPOWNER), \
+		   /*typlen*/ TYPLEN, \
+		   /*typbyval*/ TYPBYVAL, \
+		   /*typtype*/ TYPTYPE, \
+		   /*typcategory*/ TYPCATEGORY, \
+		   /*typispreferred*/ TYPISPREFERRED, \
+		   /*typisdefined*/ TYPISDEFINED, \
+		   /*typdelim*/ TYPDELIM, \
+		   /*typrelid*/ PGOid(TYPRELID), \
+		   /*typelem*/ PGOid(TYPELEM), \
+		   /*typarray*/ PGOid(TYPARRAY), \
+		   /*typinput*/ PGOid(TYPINPUT), \
+		   /*typoutput*/ PGOid(TYPOUTPUT), \
+		   /*typreceive*/ PGOid(TYPRECEIVE), \
+		   /*typsend*/ PGOid(TYPSEND), \
+		   /*typmodin*/ PGOid(TYPMODIN), \
+		   /*typmodout*/ PGOid(TYPMODOUT), \
+		   /*typanalyze*/ PGOid(TYPANALYZE), \
+		   /*typalign*/ TYPALIGN, \
+		   /*typstorage*/ TYPSTORAGE, \
+		   /*typnotnull*/ TYPNOTNULL, \
+		   /*typbasetype*/ PGOid(TYPBASETYPE), \
+		   /*typtypmod*/ PGOid(TYPTYPMOD), \
+		   /*typndims*/ PGOid(TYPNDIMS), \
+		   /*typcollation*/ PGOid(TYPCOLLATION), \
+		   /*lt_opr*/ PGOid(LT_OPR), \
+		   /*eq_opr*/ PGOid(EQ_OPR), \
+		   /*gt_opr*/ PGOid(GT_OPR), \
+		   /*hash_proc*/ PGOid(HASH_PROC), \
+           /*cmp_proc*/ PGOid(CMP_PROC)})};
+
 namespace DB
 {
 
@@ -22,42 +59,44 @@ std::unordered_map<PGTupleDescPtr, const PGTupleDesc &, PGTupleDescHash, PGTuple
 size_t TypeProvider::NextRecordTypmod = 0;
 std::vector<PGTupleDescPtr> TypeProvider::recordCacheArray = {};
 
-std::pair<PGOid, PGTypePtr> TypeProvider::TYPE_FLOAT32
-    = {PGOid(700),
-       std::make_shared<Form_pg_type>(Form_pg_type{
-           /*oid*/ PGOid(700),
-           /*typname*/ getTypeName(TypeIndex::Float32),
-		   /*typnamespace*/ PGOid(1),
-		   /*typowner*/ PGOid(1),
-		   /*typlen*/ 4,
-		   /*typbyval*/ true,
-		   /*typtype*/ 'b',
-		   /*typcategory*/ 'N',
-		   /*typispreferred*/ false,
-		   /*typisdefined*/ true,
-		   /*typdelim*/ ',',
-		   /*typrelid*/ PGOid(0),
-		   /*typelem*/ PGOid(1021),
-		   /*typarray*/ PGOid(0),
-		   /*typinput*/ PGOid(1),
-		   /*typoutput*/ PGOid(1),
-		   /*typreceive*/ PGOid(1),
-		   /*typsend*/ PGOid(1),
-		   /*typmodin*/ PGOid(1),
-		   /*typmodout*/ PGOid(1),
-		   /*typanalyze*/ PGOid(1),
-		   /*typalign*/ 'i',
-		   /*typstorage*/ 'p',
-		   /*typnotnull*/ false,
-		   /*typbasetype*/ PGOid(1),
-		   /*typtypmod*/ PGOid(1),
-		   /*typndims*/ PGOid(1),
-		   /*typcollation*/ PGOid(1),
-		   /*lt_opr*/ PGOid(622),
-		   /*eq_opr*/ PGOid(620),
-		   /*gt_opr*/ PGOid(623),
-		   /*hash_proc*/ PGOid(620),
-           /*cmp_proc*/ PGOid(0)})};
+NEW_TYPE(FLOAT32, 700, "Float32", 1, 1, 4, true, 'b', 'N', false, true, ',', 0, 1021, 0, 1, 1, 1, 1, 1, 1, 1, 'i', 'p', false, 1, 1, 1, 1, 622, 620, 623, 620, 0)
+
+// std::pair<PGOid, PGTypePtr> TypeProvider::TYPE_FLOAT32
+//     = {PGOid(700),
+//        std::make_shared<Form_pg_type>(Form_pg_type{
+//            /*oid*/ PGOid(700),
+//            /*typname*/ getTypeName(TypeIndex::Float32),
+// 		   /*typnamespace*/ PGOid(1),
+// 		   /*typowner*/ PGOid(1),
+// 		   /*typlen*/ 4,
+// 		   /*typbyval*/ true,
+// 		   /*typtype*/ 'b',
+// 		   /*typcategory*/ 'N',
+// 		   /*typispreferred*/ false,
+// 		   /*typisdefined*/ true,
+// 		   /*typdelim*/ ',',
+// 		   /*typrelid*/ PGOid(0),
+// 		   /*typelem*/ PGOid(1021),
+// 		   /*typarray*/ PGOid(0),
+// 		   /*typinput*/ PGOid(1),
+// 		   /*typoutput*/ PGOid(1),
+// 		   /*typreceive*/ PGOid(1),
+// 		   /*typsend*/ PGOid(1),
+// 		   /*typmodin*/ PGOid(1),
+// 		   /*typmodout*/ PGOid(1),
+// 		   /*typanalyze*/ PGOid(1),
+// 		   /*typalign*/ 'i',
+// 		   /*typstorage*/ 'p',
+// 		   /*typnotnull*/ false,
+// 		   /*typbasetype*/ PGOid(1),
+// 		   /*typtypmod*/ PGOid(1),
+// 		   /*typndims*/ PGOid(1),
+// 		   /*typcollation*/ PGOid(1),
+// 		   /*lt_opr*/ PGOid(622),
+// 		   /*eq_opr*/ PGOid(620),
+// 		   /*gt_opr*/ PGOid(623),
+// 		   /*hash_proc*/ PGOid(620),
+//            /*cmp_proc*/ PGOid(0)})};
 
 std::pair<PGOid, PGTypePtr> TypeProvider::TYPE_FLOAT64
     = {PGOid(701),

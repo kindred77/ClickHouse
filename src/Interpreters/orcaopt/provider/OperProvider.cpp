@@ -6,122 +6,152 @@
 
 using namespace duckdb_libpgquery;
 
+#define NEW_OPER(OPRVARNM, OID, OPRNAME, OPRNAMESPACE, OPROWNER, OPRKIND, OPRCANMERGE, OPRCANHASH, OPRLEFT, OPRRIGHT, OPRRESULT, OPRCOM, OPRNEGATE, OPRLSORTOP, OPRRSORTOP, OPRLTCMPOP, OPRGTCMPOP, OPRCODE, OPRREST, OPRJOIN) \
+    std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_##OPRVARNM = {PGOid(OID), \
+        std::make_shared<Form_pg_operator>(Form_pg_operator{ \
+            .oid = PGOid(OID), \
+            /*oprname*/ .oprname = OPRNAME, \
+            /*oprnamespace*/ .oprnamespace = PGOid(OPRNAMESPACE), \
+            /*oprowner*/ .oprowner = PGOid(OPROWNER), \
+            /*oprkind*/ .oprkind = OPRKIND, \
+            /*oprcanmerge*/ .oprcanmerge = OPRCANMERGE, \
+            /*oprcanhash*/ .oprcanhash = OPRCANHASH, \
+            /*oprleft*/ .oprleft = PGOid(OPRLEFT), \
+            /*oprright*/ .oprright = PGOid(OPRRIGHT), \
+            /*oprresult*/ .oprresult = PGOid(OPRRESULT), \
+            /*oprcom*/ .oprcom = PGOid(OPRCOM), \
+            /*oprnegate*/ .oprnegate = PGOid(OPRNEGATE), \
+            /*oprlsortop*/ .oprlsortop = PGOid(OPRLSORTOP), \
+            /*oprrsortop*/ .oprrsortop = PGOid(OPRRSORTOP), \
+            /*oprltcmpop*/ .oprltcmpop = PGOid(OPRLTCMPOP), \
+            /*oprgtcmpop*/ .oprgtcmpop = PGOid(OPRGTCMPOP), \
+            /*oprcode*/ .oprcode = PGOid(OPRCODE), \
+            /*oprrest*/ .oprrest = PGOid(OPRREST), \
+            /*oprjoin*/ .oprjoin = PGOid(OPRJOIN)})};
+
 namespace DB
 {
-std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT2PL = std::pair<PGOid, PGOperatorPtr>(
-    PGOid(550),
-    std::make_shared<Form_pg_operator>(Form_pg_operator{
-        .oid = PGOid(550),
-        /*oprname*/ .oprname = "+",
-        /*oprnamespace*/ .oprnamespace = PGOid(1),
-        /*oprowner*/ .oprowner = PGOid(1),
-        /*oprkind*/ .oprkind = 'b',
-        /*oprcanmerge*/ .oprcanmerge = false,
-        /*oprcanhash*/ .oprcanhash = false,
-        /*oprleft*/ .oprleft = PGOid(21),
-        /*oprright*/ .oprright = PGOid(21),
-        /*oprresult*/ .oprresult = PGOid(21),
-        /*oprcom*/ .oprcom = PGOid(550),
-        /*oprnegate*/ .oprnegate = PGOid(0),
-        /*oprlsortop*/ .oprlsortop = PGOid(0),
-        /*oprrsortop*/ .oprrsortop = PGOid(0),
-        /*oprltcmpop*/ .oprltcmpop = PGOid(0),
-        /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(176),
-        /*oprrest*/ .oprrest = PGOid(0),
-        /*oprjoin*/ .oprjoin = PGOid(0)}));
 
-std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT4PL = std::pair<PGOid, PGOperatorPtr>(
-    PGOid(551),
-    std::make_shared<Form_pg_operator>(Form_pg_operator{
-        .oid = PGOid(551),
-        /*oprname*/ .oprname = "+",
-        /*oprnamespace*/ .oprnamespace = PGOid(1),
-        /*oprowner*/ .oprowner = PGOid(1),
-        /*oprkind*/ .oprkind = 'b',
-        /*oprcanmerge*/ .oprcanmerge = false,
-        /*oprcanhash*/ .oprcanhash = false,
-        /*oprleft*/ .oprleft = PGOid(23),
-        /*oprright*/ .oprright = PGOid(23),
-        /*oprresult*/ .oprresult = PGOid(23),
-        /*oprcom*/ .oprcom = PGOid(551),
-        /*oprnegate*/ .oprnegate = PGOid(0),
-        /*oprlsortop*/ .oprlsortop = PGOid(0),
-        /*oprrsortop*/ .oprrsortop = PGOid(0),
-        /*oprltcmpop*/ .oprltcmpop = PGOid(0),
-        /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(177),
-        /*oprrest*/ .oprrest = PGOid(0),
-        /*oprjoin*/ .oprjoin = PGOid(0)}));
+NEW_OPER(INT2PL, 550, "+", 1, 1, 'b', false, false, 21, 21, 21, 550, 0, 0, 0, 0, 0, 176, 0, 0)
+NEW_OPER(INT4PL, 551, "+", 1, 1, 'b', false, false, 23, 23, 23, 551, 0, 0, 0, 0, 0, 177, 0, 0)
+NEW_OPER(INT24PL, 552, "+", 1, 1, 'b', false, false, 21, 23, 23, 553, 0, 0, 0, 0, 0, 178, 0, 0)
+NEW_OPER(INT42PL, 553, "+", 1, 1, 'b', false, false, 23, 21, 23, 552, 0, 0, 0, 0, 0, 179, 0, 0)
+NEW_OPER(INT2MI, 554, "-", 1, 1, 'b', false, false, 21, 21, 21, 0, 0, 0, 0, 0, 0, 180, 0, 0)
 
-std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT24PL = std::pair<PGOid, PGOperatorPtr>(
-    PGOid(552),
-    std::make_shared<Form_pg_operator>(Form_pg_operator{
-        .oid = PGOid(552),
-        /*oprname*/ .oprname = "+",
-        /*oprnamespace*/ .oprnamespace = PGOid(1),
-        /*oprowner*/ .oprowner = PGOid(1),
-        /*oprkind*/ .oprkind = 'b',
-        /*oprcanmerge*/ .oprcanmerge = false,
-        /*oprcanhash*/ .oprcanhash = false,
-        /*oprleft*/ .oprleft = PGOid(21),
-        /*oprright*/ .oprright = PGOid(23),
-        /*oprresult*/ .oprresult = PGOid(23),
-        /*oprcom*/ .oprcom = PGOid(553),
-        /*oprnegate*/ .oprnegate = PGOid(0),
-        /*oprlsortop*/ .oprlsortop = PGOid(0),
-        /*oprrsortop*/ .oprrsortop = PGOid(0),
-        /*oprltcmpop*/ .oprltcmpop = PGOid(0),
-        /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(178),
-        /*oprrest*/ .oprrest = PGOid(0),
-        /*oprjoin*/ .oprjoin = PGOid(0)}));
+// std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT2PL = std::pair<PGOid, PGOperatorPtr>(
+//     PGOid(550),
+//     std::make_shared<Form_pg_operator>(Form_pg_operator{
+//         .oid = PGOid(550),
+//         /*oprname*/ .oprname = "+",
+//         /*oprnamespace*/ .oprnamespace = PGOid(1),
+//         /*oprowner*/ .oprowner = PGOid(1),
+//         /*oprkind*/ .oprkind = 'b',
+//         /*oprcanmerge*/ .oprcanmerge = false,
+//         /*oprcanhash*/ .oprcanhash = false,
+//         /*oprleft*/ .oprleft = PGOid(21),
+//         /*oprright*/ .oprright = PGOid(21),
+//         /*oprresult*/ .oprresult = PGOid(21),
+//         /*oprcom*/ .oprcom = PGOid(550),
+//         /*oprnegate*/ .oprnegate = PGOid(0),
+//         /*oprlsortop*/ .oprlsortop = PGOid(0),
+//         /*oprrsortop*/ .oprrsortop = PGOid(0),
+//         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
+//         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
+//         /*oprcode*/ .oprcode = PGOid(176),
+//         /*oprrest*/ .oprrest = PGOid(0),
+//         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
-std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT42PL = std::pair<PGOid, PGOperatorPtr>(
-    PGOid(553),
-    std::make_shared<Form_pg_operator>(Form_pg_operator{
-        .oid = PGOid(553),
-        /*oprname*/ .oprname = "+",
-        /*oprnamespace*/ .oprnamespace = PGOid(1),
-        /*oprowner*/ .oprowner = PGOid(1),
-        /*oprkind*/ .oprkind = 'b',
-        /*oprcanmerge*/ .oprcanmerge = false,
-        /*oprcanhash*/ .oprcanhash = false,
-        /*oprleft*/ .oprleft = PGOid(23),
-        /*oprright*/ .oprright = PGOid(21),
-        /*oprresult*/ .oprresult = PGOid(23),
-        /*oprcom*/ .oprcom = PGOid(552),
-        /*oprnegate*/ .oprnegate = PGOid(0),
-        /*oprlsortop*/ .oprlsortop = PGOid(0),
-        /*oprrsortop*/ .oprrsortop = PGOid(0),
-        /*oprltcmpop*/ .oprltcmpop = PGOid(0),
-        /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(179),
-        /*oprrest*/ .oprrest = PGOid(0),
-        /*oprjoin*/ .oprjoin = PGOid(0)}));
+// std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT4PL = std::pair<PGOid, PGOperatorPtr>(
+//     PGOid(551),
+//     std::make_shared<Form_pg_operator>(Form_pg_operator{
+//         .oid = PGOid(551),
+//         /*oprname*/ .oprname = "+",
+//         /*oprnamespace*/ .oprnamespace = PGOid(1),
+//         /*oprowner*/ .oprowner = PGOid(1),
+//         /*oprkind*/ .oprkind = 'b',
+//         /*oprcanmerge*/ .oprcanmerge = false,
+//         /*oprcanhash*/ .oprcanhash = false,
+//         /*oprleft*/ .oprleft = PGOid(23),
+//         /*oprright*/ .oprright = PGOid(23),
+//         /*oprresult*/ .oprresult = PGOid(23),
+//         /*oprcom*/ .oprcom = PGOid(551),
+//         /*oprnegate*/ .oprnegate = PGOid(0),
+//         /*oprlsortop*/ .oprlsortop = PGOid(0),
+//         /*oprrsortop*/ .oprrsortop = PGOid(0),
+//         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
+//         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
+//         /*oprcode*/ .oprcode = PGOid(177),
+//         /*oprrest*/ .oprrest = PGOid(0),
+//         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
-std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT2MI = std::pair<PGOid, PGOperatorPtr>(
-    PGOid(554),
-    std::make_shared<Form_pg_operator>(Form_pg_operator{
-        .oid = PGOid(554),
-        /*oprname*/ .oprname = "-",
-        /*oprnamespace*/ .oprnamespace = PGOid(1),
-        /*oprowner*/ .oprowner = PGOid(1),
-        /*oprkind*/ .oprkind = 'b',
-        /*oprcanmerge*/ .oprcanmerge = false,
-        /*oprcanhash*/ .oprcanhash = false,
-        /*oprleft*/ .oprleft = PGOid(21),
-        /*oprright*/ .oprright = PGOid(21),
-        /*oprresult*/ .oprresult = PGOid(21),
-        /*oprcom*/ .oprcom = PGOid(0),
-        /*oprnegate*/ .oprnegate = PGOid(0),
-        /*oprlsortop*/ .oprlsortop = PGOid(0),
-        /*oprrsortop*/ .oprrsortop = PGOid(0),
-        /*oprltcmpop*/ .oprltcmpop = PGOid(0),
-        /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
-        /*oprcode*/ .oprcode = PGOid(180),
-        /*oprrest*/ .oprrest = PGOid(0),
-        /*oprjoin*/ .oprjoin = PGOid(0)}));
+// std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT24PL = std::pair<PGOid, PGOperatorPtr>(
+//     PGOid(552),
+//     std::make_shared<Form_pg_operator>(Form_pg_operator{
+//         .oid = PGOid(552),
+//         /*oprname*/ .oprname = "+",
+//         /*oprnamespace*/ .oprnamespace = PGOid(1),
+//         /*oprowner*/ .oprowner = PGOid(1),
+//         /*oprkind*/ .oprkind = 'b',
+//         /*oprcanmerge*/ .oprcanmerge = false,
+//         /*oprcanhash*/ .oprcanhash = false,
+//         /*oprleft*/ .oprleft = PGOid(21),
+//         /*oprright*/ .oprright = PGOid(23),
+//         /*oprresult*/ .oprresult = PGOid(23),
+//         /*oprcom*/ .oprcom = PGOid(553),
+//         /*oprnegate*/ .oprnegate = PGOid(0),
+//         /*oprlsortop*/ .oprlsortop = PGOid(0),
+//         /*oprrsortop*/ .oprrsortop = PGOid(0),
+//         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
+//         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
+//         /*oprcode*/ .oprcode = PGOid(178),
+//         /*oprrest*/ .oprrest = PGOid(0),
+//         /*oprjoin*/ .oprjoin = PGOid(0)}));
+
+// std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT42PL = std::pair<PGOid, PGOperatorPtr>(
+//     PGOid(553),
+//     std::make_shared<Form_pg_operator>(Form_pg_operator{
+//         .oid = PGOid(553),
+//         /*oprname*/ .oprname = "+",
+//         /*oprnamespace*/ .oprnamespace = PGOid(1),
+//         /*oprowner*/ .oprowner = PGOid(1),
+//         /*oprkind*/ .oprkind = 'b',
+//         /*oprcanmerge*/ .oprcanmerge = false,
+//         /*oprcanhash*/ .oprcanhash = false,
+//         /*oprleft*/ .oprleft = PGOid(23),
+//         /*oprright*/ .oprright = PGOid(21),
+//         /*oprresult*/ .oprresult = PGOid(23),
+//         /*oprcom*/ .oprcom = PGOid(552),
+//         /*oprnegate*/ .oprnegate = PGOid(0),
+//         /*oprlsortop*/ .oprlsortop = PGOid(0),
+//         /*oprrsortop*/ .oprrsortop = PGOid(0),
+//         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
+//         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
+//         /*oprcode*/ .oprcode = PGOid(179),
+//         /*oprrest*/ .oprrest = PGOid(0),
+//         /*oprjoin*/ .oprjoin = PGOid(0)}));
+
+// std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT2MI = std::pair<PGOid, PGOperatorPtr>(
+//     PGOid(554),
+//     std::make_shared<Form_pg_operator>(Form_pg_operator{
+//         .oid = PGOid(554),
+//         /*oprname*/ .oprname = "-",
+//         /*oprnamespace*/ .oprnamespace = PGOid(1),
+//         /*oprowner*/ .oprowner = PGOid(1),
+//         /*oprkind*/ .oprkind = 'b',
+//         /*oprcanmerge*/ .oprcanmerge = false,
+//         /*oprcanhash*/ .oprcanhash = false,
+//         /*oprleft*/ .oprleft = PGOid(21),
+//         /*oprright*/ .oprright = PGOid(21),
+//         /*oprresult*/ .oprresult = PGOid(21),
+//         /*oprcom*/ .oprcom = PGOid(0),
+//         /*oprnegate*/ .oprnegate = PGOid(0),
+//         /*oprlsortop*/ .oprlsortop = PGOid(0),
+//         /*oprrsortop*/ .oprrsortop = PGOid(0),
+//         /*oprltcmpop*/ .oprltcmpop = PGOid(0),
+//         /*oprgtcmpop*/ .oprgtcmpop = PGOid(0),
+//         /*oprcode*/ .oprcode = PGOid(180),
+//         /*oprrest*/ .oprrest = PGOid(0),
+//         /*oprjoin*/ .oprjoin = PGOid(0)}));
 
 std::pair<PGOid, PGOperatorPtr> OperProvider::OPER_INT4MI = std::pair<PGOid, PGOperatorPtr>(
     PGOid(555),
