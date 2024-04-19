@@ -24,6 +24,7 @@ set (SRCS
     "${LIBRARY_DIR}/src/row.cxx"
     "${LIBRARY_DIR}/src/util.cxx"
     "${LIBRARY_DIR}/src/version.cxx"
+    "${LIBRARY_DIR}/src/params.cxx"
 )
 
 # Need to explicitly include each header file, because in the directory include/pqxx there are also files
@@ -59,6 +60,7 @@ set (HDRS
     "${LIBRARY_DIR}/include/pqxx/util.hxx"
     "${LIBRARY_DIR}/include/pqxx/version.hxx"
     "${LIBRARY_DIR}/include/pqxx/zview.hxx"
+    "${LIBRARY_DIR}/include/pqxx/params.hxx"
 )
 
 add_library(libpqxx ${SRCS} ${HDRS})

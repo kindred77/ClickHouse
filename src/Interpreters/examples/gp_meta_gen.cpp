@@ -10,10 +10,19 @@
 
 using namespace pqxx;
 using namespace duckdb_libpgquery;
+using namespace DB;
 
 int main(int argc, char ** argv)
 {
-    PGConnectionPtr conn = std::make_shared<connection>("dbname=postgres user=kindred hostaddr=127.0.0.1 port=5432");
+    try
+    {
+        PGConnectionPtr conn = std::make_shared<connection>("dbname=postgres user=kindred hostaddr=127.0.0.1 port=5432");
+        Agg::init(conn, 16);
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
     
     return 0;
 };
