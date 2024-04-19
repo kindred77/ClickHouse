@@ -194,6 +194,7 @@ add_object_library(clickhouse_interpreters_jit Interpreters/JIT)
 add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt) #for gpdb 6.21.x
 add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/provider)
 add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/translator)
+add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/metagen)
 
 add_object_library(clickhouse_columns Columns)
 add_object_library(clickhouse_storages Storages)
