@@ -7,6 +7,8 @@ using namespace pqxx;
 namespace DB
 {
 
+std::unordered_map<PGOid, ProcPtr> Proc::proc_map;
+
 bool Proc::init(PGConnectionPtr conn, PGOid oid)
 {
     if (proc_map.count(oid) > 0) return true;

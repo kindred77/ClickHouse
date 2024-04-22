@@ -7,7 +7,7 @@ using namespace pqxx;
 namespace DB
 {
 
-std::unordered_map<duckdb_libpgquery::PGOid, AggPtr> Agg::agg_map;
+std::unordered_map<PGOid, AggPtr> Agg::agg_map;
 
 bool Agg::init(PGConnectionPtr conn, PGOid oid)
 {
