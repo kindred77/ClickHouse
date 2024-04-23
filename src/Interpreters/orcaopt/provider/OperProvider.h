@@ -34,6 +34,30 @@ where op.oprname in ('+','-','*','/','%','==','!=','<>','<=','>=','<','>','=')
 order by 2,3,4,5,6,7,8,9,10,11,12;
  */
 
+
+/*
+
+    select po.opcintype,pa.amopopr,
+    (select pop.oprname from pg_operator pop where pop.oid=pa.amopopr) as oprname,
+    case when po.opcmethod=403 then 'BTREE_AM_OID' else 'HASH_AM_OID' end as opcmethod,
+    case when po.opcmethod=405 and pa.amopstrategy=1 then 'HTEqualStrategyNumber'
+    when po.opcmethod=403 and pa.amopstrategy=1 then 'BTLessStrategyNumber'
+    when po.opcmethod=403 and pa.amopstrategy=2 then 'BTLessEqualStrategyNumber'
+    when po.opcmethod=403 and pa.amopstrategy=3 then 'BTEqualStrategyNumber'
+    when po.opcmethod=403 and pa.amopstrategy=4 then 'BTGreaterEqualStrategyNumber'
+    when po.opcmethod=403 and pa.amopstrategy=5 then 'BTGreaterStrategyNumber'
+    else 'Unknown: '||po.opcmethod||'-'||pa.amopstrategy
+    end as amopstrategy
+    from pg_amop pa
+    inner join pg_opclass po on pa.amopfamily = po.opcfamily
+    and pa.amoplefttype = po.opcintype and pa.amoprighttype = po.opcintype
+    and pa.amopstrategy in (1,2,3,4,5)
+    where po.opcmethod in (403, 405)
+    and po.opcdefault = true
+    and po.opcintype = 700;
+
+    */
+
 class OperProvider
 {
 private:

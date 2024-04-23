@@ -1,4 +1,6 @@
 #include <Interpreters/orcaopt/metagen/Oper.h>
+#include <Interpreters/orcaopt/metagen/Typ.h>
+#include <Interpreters/orcaopt/metagen/Proc.h>
 #include <iostream>
 
 using namespace duckdb_libpgquery;
@@ -11,7 +13,11 @@ std::unordered_map<PGOid, OperPtr> Oper::oper_map;
 
 bool Oper::init(PGConnectionPtr conn, PGOid oid)
 {
+    if (oid == InvalidOid) return false;
     if (oper_map.count(oid) > 0) return true;
+    std::vector<PGOid> tobeInited_types;
+    std::vector<PGOid> tobeInited_procs;
+    std::vector<PGOid> tobeInited_opers;
     try
     {
         if (!conn->is_open())
@@ -46,14 +52,38 @@ bool Oper::init(PGConnectionPtr conn, PGOid oid)
 
             oper_map.insert({oid, oper});
 
-            return true;
+            tobeInited_types.push_back(oper->oprleft);
+            tobeInited_types.push_back(oper->oprright);
+            tobeInited_types.push_back(oper->oprresult);
+
+            tobeInited_opers.push_back(oper->oprcom);
+            tobeInited_opers.push_back(oper->oprnegate);
+
+            tobeInited_procs.push_back(oper->oprcode);
+            tobeInited_procs.push_back(oper->oprrest);
+            tobeInited_procs.push_back(oper->oprjoin);
         }
     }
     catch(const std::exception& e)
     {
         std::cerr << e.what() << '\n';
+        return false;
     }
-    return false;
+
+    for (const auto oid : tobeInited_types)
+    {
+        Typ::init(conn, oid);
+    }
+    for (const auto oid : tobeInited_procs)
+    {
+        Proc::init(conn, oid);
+    }
+    for (const auto oid : tobeInited_opers)
+    {
+        Oper::init(conn, oid);
+    }
+
+    return true;
     
 };
 

@@ -41,7 +41,7 @@ public:
 
     static std::unordered_map<duckdb_libpgquery::PGOid, ProcPtr> proc_map;
 
-    bool init(PGConnectionPtr conn, duckdb_libpgquery::PGOid oid);
+    static bool init(PGConnectionPtr conn, duckdb_libpgquery::PGOid oid);
 };
 
 }

@@ -1,4 +1,7 @@
 #include <Interpreters/orcaopt/metagen/Agg.h>
+#include <Interpreters/orcaopt/metagen/Typ.h>
+#include <Interpreters/orcaopt/metagen/Proc.h>
+#include <Interpreters/orcaopt/metagen/Oper.h>
 #include <iostream>
 
 using namespace duckdb_libpgquery;
@@ -11,7 +14,11 @@ std::unordered_map<PGOid, AggPtr> Agg::agg_map;
 
 bool Agg::init(PGConnectionPtr conn, PGOid oid)
 {
+    if (oid == InvalidOid) return false;
     if (agg_map.count(oid) > 0) return true;
+    std::vector<PGOid> tobeInited_types;
+    std::vector<PGOid> tobeInited_procs;
+    std::vector<PGOid> tobeInited_opers;
     try
     {
         if (!conn->is_open())
@@ -57,14 +64,42 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
 
             agg_map.insert({oid, agg});
 
-            return true;
+            tobeInited_types.push_back(agg->aggtranstype);
+            tobeInited_types.push_back(agg->aggmtranstype);
+
+            tobeInited_procs.push_back(oid);
+            tobeInited_procs.push_back(agg->aggtransfn);
+            tobeInited_procs.push_back(agg->aggfinalfn);
+            tobeInited_procs.push_back(agg->aggcombinefn);
+            tobeInited_procs.push_back(agg->aggserialfn);
+            tobeInited_procs.push_back(agg->aggdeserialfn);
+            tobeInited_procs.push_back(agg->aggmtransfn);
+            tobeInited_procs.push_back(agg->aggminvtransfn);
+            tobeInited_procs.push_back(agg->aggmfinalfn);
+
+            tobeInited_opers.push_back(agg->aggsortop);
         }
     }
     catch(const std::exception& e)
     {
         std::cerr << e.what() << '\n';
+        return false;
     }
-    return false;
+    
+    for (const auto oid : tobeInited_types)
+    {
+        Typ::init(conn, oid);
+    }
+    for (const auto oid : tobeInited_procs)
+    {
+        Proc::init(conn, oid);
+    }
+    for (const auto oid : tobeInited_opers)
+    {
+        Oper::init(conn, oid);
+    }
+
+    return true;
     
 };
 
