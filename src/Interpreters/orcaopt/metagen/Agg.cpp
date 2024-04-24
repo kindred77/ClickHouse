@@ -16,6 +16,7 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
 {
     if (oid == InvalidOid) return false;
     if (agg_map.count(oid) > 0) return true;
+    bool is_found = false;
     std::vector<PGOid> tobeInited_types;
     std::vector<PGOid> tobeInited_procs;
     std::vector<PGOid> tobeInited_opers;
@@ -78,6 +79,8 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
             tobeInited_procs.push_back(agg->aggmfinalfn);
 
             tobeInited_opers.push_back(agg->aggsortop);
+
+            is_found = true;
         }
     }
     catch(const std::exception& e)
@@ -98,8 +101,8 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
     {
         Oper::init(conn, oid);
     }
-
-    return true;
+    
+    return is_found;
     
 };
 

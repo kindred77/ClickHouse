@@ -15,6 +15,7 @@ bool Oper::init(PGConnectionPtr conn, PGOid oid)
 {
     if (oid == InvalidOid) return false;
     if (oper_map.count(oid) > 0) return true;
+    bool is_found = false;
     std::vector<PGOid> tobeInited_types;
     std::vector<PGOid> tobeInited_procs;
     std::vector<PGOid> tobeInited_opers;
@@ -62,6 +63,8 @@ bool Oper::init(PGConnectionPtr conn, PGOid oid)
             tobeInited_procs.push_back(oper->oprcode);
             tobeInited_procs.push_back(oper->oprrest);
             tobeInited_procs.push_back(oper->oprjoin);
+
+            is_found = true;
         }
     }
     catch(const std::exception& e)
@@ -82,8 +85,8 @@ bool Oper::init(PGConnectionPtr conn, PGOid oid)
     {
         Oper::init(conn, oid);
     }
-
-    return true;
+    
+    return is_found;
     
 };
 
