@@ -6,6 +6,9 @@
 
 #include <Interpreters/orcaopt/metagen/common.h>
 #include <Interpreters/orcaopt/metagen/Agg.h>
+#include <Interpreters/orcaopt/metagen/Oper.h>
+#include <Interpreters/orcaopt/metagen/Cast.h>
+#include <Interpreters/orcaopt/metagen/Typ.h>
 #include <Interpreters/orcaopt/metagen/Proc.h>
 
 using namespace pqxx;
@@ -157,7 +160,23 @@ int main(int argc, char ** argv)
     try
     {
         PGConnectionPtr conn = std::make_shared<connection>("dbname=postgres user=kindred hostaddr=127.0.0.1 port=5432");
-        Agg::init(conn, 16);
+        for (PGOid oid : agg_init_oids)
+        {
+            Agg::init(conn, oid);
+        }
+        for (PGOid oid : type_init_oids)
+        {
+            Typ::init(conn, oid);
+        }
+        for (PGOid oid : oper_init_oids)
+        {
+            Oper::init(conn, oid);
+        }
+        for (auto [source_oid, target_oid] : cast_init_oids)
+        {
+            Cast::init(conn, source_oid, target_oid);
+        }
+        
     }
     catch(const std::exception& e)
     {
