@@ -15,6 +15,8 @@ using TypPtr = std::shared_ptr<Typ>;
 
 class Typ
 {
+private:
+    static void initVarName(PGConnectionPtr conn, TypPtr agg);
 public:
     duckdb_libpgquery::PGOid oid;
     std::string typname;
@@ -49,9 +51,14 @@ public:
     duckdb_libpgquery::PGOid hash_proc;
     duckdb_libpgquery::PGOid cmp_proc;
 
+    //prop for output
+    std::string var_name;
+
     static std::unordered_map<duckdb_libpgquery::PGOid, TypPtr> typ_map;
 
     static bool init(PGConnectionPtr conn, duckdb_libpgquery::PGOid oid);
+
+    static void output();
 };
 
 }

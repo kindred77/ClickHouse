@@ -15,6 +15,8 @@ using AggPtr = std::shared_ptr<Agg>;
 
 class Agg
 {
+private:
+    static void initVarName(PGConnectionPtr conn, AggPtr agg);
 public:
     duckdb_libpgquery::PGOid aggfnoid;
     std::string aggkind;
@@ -37,9 +39,14 @@ public:
     std::string agginitval;
     std::string aggminitval;
 
+    //prop for output
+    std::string var_name;
+
     static std::unordered_map<duckdb_libpgquery::PGOid, AggPtr> agg_map;
 
     static bool init(PGConnectionPtr conn, duckdb_libpgquery::PGOid oid);
+
+    static void output();
 };
 
 }

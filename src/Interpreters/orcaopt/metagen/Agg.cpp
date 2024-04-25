@@ -2,7 +2,12 @@
 #include <Interpreters/orcaopt/metagen/Typ.h>
 #include <Interpreters/orcaopt/metagen/Proc.h>
 #include <Interpreters/orcaopt/metagen/Oper.h>
+
+#include <Common/Exception.h>
+
 #include <iostream>
+
+#include <boost/algorithm/string/case_conv.hpp>
 
 using namespace duckdb_libpgquery;
 using namespace pqxx;
@@ -11,6 +16,42 @@ namespace DB
 {
 
 std::unordered_map<PGOid, AggPtr> Agg::agg_map;
+
+void Agg::initVarName(PGConnectionPtr conn, AggPtr agg)
+{
+    if (!Proc::init(conn, agg->aggfnoid))
+    {
+        std::string msg = "Can not init var name of agg, can not get proc, agg oid: " + std::to_string(agg->aggfnoid);
+        throw Exception(msg, 1);
+    }
+    const auto proc = Proc::proc_map[agg->aggfnoid];
+    if (proc->proargtypes.size() > 1)
+    {
+        std::string msg = "Can not init var name of agg, multiple args, agg oid: " + std::to_string(agg->aggfnoid);
+        throw Exception(msg, 1);
+    }
+
+    agg->var_name = proc->proname;
+
+    if(proc->proargtypes.size() == 1 && proc->proargtypes[0] != InvalidOid)
+    {
+        auto typ_oid = proc->proargtypes[0];
+
+        if (!Typ::init(conn, typ_oid))
+        {
+            std::string msg = "Can not init var name of agg, can not get arg type, agg oid: " + std::to_string(agg->aggfnoid) + ", type oid: " + std::to_string(typ_oid);
+            throw Exception(msg, 1);
+        }
+
+        auto typ = Typ::typ_map[typ_oid];
+
+        agg->var_name += "_";
+        agg->var_name += typ->typname;
+    }
+
+    boost::to_upper(agg->var_name);
+    
+}
 
 bool Agg::init(PGConnectionPtr conn, PGOid oid)
 {
@@ -24,8 +65,7 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
     {
         if (!conn->is_open())
         {
-            std::cout << "db not opened." << std::endl;
-            return 1;
+            throw Exception("DB not opened! ", 1);
         }
 
         std::string sql = "select aggfnoid,aggkind,aggnumdirectargs,oid(aggtransfn) as aggtransfn,"
@@ -34,18 +74,25 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
                     "oid(aggmtransfn) as aggmtransfn,oid(aggminvtransfn) as aggminvtransfn,"
                     "oid(aggmfinalfn) as aggmfinalfn,aggfinalextra,aggmfinalextra,aggsortop,"
                     "aggtranstype,aggtransspace,aggmtranstype,aggmtransspace,agginitval,aggminitval from pg_aggregate where aggfnoid=$1";
-        //array_parser parser;
-        //parser.add(oid);
-        work worker(*conn.get());
-        result resp = worker.exec_params(sql.c_str(), oid);
-        //result resp = worker.exec(sql.c_str());
-        //result resp = conn->prepare(sql.c_str());
-        //resp.bind(oid);
-        //resp.exec();
-        for (auto i =0; i < resp.size(); ++i)
+
+        auto agg = std::make_shared<Agg>();
+
         {
-            //std::cout << resp[i]["typname"] << "----" << resp[i]["typlen"] << "----" << typeid(resp[i][1]).name() << std::endl;
-            auto agg = std::make_shared<Agg>();
+            work worker(*conn.get());
+            result resp = worker.exec_params(sql.c_str(), oid);
+
+            if (resp.size() > 1)
+            {
+                std::string msg = "Duplicated agg, oid: " + std::to_string(oid);
+                throw Exception(msg, 1);
+            }
+            else if(resp.size() == 0)
+            {
+                is_found = false;
+                return is_found;
+            }
+            auto i = 0;
+
             agg->aggfnoid = oid;
             agg->aggkind = resp[i]["aggkind"].as<std::string>();
             agg->aggnumdirectargs = resp[i]["aggnumdirectargs"].as<int>();
@@ -66,28 +113,30 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
             agg->aggmtransspace = resp[i]["aggmtransspace"].as<long>();
             agg->agginitval = resp[i]["agginitval"].as<std::string>();
             agg->aggminitval = resp[i]["aggminitval"].as<std::string>();
-
-            agg_map.insert({oid, agg});
-
-            tobeInited_types.push_back(agg->aggtranstype);
-            tobeInited_types.push_back(agg->aggmtranstype);
-
-            tobeInited_procs.push_back(oid);
-            tobeInited_procs.push_back(agg->aggtransfn);
-            tobeInited_procs.push_back(agg->aggfinalfn);
-            tobeInited_procs.push_back(agg->aggcombinefn);
-            tobeInited_procs.push_back(agg->aggserialfn);
-            tobeInited_procs.push_back(agg->aggdeserialfn);
-            tobeInited_procs.push_back(agg->aggmtransfn);
-            tobeInited_procs.push_back(agg->aggminvtransfn);
-            tobeInited_procs.push_back(agg->aggmfinalfn);
-
-            tobeInited_opers.push_back(agg->aggsortop);
-
-            is_found = true;
         }
+
+        agg_map.insert({oid, agg});
+
+        tobeInited_types.push_back(agg->aggtranstype);
+        tobeInited_types.push_back(agg->aggmtranstype);
+
+        tobeInited_procs.push_back(oid);
+        tobeInited_procs.push_back(agg->aggtransfn);
+        tobeInited_procs.push_back(agg->aggfinalfn);
+        tobeInited_procs.push_back(agg->aggcombinefn);
+        tobeInited_procs.push_back(agg->aggserialfn);
+        tobeInited_procs.push_back(agg->aggdeserialfn);
+        tobeInited_procs.push_back(agg->aggmtransfn);
+        tobeInited_procs.push_back(agg->aggminvtransfn);
+        tobeInited_procs.push_back(agg->aggmfinalfn);
+
+        tobeInited_opers.push_back(agg->aggsortop);
+
+        is_found = true;
+
+        initVarName(conn, agg);
     }
-    catch(const std::exception& e)
+    catch(const Exception& e)
     {
         std::cerr << "Init agg " << oid << " failed: " << e.what() << '\n';
         return false;
@@ -109,5 +158,22 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
     return is_found;
     
 };
+
+void Agg::output()
+{
+    std::cout << "------------------Agg count: " << Agg::agg_map.size() << "------------------" << std::endl;
+    for (const auto & [key, agg] : agg_map)
+    {
+        //NEW_AGG(COUNTANY, 2147, 'n', 0, 2804, InvalidOid, 463, InvalidOid, InvalidOid, 2804, 3547, InvalidOid, false, false, InvalidOid, 20, InvalidOid, 20, InvalidOid)
+        std::cout << "NEW_AGG("
+                  << agg->var_name << ", " << agg->aggfnoid << ", '" << agg->aggkind << "', " << agg->aggnumdirectargs
+                  << ", " << agg->aggtransfn << ", " << agg->aggfinalfn << ", " << agg->aggcombinefn << ", " << agg->aggserialfn
+                  << ", " << agg->aggdeserialfn << ", " << agg->aggmtransfn << ", " << agg->aggminvtransfn << ", " << agg->aggmfinalfn
+                  << ", " << (agg->aggfinalextra ? "true" : "false") << ", " << (agg->aggmfinalextra ? "true" : "false") << ", " << agg->aggsortop << ", " << agg->aggtranstype
+                  << ", " << agg->aggtransspace << ", " << agg->aggmtranstype << ", " << agg->aggmtransspace
+                  //<< ", " << agg->agginitval << ", " << agg->aggminitval
+                  << ")" << std::endl;
+    }
+}
 
 }

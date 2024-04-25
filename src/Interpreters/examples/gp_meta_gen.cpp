@@ -176,6 +176,12 @@ int main(int argc, char ** argv)
         {
             Cast::init(conn, source_oid, target_oid);
         }
+
+        Agg::output();
+        Typ::output();
+        Oper::output();
+        Proc::output();
+        Cast::output();
         
     }
     catch(const std::exception& e)

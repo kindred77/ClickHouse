@@ -1,6 +1,9 @@
 #include <Interpreters/orcaopt/metagen/Typ.h>
 #include <Interpreters/orcaopt/metagen/Proc.h>
 #include <Interpreters/orcaopt/metagen/Oper.h>
+
+#include <Common/Exception.h>
+
 #include <iostream>
 
 using namespace duckdb_libpgquery;
@@ -10,6 +13,12 @@ namespace DB
 {
 
 std::unordered_map<PGOid, TypPtr> Typ::typ_map;
+
+void Typ::initVarName(PGConnectionPtr conn, TypPtr typ)
+{
+    typ->var_name = typ->typname;
+    boost::to_upper(typ->var_name);
+}
 
 bool Typ::init(PGConnectionPtr conn, PGOid oid)
 {
@@ -23,8 +32,7 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
     {
         if (!conn->is_open())
         {
-            std::cout << "db not opened." << std::endl;
-            return 1;
+            throw Exception("DB not opened! ", 1);
         }
 
         std::string sql = "select typname,typnamespace,typlen,typbyval,typtype,typcategory,"
@@ -62,7 +70,7 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
             if (resp.size() > 1)
             {
                 std::string msg = "Duplicated type, oid: " + std::to_string(oid);
-                throw msg;
+                throw Exception(msg, 1);
             }
             else if(resp.size() == 0)
             {
@@ -101,7 +109,7 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
             if (typ->typrelid != InvalidOid)
             {
                 std::string msg = "Type with relid is not supported yet! oid: " + std::to_string(oid) + ", name: " + typ->typname;
-                throw msg;
+                throw Exception(msg, 1);
             }
         }
         
@@ -155,6 +163,8 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
         tobeInited_procs.push_back(typ->cmp_proc);
 
         is_found = true;
+
+        initVarName(conn, typ);
     }
     catch(const std::exception& e)
     {
@@ -177,6 +187,24 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
 
     return is_found;
     
+};
+
+void Typ::output()
+{
+    std::cout << "------------------Typ count: " << Typ::typ_map.size() << "------------------" << std::endl;
+    for (const auto & [key, typ] : typ_map)
+    {
+        //NEW_TYPE(FLOAT32, 700, "Float32", 1, 1, 4, true, 'b', 'N', false, true, ',', 0, 1021, 0, 1, 1, 1, 1, 1, 1, 1, 'i', 'p', false, 1, 1, 1, 1, 622, 620, 623, 620, 0)
+        std::cout << "NEW_TYPE("
+                  << typ->var_name << ", " << typ->oid << ", \"" << typ->typname << "\", " << typ->typnamespace
+                  << ", " << typ->typlen << ", " << (typ->typbyval ? "true" : "false") << ", '" << typ->typtype << "', '" << typ->typcategory
+                  << "', " << (typ->typispreferred ? "true" : "false") << ", " << (typ->typisdefined ? "true" : "false") << ", '" << typ->typdelim << "', " << typ->typrelid
+                  << ", " << typ->typelem << ", " << typ->typarray << ", " << typ->typinput << ", " << typ->typoutput
+                  << ", " << typ->typreceive << ", " << typ->typsend << ", " << typ->typmodin << ", " << typ->typmodout << ", " << typ->typanalyze
+                  << ", '" << typ->typalign << "', '" << typ->typstorage << "', " << (typ->typnotnull ? "true" : "false") << ", " << typ->typbasetype
+                  << ", " << typ->typtypmod << ", " << typ->typndims << ", " << typ->typcollation
+                  << ")" << std::endl;
+    }
 };
 
 }

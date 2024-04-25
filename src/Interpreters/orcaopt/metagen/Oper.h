@@ -15,6 +15,8 @@ using OperPtr = std::shared_ptr<Oper>;
 
 class Oper
 {
+private:
+    static void initVarName(PGConnectionPtr conn, OperPtr oper);
 public:
     duckdb_libpgquery::PGOid oid;
     std::string oprname;
@@ -32,9 +34,14 @@ public:
     duckdb_libpgquery::PGOid oprrest;
     duckdb_libpgquery::PGOid oprjoin;
 
+    //prop for output
+    std::string var_name;
+
     static std::unordered_map<duckdb_libpgquery::PGOid, OperPtr> oper_map;
 
     static bool init(PGConnectionPtr conn, duckdb_libpgquery::PGOid oid);
+
+    static void output();
 };
 
 }
