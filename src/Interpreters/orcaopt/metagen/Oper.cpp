@@ -28,7 +28,7 @@ bool Oper::init(PGConnectionPtr conn, PGOid oid)
         }
 
         std::string sql = "select oprname,oprnamespace,oprowner,oprkind,oprcanmerge,oprcanhash,oprleft,oprright,oprresult,oprcom,oprnegate,"
-                    "oprcode,oprrest,oprjoin from pg_operator where oid=$1";
+                    "oid(oprcode) as oprcode,oid(oprrest) as oprrest,oid(oprjoin) as oprjoin from pg_operator where oid=$1";
         work worker(*conn.get());
         result resp = worker.exec_params(sql.c_str(), oid);
         for (auto i =0; i < resp.size(); ++i)
@@ -69,7 +69,7 @@ bool Oper::init(PGConnectionPtr conn, PGOid oid)
     }
     catch(const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
+        std::cerr << "Init oper " << oid << " failed: " << e.what() << '\n';
         return false;
     }
 

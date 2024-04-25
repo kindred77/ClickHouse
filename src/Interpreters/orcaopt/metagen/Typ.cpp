@@ -28,8 +28,10 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
         }
 
         std::string sql = "select typname,typnamespace,typlen,typbyval,typtype,typcategory,"
-                    "typispreferred,typeisdefined,typdelim,typrelid,typelem,typarray,typinput,typoutput,"
-                    "typreceive,typsend,typmodin,typmodout,typanalyze,typalign,typstorage,typnotnull,"
+                    "typispreferred,typisdefined,typdelim,typrelid,typelem,typarray,"
+                    "oid(typinput) as typinput,oid(typoutput) as typoutput,oid(typreceive) as typreceive,"
+                    "oid(typsend) as typsend,oid(typmodin) as typmodin,oid(typmodout) as typmodout,"
+                    "oid(typanalyze) as typanalyze,typalign,typstorage,typnotnull,"
                     "typbasetype,typtypmod,typndims,typcollation "
                     "from pg_type where oid=$1";
         
@@ -52,12 +54,22 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
                            "and po.opcdefault = true "
                            "and po.opcintype = $1";
 
-        work worker(*conn.get());
-        result resp = worker.exec_params(sql.c_str(), oid);
-        for (auto i =0; i < resp.size(); ++i)
+        auto typ = std::make_shared<Typ>();
         {
-            //std::cout << resp[i]["typname"] << "----" << resp[i]["typlen"] << "----" << typeid(resp[i][1]).name() << std::endl;
-            auto typ = std::make_shared<Typ>();
+            work worker(*conn.get());
+            result resp = worker.exec_params(sql.c_str(), oid);
+
+            if (resp.size() > 1)
+            {
+                std::string msg = "Duplicated type, oid: " + std::to_string(oid);
+                throw msg;
+            }
+            else if(resp.size() == 0)
+            {
+                is_found = false;
+                return is_found;
+            }
+            auto i = 0;
             typ->oid = oid;
             typ->typname = resp[i]["typname"].as<std::string>();
             typ->typnamespace = resp[i]["typnamespace"].as<PGOid>();
@@ -66,7 +78,7 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
             typ->typtype = resp[i]["typtype"].as<std::string>();
             typ->typcategory = resp[i]["typcategory"].as<std::string>();
             typ->typispreferred = resp[i]["typispreferred"].as<bool>();
-            typ->typeisdefined = resp[i]["typeisdefined"].as<bool>();
+            typ->typisdefined = resp[i]["typisdefined"].as<bool>();
             typ->typdelim = resp[i]["typdelim"].as<std::string>();
             typ->typrelid = resp[i]["typrelid"].as<PGOid>();
             typ->typelem = resp[i]["typelem"].as<PGOid>();
@@ -85,18 +97,15 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
             typ->typtypmod = resp[i]["typtypmod"].as<int>();
             typ->typndims = resp[i]["typndims"].as<int>();
             typ->typcollation = resp[i]["typcollation"].as<PGOid>();
-            // typ->lt_opr = resp[i]["lt_opr"].as<PGOid>();
-            // typ->eq_opr = resp[i]["eq_opr"].as<PGOid>();
-            // typ->gt_opr = resp[i]["gt_opr"].as<PGOid>();
-            // typ->hash_proc = resp[i]["hash_proc"].as<PGOid>();
-            // typ->cmp_proc = resp[i]["cmp_proc"].as<PGOid>();
 
             if (typ->typrelid != InvalidOid)
             {
                 std::string msg = "Type with relid is not supported yet! oid: " + std::to_string(oid) + ", name: " + typ->typname;
                 throw msg;
             }
-
+        }
+        
+        {
             //get ext info
             work worker_ext(*conn.get());
             result resp_ext = worker_ext.exec_params(ext_sql.c_str(), oid);
@@ -123,33 +132,33 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
             }
 
             typ->cmp_proc = InvalidOid;
-
-            typ_map.insert({oid, typ});
-
-            tobeInited_types.push_back(typ->typelem);
-            tobeInited_types.push_back(typ->typarray);
-            tobeInited_types.push_back(typ->typbasetype);
-
-            tobeInited_opers.push_back(typ->lt_opr);
-            tobeInited_opers.push_back(typ->eq_opr);
-            tobeInited_opers.push_back(typ->gt_opr);
-
-            tobeInited_procs.push_back(typ->typinput);
-            tobeInited_procs.push_back(typ->typoutput);
-            tobeInited_procs.push_back(typ->typreceive);
-            tobeInited_procs.push_back(typ->typsend);
-            tobeInited_procs.push_back(typ->typmodin);
-            tobeInited_procs.push_back(typ->typmodout);
-            tobeInited_procs.push_back(typ->typanalyze);
-            tobeInited_procs.push_back(typ->hash_proc);
-            tobeInited_procs.push_back(typ->cmp_proc);
-
-            is_found = true;
         }
+
+        typ_map.insert({oid, typ});
+
+        tobeInited_types.push_back(typ->typelem);
+        tobeInited_types.push_back(typ->typarray);
+        tobeInited_types.push_back(typ->typbasetype);
+
+        tobeInited_opers.push_back(typ->lt_opr);
+        tobeInited_opers.push_back(typ->eq_opr);
+        tobeInited_opers.push_back(typ->gt_opr);
+
+        tobeInited_procs.push_back(typ->typinput);
+        tobeInited_procs.push_back(typ->typoutput);
+        tobeInited_procs.push_back(typ->typreceive);
+        tobeInited_procs.push_back(typ->typsend);
+        tobeInited_procs.push_back(typ->typmodin);
+        tobeInited_procs.push_back(typ->typmodout);
+        tobeInited_procs.push_back(typ->typanalyze);
+        tobeInited_procs.push_back(typ->hash_proc);
+        tobeInited_procs.push_back(typ->cmp_proc);
+
+        is_found = true;
     }
     catch(const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
+        std::cerr << "Init type " << oid << " failed: " << e.what() << '\n';
         return false;
     }
 

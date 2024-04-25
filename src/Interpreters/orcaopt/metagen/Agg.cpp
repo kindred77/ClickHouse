@@ -28,8 +28,12 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
             return 1;
         }
 
-        std::string sql = "select aggfnoid,aggkind,aggnumdirectargs,aggtransfn,aggfinalfn,aggcombinefn,aggserialfn,aggdeserialfn,aggmtransfn,aggminvtransfn,aggmfinalfn,"
-                    "aggfinalextra,aggmfinalextra,aggsortop,aggtranstype,aggtransspace,aggmtranstype,aggmtransspace,agginitval,aggminitval from pg_aggregate where aggfnoid=$1";
+        std::string sql = "select aggfnoid,aggkind,aggnumdirectargs,oid(aggtransfn) as aggtransfn,"
+                    "oid(aggfinalfn) as aggfinalfn,oid(aggcombinefn) as aggcombinefn,"
+                    "oid(aggserialfn) as aggserialfn,oid(aggdeserialfn) as aggdeserialfn,"
+                    "oid(aggmtransfn) as aggmtransfn,oid(aggminvtransfn) as aggminvtransfn,"
+                    "oid(aggmfinalfn) as aggmfinalfn,aggfinalextra,aggmfinalextra,aggsortop,"
+                    "aggtranstype,aggtransspace,aggmtranstype,aggmtransspace,agginitval,aggminitval from pg_aggregate where aggfnoid=$1";
         //array_parser parser;
         //parser.add(oid);
         work worker(*conn.get());
@@ -85,7 +89,7 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
     }
     catch(const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
+        std::cerr << "Init agg " << oid << " failed: " << e.what() << '\n';
         return false;
     }
     

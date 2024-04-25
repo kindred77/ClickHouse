@@ -54,7 +54,7 @@ bool Cast::init(PGConnectionPtr conn, PGOid source_oid, PGOid target_oid)
     }
     catch(const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
+        std::cerr << "Init cast (" << source_oid << ", " << target_oid << ") failed: " << e.what() << '\n';
         return false;
     }
 

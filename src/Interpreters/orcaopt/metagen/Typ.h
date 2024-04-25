@@ -24,7 +24,7 @@ public:
     std::string typtype;
     std::string typcategory;
     bool typispreferred;
-    bool typeisdefined;
+    bool typisdefined;
     std::string typdelim;
     duckdb_libpgquery::PGOid typrelid;
     duckdb_libpgquery::PGOid typelem;

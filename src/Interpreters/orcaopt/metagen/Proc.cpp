@@ -2,6 +2,7 @@
 #include <Interpreters/orcaopt/metagen/Typ.h>
 #include <Interpreters/orcaopt/metagen/Agg.h>
 #include <iostream>
+#include <boost/algorithm/string.hpp>
 
 using namespace duckdb_libpgquery;
 using namespace pqxx;
@@ -27,8 +28,10 @@ bool Proc::init(PGConnectionPtr conn, PGOid oid)
             return 1;
         }
 
-        std::string sql = "select oid,proname,pronamespace,proowner,prolang,procost,prorows,provariadic,protransform,proisagg,proiswindow,"
-                    "prosecdef,proleakproof,proisstrict,proretset,provolatile,pronargs,pronargdefaults,prorettype,proargtypes from pg_proc where oid=$1";
+        std::string sql = "select oid,proname,pronamespace,proowner,prolang,procost,prorows,provariadic,"
+                    "oid(protransform) as protransform,proisagg,proiswindow,"
+                    "prosecdef,proleakproof,proisstrict,proretset,provolatile,pronargs,pronargdefaults,"
+                    "prorettype,proargtypes from pg_proc where oid=$1";
         work worker(*conn.get());
         result resp = worker.exec_params(sql.c_str(), oid);
         for (auto i =0; i < resp.size(); ++i)
@@ -54,16 +57,22 @@ bool Proc::init(PGConnectionPtr conn, PGOid oid)
             proc->pronargs = resp[i]["pronargs"].as<int>();
             proc->pronargdefaults = resp[i]["pronargdefaults"].as<int>();
             proc->prorettype = resp[i]["prorettype"].as<PGOid>();
-            //TODO
-            std::cout << "proargtypes:----" << resp[i]["proargtypes"].as<std::string>();
+
+            auto str = resp[i]["proargtypes"].as<std::string>();
+            std::vector<std::string> str_oids;
+            boost::split(str_oids, str, [](char c) { return c == ' '; });
+            for (auto str_oid : str_oids)
+            {
+                proc->proargtypes.push_back(std::atoi(str_oid.c_str()));
+            }
+            
             
             proc_map.insert({oid, proc});
 
             tobeInited_types.push_back(proc->provariadic);
             tobeInited_types.push_back(proc->prorettype);
-            //TODO
-            //proc.proargtypes=new ArrayList<Oid>(arr.);
-            
+            tobeInited_types.insert(tobeInited_types.end(), proc->proargtypes.begin(), proc->proargtypes.end());
+
             tobeInited_procs.push_back(proc->protransform);
 
             if (proc->proisagg)
@@ -76,7 +85,7 @@ bool Proc::init(PGConnectionPtr conn, PGOid oid)
     }
     catch(const std::exception& e)
     {
-        std::cerr << e.what() << '\n';
+        std::cerr << "Init proc " << oid << " failed: " << e.what() << '\n';
         return false;
     }
     for (const auto oid : tobeInited_types)
