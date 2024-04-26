@@ -122,6 +122,11 @@ void Cast::output()
                   << ", '" << cast->castcontext << "', '" << cast->castmethod << "'"
                   << ")" << std::endl;
     }
+    std::cout << "------------------------------------" << std::endl;
+    for (const auto & [key, cast] : cast_map)
+    {
+        std::cout << cast->var_name << std::endl;
+    }
 };
 
 }

@@ -16,7 +16,15 @@ std::unordered_map<PGOid, TypPtr> Typ::typ_map;
 
 void Typ::initVarName(PGConnectionPtr conn, TypPtr typ)
 {
-    typ->var_name = typ->typname;
+    if (typ->typname[0] == '_')
+    {
+        typ->var_name = "intern" + typ->typname;
+    }
+    else
+    {
+        typ->var_name = typ->typname;
+    }
+    
     boost::to_upper(typ->var_name);
 }
 
@@ -35,7 +43,7 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
             throw Exception("DB not opened! ", 1);
         }
 
-        std::string sql = "select typname,typnamespace,typlen,typbyval,typtype,typcategory,"
+        std::string sql = "select typname,typnamespace,typowner,typlen,typbyval,typtype,typcategory,"
                     "typispreferred,typisdefined,typdelim,typrelid,typelem,typarray,"
                     "oid(typinput) as typinput,oid(typoutput) as typoutput,oid(typreceive) as typreceive,"
                     "oid(typsend) as typsend,oid(typmodin) as typmodin,oid(typmodout) as typmodout,"
@@ -81,6 +89,7 @@ bool Typ::init(PGConnectionPtr conn, PGOid oid)
             typ->oid = oid;
             typ->typname = resp[i]["typname"].as<std::string>();
             typ->typnamespace = resp[i]["typnamespace"].as<PGOid>();
+            typ->typowner = resp[i]["typowner"].as<PGOid>();
             typ->typlen = resp[i]["typlen"].as<int>();
             typ->typbyval = resp[i]["typbyval"].as<bool>();
             typ->typtype = resp[i]["typtype"].as<std::string>();
@@ -196,14 +205,21 @@ void Typ::output()
     {
         //NEW_TYPE(FLOAT32, 700, "Float32", 1, 1, 4, true, 'b', 'N', false, true, ',', 0, 1021, 0, 1, 1, 1, 1, 1, 1, 1, 'i', 'p', false, 1, 1, 1, 1, 622, 620, 623, 620, 0)
         std::cout << "NEW_TYPE("
-                  << typ->var_name << ", " << typ->oid << ", \"" << typ->typname << "\", " << typ->typnamespace
+                  << typ->var_name << ", " << typ->oid << ", \"" << typ->typname << "\", " << typ->typnamespace << ", " << typ->typowner
                   << ", " << typ->typlen << ", " << (typ->typbyval ? "true" : "false") << ", '" << typ->typtype << "', '" << typ->typcategory
                   << "', " << (typ->typispreferred ? "true" : "false") << ", " << (typ->typisdefined ? "true" : "false") << ", '" << typ->typdelim << "', " << typ->typrelid
                   << ", " << typ->typelem << ", " << typ->typarray << ", " << typ->typinput << ", " << typ->typoutput
                   << ", " << typ->typreceive << ", " << typ->typsend << ", " << typ->typmodin << ", " << typ->typmodout << ", " << typ->typanalyze
                   << ", '" << typ->typalign << "', '" << typ->typstorage << "', " << (typ->typnotnull ? "true" : "false") << ", " << typ->typbasetype
-                  << ", " << typ->typtypmod << ", " << typ->typndims << ", " << typ->typcollation
+                  << ", " << typ->typtypmod << ", " << typ->typndims << ", " << typ->typcollation << ", " << typ->lt_opr
+                  << ", " << typ->eq_opr << ", " << typ->gt_opr << ", " << typ->hash_proc << ", " << typ->cmp_proc
                   << ")" << std::endl;
+    }
+
+    std::cout << "------------------------------------" << std::endl;
+    for (const auto & [key, typ] : typ_map)
+    {
+        std::cout << typ->var_name << std::endl;
     }
 };
 

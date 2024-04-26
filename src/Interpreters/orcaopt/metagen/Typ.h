@@ -21,6 +21,7 @@ public:
     duckdb_libpgquery::PGOid oid;
     std::string typname;
     duckdb_libpgquery::PGOid typnamespace;
+    duckdb_libpgquery::PGOid typowner;
     int typlen;
     bool typbyval;
     std::string typtype;

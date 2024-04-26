@@ -132,6 +132,12 @@ void Oper::output()
                   << ", " << oper->oprrest << ", " << oper->oprjoin
                   << ")" << std::endl;
     }
+
+    std::cout << "------------------------------------" << std::endl;
+    for (const auto & [key, oper] : oper_map)
+    {
+        std::cout << oper->var_name << std::endl;
+    }
 };
 
 }

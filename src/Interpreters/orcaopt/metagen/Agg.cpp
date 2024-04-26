@@ -174,6 +174,12 @@ void Agg::output()
                   //<< ", " << agg->agginitval << ", " << agg->aggminitval
                   << ")" << std::endl;
     }
+
+    std::cout << "------------------------------------" << std::endl;
+    for (const auto & [key, agg] : agg_map)
+    {
+        std::cout << agg->var_name << std::endl;
+    }
 }
 
 }

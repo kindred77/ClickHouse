@@ -162,6 +162,12 @@ void Proc::output()
                   << ", " << proc->pronargdefaults << ", " << proc->prorettype << ", " << proargtypes_str
                   << ")" << std::endl;
     }
+
+    std::cout << "------------------------------------" << std::endl;
+    for (const auto & [key, proc] : proc_map)
+    {
+        std::cout << proc->var_name << std::endl;
+    }
 };
 
 }

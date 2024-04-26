@@ -150,41 +150,40 @@ private:
 	static std::vector<duckdb_libpgquery::PGTupleDescPtr> recordCacheArray;
 
 	static int TYPE_OID_ID;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_FLOAT32;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_FLOAT64;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_BOOLEAN;
-	// static std::pair<PGOid, PGTypePtr> TYPE_UINT8;
-	// static std::pair<PGOid, PGTypePtr> TYPE_UINT16;
-	// static std::pair<PGOid, PGTypePtr> TYPE_UINT32;
-	// static std::pair<PGOid, PGTypePtr> TYPE_UINT64;
-	// static std::pair<PGOid, PGTypePtr> TYPE_UINT128;
-	// static std::pair<PGOid, PGTypePtr> TYPE_UINT256;
-	// static std::pair<PGOid, PGTypePtr> TYPE_INT8;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT16;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT32;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT64;
-	// static std::pair<PGOid, PGTypePtr> TYPE_INT128;
-	// static std::pair<PGOid, PGTypePtr> TYPE_INT256;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_STRING;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_FIXEDSTRING;
+	
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_TIMESTAMPTZ;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_NUMERIC;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_TIMESTAMPTZ;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_TIMESTAMP;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_DATE;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_DATE;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_DATETIME;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_DATETIME64;
-	// static std::pair<PGOid, PGTypePtr> TYPE_ARRAY;
-	// static std::pair<PGOid, PGTypePtr> TYPE_TUPLE;
-	// static std::pair<PGOid, PGTypePtr> TYPE_DECIMAL32;
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_DECIMAL64;
-	// static std::pair<PGOid, PGTypePtr> TYPE_DECIMAL128;
-	// static std::pair<PGOid, PGTypePtr> TYPE_DECIMAL256;
-	// static std::pair<PGOid, PGTypePtr> TYPE_AGGFUNCSTATE;
-	// static std::pair<PGOid, PGTypePtr> TYPE_MAP;
-	// static std::pair<PGOid, PGTypePtr> TYPE_UUID;
-
-	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_ANY;
-
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_BPCHAR;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_NUMERIC;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_BPCHAR;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERNAL;
-
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_TEXT;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_TIMESTAMP;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_FLOAT4;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT8;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_ANY;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_INT4;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_FLOAT4;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_FLOAT8;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_FLOAT8;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_BOOL;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_BYTEA;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_INT2;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_BOOL;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_CSTRING;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_OID;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_TEXT;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_ANYARRAY;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT2;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_CSTRING;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_BYTEA;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT4;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_OID;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_INT8;
 
 	using OidTypeMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr>;
 	static OidTypeMap oid_type_map;

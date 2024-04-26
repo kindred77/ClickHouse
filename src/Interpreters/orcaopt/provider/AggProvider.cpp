@@ -29,14 +29,14 @@ using namespace duckdb_libpgquery;
 namespace DB
 {
 
-NEW_AGG(COUNTANY, 2147, 'n', 0, 2804, InvalidOid, 463, InvalidOid, InvalidOid, 2804, 3547, InvalidOid, false, false, InvalidOid, 20, InvalidOid, 20, InvalidOid)
-NEW_AGG(COUNTSTAR, 2803, 'n', 0, 1219, InvalidOid, 463, InvalidOid, InvalidOid, 1219, 3546, InvalidOid, false, false, InvalidOid, 20, InvalidOid, 20, InvalidOid)
+NEW_AGG(COUNT, 2803, 'n', 0, 1219, 0, 463, 0, 0, 1219, 3546, 0, false, false, 0, 20, 0, 20, 0)
+NEW_AGG(COUNT_ANY, 2147, 'n', 0, 2804, 0, 463, 0, 0, 2804, 3547, 0, false, false, 0, 20, 0, 20, 0)
 
 #undef NEW_AGG
 
 AggProvider::OidAggMap AggProvider::oid_agg_map = {
-	AggProvider::AGG_COUNTANY,
-	AggProvider::AGG_COUNTSTAR,
+	AggProvider::AGG_COUNT_ANY,
+	AggProvider::AGG_COUNT,
 };
 
 // AggProvider::AggProvider(const ContextPtr& context_) : context(context_)

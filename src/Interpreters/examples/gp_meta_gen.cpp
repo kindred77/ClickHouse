@@ -160,6 +160,45 @@ int main(int argc, char ** argv)
     try
     {
         PGConnectionPtr conn = std::make_shared<connection>("dbname=postgres user=kindred hostaddr=127.0.0.1 port=5432");
+        std::vector<std::string> args{argv, argv + argc};
+        bool showAll = args.size() == 1;
+
+        auto it = std::find_if(args.begin(), args.end(), [&](const std::string& arg) { return arg == "agg"; });
+        bool showAgg = it != args.end();
+
+        it = std::find_if(args.begin(), args.end(), [&](const std::string& arg) { return arg == "type"; });
+        bool showType = it != args.end();
+
+        it = std::find_if(args.begin(), args.end(), [&](const std::string& arg) { return arg == "oper"; });
+        bool showOper = it != args.end();
+
+        it = std::find_if(args.begin(), args.end(), [&](const std::string& arg) { return arg == "proc"; });
+        bool showProc = it != args.end();
+
+        it = std::find_if(args.begin(), args.end(), [&](const std::string& arg) { return arg == "cast"; });
+        bool showCast = it != args.end();
+
+        if (args.size() > 1)
+        {
+            std::vector<std::string> mustbe = {"agg", "type", "oper", "proc", "cast"};
+            std::vector<std::string> diff;
+            args.erase(args.begin());
+            std::sort(args.begin(), args.end());
+            std::sort(mustbe.begin(), mustbe.end());
+            std::set_difference(args.begin(), args.end(), mustbe.begin(), mustbe.end(), std::back_inserter(diff));
+
+            if (!diff.empty())
+            {
+                std::cout << "Usage: agg, type, oper, proc, cast." << std::endl;
+                std::cout << "unknown option: " << std::endl;
+                for (auto str : diff)
+                {
+                    std::cout << str << std::endl;
+                }
+                return -1;
+            }
+        }
+        
         for (PGOid oid : agg_init_oids)
         {
             Agg::init(conn, oid);
@@ -177,16 +216,32 @@ int main(int argc, char ** argv)
             Cast::init(conn, source_oid, target_oid);
         }
 
-        Agg::output();
-        Typ::output();
-        Oper::output();
-        Proc::output();
-        Cast::output();
+        if (showAll || showAgg)
+        {
+            Agg::output();
+        }
+        if (showAll || showType)
+        {
+            Typ::output();
+        }
+        if (showAll || showOper)
+        {
+            Oper::output();
+        }
+        if (showAll || showProc)
+        {
+            Proc::output();
+        }
+        if (showAll || showCast)
+        {
+            Cast::output();
+        }
         
     }
     catch(const std::exception& e)
     {
         std::cerr << e.what() << '\n';
+        return -1;
     }
     
     return 0;
