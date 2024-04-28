@@ -14,11 +14,49 @@ namespace DB
 {
 
 std::unordered_map<PGOid, ProcPtr> Proc::proc_map;
+std::unordered_map<std::string, ProcPtr> Proc::proc_map2;
+
+ void Proc::initVarName2(PGConnectionPtr conn, ProcPtr proc)
+ {
+    if (proc->pronargs > 1)
+    {
+        std::string msg = "Can not init var name of proc, number of args greater than 1, proc oid: "
+                        + std::to_string(proc->oid);
+        throw Exception(msg, 1);
+    }
+    if (proc->pronargs == 1)
+    {
+        if (!Typ::init(conn, proc->proargtypes[0]))
+        {
+            std::string msg = "Can not init var name of proc, oid: " + std::to_string(proc->oid) + 
+            ", got invalid arg type, oid: " + std::to_string(proc->proargtypes[0]);
+            throw Exception(msg, 1);
+        }
+        const auto & typ = Typ::typ_map[proc->proargtypes[0]];
+        proc->var_name = proc->proname + "_" + typ->typname;
+        boost::to_upper(proc->var_name);
+    }
+ }
 
 void Proc::initVarName(PGConnectionPtr conn, ProcPtr proc)
 {
     proc->var_name = proc->proname;
     boost::to_upper(proc->var_name);
+    //got duplicate var name, reinit it
+    if (proc_map2.count(proc->var_name) > 0)
+    {
+        initVarName2(conn, proc);
+        auto & proc_first = proc_map2[proc->var_name];
+        if (proc_first)
+        {
+            initVarName2(conn, proc_first);
+            proc_first = nullptr;
+        }
+    }
+    else
+    {
+        proc_map2.insert({proc->var_name, proc});
+    }
 }
 
 bool Proc::init(PGConnectionPtr conn, PGOid oid)

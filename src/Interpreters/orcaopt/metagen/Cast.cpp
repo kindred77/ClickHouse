@@ -22,7 +22,7 @@ void Cast::initVarName(PGConnectionPtr conn, CastPtr cast)
                         + std::to_string(cast->oid) + ", source type oid: " + std::to_string(cast->castsource);
         throw Exception(msg, 1);
     }
-    const auto source_type = Typ::typ_map[cast->castsource];
+    const auto & source_type = Typ::typ_map[cast->castsource];
     cast->var_name = source_type->typname;
 
     if (!Typ::init(conn, cast->casttarget))
@@ -31,7 +31,7 @@ void Cast::initVarName(PGConnectionPtr conn, CastPtr cast)
                         + std::to_string(cast->oid) + ", target type oid: " + std::to_string(cast->casttarget);
         throw Exception(msg, 1);
     }
-    const auto target_type = Typ::typ_map[cast->casttarget];
+    const auto & target_type = Typ::typ_map[cast->casttarget];
     cast->var_name += ("_TO_" + target_type->typname);
 
     boost::to_upper(cast->var_name);

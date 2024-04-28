@@ -507,10 +507,10 @@ struct Form_pg_operator
     PGOid oprresult; /* result datatype */
     PGOid oprcom; /* OID of commutator oper, or 0 if none */
     PGOid oprnegate; /* OID of negator oper, or 0 if none */
-    PGOid oprlsortop; /* OID of left sortop, if mergejoinable */
-    PGOid oprrsortop; /* OID of right sortop, if mergejoinable */
-    PGOid oprltcmpop; /* OID of "l<r" oper, if mergejoinable */
-    PGOid oprgtcmpop; /* OID of "l>r" oper, if mergejoinable */
+    // PGOid oprlsortop; /* OID of left sortop, if mergejoinable */
+    // PGOid oprrsortop; /* OID of right sortop, if mergejoinable */
+    // PGOid oprltcmpop; /* OID of "l<r" oper, if mergejoinable */
+    // PGOid oprgtcmpop; /* OID of "l>r" oper, if mergejoinable */
     PGOid oprcode; /* OID of underlying function */
     PGOid oprrest; /* OID of restriction estimator, or 0 */
     PGOid oprjoin; /* OID of join estimator, or 0 */

@@ -17,6 +17,7 @@ class Proc
 {
 private:
     static void initVarName(PGConnectionPtr conn, ProcPtr oper);
+    static void initVarName2(PGConnectionPtr conn, ProcPtr oper);
 public:
     duckdb_libpgquery::PGOid aggfnoid;
 
@@ -44,6 +45,7 @@ public:
     //prop for output
     std::string var_name;
 
+    static std::unordered_map<std::string, ProcPtr> proc_map2; 
     static std::unordered_map<duckdb_libpgquery::PGOid, ProcPtr> proc_map;
 
     static bool init(PGConnectionPtr conn, duckdb_libpgquery::PGOid oid);

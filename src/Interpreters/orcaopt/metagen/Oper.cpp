@@ -22,7 +22,7 @@ void Oper::initVarName(PGConnectionPtr conn, OperPtr oper)
                         + std::to_string(oper->oid) + ", proc oid: " + std::to_string(oper->oprcode);
         throw Exception(msg, 1);
     }
-    const auto proc = Proc::proc_map[oper->oprcode];
+    const auto & proc = Proc::proc_map[oper->oprcode];
     oper->var_name = proc->proname;
     boost::to_upper(oper->var_name);
 }

@@ -24,7 +24,7 @@ void Agg::initVarName(PGConnectionPtr conn, AggPtr agg)
         std::string msg = "Can not init var name of agg, can not get proc, agg oid: " + std::to_string(agg->aggfnoid);
         throw Exception(msg, 1);
     }
-    const auto proc = Proc::proc_map[agg->aggfnoid];
+    const auto & proc = Proc::proc_map[agg->aggfnoid];
     if (proc->proargtypes.size() > 1)
     {
         std::string msg = "Can not init var name of agg, multiple args, agg oid: " + std::to_string(agg->aggfnoid);
@@ -43,7 +43,7 @@ void Agg::initVarName(PGConnectionPtr conn, AggPtr agg)
             throw Exception(msg, 1);
         }
 
-        auto typ = Typ::typ_map[typ_oid];
+        const auto & typ = Typ::typ_map[typ_oid];
 
         agg->var_name += "_";
         agg->var_name += typ->typname;
