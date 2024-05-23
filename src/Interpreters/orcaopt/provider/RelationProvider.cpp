@@ -180,6 +180,96 @@ void RelationProvider::mockTestData()
     }
 
     oid_relation_map.insert({tab_rel->oid, tab_rel});
+
+    table_oid = 9998;
+    table_name = "test2";
+    cols = {{"text", "col1"}, {"int8", "col2"}, {"timestamp", "col3"}, {"bool", "col4"}, {"date", "col5"}};
+    tab_class = std::make_shared<Form_pg_class>(Form_pg_class{
+        /*oid*/ PGOid(table_oid),
+        /*relname*/ table_name,
+        /*relnamespace*/ db_ptr->oid,
+        /*reltype*/ InvalidOid,
+        /*reloftype*/ InvalidOid,
+        /*relowner*/ InvalidOid,
+        /*relam*/ InvalidOid,
+        /*relfilenode*/ InvalidOid,
+        /*reltablespace*/ InvalidOid,
+        /*relpages*/ 0,
+        /*reltuples*/ 0,
+        /*relallvisible*/ 0,
+        /*reltoastrelid*/ InvalidOid,
+        /*relhasindex*/ false,
+        /*relisshared*/ false,
+        /*relpersistence*/ 'p',
+        /*relkind*/ 'r',
+        /*relstorage*/ 'a',
+        /*relnatts*/ static_cast<int16>(cols.size()),
+        /*relchecks*/ 0,
+        /*relhasoids*/ false,
+        /*relhaspkey*/ false,
+        /*relhasrules*/ false,
+        /*relhastriggers*/ false,
+        /*relhassubclass*/ false,
+        /*relispopulated*/ false,
+        /*relreplident*/ 'd',
+        /*relfrozenxid*/ 0,
+        /*relminmxid*/ 0
+    });
+
+    // oid of class and oid of relation is the same
+    tab_rel = std::make_shared<PGRelation>(PGRelation{
+        /*oid*/ .oid = tab_class->oid,
+        // /*rd_node*/ {},
+        // /*rd_refcnt*/ 0,
+        // /*rd_backend*/ 0,
+        // /*rd_islocaltemp*/ false,
+        // /*rd_isnailed*/ false,
+        // /*rd_isvalid*/ false,
+        // /*rd_indexvalid*/ false,
+        // /*rd_createSubid*/ 0,
+        // /*rd_newRelfilenodeSubid*/ 0,
+        /*rd_rel*/ .rd_rel = tab_class,
+        /*rd_att*/ .rd_att = PGCreateTemplateTupleDesc(tab_class->relnatts, tab_class->relhasoids),
+         /*rd_id*/ tab_class->oid,
+        // /*rd_lockInfo*/ {},
+        // /*rd_cdbpolicy*/ {},
+        // /*rd_cdbDefaultStatsWarningIssued*/ false,
+        // /*rd_indexlist*/ NULL,
+        // /*rd_oidindex*/ InvalidOid,
+        // /*rd_replidindex*/ InvalidOid,
+        // /*rd_indexattr*/ NULL,
+        // /*rd_keyattr*/ NULL,
+        // /*rd_idattr*/ NULL,
+        // /*rd_options*/ NULL,
+        // /*rd_opfamily*/ NULL,
+        // /*rd_opcintype*/ NULL,
+        // /*rd_indoption*/ NULL,
+        // /*rd_indexprs*/ NULL,
+        // /*rd_indpred*/ NULL,
+        // /*rd_exclops*/ NULL,
+        // /*rd_exclprocs*/ NULL,
+        // /*rd_exclstrats*/ NULL,
+        // /*rd_amcache*/ NULL,
+        // /*rd_indcollation*/ NULL,
+        // /*rd_toastoid*/ InvalidOid
+    });
+
+    attr_num = 1;
+    for (auto type_and_name : cols)
+    {
+        auto type_ptr = TypeProvider::get_type_by_typename_namespaceoid(type_and_name.first);
+        if (!type_ptr)
+        {
+            GPOS_RAISE(ExmaRelationProvider, ExmiUnknownType,
+						   type_and_name.first.c_str());
+            return;
+        }
+        TypeProvider::PGTupleDescInitEntry(tab_rel->rd_att, attr_num,
+            type_and_name.second, /*oidtypeid*/ type_ptr->oid, /*typmod*/ type_ptr->typtypmod, /*attdim*/ 0);
+        attr_num++;
+    }
+
+    oid_relation_map.insert({tab_rel->oid, tab_rel});
 };
 
 void RelationProvider::Init(ContextPtr& context_)

@@ -582,7 +582,8 @@ void optimize2(PGQuery * query)
 int main(int argc, char ** argv)
 {
     //std::string query_str = "select col1,col2 from test.test;";
-	std::string query_str = "select count(*) from (select distinct col1 from (select col1,col2 from test.test group by col1,col2) t1) t2;";
+	//std::string query_str = "select count(*) from (select distinct col1 from (select col1,col2 from test.test group by col1,col2) t1) t2;";
+	std::string query_str = "select t.col1,t2.col4,t.col4,count(distinct t.col5) as cnt1,count(distinct t2.col5) as cnt2 from test.test t inner join test.test2 t2 on t.col2=t2.col2 where t.col1 like '%test' and t2.col3 between '2024-01-01 00:00:00' and '2024-02-01 00:00:00' group by t.col1,t2.col4,t.col4 order by cnt1,cnt2 desc;";
     duckdb::PostgresParser::SetPreserveIdentifierCase(false);
 
     auto shared_context = DB::Context::createShared();
