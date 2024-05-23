@@ -295,7 +295,8 @@ PGOid TypeProvider::getBaseTypeAndTypmod(PGOid typid, int32 * typmod)
 		PGTypePtr tup = getTypeByOid(typid);
 		if (tup == nullptr)
 		{
-			elog(ERROR, "Lookup failed for type %u", typid);
+            GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+						   typid);
 			return InvalidOid;
 		}
 
@@ -324,7 +325,8 @@ void TypeProvider::get_type_category_preferred(PGOid typid, char * typcategory, 
 	PGTypePtr tup = getTypeByOid(typid);
 	if (tup == NULL)
 	{
-		elog(ERROR, "Lookup failed for type %u", typid);
+		GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+			typid);
 		return;
 	}
 	*typcategory = tup->typcategory;
@@ -374,7 +376,8 @@ bool TypeProvider::TypeIsVisible(PGOid typid)
     PGTypePtr typtup = getTypeByOid(typid);
     if (typtup == nullptr)
 	{
-        elog(ERROR, "Lookup failed for type %u", typid);
+        GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+				typid);
 		return false;
 	}
 
@@ -443,7 +446,10 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
         if (allow_invalid)
             return "???";
         else
-            elog(ERROR, "Lookup failed for type %u", type_oid);
+        {
+            GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+						   type_oid);
+        }
     }
 
     /*
@@ -464,7 +470,10 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
             if (allow_invalid)
                 return "???[]";
             else
-                elog(ERROR, "cache lookup failed for type %u", type_oid);
+            {
+                GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+						   type_oid);
+            }
         }
         type_oid = array_base_type;
         is_array = true;
@@ -637,7 +646,8 @@ PGTupleDescPtr TypeProvider::get_tupdesc_by_type_relid(PGTypePtr type)
 {
     if (!OidIsValid(type->typrelid)) /* should not happen */
 	{
-        elog(ERROR, "invalid typrelid for composite type %u", type->oid);
+        GPOS_RAISE(ExmaProcProvider, ExmiInvalidTypeForComposite,
+			type->oid);
 		return nullptr;
 	}
     PGRelationPtr rel = RelationProvider::relation_open(type->typrelid, AccessShareLock);
@@ -689,7 +699,7 @@ PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_internal(PGOid type_id, int3
         {
             if (!noError)
             {
-                ereport(ERROR, (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE), errmsg("record type has not been registered")));
+                GPOS_RAISE(ExmaProcProvider, ExmiRecordTypeNotRegister);
             }
             return nullptr;
         }
@@ -751,19 +761,19 @@ void TypeProvider::getTypeOutputInfo(PGOid type, PGOid * typOutput, bool * typIs
 	PGTypePtr tup = getTypeByOid(type);
 	if (tup == nullptr)
 	{
-		elog(ERROR, "cache lookup failed for type %u", type);
+        GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound, type);
 		return;
 	}
 
 	if (!tup->typisdefined)
 	{
-		ereport(ERROR, (errcode(PG_ERRCODE_UNDEFINED_OBJECT), errmsg("type %s is only a shell", format_type_be(type).c_str())));
+        GPOS_RAISE(ExmaProcProvider, ExmiTypeIsShell, format_type_be(type).c_str());
 		return;
 	}
 
 	if (!OidIsValid(tup->typoutput))
 	{
-		ereport(ERROR, (errcode(PG_ERRCODE_UNDEFINED_FUNCTION), errmsg("no output function available for type %s", format_type_be(type).c_str())));
+        GPOS_RAISE(ExmaProcProvider, ExmiNoAvailableOutputFunction, format_type_be(type).c_str());
 		return;
 	}
 
@@ -795,19 +805,19 @@ void TypeProvider::getTypeInputInfo(PGOid type, PGOid * typInput, PGOid * typIOP
 	PGTypePtr tup = getTypeByOid(type);
 	if (tup == nullptr)
 	{
-		elog(ERROR, "cache lookup failed for type %u", type);
+		GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound, type);
 		return;
 	}
 
 	if (!tup->typisdefined)
 	{
-		ereport(ERROR, (errcode(PG_ERRCODE_UNDEFINED_OBJECT), errmsg("type %s is only a shell", format_type_be(type).c_str())));
+		GPOS_RAISE(ExmaProcProvider, ExmiTypeIsShell, format_type_be(type).c_str());
 		return;
 	}
 
 	if (!OidIsValid(tup->typinput))
 	{
-		ereport(ERROR, (errcode(PG_ERRCODE_UNDEFINED_FUNCTION), errmsg("no typinput function available for type %s", format_type_be(type).c_str())));
+		GPOS_RAISE(ExmaProcProvider, ExmiNoAvailableOutputFunction, format_type_be(type).c_str());
 		return;
 	}
 
@@ -932,7 +942,7 @@ PGOid TypeProvider::get_range_subtype(PGOid rangeOid)
     //     return InvalidOid;
 
 	// TODO kindred
-	elog(ERROR, "range type not supported yet: %u", rangeOid);
+    GPOS_RAISE(ExmaProcProvider, ExmiRangeTypeNotSupported, rangeOid);
 
 	return InvalidOid;
 };
@@ -1082,7 +1092,9 @@ void TypeProvider::PGTupleDescInitEntry(
     /* attacl, attoptions and attfdwoptions are not present in tupledescs */
     PGTypePtr tuple = getTypeByOid(oidtypeid);
     if (tuple == NULL)
-        elog(ERROR, "cache lookup failed for type %u", oidtypeid);
+    {
+        GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound, oidtypeid);
+    }
     //typeForm = (Form_pg_type)GETSTRUCT(tuple);
     
     att->atttypid = oidtypeid;
@@ -1151,7 +1163,7 @@ PGTupleDescPtr TypeProvider::build_function_result_tupdesc_d(PGProcPtr & procTup
 
 	if (numargs != procTuple->proargmodes.size())
 	{
-		elog(ERROR, "proargmodes is not a 1-D char array");
+        GPOS_RAISE(ExmaProcProvider, ExmiProArgModesNot1DCharArr);
 		return nullptr;
 	}
 	/* extract output-argument types and names */
@@ -1267,10 +1279,9 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
             PGOid array_typelem = get_element_type(context_base_type);
 
             if (!OidIsValid(array_typelem))
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
-                     errmsg("argument declared \"anyarray\" is not an array but type %s", format_type_be(context_base_type).c_str())));
+            {
+                GPOS_RAISE(ExmaProcProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
+            }
             return context_base_type;
         }
         else if (
@@ -1281,10 +1292,9 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
             PGOid array_typeid = get_array_type(context_actual_type);
 
             if (!OidIsValid(array_typeid))
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_UNDEFINED_OBJECT),
-                     errmsg("could not find array type for data type %s", format_type_be(context_actual_type).c_str())));
+            {
+                GPOS_RAISE(ExmaProcProvider, ExmiNotFoundArrayType, format_type_be(context_actual_type).c_str());
+            }
             return array_typeid;
         }
     }
@@ -1298,10 +1308,9 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
             PGOid array_typelem = get_element_type(context_base_type);
 
             if (!OidIsValid(array_typelem))
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
-                     errmsg("argument declared \"anyarray\" is not an array but type %s", format_type_be(context_base_type).c_str())));
+            {
+                GPOS_RAISE(ExmaProcProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
+            }
             return array_typelem;
         }
         else if (context_declared_type == ANYRANGEOID)
@@ -1311,10 +1320,9 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
             PGOid range_typelem = get_range_subtype(context_base_type);
 
             if (!OidIsValid(range_typelem))
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
-                     errmsg("argument declared \"anyrange\" is not a range type but type %s", format_type_be(context_base_type).c_str())));
+            {
+                GPOS_RAISE(ExmaProcProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
+            }
             return range_typelem;
         }
         else if (context_declared_type == ANYELEMENTOID || context_declared_type == ANYNONARRAYOID || context_declared_type == ANYENUMOID)
@@ -1330,7 +1338,7 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
     }
     /* If we get here, declared_type is polymorphic and context isn't */
     /* NB: this is a calling-code logic error, not a user error */
-    elog(ERROR, "could not determine polymorphic type because context isn't polymorphic");
+    GPOS_RAISE(ExmaProcProvider, ExmiCouldNotDeterminePolymorphicType);
     return InvalidOid; /* keep compiler quiet */
 };
 
@@ -1617,7 +1625,7 @@ TypeProvider::internal_get_result_type(PGOid funcid, duckdb_libpgquery::PGNode *
 	PGProcPtr tp = ProcProvider::getProcByOid(funcid);
 	if (nullptr == tp)
 	{
-		elog(ERROR, "cache lookup failed for function %u", funcid);
+        GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound, funcid);
 		return TYPEFUNC_OTHER;
 	}
 
@@ -1663,13 +1671,11 @@ TypeProvider::internal_get_result_type(PGOid funcid, duckdb_libpgquery::PGNode *
         PGOid newrettype = exprType(call_expr);
 
         if (!OidIsValid(newrettype)) /* this probably should not happen */
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
-                 errmsg(
-                     "could not determine actual result type for function \"%s\" declared to return type %s",
-                     tp->proname.c_str(),
-                     format_type_be(rettype).c_str())));
+        {
+            GPOS_RAISE(ExmaProcProvider, ExmiCouldNotDetermineActualResultTypeForFunc,
+                    tp->proname.c_str(),
+                    format_type_be(rettype).c_str());
+        }
         rettype = newrettype;
     }
 
@@ -1699,7 +1705,8 @@ TypeProvider::internal_get_result_type(PGOid funcid, duckdb_libpgquery::PGNode *
             //         *resultTupleDesc = rsinfo->expectedDesc;
             //     /* Assume no polymorphic columns here, either */
             // }
-			elog(ERROR, "return set of record type not supported yet: %u", funcid);
+            GPOS_RAISE(ExmaProcProvider, ExmiSetOfRecordTypeNotSupported,
+                    funcid);
             break;
         default:
             break;
@@ -1849,7 +1856,8 @@ void TypeProvider::get_typlenbyval(PGOid typid, int16 *typlen, bool *typbyval)
     //tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
     if (!typtup)
     {
-        elog(ERROR, "cache lookup failed for type %u", typid);
+        GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+                    typid);
     }
     *typlen = typtup->typlen;
     *typbyval = typtup->typbyval;

@@ -1,11 +1,14 @@
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 #include <common/parser_common.hpp>
 
+#include <Interpreters/orcaopt/provider/Provider.h>
 #include <Interpreters/orcaopt/provider/TypeProvider.h>
 
 #include <Interpreters/Context.h>
 #include <Databases/IDatabase.h>
 #include <Storages/IStorage.h>
+
+#include <gpos/error/CException.h>
 
 #include <rocksdb/db.h>
 #include <rocksdb/table.h>
@@ -167,7 +170,8 @@ void RelationProvider::mockTestData()
         auto type_ptr = TypeProvider::get_type_by_typename_namespaceoid(type_and_name.first);
         if (!type_ptr)
         {
-            elog(ERROR, "Unknow type: %s.", type_and_name.first.c_str());
+            GPOS_RAISE(ExmaRelationProvider, ExmiUnknownType,
+						   type_and_name.first.c_str());
             return;
         }
         TypeProvider::PGTupleDescInitEntry(tab_rel->rd_att, attr_num,
@@ -325,7 +329,10 @@ void RelationProvider::Init(ContextPtr& context_)
 
 PGClassPtr RelationProvider::getClassByRelOid(PGOid oid)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
 	auto it = oid_relation_map.find(oid);
 	if (it == oid_relation_map.end())
@@ -335,12 +342,15 @@ PGClassPtr RelationProvider::getClassByRelOid(PGOid oid)
 
 bool RelationProvider::has_subclass(PGOid relationId)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
 	PGClassPtr tuple = getClassByRelOid(relationId);
 	if (tuple == nullptr)
 	{
-		elog(ERROR, "cache lookup failed for relation %u", relationId);
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationNotFound, relationId);
 		return false;
 	}
 
@@ -349,7 +359,10 @@ bool RelationProvider::has_subclass(PGOid relationId)
 
 const std::string RelationProvider::get_database_name(PGOid dbid)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     auto it = oid_database_map.find(dbid);
 	if (it == oid_database_map.end())
@@ -359,7 +372,10 @@ const std::string RelationProvider::get_database_name(PGOid dbid)
 
 char RelationProvider::get_rel_relkind(PGOid relid)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -369,7 +385,10 @@ char RelationProvider::get_rel_relkind(PGOid relid)
 
 const std::string RelationProvider::get_attname(PGOid relid, PGAttrNumber attnum)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -387,7 +406,10 @@ const std::string RelationProvider::get_attname(PGOid relid, PGAttrNumber attnum
 
 const std::string RelationProvider::get_rel_name(PGOid relid)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -397,7 +419,10 @@ const std::string RelationProvider::get_rel_name(PGOid relid)
 
 PGAttrPtr RelationProvider::get_att_by_reloid_attnum(PGOid relid, PGAttrNumber attnum)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -407,7 +432,10 @@ PGAttrPtr RelationProvider::get_att_by_reloid_attnum(PGOid relid, PGAttrNumber a
 
 std::string RelationProvider::get_rte_attribute_name(PGRangeTblEntry * rte, PGAttrNumber attnum)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     const char * name;
 
@@ -461,7 +489,8 @@ std::string RelationProvider::get_rte_attribute_name(PGRangeTblEntry * rte, PGAt
 bogus:
     /* else caller gave us a bogus attnum */
     name = (rte->eref && rte->eref->aliasname) ? rte->eref->aliasname : "*BOGUS*";
-    ereport(WARNING, (errcode(PG_ERRCODE_INTERNAL_ERROR), errmsg_internal("invalid attnum %d for rangetable entry %s", attnum, name)));
+    GPOS_RAISE(ExmaRelationProvider, ExmiInvalidAttNum,
+				attnum, name);
     return "*BOGUS*";
 };
 
@@ -469,7 +498,10 @@ PGOid RelationProvider::RangeVarGetRelidExtended(
         const PGRangeVar * relation, LOCKMODE lockmode, bool missing_ok,
 		bool nowait, RangeVarGetRelidCallback callback, void * callback_arg)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     // uint64 inval_count;
     // Oid relId;
@@ -678,7 +710,10 @@ PGOid RelationProvider::RangeVarGetRelidExtended(
 
 PGRelationPtr RelationProvider::relation_open(PGOid relationId, LOCKMODE lockmode)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     if (lockmode == RowShareLock
         || lockmode == RowExclusiveLock
@@ -686,7 +721,7 @@ PGRelationPtr RelationProvider::relation_open(PGOid relationId, LOCKMODE lockmod
         || lockmode == ShareRowExclusiveLock
         || lockmode == AccessExclusiveLock)
     {
-        elog(ERROR, "LockMode do not supported yet %u", lockmode);
+        GPOS_RAISE(ExmaRelationProvider, ExmiLockModeNotSupported, lockmode);
         return nullptr;
     }
     
@@ -714,28 +749,40 @@ bool RelationProvider::RelationExists(PGOid oid)
 
 void RelationProvider::relation_close(PGRelationPtr relation, LOCKMODE lockmode)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     return;
 };
 
 PGRelationPtr RelationProvider::try_heap_open(PGOid relationId, LOCKMODE lockmode, bool noWait)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     return relation_open(relationId, lockmode);
 };
 
 bool RelationProvider::IsSystemRelation(PGRelationPtr relation)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     return false;
 };
 
 PGOid RelationProvider::get_relname_relid(const char * relname, PGOid relnamespace)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     for (auto pair : oid_relation_map)
     {
@@ -751,7 +798,10 @@ PGOid RelationProvider::get_relname_relid(const char * relname, PGOid relnamespa
 
 PGOid RelationProvider::LookupNamespaceNoError(const char * nspname)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
     
     /* check for pg_temp alias */
     // if (strcmp(nspname, "pg_temp") == 0)
@@ -817,7 +867,10 @@ PGOid RelationProvider::LookupNamespaceNoError(const char * nspname)
 
 bool RelationProvider::PGPolicyIsReplicated(const PGPolicyPtr policy)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     if (policy == nullptr)
         return false;
@@ -832,7 +885,10 @@ bool RelationProvider::PGPolicyIsReplicated(const PGPolicyPtr policy)
 
 PGAttrNumber RelationProvider::get_attnum(PGOid relid, const char * attname)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     auto it = oid_relation_map.find(relid);
 	if (it == oid_relation_map.end())
@@ -850,7 +906,10 @@ PGAttrNumber RelationProvider::get_attnum(PGOid relid, const char * attname)
 
 PGOid RelationProvider::get_atttype(PGOid relid, PGAttrNumber attnum)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     // HeapTuple tp;
 
@@ -883,7 +942,10 @@ PGOid RelationProvider::get_atttype(PGOid relid, PGAttrNumber attnum)
 
 PGOid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missing_ok)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     // PGOid namespaceId;
     // AclResult aclresult;
@@ -932,7 +994,10 @@ PGOid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missi
 
 std::string RelationProvider::get_namespace_name(PGOid nspid)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     // HeapTuple tp;
 
@@ -962,28 +1027,38 @@ std::string RelationProvider::get_namespace_name(PGOid nspid)
 
 PGRelationPtr RelationProvider::heap_open(PGOid relationId, LOCKMODE lockmode)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     PGRelationPtr r;
     
     r = relation_open(relationId, lockmode);
     if (!r)
     {
-        elog(ERROR, "Table not find, Oid: %d.", relationId);
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationNotFound, relationId);
         return nullptr;
     }
 
     if (r->rd_rel->relkind == PG_RELKIND_INDEX)
-        ereport(ERROR, (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is an index", RelationGetRelationName(r))));
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiWrongObjectType, RelationGetRelationName(r));
+    }
     else if (r->rd_rel->relkind == PG_RELKIND_COMPOSITE_TYPE)
-        ereport(ERROR, (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE), errmsg("\"%s\" is a composite type", RelationGetRelationName(r))));
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiWrongObjectType, RelationGetRelationName(r));
+    }
 
     return r;
 };
 
 PGOid RelationProvider::get_rel_type_id(PGOid relid)
 {
-    if (!is_init) elog(ERROR, "RelationProvider not inited, call Init() first.");
+    if (!is_init)
+    {
+        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+    }
 
     auto rel_class = getClassByRelOid(relid);
     return rel_class->reltype;

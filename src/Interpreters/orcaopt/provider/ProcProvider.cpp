@@ -1,4 +1,5 @@
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
+#include <Interpreters/orcaopt/provider/OperProvider.h>
 
 #include <Interpreters/Context.h>
 #include <gpos/error/CException.h>
@@ -573,13 +574,18 @@ std::optional<std::string> ProcProvider::get_func_name(PGOid oid)
     return std::nullopt;
 };
 
-bool ProcProvider::func_strict(PGOid funcid)
+bool ProcProvider::func_strict(PGOid operator_oid)
 {
-    PGProcPtr tp = getProcByOid(funcid);
+    auto oprcode = OperProvider::get_opcode(operator_oid);
+    if (InvalidOid == oprcode)
+    {
+        return InvalidOid;
+    }
+    PGProcPtr tp = getProcByOid(oprcode);
 	if (tp == NULL)
 	{
         GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound,
-						   funcid);
+						   oprcode);
         return InvalidOid;
 	}
 
@@ -591,7 +597,9 @@ PGOid ProcProvider::get_func_rettype(PGOid funcid)
     PGProcPtr tp = getProcByOid(funcid);
 	if (tp == NULL)
 	{
-		elog(ERROR, "cache lookup failed for function %u", funcid);
+		GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound,
+						   funcid);
+
         return InvalidOid;
 	}
 
@@ -603,7 +611,9 @@ bool ProcProvider::get_func_retset(PGOid funcid)
 	PGProcPtr tp = getProcByOid(funcid);
 	if (tp == NULL)
 	{
-		elog(ERROR, "cache lookup failed for function %u", funcid);
+		GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound,
+						   funcid);
+
         return false;
 	}
 

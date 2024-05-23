@@ -938,7 +938,6 @@ String FunctionProvider::get_func_result_name(PGOid functionId)
     PGProcPtr procTuple = ProcProvider::getProcByOid(functionId);
     if (!procTuple)
     {
-        elog(ERROR, "can not find function: %u", functionId);
         return "";
     }
 

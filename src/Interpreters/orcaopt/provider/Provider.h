@@ -8,7 +8,8 @@ namespace DB
 enum ExMajor
 {
 	ExmaProcProvider = 10000,
-
+	ExmaRelationProvider,
+	ExmaTypeProvider,
 	ExmaSentinel
 };
 
@@ -16,7 +17,24 @@ enum ExMajor
 enum ExMinor
 {
 	ExmiNoProcFound,
-
+	ExmiUnknownType,
+	ExmiRelationProviderNotInit,
+	ExmiRelationNotFound,
+	ExmiLockModeNotSupported,
+	ExmiInvalidAttNum,
+	ExmiWrongObjectType,
+	ExmiTypeNotFound,
+	ExmiInvalidTypeForComposite,
+	ExmiRecordTypeNotRegister,
+	ExmiTypeIsShell,
+	ExmiNoAvailableOutputFunction,
+	ExmiRangeTypeNotSupported,
+	ExmiProArgModesNot1DCharArr,
+	ExmiNotAnyArray,
+	ExmiNotFoundArrayType,
+	ExmiCouldNotDeterminePolymorphicType,
+	ExmiCouldNotDetermineActualResultTypeForFunc,
+	ExmiSetOfRecordTypeNotSupported,
 
 	ExmiSentinel
 };
