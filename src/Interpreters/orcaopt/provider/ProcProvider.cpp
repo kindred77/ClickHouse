@@ -1,6 +1,7 @@
 #include <Interpreters/orcaopt/provider/ProcProvider.h>
 
 #include <Interpreters/Context.h>
+#include <gpos/error/CException.h>
 
 using namespace duckdb_libpgquery;
 
@@ -577,7 +578,8 @@ bool ProcProvider::func_strict(PGOid funcid)
     PGProcPtr tp = getProcByOid(funcid);
 	if (tp == NULL)
 	{
-		elog(ERROR, "cache lookup failed for function %u", funcid);
+        GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound,
+						   funcid);
         return InvalidOid;
 	}
 

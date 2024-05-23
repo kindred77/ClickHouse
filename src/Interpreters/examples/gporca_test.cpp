@@ -1,6 +1,7 @@
 #include <iostream>
 #include <Interpreters/orcaopt/SelectParser.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
+#include <Interpreters/orcaopt/provider/Provider.h>
 #include <Interpreters/Context.h>
 #include <postgres_parser.hpp>
 #include <Interpreters/orcaopt/translator/CTranslatorQueryToDXL.h>
@@ -11,6 +12,7 @@
 #include <gpos/_api.h>
 #include <gpopt/mdcache/CMDCache.h>
 #include <gpopt/init.h>
+#include <gpopt/exception.h>
 #include <gpopt/search/CSearchStage.h>
 #include <gpopt/engine/CEnumeratorConfig.h>
 #include <gpopt/engine/CCTEConfig.h>
@@ -97,10 +99,8 @@ LoadSearchStrategy(CMemoryPool *mp, char *path)
 	{
 		if (NULL != path)
 		{
-			std::cout << "LoadSearchStrategy--00" << std::endl;
 			dxl_parse_handler =
 				CDXLUtils::GetParseHandlerForDXLFile(mp, path, NULL);
-			std::cout << "LoadSearchStrategy--11" << std::endl;
 			if (NULL != dxl_parse_handler)
 			{
 				elog(DEBUG2, "\n[OPT]: Using search strategy in (%s)", path);
@@ -253,6 +253,34 @@ void * testDXL(void *ptr)
 	return NULL;
 };
 
+bool
+IsAbortRequested(void)
+{
+	// No GP_WRAP_START/END needed here. We just check these global flags,
+	// it cannot throw an ereport().
+	return false;
+}
+
+void InitGPOPT()
+{
+	// if (optimizer_use_gpdb_allocators)
+	// {
+	// 	CMemoryPoolPallocManager::Init();
+	// }
+
+	struct gpos_init_params params = {IsAbortRequested};
+
+	gpos_init(&params);
+	gpdxl_init();
+	gpopt_init();
+
+	if (GPOS_OK != gpos::CWorkerPoolManager::Init())
+	{
+		std::cout << "CWorkerPoolManager can not init!" << std::endl;
+		return;
+	}
+};
+
 void * OptimizeTask(void *ptr)
 {
     CSystemId default_sysid(IMDId::EmdidGPDB, GPOS_WSZ_STR_LENGTH("GPDB"));
@@ -260,7 +288,8 @@ void * OptimizeTask(void *ptr)
     GPOS_ASSERT(NULL != ptr);
     AUTO_MEM_POOL(amp);
 	CMemoryPool *mp = amp.Pmp();
-
+	DB::Provider::Init(mp);
+	(void) gpopt::EresExceptionInit(mp);
     bool reset_mdcache = true;//gpdb::MDCacheNeedsReset();
 
 	// initialize metadata cache, or purge if needed, or change size if requested
@@ -291,7 +320,6 @@ void * OptimizeTask(void *ptr)
 
 	IMdIdArray *col_stats = NULL;
 	MdidHashSet *rel_stats = NULL;
-
     GPOS_TRY
 	{
 		// set trace flags
@@ -308,7 +336,6 @@ void * OptimizeTask(void *ptr)
 			// scope for MD accessor
 			CMDAccessor mda(mp, CMDCache::Pcache(), default_sysid,
 							relcache_provider);
-
 			ULONG num_segments = 2;//gpdb::GetGPSegmentCount();
 			ULONG num_segments_for_costing = optimizer_segments;
 			if (0 == num_segments_for_costing)
@@ -318,15 +345,12 @@ void * OptimizeTask(void *ptr)
 			CAutoP<CTranslatorQueryToDXL> query_to_dxl_translator;
 			query_to_dxl_translator = CTranslatorQueryToDXL::QueryToDXLInstance(
 				mp, &mda, (PGQuery *) ptr);
-
 			ICostModel *cost_model = GetCostModel(mp, num_segments_for_costing);
 			COptimizerConfig *optimizer_config =
 				CreateOptimizerConfig(mp, cost_model);
-
 			// CConstExprEvaluatorProxy expr_eval_proxy(mp, &mda);
 			// IConstExprEvaluator *expr_evaluator =
 			// 	GPOS_NEW(mp) CConstExprEvaluatorDXL(mp, &mda, &expr_eval_proxy);
-
 			CDXLNode *query_dxl =
 				query_to_dxl_translator->TranslateQueryToDXL();
 			CDXLNodeArray *query_output_dxlnode_array =
@@ -340,8 +364,6 @@ void * OptimizeTask(void *ptr)
 
             CDXLUtils::SerializeQuery(mp, oss, query_dxl, query_output_dxlnode_array, cte_dxlnode_array, true, true);
 			std::wcout << std::wstring(str.GetBuffer()) << std::endl;
-
-
 			// BOOL is_master_only =
 			// 	!optimizer_enable_motions ||
 			// 	(!optimizer_enable_motions_masteronly_queries &&
@@ -360,7 +382,6 @@ void * OptimizeTask(void *ptr)
 				mp, &mda, query_dxl, query_output_dxlnode_array,
 				cte_dxlnode_array, NULL, num_segments, 1985,
 				gp_command_count, NULL, optimizer_config);
-
 			CWStringDynamic plan_str(mp);
 			COstreamString oss2(&plan_str);
 			CDXLUtils::SerializePlan(
@@ -368,7 +389,6 @@ void * OptimizeTask(void *ptr)
 				optimizer_config->GetEnumeratorCfg()->GetPlanId(),
 				optimizer_config->GetEnumeratorCfg()->GetPlanSpaceSize(),
 				true /*serialize_header_footer*/, true /*indentation*/);
-
 			std::wcout << std::wstring(plan_str.GetBuffer()) << std::endl;
 
 			// plan_dxl = COptimizer::PdxlnOptimize(
@@ -427,9 +447,8 @@ void * OptimizeTask(void *ptr)
 		// CRefCount::SafeRelease(trace_flags);
 		CRefCount::SafeRelease(plan_dxl);
 		CMDCache::Shutdown();
-
-		// IErrorContext *errctxt = CTask::Self()->GetErrCtxt();
-
+		IErrorContext *errctxt = CTask::Self()->GetErrCtxt();
+		std::wcout << ex.Filename() << ": " << ex.Line() << ". " << errctxt->GetErrorMsg() << std::endl;
 		// opt_ctxt->m_should_error_out = ShouldErrorOut(ex);
 		// opt_ctxt->m_is_unexpected_failure = IsLoggableFailure(ex);
 		// opt_ctxt->m_error_msg =
@@ -459,17 +478,14 @@ void * OptimizeTask(void *ptr)
 void Execute(void *(*func)(void *), void *func_arg)
 {
     Assert(func);
-
+	InitGPOPT();
 	CHAR *err_buf = (CHAR *) palloc(GPOPT_ERROR_BUFFER_SIZE);
 	err_buf[0] = '\0';
-
 	// initialize DXL support
 	InitDXL();
-
 	bool abort_flag = false;
 
 	CAutoMemoryPool amp(CAutoMemoryPool::ElcNone);
-
 	gpos_exec_params params;
 	params.func = func;
 	params.arg = func_arg;
@@ -490,28 +506,6 @@ void Execute(void *(*func)(void *), void *func_arg)
 	}
 	GPOS_CATCH_END;
 	//LogExceptionMessageAndDelete(err_buf);
-};
-
-bool
-IsAbortRequested(void)
-{
-	// No GP_WRAP_START/END needed here. We just check these global flags,
-	// it cannot throw an ereport().
-	return false;
-}
-
-void InitGPOPT()
-{
-	// if (optimizer_use_gpdb_allocators)
-	// {
-	// 	CMemoryPoolPallocManager::Init();
-	// }
-
-	struct gpos_init_params params = {IsAbortRequested};
-
-	gpos_init(&params);
-	gpdxl_init();
-	gpopt_init();
 };
 
 void optimize2(PGQuery * query)
@@ -607,8 +601,8 @@ int main(int argc, char ** argv)
         return -1;
     }
 
-    InitGPOPT();
-    
+    //InitGPOPT();
+	
     for (auto entry = parser.parse_tree->head; entry != nullptr; entry = entry->next)
     {
         auto query_node = (PGNode *)entry->data.ptr_value;

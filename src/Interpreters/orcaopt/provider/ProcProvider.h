@@ -2,6 +2,7 @@
 
 #include <common/parser_common.hpp>
 #include <Interpreters/Context.h>
+#include <Interpreters/orcaopt/provider/Provider.h>
 
 #include <gpos/memory/CMemoryPool.h>
 
@@ -16,7 +17,7 @@ pg_proc  -> CMDFunctionGPDB
 class Context;
 using ContextPtr = std::shared_ptr<const Context>;
 
-class ProcProvider
+class ProcProvider : public Provider
 {
 private:
 	using OidProcMap = std::map<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr>;
@@ -252,12 +253,11 @@ private:
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_NUMERICTYPMODIN;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGProcPtr> PROC_ARRAY_IN;
 
-
 	//ContextPtr context;
 public:
 	//explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	//explicit ProcProvider(const ContextPtr& context_);
-	
+
 	static duckdb_libpgquery::PGProcPtr getProcByOid(duckdb_libpgquery::PGOid oid);
 
 	static std::optional<std::string> get_func_name(duckdb_libpgquery::PGOid oid);

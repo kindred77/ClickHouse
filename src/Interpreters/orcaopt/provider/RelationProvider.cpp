@@ -90,7 +90,7 @@ void RelationProvider::mockTestData()
 
     auto table_oid = 9999;
     auto table_name = "test";
-    std::map<String, String> cols = {{"String", "col1"}, {"Int64", "col2"}, {"DateTime", "col3"}, {"Int8", "col4"}, {"Date", "col5"}};
+    std::map<String, String> cols = {{"text", "col1"}, {"int8", "col2"}, {"timestamp", "col3"}, {"bool", "col4"}, {"date", "col5"}};
     auto tab_class = std::make_shared<Form_pg_class>(Form_pg_class{
         /*oid*/ PGOid(table_oid),
         /*relname*/ table_name,
