@@ -5,6 +5,8 @@
 #include "nodes/nodeFuncs.hpp"
 #include "nodes/parsenodes.hpp"
 
+#include <iostream>
+
 namespace duckdb_libpgquery {
 
 PGTargetEntry *
@@ -56,6 +58,7 @@ pg_expression_tree_walker(PGNode *node,
 		case T_PGCurrentOfExpr:
 		case T_PGRangeTblRef:
 		case T_PGSortGroupClause:
+		case T_PGString:
 		// case T_PGDMLActionExpr:
 		// case T_PGPartSelectedExpr:
 		// case T_PGPartDefaultExpr:
@@ -317,12 +320,15 @@ pg_expression_tree_walker(PGNode *node,
 		case T_PGFromExpr:
 			{
 				PGFromExpr   *from = (PGFromExpr *) node;
-
 				if (walker(reinterpret_cast<PGNode*>(from->fromlist),
                     reinterpret_cast<assign_collations_context*>(context)))
+				{
 					return true;
+				}
 				if (walker(from->quals, reinterpret_cast<assign_collations_context*>(context)))
+				{
 					return true;
+				}
 			}
 			break;
 		case T_PGJoinExpr:
@@ -435,7 +441,33 @@ pg_expression_tree_walker(PGNode *node,
 			}
 			break;
 
+		case T_PGAExpr:
+			{
+				PGAExpr * a = (PGAExpr *)node;
+
+				if (walker((PGNode *) a->lexpr, reinterpret_cast<assign_collations_context*>(context))
+					&& walker((PGNode *) a->rexpr, reinterpret_cast<assign_collations_context*>(context))
+					&& walker((PGNode *) a->name, reinterpret_cast<assign_collations_context*>(context)))
+				{
+					return true;
+				}
+				return false;
+			}
+			break;
+
+		case T_PGColumnRef:
+			{
+				PGColumnRef * a = (PGColumnRef *)node;
+
+				if (walker((PGNode *) a->fields, reinterpret_cast<assign_collations_context*>(context)))
+				{
+					return true;
+				}
+				return false;
+			}
+			break;
 		default:
+			std::cout << "Error: unrecognized node type:" << std::to_string((int) nodeTag(node)) << std::endl;
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));
 			//throw ::DB::Exception(ERROR, "unrecognized node type: {}", (int) nodeTag(node));
@@ -506,7 +538,6 @@ pg_query_tree_walker(PGQuery *query,
 				  int flags)
 {
 	Assert(query != NULL && IsA(query, PGQuery))
-
 	/*
 	 * We don't walk any utilityStmt here. However, we can't easily assert
 	 * that it is absent, since there are at least two code paths by which
@@ -515,22 +546,37 @@ pg_query_tree_walker(PGQuery *query,
 	 */
 
 	if (walker((PGNode *) query->targetList, (assign_collations_context*)context))
+	{
 		return true;
+	}
 	if (walker((PGNode *) query->withCheckOptions, (assign_collations_context*)context))
+	{
 		return true;
+	}
 	if (walker((PGNode *) query->returningList, (assign_collations_context*)context))
+	{
 		return true;
+	}
 	if (walker((PGNode *) query->jointree, (assign_collations_context*)context))
+	{
 		return true;
+	}
 	if (walker(query->setOperations, (assign_collations_context*)context))
+	{
 		return true;
+	}
 	if (walker(query->havingQual, (assign_collations_context*)context))
+	{
 		return true;
+	}
 	if (walker(query->limitOffset, (assign_collations_context*)context))
+	{
 		return true;
+	}
 	if (walker(query->limitCount, (assign_collations_context*)context))
+	{
 		return true;
-
+	}
 	/*
 	 * Most callers aren't interested in SortGroupClause nodes since those
 	 * don't contain actual expressions. However they do contain OIDs which
@@ -565,7 +611,6 @@ pg_query_tree_walker(PGQuery *query,
 				return true;
 		}
 	}
-
 	/*
 	 * groupingSets and rowMarks are not walked:
 	 *
@@ -921,7 +966,10 @@ PGIncrementVarSublevelsUp_walker(PGNode *node,
     {
         /* this should not happen */
         if (context->min_sublevels_up == 0)
+		{
+			std::cout << "Error: cannot push down CurrentOfExpr" << std::endl;
             elog(ERROR, "cannot push down CurrentOfExpr");
+		}
         return false;
     }
     if (IsA(node, PGAggref))
@@ -1755,6 +1803,7 @@ pg_expression_tree_mutator(PGNode *node,
 			}
 			break;
 		default:
+			std::cout << "Error: unrecognized node type" << std::endl;
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));
 			break;
@@ -2799,8 +2848,11 @@ void pg_get_sortgroupclauses_tles_recurse(PGList * clauses, PGList * targetList,
         //         ((GroupingClause *)node)->groupsets, targetList, &sub_grouping_tles, &sub_grouping_sortops, &sub_grouping_eqops);
         // }
         else
+		{
+			std::cout << "Error: unrecognized node type in list of sort/group clauses" << std::endl;
             elog(ERROR, "unrecognized node type in list of sort/group clauses: %d", (int)nodeTag(node));
-    }
+		}
+	}
 
     /*
 	 * Put SortGroupClauses before GroupingClauses.
@@ -2877,7 +2929,10 @@ PGIndex maxSortGroupRef(PGList *targetlist, bool include_orderedagg)
     if (targetlist != NIL)
     {
         if (!IsA(targetlist, PGList) || !IsA(linitial(targetlist), PGTargetEntry))
+		{
+			std::cout << "Error: non-targetlist argument supplied" << std::endl;
             elog(ERROR, "non-targetlist argument supplied");
+		}
 
         maxSortGroupRef_walker((PGNode *)targetlist, &context);
     }
@@ -3143,6 +3198,7 @@ pg_find_nodes_walker(PGNode *node, pg_find_nodes_context *context)
 
     if (IsA(node, PGQuery))
     {
+		std::cout << "pg_find_nodes_walker------0000------" << std::endl;
         /* Recurse into subselects */
         return pg_query_tree_walker((PGQuery *)node, (walker_func)pg_find_nodes_walker, (void *)context, 0 /* flags */);
     }
@@ -3158,7 +3214,7 @@ pg_find_nodes_walker(PGNode *node, pg_find_nodes_context *context)
 
         i++;
     }
-
+	
     return pg_expression_tree_walker(node, (walker_func)pg_find_nodes_walker, (void *)context);
 };
 

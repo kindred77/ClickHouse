@@ -308,7 +308,6 @@ void * OptimizeTask(void *ptr)
 	{
 		CMDCache::SetCacheQuota(optimizer_mdcache_size * 1024L);
 	}
-	
     // load search strategy
 	// CSearchStageArray *search_strategy_arr =
 	// 	LoadSearchStrategy(mp, "default");
@@ -358,7 +357,6 @@ void * OptimizeTask(void *ptr)
 			CDXLNodeArray *cte_dxlnode_array =
 				query_to_dxl_translator->GetCTEs();
 			GPOS_ASSERT(NULL != query_output_dxlnode_array);
-
             CWStringDynamic str(mp);
 	        COstreamString oss(&str);
 
@@ -595,6 +593,7 @@ int main(int argc, char ** argv)
     DB::RelationProvider::mockTestData();
 
     duckdb::PostgresParser parser;
+	
     parser.Parse(query_str);
     if (!parser.success || !parser.parse_tree)
     {
