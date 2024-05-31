@@ -2552,7 +2552,11 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
                     case PG_AEXPR_IN:
                         result = transformAExprIn(pstate, a);
                         break;
+					case PG_AEXPR_BETWEEN:
+						result = transformAExprBetween(pstate, a);
+                        break;
                     default:
+						std::cout << "transformAExprBetween---------1111---" << std::endl;
                         elog(ERROR, "unrecognized A_Expr kind: %d", a->kind);
                         result = NULL; /* keep compiler quiet */
                         break;
@@ -2708,7 +2712,11 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
         case T_PGDistinctExpr:
         case T_PGNullIfExpr:
         case T_PGScalarArrayOpExpr:
-        case T_PGBoolExpr:
+        case T_PGBoolExpr: {
+			PGBoolExpr * bexpr = (PGBoolExpr *)expr;
+			result = transformBoolExpr(pstate, bexpr);
+            break;
+		}
         case T_PGFieldSelect:
         case T_PGFieldStore:
         case T_PGRelabelType:

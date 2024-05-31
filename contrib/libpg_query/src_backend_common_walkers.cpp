@@ -441,31 +441,31 @@ pg_expression_tree_walker(PGNode *node,
 			}
 			break;
 
-		case T_PGAExpr:
-			{
-				PGAExpr * a = (PGAExpr *)node;
+		// case T_PGAExpr:
+		// 	{
+		// 		PGAExpr * a = (PGAExpr *)node;
 
-				if (walker((PGNode *) a->lexpr, reinterpret_cast<assign_collations_context*>(context))
-					&& walker((PGNode *) a->rexpr, reinterpret_cast<assign_collations_context*>(context))
-					&& walker((PGNode *) a->name, reinterpret_cast<assign_collations_context*>(context)))
-				{
-					return true;
-				}
-				return false;
-			}
-			break;
+		// 		if (walker((PGNode *) a->lexpr, reinterpret_cast<assign_collations_context*>(context))
+		// 			&& walker((PGNode *) a->rexpr, reinterpret_cast<assign_collations_context*>(context))
+		// 			&& walker((PGNode *) a->name, reinterpret_cast<assign_collations_context*>(context)))
+		// 		{
+		// 			return true;
+		// 		}
+		// 		return false;
+		// 	}
+		// 	break;
 
-		case T_PGColumnRef:
-			{
-				PGColumnRef * a = (PGColumnRef *)node;
+		// case T_PGColumnRef:
+		// 	{
+		// 		PGColumnRef * a = (PGColumnRef *)node;
 
-				if (walker((PGNode *) a->fields, reinterpret_cast<assign_collations_context*>(context)))
-				{
-					return true;
-				}
-				return false;
-			}
-			break;
+		// 		if (walker((PGNode *) a->fields, reinterpret_cast<assign_collations_context*>(context)))
+		// 		{
+		// 			return true;
+		// 		}
+		// 		return false;
+		// 	}
+		// 	break;
 		default:
 			std::cout << "Error: unrecognized node type:" << std::to_string((int) nodeTag(node)) << std::endl;
 			elog(ERROR, "unrecognized node type: %d",
