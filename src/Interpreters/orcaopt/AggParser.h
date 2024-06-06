@@ -2,6 +2,8 @@
 
 #include <common/parser_common.hpp>
 
+#include <Interpreters/orcaopt/Parser.h>
+
 #define AGGKIND_IS_ORDERED_SET(kind)  ((kind) != AGGKIND_NORMAL)
 
 namespace DB
@@ -21,7 +23,7 @@ cmp_list_len_asc(const void *a, const void *b);
 // class Context;
 // using ContextPtr = std::shared_ptr<const Context>;
 
-class AggParser
+class AggParser : public Parser
 {
 private:
     // ClauseParserPtr clause_parser;

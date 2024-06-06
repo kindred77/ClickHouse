@@ -2,6 +2,8 @@
 #include <Interpreters/orcaopt/SelectParser.h>
 #include <Interpreters/orcaopt/provider/RelationProvider.h>
 #include <Interpreters/orcaopt/provider/Provider.h>
+#include <Interpreters/orcaopt/Parser.h>
+#include <Interpreters/orcaopt/CommonException.h>
 #include <Interpreters/Context.h>
 #include <postgres_parser.hpp>
 #include <Interpreters/orcaopt/translator/CTranslatorQueryToDXL.h>
@@ -288,7 +290,9 @@ void * OptimizeTask(void *ptr)
     GPOS_ASSERT(NULL != ptr);
     AUTO_MEM_POOL(amp);
 	CMemoryPool *mp = amp.Pmp();
+	DB::CommonException::Init(mp);
 	DB::Provider::Init(mp);
+	DB::Parser::Init(mp);
 	(void) gpopt::EresExceptionInit(mp);
     bool reset_mdcache = true;//gpdb::MDCacheNeedsReset();
 

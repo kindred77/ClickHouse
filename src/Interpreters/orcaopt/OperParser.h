@@ -2,6 +2,8 @@
 
 #include <common/parser_common.hpp>
 
+#include <Interpreters/orcaopt/Parser.h>
+
 namespace DB
 {
 // class FuncParser;
@@ -15,7 +17,7 @@ namespace DB
 // class Context;
 // using ContextPtr = std::shared_ptr<const Context>;
 
-class OperParser
+class OperParser : public Parser
 {
 private:
     // FuncParserPtr func_parser;

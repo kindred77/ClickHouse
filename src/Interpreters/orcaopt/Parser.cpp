@@ -1,4 +1,4 @@
-#include <Interpreters/orcaopt/provider/Provider.h>
+#include <Interpreters/orcaopt/Parser.h>
 #include <gpos/error/CMessage.h>
 #include <gpos/error/CMessageRepository.h>
 
@@ -7,9 +7,9 @@ using namespace gpos;
 namespace DB
 {
 
-bool Provider::is_init = false;
+bool Parser::is_init = false;
 
-void Provider::Init(CMemoryPool *mp)
+void Parser::Init(CMemoryPool *mp)
 {
 
 }

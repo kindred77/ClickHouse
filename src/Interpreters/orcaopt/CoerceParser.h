@@ -2,6 +2,8 @@
 
 #include <common/parser_common.hpp>
 
+#include <Interpreters/orcaopt/Parser.h>
+
 namespace DB
 {
 
@@ -20,7 +22,7 @@ namespace DB
 // class Context;
 // using ContextPtr = std::shared_ptr<const Context>;
 
-class CoerceParser
+class CoerceParser : public Parser
 {
 private:
 	// RelationParserPtr relation_parser;

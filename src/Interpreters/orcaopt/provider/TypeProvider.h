@@ -3,6 +3,8 @@
 #include <common/parser_common.hpp>
 #include <Interpreters/Context.h>
 
+#include <Interpreters/orcaopt/CommonException.h>
+
 #include <naucrates/md/IMDType.h>
 #include <naucrates/md/CMDName.h>
 

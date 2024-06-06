@@ -3,6 +3,7 @@
 #include <common/parser_common.hpp>
 #include <Interpreters/Context.h>
 #include <Interpreters/orcaopt/provider/Provider.h>
+#include <Interpreters/orcaopt/CommonException.h>
 
 #include <gpos/memory/CMemoryPool.h>
 

@@ -5,6 +5,8 @@
 
 #include <gpos/memory/CMemoryPool.h>
 
+#include <Interpreters/orcaopt/CommonException.h>
+
 #include <map>
 
 namespace rocksdb

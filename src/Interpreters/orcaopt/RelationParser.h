@@ -2,6 +2,8 @@
 
 #include <common/parser_common.hpp>
 
+#include <Interpreters/orcaopt/Parser.h>
+
 //#include <Storages/IStorage.h>
 
 //#include <optional>
@@ -21,7 +23,7 @@ namespace DB
 
 using String = std::string;
 
-class RelationParser
+class RelationParser : public Parser
 {
 private:
     // CoerceParserPtr coerce_parser;

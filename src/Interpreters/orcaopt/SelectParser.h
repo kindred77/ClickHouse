@@ -2,6 +2,8 @@
 
 #include <common/parser_common.hpp>
 
+#include <Interpreters/orcaopt/Parser.h>
+
 namespace DB
 {
 // class ClauseParser;
@@ -25,7 +27,7 @@ namespace DB
 // class Context;
 // using ContextPtr = std::shared_ptr<const Context>;
 
-class SelectParser
+class SelectParser : public Parser
 {
 private:
     // ClauseParserPtr clause_parser;

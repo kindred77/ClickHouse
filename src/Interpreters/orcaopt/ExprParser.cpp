@@ -15,6 +15,8 @@
 
 #include <Interpreters/Context.h>
 
+#include <gpos/error/CException.h>
+
 using namespace duckdb_libpgquery;
 
 namespace DB
@@ -2555,9 +2557,19 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 					case PG_AEXPR_BETWEEN:
 						result = transformAExprBetween(pstate, a);
                         break;
+					case PG_AEXPR_LIKE:
+					{
+						auto * func_call_like = makeFuncCall(SystemFuncName("like"), list_make2(a->lexpr, a->rexpr), a->location);
+						result = transformFuncCall(pstate, func_call_like);
+					}
+					case PG_AEXPR_ILIKE:
+					{
+						auto * func_call_ilike = makeFuncCall(SystemFuncName("ilike"), list_make2(a->lexpr, a->rexpr), a->location);
+						result = transformFuncCall(pstate, func_call_ilike);
+					}
                     default:
-						std::cout << "transformAExprBetween---------1111---" << std::endl;
-                        elog(ERROR, "unrecognized A_Expr kind: %d", a->kind);
+						GPOS_RAISE(ExmaExprParser, ExmiUnrecognizedAExprKind,
+						   a->kind);
                         result = NULL; /* keep compiler quiet */
                         break;
             }
@@ -2693,7 +2705,11 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
         //     result = (Node *)in;
         // }
         // break;
-
+		case T_PGBoolExpr: {
+			PGBoolExpr * bexpr = (PGBoolExpr *)expr;
+			result = transformBoolExpr(pstate, bexpr);
+            break;
+		}
             /*********************************************
 			 * Quietly accept node types that may be presented when we are
 			 * called on an already-transformed tree.
@@ -2712,11 +2728,6 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
         case T_PGDistinctExpr:
         case T_PGNullIfExpr:
         case T_PGScalarArrayOpExpr:
-        case T_PGBoolExpr: {
-			PGBoolExpr * bexpr = (PGBoolExpr *)expr;
-			result = transformBoolExpr(pstate, bexpr);
-            break;
-		}
         case T_PGFieldSelect:
         case T_PGFieldStore:
         case T_PGRelabelType:

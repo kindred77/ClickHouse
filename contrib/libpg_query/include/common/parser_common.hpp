@@ -9,6 +9,7 @@
 #include <nodes/bitmapset.hpp>
 #include <nodes/lockoptions.hpp>
 #include <nodes/value.hpp>
+#include <parser/parser.hpp>
 #include <pg_functions.hpp>
 #include <access/attnum.hpp>
 #include <common/common_def.hpp>

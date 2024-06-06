@@ -2,10 +2,12 @@
 
 #include <gpos/memory/CMemoryPool.h>
 
+#include <Interpreters/orcaopt/provider/Provider.h>
+
 namespace DB
 {
 
-class Provider
+class Parser
 {
 private:
     static bool is_init;
