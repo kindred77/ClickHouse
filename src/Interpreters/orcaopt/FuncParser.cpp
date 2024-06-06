@@ -66,14 +66,13 @@ FuncParser::ParseComplexProjection(PGParseState *pstate, const char *funcname, P
 	 * That task is handled by expandRecordVariable().
 	 */
     if (IsA(first_arg, PGVar) && ((PGVar *)first_arg)->vartype == RECORDOID)
+    {
         tupdesc = TargetParser::expandRecordVariable(pstate, (PGVar *)first_arg, 0);
+    }
 	//TODO kindred
 	else
 	{
-        ereport(
-            ERROR,
-            (errcode(PG_ERRCODE_INVALID_COLUMN_REFERENCE),
-             errmsg("Complex projection do not supported yet!")));
+        GPOS_RAISE(ExmaFuncParser, ExmiComplexProjNotSupported);
 		return NULL;
     }
     //else if (get_expr_result_type(first_arg, NULL, &tupdesc) != TYPEFUNC_COMPOSITE)
@@ -156,12 +155,9 @@ FuncParser::func_select_candidate(int nargs,
 
 	/* protect local fixed-size arrays */
 	if (nargs > FUNC_MAX_ARGS)
-		ereport(ERROR,
-				(errcode(PG_ERRCODE_TOO_MANY_ARGUMENTS),
-				 errmsg("cannot pass more than %d argument to a function",
-							   "cannot pass more than %d arguments to a function",
-							   FUNC_MAX_ARGS,
-							   FUNC_MAX_ARGS)));
+    {
+        GPOS_RAISE(ExmaFuncParser, ExmiFuncTooManyArgs, FUNC_MAX_ARGS);
+    }
 
 	/*
 	 * If any input types are domains, reduce them to their base types. This
@@ -719,14 +715,16 @@ FuncParser::func_get_detail(PGList *funcname,
 
         PGProcPtr ftup = ProcProvider::getProcByOid(best_candidate->oid);
         if (ftup == NULL) /* should not happen */
-            elog(ERROR, "cache lookup failed for function %u", best_candidate->oid);
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiNoFuncFound, best_candidate->oid);
+        }
         *rettype = ftup->prorettype;
         *retset = ftup->proretset;
         *vatype = ftup->provariadic;
         /* fetch default args if caller wants 'em */
         if (argdefaults && best_candidate->ndargs > 0)
         {
-			elog(ERROR, "Not supported yet!");
+			GPOS_RAISE(ExmaFuncParser, ExmiNotImplementYet);
 			//TODO kindred
             // Datum proargdefaults;
             // bool isnull;
@@ -871,7 +869,9 @@ FuncParser::unify_hypothetical_args(PGParseState *pstate,
 	numNonHypotheticalArgs = numDirectArgs - numAggregatedArgs;
 	/* safety check (should only trigger with a misdeclared agg) */
 	if (numNonHypotheticalArgs < 0)
-		elog(ERROR, "incorrect number of arguments to hypothetical-set aggregate");
+    {
+        GPOS_RAISE(ExmaFuncParser, ExmiIncorrectNumOfArgsToHypotheticalSetAgg);
+    }
 
 	/* Deconstruct fargs into an array for ease of subscripting */
 	i = 0;
@@ -888,7 +888,9 @@ FuncParser::unify_hypothetical_args(PGParseState *pstate,
 
 		/* A mismatch means AggregateCreate didn't check properly ... */
 		if (declared_arg_types[i] != declared_arg_types[aargpos])
-			elog(ERROR, "hypothetical-set aggregate has inconsistent declared argument types");
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiHypotheticalSetAggInconsistentDeclArgTypes);
+        }
 
 		/* No need to unify if make_fn_arguments will coerce */
 		if (declared_arg_types[i] != ANYOID)
@@ -937,6 +939,7 @@ FuncParser::unify_hypothetical_args(PGParseState *pstate,
 PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname, 
 		PGList * fargs, PGFuncCall * fn, int location)
 {
+    std::cout << "ExprParser::ParseFuncOrColumn----000" << std::endl;
     bool is_column = (fn == NULL);
     PGList * agg_order = (fn ? fn->agg_order : NIL);
     PGExpr * agg_filter = NULL;
@@ -968,7 +971,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 	 */
     if (fn && fn->agg_filter != NULL)
         agg_filter = (PGExpr *)ClauseParser::transformWhereClause(pstate, fn->agg_filter, EXPR_KIND_FILTER, "FILTER");
-
+    std::cout << "ExprParser::ParseFuncOrColumn----111" << std::endl;
     /*
 	 * Most of the rest of the parser just assumes that functions do not have
 	 * more than FUNC_MAX_ARGS parameters.  We have to test here to protect
@@ -976,17 +979,10 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 	 * but the test doesn't hurt.
 	 */
     if (list_length(fargs) > FUNC_MAX_ARGS)
-        ereport(
-            ERROR,
-            (errcode(PG_ERRCODE_TOO_MANY_ARGUMENTS),
-			//TODO kindred
-             /* errmsg_plural(
-                 "cannot pass more than %d argument to a function",
-                 "cannot pass more than %d arguments to a function",
-                 FUNC_MAX_ARGS,
-                 FUNC_MAX_ARGS), */
-             parser_errposition(pstate, location)));
-
+    {
+        GPOS_RAISE(ExmaFuncParser, ExmiFuncTooManyArgs, FUNC_MAX_ARGS);
+    }
+    std::cout << "ExprParser::ParseFuncOrColumn----222" << std::endl;
     /*
 	 * Extract arg type info in preparation for function lookup.
 	 *
@@ -1014,7 +1010,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 
         actual_arg_types[nargs++] = argtype;
     }
-
+    std::cout << "ExprParser::ParseFuncOrColumn----333" << std::endl;
     /*
 	 * Check for named arguments; if there are any, build a list of names.
 	 *
@@ -1037,25 +1033,21 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
             foreach (lc, argnames)
             {
                 if (strcmp(na->name, (char *)lfirst(lc)) == 0)
-                    ereport(
-                        ERROR,
-                        (errcode(PG_ERRCODE_SYNTAX_ERROR),
-                         errmsg("argument name \"%s\" used more than once", na->name),
-                         parser_errposition(pstate, na->location)));
+                {
+                    GPOS_RAISE(ExmaFuncParser, ExmiArgNameUsedMoreThanOnce, na->name);
+                }
             }
             argnames = lappend(argnames, na->name);
         }
         else
         {
             if (argnames != NIL)
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_SYNTAX_ERROR),
-                     errmsg("positional argument cannot follow named argument"),
-                     parser_errposition(pstate, exprLocation(arg))));
+            {
+                GPOS_RAISE(ExmaFuncParser, ExmiPosArgCannotFollowNamedArg);
+            }
         }
     }
-
+    std::cout << "ExprParser::ParseFuncOrColumn----444" << std::endl;
     if (fargs)
     {
         first_arg = (PGNode *)linitial(fargs);
@@ -1085,7 +1077,7 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 			 */
         }
     }
-
+    std::cout << "ExprParser::ParseFuncOrColumn----555" << std::endl;
     /*
 	 * Okay, it's not a column projection, so it must really be a function.
 	 * func_get_detail looks up the function in the catalogs, does
@@ -1116,8 +1108,10 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
         &vatype,
         &declared_arg_types,
         &argdefaults);
+    std::cout << "ExprParser::ParseFuncOrColumn----666" << std::endl;
     if (fdresult == FUNCDETAIL_COERCION)
     {
+        std::cout << "ExprParser::ParseFuncOrColumn----777" << std::endl;
         /*
 		 * We interpreted it as a type coercion. coerce_type can handle these
 		 * cases, so why duplicate code...
@@ -1126,55 +1120,39 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
     }
     else if (fdresult == FUNCDETAIL_NORMAL)
     {
+        std::cout << "ExprParser::ParseFuncOrColumn----888" << std::endl;
         /*
 		 * Normal function found; was there anything indicating it must be an
 		 * aggregate?
 		 */
         if (agg_star)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("%s(*) specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str(), PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiButIsNotAggFunc, PGNameListToString(funcname).c_str(), PGNameListToString(funcname).c_str());
+        }
         if (agg_distinct)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("DISTINCT specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiDistinctSpecifiedButIsNotAggFunc, PGNameListToString(funcname).c_str());
+        }
         if (agg_within_group)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("WITHIN GROUP specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
-        if (agg_within_group)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("WITHIN GROUP specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiWithGroupSpecifiedButIsNotAggFunc, PGNameListToString(funcname).c_str());
+        }
         if (agg_order != NIL)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("ORDER BY specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiOrderBySpecifiedButIsNotAggFunc, PGNameListToString(funcname).c_str());
+        }
         if (agg_filter)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("FILTER specified, but %s is not an aggregate function", PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiFilterSpecifiedButIsNotAggFunc, PGNameListToString(funcname).c_str());
+        }
         if (over)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("OVER specified, but %s is not a window function nor an aggregate function", PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiOverSpecifiedButIsNotAggOrWinFunc, PGNameListToString(funcname).c_str());
+        }
     }
     else if (fdresult == FUNCDETAIL_AGGREGATE)
     {
+        std::cout << "ExprParser::ParseFuncOrColumn----999" << std::endl;
         /*
 		 * It's an aggregate; fetch needed info from the pg_aggregate entry.
 		 */
@@ -1184,7 +1162,9 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 
         PGAggPtr tup = AggProvider::getAggByFuncOid(funcid);
         if (tup == NULL) /* should not happen */
-            elog(ERROR, "cache lookup failed for aggregate %u", funcid);
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiNoAggFound, funcid);
+        }
         //classForm = (Form_pg_aggregate)GETSTRUCT(tup);
         aggkind = tup->aggkind;
         catDirectArgs = tup->aggnumdirectargs;
@@ -1196,17 +1176,13 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
             int numDirectArgs;
 
             if (!agg_within_group)
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                     errmsg("WITHIN GROUP is required for ordered-set aggregate %s", PGNameListToString(funcname).c_str()),
-                     parser_errposition(pstate, location)));
+            {
+                GPOS_RAISE(ExmaFuncParser, ExmiWithGroupIsRequiredForOrderSetAgg, PGNameListToString(funcname).c_str());
+            }
             if (over)
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
-                     errmsg("OVER is not supported for ordered-set aggregate %s", PGNameListToString(funcname).c_str()),
-                     parser_errposition(pstate, location)));
+            {
+                GPOS_RAISE(ExmaFuncParser, ExmiOverIsNotSupportedForOrderSetAgg, PGNameListToString(funcname).c_str());
+            }
             /* gram.y rejects DISTINCT + WITHIN GROUP */
             Assert(!agg_distinct)
             /* gram.y rejects VARIADIC + WITHIN GROUP */
@@ -1229,16 +1205,9 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
             {
                 /* Test is simple if aggregate isn't variadic */
                 if (numDirectArgs != catDirectArgs)
-                    ereport(
-                        ERROR,
-                        (errcode(PG_ERRCODE_UNDEFINED_FUNCTION),
-                         errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str()),
-                         errmsg(
-                             "There is an ordered-set aggregate %s, but it requires %d direct arguments, not %d.",
-                             PGNameListToString(funcname).c_str(),
-                             catDirectArgs,
-                             numDirectArgs),
-                         parser_errposition(pstate, location)));
+                {
+                    GPOS_RAISE(ExmaFuncParser, ExmiFuncNotFound, func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str());
+                }
             }
             else
             {
@@ -1258,16 +1227,9 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                 {
                     /* VARIADIC isn't part of direct args, so still easy */
                     if (numDirectArgs != catDirectArgs)
-                        ereport(
-                            ERROR,
-                            (errcode(PG_ERRCODE_UNDEFINED_FUNCTION),
-                             errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str()),
-                             errmsg(
-                                 "There is an ordered-set aggregate %s, but it requires %d direct arguments, not %d.",
-                                 PGNameListToString(funcname).c_str(),
-                                 catDirectArgs,
-                                 numDirectArgs),
-                             parser_errposition(pstate, location)));
+                    {
+                        GPOS_RAISE(ExmaFuncParser, ExmiFuncNotFound, func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str());
+                    }
                 }
                 else
                 {
@@ -1283,30 +1245,16 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
                     if (aggkind == AGGKIND_HYPOTHETICAL)
                     {
                         if (nvargs != 2 * numAggregatedArgs)
-                            ereport(
-                                ERROR,
-                                (errcode(PG_ERRCODE_UNDEFINED_FUNCTION),
-                                 errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str()),
-                                 errmsg(
-                                     "To use the hypothetical-set aggregate %s, the number of hypothetical direct arguments (here %d) must "
-                                     "match the number of ordering columns (here %d).",
-                                     PGNameListToString(funcname).c_str(),
-                                     nvargs - numAggregatedArgs,
-                                     numAggregatedArgs),
-                                 parser_errposition(pstate, location)));
+                        {
+                            GPOS_RAISE(ExmaFuncParser, ExmiFuncNotFound, func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str());
+                        }
                     }
                     else
                     {
                         if (nvargs <= numAggregatedArgs)
-                            ereport(
-                                ERROR,
-                                (errcode(PG_ERRCODE_UNDEFINED_FUNCTION),
-                                 errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str()),
-                                 errmsg(
-                                     "There is an ordered-set aggregate %s, but it requires at least %d direct arguments.",
-                                     PGNameListToString(funcname).c_str(),
-                                     catDirectArgs),
-                                 parser_errposition(pstate, location)));
+                        {
+                            GPOS_RAISE(ExmaFuncParser, ExmiFuncNotFound, func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str());
+                        }
                     }
                 }
             }
@@ -1319,34 +1267,31 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
         {
             /* Normal aggregate, so it can't have WITHIN GROUP */
             if (agg_within_group)
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                     errmsg("%s is not an ordered-set aggregate, so it cannot have WITHIN GROUP", PGNameListToString(funcname).c_str()),
-                     parser_errposition(pstate, location)));
+            {
+                GPOS_RAISE(ExmaFuncParser, ExmiCannotHaveWithinGroupInNoneOrderSetAgg, PGNameListToString(funcname).c_str());
+            }
         }
+        std::cout << "ExprParser::ParseFuncOrColumn----aaa" << std::endl;
     }
     else if (fdresult == FUNCDETAIL_WINDOWFUNC)
     {
+        std::cout << "ExprParser::ParseFuncOrColumn----bbb" << std::endl;
         /*
 		 * True window functions must be called with a window definition.
 		 */
         if (!over)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("window function %s requires an OVER clause", PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiWinFuncRequiresOver, PGNameListToString(funcname).c_str());
+        }
         /* And, per spec, WITHIN GROUP isn't allowed */
         if (agg_within_group)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_WRONG_OBJECT_TYPE),
-                 errmsg("window function %s cannot have WITHIN GROUP", PGNameListToString(funcname).c_str()),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiWinFuncCannotHaveWithinGroup, PGNameListToString(funcname).c_str());
+        }
     }
     else
     {
+        std::cout << "ExprParser::ParseFuncOrColumn----ccc" << std::endl;
         /*
 		 * Oops.  Time to die.
 		 *
@@ -1360,34 +1305,20 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 		 * Else generate a detailed complaint for a function
 		 */
         if (fdresult == FUNCDETAIL_MULTIPLE)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_AMBIGUOUS_FUNCTION),
-                 errmsg("function %s is not unique", func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str()),
-                 errhint("Could not choose a best candidate function. "
-                         "You might need to add explicit type casts."),
-                 parser_errposition(pstate, location)));
+        {
+            std::cout << "ExprParser::ParseFuncOrColumn----ddd" << std::endl;
+            GPOS_RAISE(ExmaFuncParser, ExmiFuncIsNotUnique, func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str());
+        }
         else if (list_length(agg_order) > 1 && !agg_within_group)
         {
+            std::cout << "ExprParser::ParseFuncOrColumn----eee" << std::endl;
+            GPOS_RAISE(ExmaFuncParser, ExmiFuncNotFoundNoAggFunc, func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str());
             /* It's agg(x, ORDER BY y,z) ... perhaps misplaced ORDER BY */
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_UNDEFINED_FUNCTION),
-                 errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str()),
-                 errhint("No aggregate function matches the given name and argument types. "
-                         "Perhaps you misplaced ORDER BY; ORDER BY must appear "
-                         "after all regular arguments of the aggregate."),
-                 parser_errposition(pstate, location)));
         }
         else
         {
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_UNDEFINED_FUNCTION),
-                 errmsg("function %s does not exist", func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str()),
-                 errhint("No function matches the given name and argument types. "
-                         "You might need to add explicit type casts."),
-                 parser_errposition(pstate, location)));
+            std::cout << "ExprParser::ParseFuncOrColumn----fff" << std::endl;
+            GPOS_RAISE(ExmaFuncParser, ExmiFuncNotFoundNoMatchingNameAndArgTypes, func_signature_string(funcname, nargs, argnames, actual_arg_types).c_str());
         }
     }
 
@@ -1405,19 +1336,13 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 
         /* probably shouldn't happen ... */
         if (nargsplusdefs >= FUNC_MAX_ARGS)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_TOO_MANY_ARGUMENTS),
-                 /* errmsg_plural(
-                     "cannot pass more than %d argument to a function",
-                     "cannot pass more than %d arguments to a function",
-                     FUNC_MAX_ARGS,
-                     FUNC_MAX_ARGS), */
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiFuncTooManyArgs, FUNC_MAX_ARGS);
+        }
 
         actual_arg_types[nargsplusdefs++] = exprType(expr);
     }
-
+    
     /*
 	 * enforce consistency with polymorphic argument and return types,
 	 * possibly adjusting return type or declared_arg_types (which will be
@@ -1458,11 +1383,9 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
         newa->element_typeid = exprType((PGNode *)linitial(vargs));
         newa->array_typeid = TypeProvider::get_array_type(newa->element_typeid);
         if (!OidIsValid(newa->array_typeid))
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_UNDEFINED_OBJECT),
-                 errmsg("could not find array type for data type %s", TypeProvider::format_type_be(newa->element_typeid).c_str()),
-                 parser_errposition(pstate, exprLocation((PGNode *)vargs))));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiCannotFindArrayTypeForType, TypeProvider::format_type_be(newa->element_typeid).c_str());
+        }
         /* array_collid will be set by parse_collate.c */
         newa->multidims = false;
         newa->location = exprLocation((PGNode *)vargs);
@@ -1484,11 +1407,9 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
         PGOid va_arr_typid = actual_arg_types[nargs - 1];
 
         if (!OidIsValid(TypeProvider::get_base_element_type(va_arr_typid)))
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_DATATYPE_MISMATCH),
-                 errmsg("VARIADIC argument must be an array"),
-                 parser_errposition(pstate, exprLocation((PGNode *)llast(fargs)))));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiVARIADICMustBeAnArray);
+        }
     }
 
     if (retset)
@@ -1543,11 +1464,9 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 #endif
 
         if (retset)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_INVALID_FUNCTION_DEFINITION),
-                 errmsg("aggregates cannot return sets"),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiAggCannotReturnSets);
+        }
 
         /*
 		 * We might want to support named arguments later, but disallow it for
@@ -1559,11 +1478,9 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 		 * planning to avoid semantic problems.
 		 */
         if (argnames != NIL)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
-                 errmsg("aggregates cannot use named arguments"),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiAggCannotUseNamedArg);
+        }
 
         /* parse_agg.c does additional aggregate-specific processing */
         AggParser::transformAggregateCall(pstate, aggref, fargs, agg_order, agg_distinct);
@@ -1599,16 +1516,14 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
         if (agg_distinct)
         {
             if (fdresult == FUNCDETAIL_WINDOWFUNC)
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
-                     errmsg("DISTINCT is not implemented for window functions"),
-                     parser_errposition(pstate, location)));
+            {
+                GPOS_RAISE(ExmaFuncParser, ExmiDistinctIsNotImplForWinFuncs);
+            }
 
             if (list_length(fargs) != 1)
-                ereport(
-                    ERROR,
-                    (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("DISTINCT is supported only for single-argument window aggregates")));
+            {
+                GPOS_RAISE(ExmaFuncParser, ExmiDistinctIsOnlySupportForSingleArgWinAggs);
+            }
         }
 
         /*
@@ -1630,28 +1545,22 @@ PGNode * FuncParser::ParseFuncOrColumn(PGParseState * pstate, PGList * funcname,
 		 * ordered aggs not allowed in windows yet
 		 */
         if (agg_order != NIL)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
-                 errmsg("aggregate ORDER BY is not implemented for window functions"),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiOrderByIsNotImplForWinFuncs);
+        }
 
         /*
 		 * FILTER is not yet supported with true window functions
 		 */
         if (!wfunc->winagg && agg_filter)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED),
-                 errmsg("FILTER is not implemented for non-aggregate window functions"),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiFilterIsNotImplForNoneAggWinFuncs);
+        }
 
         if (retset)
-            ereport(
-                ERROR,
-                (errcode(PG_ERRCODE_INVALID_FUNCTION_DEFINITION),
-                 errmsg("window functions cannot return sets"),
-                 parser_errposition(pstate, location)));
+        {
+            GPOS_RAISE(ExmaFuncParser, ExmiWinFuncsCannotReturnSets);
+        }
 
         /* parse_agg.c does additional window-func-specific processing */
         AggParser::transformWindowFuncCall(pstate, wfunc, over);
@@ -1805,7 +1714,9 @@ FuncParser::check_srf_call_placement(PGParseState * pstate, int location)
 			 */
     }
     if (err)
+    {
         ereport(ERROR, (errcode(PG_ERRCODE_FEATURE_NOT_SUPPORTED), errmsg_internal("%s", err), parser_errposition(pstate, location)));
+    }
     if (errkind)
         ereport(
             ERROR,

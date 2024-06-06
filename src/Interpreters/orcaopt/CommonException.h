@@ -14,6 +14,7 @@ enum ExMajor
 
     //parser
 	ExmaExprParser,
+	ExmaFuncParser,
 
 	ExmaSentinel
 };
@@ -44,6 +45,39 @@ enum ExMinor
 
     //parser
 	ExmiUnrecognizedAExprKind,
+	ExmiComplexProjNotSupported,
+	ExmiFuncTooManyArgs,
+	ExmiNoFuncFound,
+	ExmiNotImplementYet,
+	ExmiIncorrectNumOfArgsToHypotheticalSetAgg,
+	ExmiHypotheticalSetAggInconsistentDeclArgTypes,
+	ExmiArgNameUsedMoreThanOnce,
+	ExmiPosArgCannotFollowNamedArg,
+	ExmiButIsNotAggFunc,
+	ExmiDistinctSpecifiedButIsNotAggFunc,
+	ExmiWithGroupSpecifiedButIsNotAggFunc,
+	ExmiOrderBySpecifiedButIsNotAggFunc,
+	ExmiFilterSpecifiedButIsNotAggFunc,
+	ExmiOverSpecifiedButIsNotAggOrWinFunc,
+	ExmiNoAggFound,
+	ExmiWithGroupIsRequiredForOrderSetAgg,
+	ExmiOverIsNotSupportedForOrderSetAgg,
+	ExmiFuncNotFound,
+	ExmiCannotHaveWithinGroupInNoneOrderSetAgg,
+	ExmiWinFuncRequiresOver,
+	ExmiWinFuncCannotHaveWithinGroup,
+	ExmiFuncIsNotUnique,
+	ExmiFuncNotFoundNoAggFunc,
+	ExmiFuncNotFoundNoMatchingNameAndArgTypes,
+	ExmiCannotFindArrayTypeForType,
+	ExmiVARIADICMustBeAnArray,
+	ExmiAggCannotReturnSets,
+	ExmiAggCannotUseNamedArg,
+	ExmiDistinctIsNotImplForWinFuncs,
+	ExmiDistinctIsOnlySupportForSingleArgWinAggs,
+	ExmiOrderByIsNotImplForWinFuncs,
+	ExmiFilterIsNotImplForNoneAggWinFuncs,
+	ExmiWinFuncsCannotReturnSets,
 
 	ExmiSentinel
 };
