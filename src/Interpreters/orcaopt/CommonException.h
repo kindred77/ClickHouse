@@ -8,13 +8,10 @@ namespace DB
 enum ExMajor
 {
     //provider
-	ExmaProcProvider = 10000,
-	ExmaRelationProvider,
-	ExmaTypeProvider,
+	ExmaProvider = 10000,
 
     //parser
-	ExmaExprParser,
-	ExmaFuncParser,
+	ExmaParser,
 
 	ExmaSentinel
 };
@@ -78,6 +75,7 @@ enum ExMinor
 	ExmiOrderByIsNotImplForWinFuncs,
 	ExmiFilterIsNotImplForNoneAggWinFuncs,
 	ExmiWinFuncsCannotReturnSets,
+	ExmiSetReturningFuncIsNotAllowedIn,
 
 	ExmiSentinel
 };

@@ -405,7 +405,6 @@ SelectParser::transformSelectStmt(PGParseState *pstate, PGSelectStmt *stmt)
 
     /* transform WHERE */
     qual = ClauseParser::transformWhereClause(pstate, stmt->whereClause, EXPR_KIND_WHERE, "WHERE");
-
     /* initial processing of HAVING clause is much like WHERE clause */
     qry->havingQual = ClauseParser::transformWhereClause(pstate, stmt->havingClause, EXPR_KIND_HAVING, "HAVING");
 

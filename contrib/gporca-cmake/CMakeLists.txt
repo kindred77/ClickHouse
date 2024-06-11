@@ -956,7 +956,7 @@ message(STATUS "using external gpxerces include: ${GPXERCES_INCLUDE_DIR}, lib: $
 target_link_libraries(gporca PUBLIC ${GPXERCES_LIBRARY})
 target_include_directories (gporca SYSTEM PUBLIC "${GPXERCES_INCLUDE_DIR}")
 
-target_link_libraries(gporca PUBLIC duckdb_pg_query)
+#target_link_libraries(gporca PUBLIC duckdb_pg_query)
 
 set(GPORCA_GPOS_INCLUDE "${GPORCA_GPOS_SOURCE_DIR}/include")
 set(GPORCA_NAUCRATES_INCLUDE "${GPORCA_NAUCRATES_SOURCE_DIR}/include")

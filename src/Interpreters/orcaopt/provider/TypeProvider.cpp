@@ -295,7 +295,7 @@ PGOid TypeProvider::getBaseTypeAndTypmod(PGOid typid, int32 * typmod)
 		PGTypePtr tup = getTypeByOid(typid);
 		if (tup == nullptr)
 		{
-            GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+            GPOS_RAISE(ExmaProvider, ExmiTypeNotFound,
 						   typid);
 			return InvalidOid;
 		}
@@ -325,7 +325,7 @@ void TypeProvider::get_type_category_preferred(PGOid typid, char * typcategory, 
 	PGTypePtr tup = getTypeByOid(typid);
 	if (tup == NULL)
 	{
-		GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+		GPOS_RAISE(ExmaProvider, ExmiTypeNotFound,
 			typid);
 		return;
 	}
@@ -376,7 +376,7 @@ bool TypeProvider::TypeIsVisible(PGOid typid)
     PGTypePtr typtup = getTypeByOid(typid);
     if (typtup == nullptr)
 	{
-        GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+        GPOS_RAISE(ExmaProvider, ExmiTypeNotFound,
 				typid);
 		return false;
 	}
@@ -439,7 +439,6 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
     {
         return "-";
     }
-
     PGTypePtr tuple = getTypeByOid(type_oid);
     if (tuple == NULL)
     {
@@ -447,11 +446,10 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
             return "???";
         else
         {
-            GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+            GPOS_RAISE(ExmaProvider, ExmiTypeNotFound,
 						   type_oid);
         }
     }
-
     /*
 	 * Check if it's a regular (variable length) array type.  Fixed-length
 	 * array types such as "name" shouldn't get deconstructed.  As of Postgres
@@ -471,7 +469,7 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
                 return "???[]";
             else
             {
-                GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+                GPOS_RAISE(ExmaProvider, ExmiTypeNotFound,
 						   type_oid);
             }
         }
@@ -480,7 +478,6 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
     }
     else
         is_array = false;
-
     /*
 	 * See if we want to special-case the output for certain built-in types.
 	 * Note that these special cases should all correspond to special
@@ -606,7 +603,6 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
                 buf = "character varying";
             break;
     }
-
     if (buf == "")
     {
         /*
@@ -617,12 +613,10 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
 		 */
         std::string nspname;
         std::string typname;
-
         if (!force_qualify && TypeIsVisible(type_oid))
             nspname = "";
         else
             nspname = RelationProvider::get_namespace_name(tuple->typnamespace);
-
         typname = tuple->typname;
 
         //TODO kindred
@@ -638,7 +632,6 @@ std::string TypeProvider::format_type_internal(PGOid type_oid, int32 typemod, bo
         //buf = psprintf("%s[]", buf);
         buf = buf + "[]";
     }
-
     return buf;
 };
 
@@ -646,7 +639,7 @@ PGTupleDescPtr TypeProvider::get_tupdesc_by_type_relid(PGTypePtr type)
 {
     if (!OidIsValid(type->typrelid)) /* should not happen */
 	{
-        GPOS_RAISE(ExmaProcProvider, ExmiInvalidTypeForComposite,
+        GPOS_RAISE(ExmaProvider, ExmiInvalidTypeForComposite,
 			type->oid);
 		return nullptr;
 	}
@@ -699,7 +692,7 @@ PGTupleDescPtr TypeProvider::lookup_rowtype_tupdesc_internal(PGOid type_id, int3
         {
             if (!noError)
             {
-                GPOS_RAISE(ExmaProcProvider, ExmiRecordTypeNotRegister);
+                GPOS_RAISE(ExmaProvider, ExmiRecordTypeNotRegister);
             }
             return nullptr;
         }
@@ -761,19 +754,19 @@ void TypeProvider::getTypeOutputInfo(PGOid type, PGOid * typOutput, bool * typIs
 	PGTypePtr tup = getTypeByOid(type);
 	if (tup == nullptr)
 	{
-        GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound, type);
+        GPOS_RAISE(ExmaProvider, ExmiTypeNotFound, type);
 		return;
 	}
 
 	if (!tup->typisdefined)
 	{
-        GPOS_RAISE(ExmaProcProvider, ExmiTypeIsShell, format_type_be(type).c_str());
+        GPOS_RAISE(ExmaProvider, ExmiTypeIsShell, format_type_be(type).c_str());
 		return;
 	}
 
 	if (!OidIsValid(tup->typoutput))
 	{
-        GPOS_RAISE(ExmaProcProvider, ExmiNoAvailableOutputFunction, format_type_be(type).c_str());
+        GPOS_RAISE(ExmaProvider, ExmiNoAvailableOutputFunction, format_type_be(type).c_str());
 		return;
 	}
 
@@ -805,19 +798,19 @@ void TypeProvider::getTypeInputInfo(PGOid type, PGOid * typInput, PGOid * typIOP
 	PGTypePtr tup = getTypeByOid(type);
 	if (tup == nullptr)
 	{
-		GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound, type);
+		GPOS_RAISE(ExmaProvider, ExmiTypeNotFound, type);
 		return;
 	}
 
 	if (!tup->typisdefined)
 	{
-		GPOS_RAISE(ExmaProcProvider, ExmiTypeIsShell, format_type_be(type).c_str());
+		GPOS_RAISE(ExmaProvider, ExmiTypeIsShell, format_type_be(type).c_str());
 		return;
 	}
 
 	if (!OidIsValid(tup->typinput))
 	{
-		GPOS_RAISE(ExmaProcProvider, ExmiNoAvailableOutputFunction, format_type_be(type).c_str());
+		GPOS_RAISE(ExmaProvider, ExmiNoAvailableOutputFunction, format_type_be(type).c_str());
 		return;
 	}
 
@@ -942,7 +935,7 @@ PGOid TypeProvider::get_range_subtype(PGOid rangeOid)
     //     return InvalidOid;
 
 	// TODO kindred
-    GPOS_RAISE(ExmaProcProvider, ExmiRangeTypeNotSupported, rangeOid);
+    GPOS_RAISE(ExmaProvider, ExmiRangeTypeNotSupported, rangeOid);
 
 	return InvalidOid;
 };
@@ -1093,7 +1086,7 @@ void TypeProvider::PGTupleDescInitEntry(
     PGTypePtr tuple = getTypeByOid(oidtypeid);
     if (tuple == NULL)
     {
-        GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound, oidtypeid);
+        GPOS_RAISE(ExmaProvider, ExmiTypeNotFound, oidtypeid);
     }
     //typeForm = (Form_pg_type)GETSTRUCT(tuple);
     
@@ -1163,7 +1156,7 @@ PGTupleDescPtr TypeProvider::build_function_result_tupdesc_d(PGProcPtr & procTup
 
 	if (numargs != procTuple->proargmodes.size())
 	{
-        GPOS_RAISE(ExmaProcProvider, ExmiProArgModesNot1DCharArr);
+        GPOS_RAISE(ExmaProvider, ExmiProArgModesNot1DCharArr);
 		return nullptr;
 	}
 	/* extract output-argument types and names */
@@ -1280,7 +1273,7 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
 
             if (!OidIsValid(array_typelem))
             {
-                GPOS_RAISE(ExmaProcProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
+                GPOS_RAISE(ExmaProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
             }
             return context_base_type;
         }
@@ -1293,7 +1286,7 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
 
             if (!OidIsValid(array_typeid))
             {
-                GPOS_RAISE(ExmaProcProvider, ExmiNotFoundArrayType, format_type_be(context_actual_type).c_str());
+                GPOS_RAISE(ExmaProvider, ExmiNotFoundArrayType, format_type_be(context_actual_type).c_str());
             }
             return array_typeid;
         }
@@ -1309,7 +1302,7 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
 
             if (!OidIsValid(array_typelem))
             {
-                GPOS_RAISE(ExmaProcProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
+                GPOS_RAISE(ExmaProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
             }
             return array_typelem;
         }
@@ -1321,7 +1314,7 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
 
             if (!OidIsValid(range_typelem))
             {
-                GPOS_RAISE(ExmaProcProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
+                GPOS_RAISE(ExmaProvider, ExmiNotAnyArray, format_type_be(context_base_type).c_str());
             }
             return range_typelem;
         }
@@ -1338,7 +1331,7 @@ PGOid TypeProvider::resolve_generic_type(PGOid declared_type, PGOid context_actu
     }
     /* If we get here, declared_type is polymorphic and context isn't */
     /* NB: this is a calling-code logic error, not a user error */
-    GPOS_RAISE(ExmaProcProvider, ExmiCouldNotDeterminePolymorphicType);
+    GPOS_RAISE(ExmaProvider, ExmiCouldNotDeterminePolymorphicType);
     return InvalidOid; /* keep compiler quiet */
 };
 
@@ -1625,7 +1618,7 @@ TypeProvider::internal_get_result_type(PGOid funcid, duckdb_libpgquery::PGNode *
 	PGProcPtr tp = ProcProvider::getProcByOid(funcid);
 	if (nullptr == tp)
 	{
-        GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound, funcid);
+        GPOS_RAISE(ExmaProvider, ExmiNoProcFound, funcid);
 		return TYPEFUNC_OTHER;
 	}
 
@@ -1672,7 +1665,7 @@ TypeProvider::internal_get_result_type(PGOid funcid, duckdb_libpgquery::PGNode *
 
         if (!OidIsValid(newrettype)) /* this probably should not happen */
         {
-            GPOS_RAISE(ExmaProcProvider, ExmiCouldNotDetermineActualResultTypeForFunc,
+            GPOS_RAISE(ExmaProvider, ExmiCouldNotDetermineActualResultTypeForFunc,
                     tp->proname.c_str(),
                     format_type_be(rettype).c_str());
         }
@@ -1705,7 +1698,7 @@ TypeProvider::internal_get_result_type(PGOid funcid, duckdb_libpgquery::PGNode *
             //         *resultTupleDesc = rsinfo->expectedDesc;
             //     /* Assume no polymorphic columns here, either */
             // }
-            GPOS_RAISE(ExmaProcProvider, ExmiSetOfRecordTypeNotSupported,
+            GPOS_RAISE(ExmaProvider, ExmiSetOfRecordTypeNotSupported,
                     funcid);
             break;
         default:
@@ -1856,7 +1849,7 @@ void TypeProvider::get_typlenbyval(PGOid typid, int16 *typlen, bool *typbyval)
     //tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typid));
     if (!typtup)
     {
-        GPOS_RAISE(ExmaProcProvider, ExmiTypeNotFound,
+        GPOS_RAISE(ExmaProvider, ExmiTypeNotFound,
                     typid);
     }
     *typlen = typtup->typlen;

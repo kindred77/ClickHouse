@@ -325,6 +325,10 @@ void * OptimizeTask(void *ptr)
 	MdidHashSet *rel_stats = NULL;
     GPOS_TRY
 	{
+		//transform
+		auto raw_stmt = (PGRawStmt *)ptr;
+    	auto ps_stat = std::make_shared<PGParseState>();
+		PGQuery *query = DB::SelectParser::transformStmt(ps_stat.get(), raw_stmt->stmt);
 		// set trace flags
 		// trace_flags = CConfigParamMapping::PackConfigParamInBitset(
 		// 	mp, CXform::ExfSentinel);
@@ -347,7 +351,7 @@ void * OptimizeTask(void *ptr)
 			}
 			CAutoP<CTranslatorQueryToDXL> query_to_dxl_translator;
 			query_to_dxl_translator = CTranslatorQueryToDXL::QueryToDXLInstance(
-				mp, &mda, (PGQuery *) ptr);
+				mp, &mda, query);
 			ICostModel *cost_model = GetCostModel(mp, num_segments_for_costing);
 			COptimizerConfig *optimizer_config =
 				CreateOptimizerConfig(mp, cost_model);
@@ -484,7 +488,7 @@ void Execute(void *(*func)(void *), void *func_arg)
 	CHAR *err_buf = (CHAR *) palloc(GPOPT_ERROR_BUFFER_SIZE);
 	err_buf[0] = '\0';
 	// initialize DXL support
-	InitDXL();
+	//InitDXL();
 	bool abort_flag = false;
 
 	CAutoMemoryPool amp(CAutoMemoryPool::ElcNone);
@@ -510,7 +514,7 @@ void Execute(void *(*func)(void *), void *func_arg)
 	//LogExceptionMessageAndDelete(err_buf);
 };
 
-void optimize2(PGQuery * query)
+void optimize2(PGRawStmt * query)
 {
     Execute(&OptimizeTask, query);
 
@@ -607,7 +611,13 @@ int main(int argc, char ** argv)
         return -1;
     }
 
-    //InitGPOPT();
+    // InitGPOPT();
+	// AUTO_MEM_POOL(amp);
+	// CMemoryPool *mp = amp.Pmp();
+	// DB::CommonException::Init(mp);
+	// DB::Provider::Init(mp);
+	// DB::Parser::Init(mp);
+	// (void) gpopt::EresExceptionInit(mp);
 	
     for (auto entry = parser.parse_tree->head; entry != nullptr; entry = entry->next)
     {
@@ -615,9 +625,11 @@ int main(int argc, char ** argv)
         if (query_node->type == T_PGRawStmt)
         {
             auto raw_stmt = (PGRawStmt *)query_node;
-            auto ps_stat = std::make_shared<PGParseState>();
-            auto query = DB::SelectParser::transformStmt(ps_stat.get(), raw_stmt->stmt);
-            optimize2(query);
+			optimize2(raw_stmt);
+
+            // auto ps_stat = std::make_shared<PGParseState>();
+			// PGQuery *query = DB::SelectParser::transformStmt(ps_stat.get(), raw_stmt->stmt);
+			// optimize2(query);
         }
         else
         {

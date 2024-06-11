@@ -195,6 +195,7 @@ add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt) #for gpd
 add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/provider)
 add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/translator)
 add_object_library(clickhouse_interpreters_gporca Interpreters/orcaopt/metagen)
+add_subdirectory(Interpreters/orcaopt/pgquery)
 
 add_object_library(clickhouse_columns Columns)
 add_object_library(clickhouse_storages Storages)
@@ -528,6 +529,7 @@ endif()
     #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_INCLUDE_DIR})
     
     dbms_target_link_libraries(PUBLIC gporca)
+    dbms_target_link_libraries(PUBLIC duckdb_pg_query)
     #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_GPOS_INCLUDE})
     #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_NAUCRATES_INCLUDE})
     #dbms_target_include_directories(SYSTEM BEFORE PRIVATE ${GPORCA_GPDBCOST_INCLUDE})

@@ -2568,7 +2568,7 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 						result = transformFuncCall(pstate, func_call_ilike);
 					}
                     default:
-						GPOS_RAISE(ExmaExprParser, ExmiUnrecognizedAExprKind,
+						GPOS_RAISE(ExmaParser, ExmiUnrecognizedAExprKind,
 						   a->kind);
                         result = NULL; /* keep compiler quiet */
                         break;

@@ -1,4 +1,4 @@
-set(LIBPGQUERY_SOURCE_DIR "${ClickHouse_SOURCE_DIR}/contrib/libpg_query")
+set(LIBPGQUERY_SOURCE_DIR "${ClickHouse_SOURCE_DIR}/src/Interpreters/orcaopt/pgquery")
 
 project(duckdb_pg_query CXX C)
 if(POLICY CMP0063)

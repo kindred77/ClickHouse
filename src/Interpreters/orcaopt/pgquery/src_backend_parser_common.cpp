@@ -485,7 +485,9 @@ std::string PGNameListToString(duckdb_libpgquery::PGList * names)
 			result += "*";
 		}
         else
+        {
             elog(ERROR, "unexpected node type in name list: %d", (int)nodeTag(name));
+        }
     }
 
     return result;

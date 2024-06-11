@@ -170,7 +170,7 @@ void RelationProvider::mockTestData()
         auto type_ptr = TypeProvider::get_type_by_typename_namespaceoid(type_and_name.first);
         if (!type_ptr)
         {
-            GPOS_RAISE(ExmaRelationProvider, ExmiUnknownType,
+            GPOS_RAISE(ExmaProvider, ExmiUnknownType,
 						   type_and_name.first.c_str());
             return;
         }
@@ -260,7 +260,7 @@ void RelationProvider::mockTestData()
         auto type_ptr = TypeProvider::get_type_by_typename_namespaceoid(type_and_name.first);
         if (!type_ptr)
         {
-            GPOS_RAISE(ExmaRelationProvider, ExmiUnknownType,
+            GPOS_RAISE(ExmaProvider, ExmiUnknownType,
 						   type_and_name.first.c_str());
             return;
         }
@@ -421,7 +421,7 @@ PGClassPtr RelationProvider::getClassByRelOid(PGOid oid)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
 	auto it = oid_relation_map.find(oid);
@@ -434,13 +434,13 @@ bool RelationProvider::has_subclass(PGOid relationId)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
 	PGClassPtr tuple = getClassByRelOid(relationId);
 	if (tuple == nullptr)
 	{
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationNotFound, relationId);
+        GPOS_RAISE(ExmaProvider, ExmiRelationNotFound, relationId);
 		return false;
 	}
 
@@ -451,7 +451,7 @@ const std::string RelationProvider::get_database_name(PGOid dbid)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     auto it = oid_database_map.find(dbid);
@@ -464,7 +464,7 @@ char RelationProvider::get_rel_relkind(PGOid relid)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     auto it = oid_relation_map.find(relid);
@@ -477,7 +477,7 @@ const std::string RelationProvider::get_attname(PGOid relid, PGAttrNumber attnum
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     auto it = oid_relation_map.find(relid);
@@ -498,7 +498,7 @@ const std::string RelationProvider::get_rel_name(PGOid relid)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     auto it = oid_relation_map.find(relid);
@@ -511,7 +511,7 @@ PGAttrPtr RelationProvider::get_att_by_reloid_attnum(PGOid relid, PGAttrNumber a
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     auto it = oid_relation_map.find(relid);
@@ -524,7 +524,7 @@ std::string RelationProvider::get_rte_attribute_name(PGRangeTblEntry * rte, PGAt
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     const char * name;
@@ -579,7 +579,7 @@ std::string RelationProvider::get_rte_attribute_name(PGRangeTblEntry * rte, PGAt
 bogus:
     /* else caller gave us a bogus attnum */
     name = (rte->eref && rte->eref->aliasname) ? rte->eref->aliasname : "*BOGUS*";
-    GPOS_RAISE(ExmaRelationProvider, ExmiInvalidAttNum,
+    GPOS_RAISE(ExmaProvider, ExmiInvalidAttNum,
 				attnum, name);
     return "*BOGUS*";
 };
@@ -590,7 +590,7 @@ PGOid RelationProvider::RangeVarGetRelidExtended(
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     // uint64 inval_count;
@@ -802,7 +802,7 @@ PGRelationPtr RelationProvider::relation_open(PGOid relationId, LOCKMODE lockmod
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     if (lockmode == RowShareLock
@@ -811,7 +811,7 @@ PGRelationPtr RelationProvider::relation_open(PGOid relationId, LOCKMODE lockmod
         || lockmode == ShareRowExclusiveLock
         || lockmode == AccessExclusiveLock)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiLockModeNotSupported, lockmode);
+        GPOS_RAISE(ExmaProvider, ExmiLockModeNotSupported, lockmode);
         return nullptr;
     }
     
@@ -841,7 +841,7 @@ void RelationProvider::relation_close(PGRelationPtr relation, LOCKMODE lockmode)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     return;
@@ -851,7 +851,7 @@ PGRelationPtr RelationProvider::try_heap_open(PGOid relationId, LOCKMODE lockmod
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     return relation_open(relationId, lockmode);
@@ -861,7 +861,7 @@ bool RelationProvider::IsSystemRelation(PGRelationPtr relation)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     return false;
@@ -871,7 +871,7 @@ PGOid RelationProvider::get_relname_relid(const char * relname, PGOid relnamespa
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     for (auto pair : oid_relation_map)
@@ -890,7 +890,7 @@ PGOid RelationProvider::LookupNamespaceNoError(const char * nspname)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
     
     /* check for pg_temp alias */
@@ -959,7 +959,7 @@ bool RelationProvider::PGPolicyIsReplicated(const PGPolicyPtr policy)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     if (policy == nullptr)
@@ -977,7 +977,7 @@ PGAttrNumber RelationProvider::get_attnum(PGOid relid, const char * attname)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     auto it = oid_relation_map.find(relid);
@@ -998,7 +998,7 @@ PGOid RelationProvider::get_atttype(PGOid relid, PGAttrNumber attnum)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     // HeapTuple tp;
@@ -1034,7 +1034,7 @@ PGOid RelationProvider::LookupExplicitNamespace(const char * nspname, bool missi
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     // PGOid namespaceId;
@@ -1086,7 +1086,7 @@ std::string RelationProvider::get_namespace_name(PGOid nspid)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     // HeapTuple tp;
@@ -1119,7 +1119,7 @@ PGRelationPtr RelationProvider::heap_open(PGOid relationId, LOCKMODE lockmode)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     PGRelationPtr r;
@@ -1127,17 +1127,17 @@ PGRelationPtr RelationProvider::heap_open(PGOid relationId, LOCKMODE lockmode)
     r = relation_open(relationId, lockmode);
     if (!r)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationNotFound, relationId);
+        GPOS_RAISE(ExmaProvider, ExmiRelationNotFound, relationId);
         return nullptr;
     }
 
     if (r->rd_rel->relkind == PG_RELKIND_INDEX)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiWrongObjectType, RelationGetRelationName(r));
+        GPOS_RAISE(ExmaProvider, ExmiWrongObjectType, RelationGetRelationName(r));
     }
     else if (r->rd_rel->relkind == PG_RELKIND_COMPOSITE_TYPE)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiWrongObjectType, RelationGetRelationName(r));
+        GPOS_RAISE(ExmaProvider, ExmiWrongObjectType, RelationGetRelationName(r));
     }
 
     return r;
@@ -1147,7 +1147,7 @@ PGOid RelationProvider::get_rel_type_id(PGOid relid)
 {
     if (!is_init)
     {
-        GPOS_RAISE(ExmaRelationProvider, ExmiRelationProviderNotInit);
+        GPOS_RAISE(ExmaProvider, ExmiRelationProviderNotInit);
     }
 
     auto rel_class = getClassByRelOid(relid);

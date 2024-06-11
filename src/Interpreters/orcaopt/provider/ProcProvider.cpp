@@ -584,7 +584,7 @@ bool ProcProvider::func_strict(PGOid operator_oid)
     PGProcPtr tp = getProcByOid(oprcode);
 	if (tp == NULL)
 	{
-        GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound,
+        GPOS_RAISE(ExmaProvider, ExmiNoProcFound,
 						   oprcode);
         return InvalidOid;
 	}
@@ -597,7 +597,7 @@ PGOid ProcProvider::get_func_rettype(PGOid funcid)
     PGProcPtr tp = getProcByOid(funcid);
 	if (tp == NULL)
 	{
-		GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound,
+		GPOS_RAISE(ExmaProvider, ExmiNoProcFound,
 						   funcid);
 
         return InvalidOid;
@@ -611,7 +611,7 @@ bool ProcProvider::get_func_retset(PGOid funcid)
 	PGProcPtr tp = getProcByOid(funcid);
 	if (tp == NULL)
 	{
-		GPOS_RAISE(ExmaProcProvider, ExmiNoProcFound,
+		GPOS_RAISE(ExmaProvider, ExmiNoProcFound,
 						   funcid);
 
         return false;
