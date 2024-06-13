@@ -68,8 +68,10 @@ NEW_TYPE(DATE, 1082, "date", 11, 10, 4, true, 'b', 'D', false, true, ',', 0, 0, 
 NEW_TYPE(INTERN_BPCHAR, 1014, "_bpchar", 11, 10, -1, false, 'b', 'A', false, true, ',', 0, 1042, 0, 750, 751, 2400, 2401, 2913, 2914, 3816, 'i', 'x', false, 0, -1, 0, 100, 0, 0, 0, 0, 0)
 NEW_TYPE(NUMERIC, 1700, "numeric", 11, 10, -1, false, 'b', 'N', false, true, ',', 0, 0, 1231, 1701, 1702, 2460, 2461, 2917, 2918, 0, 'i', 'm', false, 0, -1, 0, 0, 1754, 1752, 1756, 1752, 0)
 NEW_TYPE(BPCHAR, 1042, "bpchar", 11, 10, -1, false, 'b', 'S', false, true, ',', 0, 0, 1014, 1044, 1045, 2430, 2431, 2913, 2914, 0, 'i', 'x', false, 0, -1, 0, 100, 1058, 1054, 1060, 1054, 0)
+NEW_TYPE(INTERN_TEXT, 1009, "_text", 11, 10, -1, false, 'b', 'A', false, true, ',', 0, 25, 0, 750, 751, 2400, 2401, 0, 0, 3816, 'i', 'x', false, 0, -1, 0, 100, 0, 0, 0, 0, 0)
 NEW_TYPE(INTERNAL, 2281, "internal", 11, 10, 8, true, 'p', 'P', false, true, ',', 0, 0, 0, 2304, 2305, 0, 0, 0, 0, 0, 'd', 'p', false, 0, -1, 0, 0, 0, 0, 0, 0, 0)
 NEW_TYPE(TEXT, 25, "text", 11, 10, -1, false, 'b', 'S', true, true, ',', 0, 0, 1009, 46, 47, 2414, 2415, 0, 0, 0, 'i', 'x', false, 0, -1, 0, 100, 664, 98, 666, 98, 0)
+NEW_TYPE(UNKNOWN, 705, "unknown", 11, 10, -2, false, 'b', 'X', false, true, ',', 0, 0, 0, 109, 110, 2416, 2417, 0, 0, 0, 'c', 'p', false, 0, -1, 0, 0, 0, 0, 0, 0, 0)
 NEW_TYPE(INTERN_TIMESTAMP, 1115, "_timestamp", 11, 10, -1, false, 'b', 'A', false, true, ',', 0, 1114, 0, 750, 751, 2400, 2401, 2905, 2906, 3816, 'd', 'x', false, 0, -1, 0, 0, 0, 0, 0, 0, 0)
 NEW_TYPE(INTERN_FLOAT4, 1021, "_float4", 11, 10, -1, false, 'b', 'A', false, true, ',', 0, 700, 0, 750, 751, 2400, 2401, 0, 0, 3816, 'i', 'x', false, 0, -1, 0, 0, 0, 0, 0, 0, 0)
 NEW_TYPE(INT8, 20, "int8", 11, 10, 8, true, 'b', 'N', false, true, ',', 0, 0, 1016, 460, 461, 2408, 2409, 0, 0, 0, 'd', 'p', false, 0, -1, 0, 0, 412, 410, 413, 410, 0)
@@ -84,7 +86,6 @@ NEW_TYPE(INTERN_INT2, 1005, "_int2", 11, 10, -1, false, 'b', 'A', false, true, '
 NEW_TYPE(BOOL, 16, "bool", 11, 10, 1, true, 'b', 'B', true, true, ',', 0, 0, 1000, 1242, 1243, 2436, 2437, 0, 0, 0, 'c', 'p', false, 0, -1, 0, 0, 58, 91, 59, 91, 0)
 NEW_TYPE(INTERN_CSTRING, 1263, "_cstring", 11, 10, -1, false, 'b', 'A', false, true, ',', 0, 2275, 0, 750, 751, 2400, 2401, 0, 0, 3816, 'i', 'x', false, 0, -1, 0, 0, 0, 0, 0, 0, 0)
 NEW_TYPE(INTERN_OID, 1028, "_oid", 11, 10, -1, false, 'b', 'A', false, true, ',', 0, 26, 0, 750, 751, 2400, 2401, 0, 0, 3816, 'i', 'x', false, 0, -1, 0, 0, 0, 0, 0, 0, 0)
-NEW_TYPE(INTERN_TEXT, 1009, "_text", 11, 10, -1, false, 'b', 'A', false, true, ',', 0, 25, 0, 750, 751, 2400, 2401, 0, 0, 3816, 'i', 'x', false, 0, -1, 0, 100, 0, 0, 0, 0, 0)
 NEW_TYPE(ANYARRAY, 2277, "anyarray", 11, 10, -1, false, 'p', 'P', false, true, ',', 0, 0, 0, 2296, 2297, 2502, 2503, 0, 0, 0, 'd', 'x', false, 0, -1, 0, 0, 1072, 1070, 1073, 1070, 0)
 NEW_TYPE(INT2, 21, "int2", 11, 10, 2, true, 'b', 'N', false, true, ',', 0, 0, 1005, 38, 39, 2404, 2405, 0, 0, 0, 's', 'p', false, 0, -1, 0, 0, 95, 94, 520, 94, 0)
 NEW_TYPE(CSTRING, 2275, "cstring", 11, 10, -2, false, 'p', 'P', false, true, ',', 0, 0, 1263, 2292, 2293, 2500, 2501, 0, 0, 0, 'c', 'p', false, 0, -1, 0, 0, 0, 0, 0, 0, 0)
@@ -105,6 +106,7 @@ TypeProvider::OidTypeMap TypeProvider::oid_type_map = {
     TypeProvider::TYPE_BPCHAR,
     TypeProvider::TYPE_INTERNAL,
     TypeProvider::TYPE_TEXT,
+    TypeProvider::TYPE_UNKNOWN,
     TypeProvider::TYPE_INTERN_TIMESTAMP,
     TypeProvider::TYPE_INTERN_FLOAT4,
     TypeProvider::TYPE_INT8,

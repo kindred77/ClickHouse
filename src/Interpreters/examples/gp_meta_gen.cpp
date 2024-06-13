@@ -24,6 +24,7 @@ int main(int argc, char ** argv)
     std::vector<PGOid> type_init_oids = {
         700, //Float32
         701, //Float64
+        705, //unknown
         16, //Int8
         21, //Int16
         23, //Int32

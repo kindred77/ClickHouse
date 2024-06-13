@@ -164,6 +164,7 @@ private:
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_BPCHAR;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERNAL;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_TEXT;
+	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_UNKNOWN;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_TIMESTAMP;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INTERN_FLOAT4;
 	static std::pair<duckdb_libpgquery::PGOid, duckdb_libpgquery::PGTypePtr> TYPE_INT8;
