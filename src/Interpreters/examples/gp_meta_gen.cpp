@@ -39,6 +39,9 @@ int main(int argc, char ** argv)
         2281, //internal
         26, //oid
     };
+    std::vector<PGOid> proc_init_oids = {
+        1569
+    };
     std::vector<PGOid> oper_init_oids = {
         550, //INT2PL
         551, //INT4PL
@@ -207,6 +210,10 @@ int main(int argc, char ** argv)
         for (PGOid oid : type_init_oids)
         {
             Typ::init(conn, oid);
+        }
+        for (PGOid oid : proc_init_oids)
+        {
+            Proc::init(conn, oid);
         }
         for (PGOid oid : oper_init_oids)
         {

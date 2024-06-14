@@ -55,17 +55,19 @@ NEW_PROC(INT24DIV, 172, "int24div", 11, 10, 12, 1, 0, 0, 0, false, false, false,
 NEW_PROC(INT4DIV, 154, "int4div", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 23, {PGOid(23), PGOid(23)})
 NEW_PROC(INT2DIV, 153, "int2div", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 21, {PGOid(21), PGOid(21)})
 NEW_PROC(INT42MUL, 171, "int42mul", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 23, {PGOid(23), PGOid(21)})
+NEW_PROC(INT24MUL, 170, "int24mul", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 23, {PGOid(21), PGOid(23)})
 NEW_PROC(INT4MUL, 141, "int4mul", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 23, {PGOid(23), PGOid(23)})
+NEW_PROC(INT2MUL, 152, "int2mul", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 21, {PGOid(21), PGOid(21)})
 NEW_PROC(INT42MI, 183, "int42mi", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 23, {PGOid(23), PGOid(21)})
 NEW_PROC(INT24MI, 182, "int24mi", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 23, {PGOid(21), PGOid(23)})
 NEW_PROC(INT4MI, 181, "int4mi", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 23, {PGOid(23), PGOid(23)})
+NEW_PROC(LIKE, 1569, "like", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 16, {PGOid(25), PGOid(25)})
 NEW_PROC(NUMERIC_NE, 1719, "numeric_ne", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 16, {PGOid(1700), PGOid(1700)})
 NEW_PROC(NUMERIC_EQ, 1718, "numeric_eq", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 16, {PGOid(1700), PGOid(1700)})
 NEW_PROC(TIMESTAMPTZ_NE, 1153, "timestamptz_ne", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(1184), PGOid(1184)})
 NEW_PROC(TIMESTAMPTZ_EQ, 1152, "timestamptz_eq", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(1184), PGOid(1184)})
 NEW_PROC(BYTEALE, 1950, "byteale", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(17), PGOid(17)})
 NEW_PROC(TIMESTAMPTZ_GE, 1156, "timestamptz_ge", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(1184), PGOid(1184)})
-NEW_PROC(INT24MUL, 170, "int24mul", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 23, {PGOid(21), PGOid(23)})
 NEW_PROC(BYTEALT, 1949, "bytealt", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(17), PGOid(17)})
 NEW_PROC(TIMESTAMPTZ_LE, 1155, "timestamptz_le", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(1184), PGOid(1184)})
 NEW_PROC(BYTEAGT, 1951, "byteagt", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(17), PGOid(17)})
@@ -87,7 +89,6 @@ NEW_PROC(TIMESTAMP_LE, 2055, "timestamp_le", 11, 10, 12, 1, 0, 0, 0, false, fals
 NEW_PROC(INT8LT, 469, "int8lt", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(20), PGOid(20)})
 NEW_PROC(TIMESTAMP_GT, 2057, "timestamp_gt", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(1114), PGOid(1114)})
 NEW_PROC(TIMESTAMP_SEND, 2475, "timestamp_send", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 1, 0, 17, {PGOid(1114)})
-NEW_PROC(TIMESTAMP_RECV, 2474, "timestamp_recv", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 3, 0, 1114, {PGOid(2281), PGOid(26), PGOid(23)})
 NEW_PROC(TIMESTAMP_OUT, 1313, "timestamp_out", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 's', 1, 0, 2275, {PGOid(1114)})
 NEW_PROC(BPCHARNE, 1053, "bpcharne", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(1042), PGOid(1042)})
 NEW_PROC(BPCHARIN, 1044, "bpcharin", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 3, 0, 1042, {PGOid(2275), PGOid(26), PGOid(23)})
@@ -97,11 +98,15 @@ NEW_PROC(NUMERIC_LT, 1722, "numeric_lt", 11, 10, 12, 1, 0, 0, 0, false, false, f
 NEW_PROC(BPCHARTYPMODIN, 2913, "bpchartypmodin", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 1, 0, 23, {PGOid(1263)})
 NEW_PROC(FLOAT4_NUMERIC, 1745, "float4", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 1, 0, 700, {PGOid(1700)})
 NEW_PROC(TEXTNE, 157, "textne", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(25), PGOid(25)})
-NEW_PROC(INT2MUL, 152, "int2mul", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 21, {PGOid(21), PGOid(21)})
 NEW_PROC(TEXT_GE, 743, "text_ge", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 2, 0, 16, {PGOid(25), PGOid(25)})
 NEW_PROC(TEXTSEND, 2415, "textsend", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 's', 1, 0, 17, {PGOid(25)})
 NEW_PROC(TEXTRECV, 2414, "textrecv", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 's', 1, 0, 25, {PGOid(2281)})
 NEW_PROC(TEXTOUT, 47, "textout", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 1, 0, 2275, {PGOid(25)})
+NEW_PROC(UNKNOWNSEND, 2417, "unknownsend", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 1, 0, 17, {PGOid(705)})
+NEW_PROC(UNKNOWNRECV, 2416, "unknownrecv", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 1, 0, 705, {PGOid(2281)})
+NEW_PROC(TIMESTAMP_RECV, 2474, "timestamp_recv", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 3, 0, 1114, {PGOid(2281), PGOid(26), PGOid(23)})
+NEW_PROC(UNKNOWNOUT, 110, "unknownout", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 1, 0, 2275, {PGOid(705)})
+NEW_PROC(UNKNOWNIN, 109, "unknownin", 11, 10, 12, 1, 0, 0, 0, false, false, false, false, true, false, 'i', 1, 0, 705, {PGOid(2275)})
 NEW_PROC(FLOAT4NE, 288, "float4ne", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(700), PGOid(700)})
 NEW_PROC(FLOAT4EQ, 287, "float4eq", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(700), PGOid(700)})
 NEW_PROC(DATE_EQ, 1086, "date_eq", 11, 10, 12, 1, 0, 0, 0, false, false, false, true, true, false, 'i', 2, 0, 16, {PGOid(1082), PGOid(1082)})
@@ -286,17 +291,19 @@ ProcProvider::OidProcMap ProcProvider::oid_proc_map = {
     ProcProvider::PROC_INT4DIV,
     ProcProvider::PROC_INT2DIV,
     ProcProvider::PROC_INT42MUL,
+    ProcProvider::PROC_INT24MUL,
     ProcProvider::PROC_INT4MUL,
+    ProcProvider::PROC_INT2MUL,
     ProcProvider::PROC_INT42MI,
     ProcProvider::PROC_INT24MI,
     ProcProvider::PROC_INT4MI,
+    ProcProvider::PROC_LIKE,
     ProcProvider::PROC_NUMERIC_NE,
     ProcProvider::PROC_NUMERIC_EQ,
     ProcProvider::PROC_TIMESTAMPTZ_NE,
     ProcProvider::PROC_TIMESTAMPTZ_EQ,
     ProcProvider::PROC_BYTEALE,
     ProcProvider::PROC_TIMESTAMPTZ_GE,
-    ProcProvider::PROC_INT24MUL,
     ProcProvider::PROC_BYTEALT,
     ProcProvider::PROC_TIMESTAMPTZ_LE,
     ProcProvider::PROC_BYTEAGT,
@@ -318,7 +325,6 @@ ProcProvider::OidProcMap ProcProvider::oid_proc_map = {
     ProcProvider::PROC_INT8LT,
     ProcProvider::PROC_TIMESTAMP_GT,
     ProcProvider::PROC_TIMESTAMP_SEND,
-    ProcProvider::PROC_TIMESTAMP_RECV,
     ProcProvider::PROC_TIMESTAMP_OUT,
     ProcProvider::PROC_BPCHARNE,
     ProcProvider::PROC_BPCHARIN,
@@ -328,11 +334,15 @@ ProcProvider::OidProcMap ProcProvider::oid_proc_map = {
     ProcProvider::PROC_BPCHARTYPMODIN,
     ProcProvider::PROC_FLOAT4_NUMERIC,
     ProcProvider::PROC_TEXTNE,
-    ProcProvider::PROC_INT2MUL,
     ProcProvider::PROC_TEXT_GE,
     ProcProvider::PROC_TEXTSEND,
     ProcProvider::PROC_TEXTRECV,
     ProcProvider::PROC_TEXTOUT,
+    ProcProvider::PROC_UNKNOWNSEND,
+    ProcProvider::PROC_UNKNOWNRECV,
+    ProcProvider::PROC_TIMESTAMP_RECV,
+    ProcProvider::PROC_UNKNOWNOUT,
+    ProcProvider::PROC_UNKNOWNIN,
     ProcProvider::PROC_FLOAT4NE,
     ProcProvider::PROC_FLOAT4EQ,
     ProcProvider::PROC_DATE_EQ,
