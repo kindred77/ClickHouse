@@ -616,10 +616,17 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 		 * We assume here that UNKNOWN's internal representation is the same
 		 * as CSTRING.
 		 */
+        //TODO by kindred
         if (!con->constisnull)
-            newcon->constvalue = TypeParser::stringTypeDatum(targetType, DatumGetCString(con->constvalue), inputTypeMod);
-        else
-            newcon->constvalue = TypeParser::stringTypeDatum(targetType, NULL, inputTypeMod);
+		{
+            newcon->constvalue = (PGDatum)DatumGetCString(con->constvalue);
+			//newcon->constvalue = TypeParser::stringTypeDatum(targetType, DatumGetCString(con->constvalue), inputTypeMod);
+		}
+		else
+		{
+			newcon->constvalue = 0;
+            //newcon->constvalue = TypeParser::stringTypeDatum(targetType, NULL, inputTypeMod);
+		}
 
         cancel_parser_errposition_callback(&pcbstate);
 
