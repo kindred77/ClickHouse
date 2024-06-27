@@ -2561,11 +2561,13 @@ ExprParser::transformExprRecurse(PGParseState *pstate, PGNode *expr)
 					{
 						auto * func_call_like = makeFuncCall(SystemFuncName("like"), list_make2(a->lexpr, a->rexpr), a->location);
 						result = transformFuncCall(pstate, func_call_like);
+						break;
 					}
 					case PG_AEXPR_ILIKE:
 					{
 						auto * func_call_ilike = makeFuncCall(SystemFuncName("ilike"), list_make2(a->lexpr, a->rexpr), a->location);
 						result = transformFuncCall(pstate, func_call_ilike);
+						break;
 					}
                     default:
 						GPOS_RAISE(ExmaParser, ExmiUnrecognizedAExprKind,
