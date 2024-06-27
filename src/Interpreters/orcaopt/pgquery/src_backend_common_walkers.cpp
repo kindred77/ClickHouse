@@ -3198,7 +3198,6 @@ pg_find_nodes_walker(PGNode *node, pg_find_nodes_context *context)
 
     if (IsA(node, PGQuery))
     {
-		std::cout << "pg_find_nodes_walker------0000------" << std::endl;
         /* Recurse into subselects */
         return pg_query_tree_walker((PGQuery *)node, (walker_func)pg_find_nodes_walker, (void *)context, 0 /* flags */);
     }

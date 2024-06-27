@@ -293,6 +293,7 @@ void * OptimizeTask(void *ptr)
 	DB::CommonException::Init(mp);
 	DB::Provider::Init(mp);
 	DB::Parser::Init(mp);
+	InitDXL();
 	(void) gpopt::EresExceptionInit(mp);
     bool reset_mdcache = true;//gpdb::MDCacheNeedsReset();
 
@@ -350,16 +351,20 @@ void * OptimizeTask(void *ptr)
 				num_segments_for_costing = num_segments;
 			}
 			CAutoP<CTranslatorQueryToDXL> query_to_dxl_translator;
+			std::cout << "OptimizeTask----000----" << std::endl;
 			query_to_dxl_translator = CTranslatorQueryToDXL::QueryToDXLInstance(
 				mp, &mda, query);
+			std::cout << "OptimizeTask----111----" << std::endl;
 			ICostModel *cost_model = GetCostModel(mp, num_segments_for_costing);
 			COptimizerConfig *optimizer_config =
 				CreateOptimizerConfig(mp, cost_model);
 			// CConstExprEvaluatorProxy expr_eval_proxy(mp, &mda);
 			// IConstExprEvaluator *expr_evaluator =
 			// 	GPOS_NEW(mp) CConstExprEvaluatorDXL(mp, &mda, &expr_eval_proxy);
+			std::cout << "OptimizeTask----222----" << std::endl;
 			CDXLNode *query_dxl =
 				query_to_dxl_translator->TranslateQueryToDXL();
+			std::cout << "OptimizeTask----333----" << std::endl;
 			CDXLNodeArray *query_output_dxlnode_array =
 				query_to_dxl_translator->GetQueryOutputCols();
 			CDXLNodeArray *cte_dxlnode_array =
@@ -383,11 +388,12 @@ void * OptimizeTask(void *ptr)
 			// 					use_legacy_opfamilies);
 
 			int gp_command_count = 1;
-			
+			std::cout << "OptimizeTask----444----" << std::endl;
 			plan_dxl = COptimizer::PdxlnOptimize(
 				mp, &mda, query_dxl, query_output_dxlnode_array,
 				cte_dxlnode_array, NULL, num_segments, 1985,
 				gp_command_count, NULL, optimizer_config);
+			std::cout << "OptimizeTask----555----" << std::endl;
 			CWStringDynamic plan_str(mp);
 			COstreamString oss2(&plan_str);
 			CDXLUtils::SerializePlan(
