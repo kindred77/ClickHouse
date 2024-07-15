@@ -264,6 +264,8 @@ public:
 	//explicit ProcProvider(gpos::CMemoryPool *mp_, ContextPtr context);
 	//explicit ProcProvider(const ContextPtr& context_);
 
+	static bool FunctionExists(duckdb_libpgquery::PGOid functionId);
+
 	static duckdb_libpgquery::PGProcPtr getProcByOid(duckdb_libpgquery::PGOid oid);
 
 	static std::optional<std::string> get_func_name(duckdb_libpgquery::PGOid oid);

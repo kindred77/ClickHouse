@@ -13,6 +13,9 @@ enum ExMajor
     //parser
 	ExmaParser,
 
+	//wrapper
+	ExmaWrapper,
+
 	ExmaSentinel
 };
 
@@ -76,6 +79,10 @@ enum ExMinor
 	ExmiFilterIsNotImplForNoneAggWinFuncs,
 	ExmiWinFuncsCannotReturnSets,
 	ExmiSetReturningFuncIsNotAllowedIn,
+
+	//wrapper
+	ExmiInvalidDatumPointer,
+	ExmiInvalidTypeLen,
 
 	ExmiSentinel
 };

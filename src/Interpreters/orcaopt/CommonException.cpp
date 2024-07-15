@@ -337,6 +337,18 @@ GPOS_RESULT CommonException::EresExceptionInit(CMemoryPool *mp)
 				 GPOS_WSZ_WSZLEN(
 					 "Set-returning functions are not allowed in %s"),
 				 1, GPOS_WSZ_WSZLEN("Set-returning functions are not allowed.")),
+		
+		CMessage(CException(ExmaWrapper, ExmiInvalidDatumPointer),
+				 CException::ExsevError,
+				 GPOS_WSZ_WSZLEN(
+					 "Invalid Datum pointer."),
+				 0, GPOS_WSZ_WSZLEN("invalid Datum pointer")),
+
+		CMessage(CException(ExmaWrapper, ExmiInvalidTypeLen),
+				 CException::ExsevError,
+				 GPOS_WSZ_WSZLEN(
+					 "Invalid typLen: %d."),
+				 1, GPOS_WSZ_WSZLEN("invalid typLen")),
 	};
 
 	GPOS_RESULT eres = GPOS_FAILED;

@@ -216,7 +216,7 @@ CTranslatorRelcacheToDXL::RetrieveObjectGPDB(CMemoryPool *mp,
         return RetrieveAgg(mp, mdid);
     }
 
-    if (FunctionProvider::FunctionExists(oid))
+    if (ProcProvider::FunctionExists(oid))
     {
         return RetrieveFunc(mp, mdid);
     }

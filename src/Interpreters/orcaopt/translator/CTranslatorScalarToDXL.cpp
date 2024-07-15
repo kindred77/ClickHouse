@@ -601,8 +601,8 @@ CTranslatorScalarToDXL::TranslateConstToDXL(CMemoryPool *mp, CMDAccessor *mda,
 {
 	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(constant->consttype);
 	const IMDType *md_type = mda->RetrieveType(mdid);
+	std::wcout << "CTranslatorScalarToDXL::TranslateConstToDXL----000--mdid->GetBuffer(): " << mdid->GetBuffer() << "--constant->constisnull: " << constant->constisnull << "----constant->constlen: " << constant->constlen << "---constant->constvalue: " << constant->constvalue << "-----constant->constbyval: " << constant->constbyval << std::endl;
 	mdid->Release();
-
 	// translate gpdb datum into a DXL datum
 	CDXLDatum *datum_dxl = CTranslatorScalarToDXL::TranslateDatumToDXL(
 		mp, md_type, constant->consttypmod, constant->constisnull,
@@ -2069,15 +2069,16 @@ CTranslatorScalarToDXL::TranslateGenericDatumToDXL(CMemoryPool *mp,
 {
 	CMDIdGPDB *mdid_old = CMDIdGPDB::CastMdid(md_type->MDId());
 	CMDIdGPDB *mdid = GPOS_NEW(mp) CMDIdGPDB(*mdid_old);
-
+	std::wcout << "CTranslatorScalarToDXL::TranslateGenericDatumToDXL-----000----mdid: " << mdid->GetBuffer() << "----len: " << len << "--datum: " << datum << std::endl;
 	BYTE *bytes = ExtractByteArrayFromDatum(mp, md_type, is_null, len, datum);
+	std::wcout << "CTranslatorScalarToDXL::TranslateGenericDatumToDXL-----111----mdid: " << mdid->GetBuffer() << "----len: " << len << "----bytes: " << bytes << std::endl;
 	ULONG length = 0;
 	if (!is_null)
 	{
 		length =
 			(ULONG) DatumSize(datum, md_type->IsPassedByValue(), len);
 	}
-
+	std::wcout << "CTranslatorScalarToDXL::TranslateGenericDatumToDXL-----222----" << mdid->GetBuffer() << "----" << len << "----" << length << std::endl;
 	CDouble double_value(0);
 	if (CMDTypeGenericGPDB::HasByte2DoubleMapping(mdid))
 	{

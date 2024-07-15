@@ -476,11 +476,6 @@ int FunctionProvider::get_func_arg_info(const PGProcPtr& procTup,
     return numargs;
 };
 
-bool FunctionProvider::FunctionExists(PGOid functionId)
-{
-    return false;
-};
-
 bool FunctionProvider::MatchNamedCall(const PGProcPtr& proctup, int nargs, PGList * argnames, int ** argnumbers)
 {
     int pronargs = proctup->pronargs;

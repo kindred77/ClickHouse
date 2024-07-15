@@ -619,11 +619,15 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
         //TODO by kindred
         if (!con->constisnull)
 		{
+			std::cout << "CoerceParser::coerce_type-----000----con->constvalue: " << DatumGetCString(con->constvalue) << "---newcon->constlen: " << newcon->constlen << "--newcon->constbyval: " << newcon->constbyval << std::endl;
             newcon->constvalue = (PGDatum)DatumGetCString(con->constvalue);
+
+			std::cout << "CoerceParser::coerce_type-----111----con->constvalue: " << DatumGetCString(con->constvalue) << "---newcon->constvalue: " << (const char*)newcon->constvalue << std::endl;
 			//newcon->constvalue = TypeParser::stringTypeDatum(targetType, DatumGetCString(con->constvalue), inputTypeMod);
 		}
 		else
 		{
+			std::cout << "CoerceParser::coerce_type-----222----" << std::endl;
 			newcon->constvalue = 0;
             //newcon->constvalue = TypeParser::stringTypeDatum(targetType, NULL, inputTypeMod);
 		}
@@ -634,8 +638,10 @@ CoerceParser::coerce_type(PGParseState *pstate, PGNode *node,
 
         /* If target is a domain, apply constraints. */
         if (baseTypeId != targetTypeId)
+		{
+			std::cout << "CoerceParser::coerce_type-----333----con->constvalue: " << DatumGetCString(con->constvalue) << "---newcon->constvalue: " << (const char*)newcon->constvalue << std::endl;
             result = coerce_to_domain(result, baseTypeId, baseTypeMod, targetTypeId, cformat, location, false, false);
-
+		}
         return result;
     }
     // if (IsA(node, PGParam) && pstate != NULL && pstate->p_coerce_param_hook != NULL)

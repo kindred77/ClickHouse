@@ -552,6 +552,14 @@ ProcProvider::OidProcMap ProcProvider::oid_proc_map = {
 	// oid_proc_map.insert(PROC_DECIMAL64TOFLOAT64);
 // };
 
+bool ProcProvider::FunctionExists(PGOid functionId)
+{
+    auto it = oid_proc_map.find(functionId);
+	if (it == oid_proc_map.end())
+	    return false;
+	return true;
+};
+
 std::unique_ptr<std::vector<PGProcPtr>> ProcProvider::search_procs_by_name(const std::string & func_name)
 {
     auto procs = std::make_unique<std::vector<PGProcPtr>>();

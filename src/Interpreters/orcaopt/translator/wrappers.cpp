@@ -1,4 +1,5 @@
 #include <Interpreters/orcaopt/translator/wrappers.h>
+#include <Interpreters/orcaopt/CommonException.h>
 
 #include <common/parser_common.hpp>
 
@@ -675,9 +676,57 @@ duckdb_libpgquery::PGList * GetRelationKeys(PGOid relid)
 	return NULL;
 };
 
-size_t DatumSize(Datum value, bool type_by_val, int iTypLen)
+size_t DatumSize(PGDatum value, bool typByVal, int typLen)
 {
-	return 0;
+	Size		size;
+
+	std::cout << "DatumSize----000---" << value << "-----" << typByVal << "----   " << typLen << std::endl;
+
+	if (typByVal)
+	{
+		/* Pass-by-value types are always fixed-length */
+		Assert(typLen > 0 && typLen <= sizeof(Datum))
+		size = (Size) typLen;
+	}
+	else
+	{
+		if (typLen > 0)
+		{
+			/* Fixed-length pass-by-ref type */
+			size = (Size) typLen;
+		}
+		else if (typLen == -1)
+		{
+			/* It is a varlena datatype */
+			struct varlena *s = (struct varlena *) DatumGetPointer(value);
+
+			if (!PointerIsValid(s))
+			{
+				GPOS_RAISE(DB::ExmaWrapper, DB::ExmiInvalidDatumPointer);
+			}
+
+			size = (Size) VARSIZE_ANY(s);
+		}
+		else if (typLen == -2)
+		{
+			/* It is a cstring datatype */
+			char	   *s = (char *) DatumGetPointer(value);
+
+			if (!PointerIsValid(s))
+			{
+				GPOS_RAISE(DB::ExmaWrapper, DB::ExmiInvalidDatumPointer);
+			}
+
+			size = (Size) (strlen(s) + 1);
+		}
+		else
+		{
+			GPOS_RAISE(DB::ExmaWrapper, DB::ExmiInvalidTypeLen, typLen);
+			size = 0;			/* keep compiler quiet */
+		}
+	}
+
+	return size;
 };
 
 bool BoolFromDatum(Datum d)

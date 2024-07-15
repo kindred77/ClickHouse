@@ -1740,6 +1740,7 @@ FuncParser::make_fn_arguments(PGParseState *pstate,
 			}
 			else
 			{
+				std::cout << "FuncParser::make_fn_arguments-----000---i: " << i << "---actual_arg_types[i]: " << actual_arg_types[i] << "----declared_arg_types[i]: " << declared_arg_types[i] << std::endl;
 				node = CoerceParser::coerce_type(pstate,
 								   node,
 								   actual_arg_types[i],
@@ -1747,6 +1748,11 @@ FuncParser::make_fn_arguments(PGParseState *pstate,
 								   PG_COERCION_IMPLICIT,
 								   PG_COERCE_IMPLICIT_CAST,
 								   -1);
+				if (node->type == T_PGConst)
+				{
+					PGConst * cons = (PGConst *)node;
+					std::cout << "FuncParser::make_fn_arguments-----111---value: " << (const char*)cons->constvalue << std::endl;
+				}
 				lfirst(current_fargs) = node;
 			}
 		}
