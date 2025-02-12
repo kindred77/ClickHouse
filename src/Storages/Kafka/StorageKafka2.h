@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Core/BackgroundSchedulePool.h>
+#include <Core/BackgroundSchedulePoolTaskHolder.h>
 #include <Core/Block.h>
+#include <Core/StreamingHandleErrorMode.h>
 #include <Core/Types.h>
 #include <Storages/IStorage.h>
 #include <Storages/Kafka/KafkaConsumer2.h>
-#include <Storages/Kafka/KafkaSettings.h>
 #include <Common/Macros.h>
 #include <Common/SettingsChanges.h>
 #include <Common/ThreadStatus.h>
@@ -29,6 +29,7 @@ class Configuration;
 namespace DB
 {
 
+struct KafkaSettings;
 template <typename TStorageKafka>
 struct KafkaInterceptors;
 
@@ -63,6 +64,8 @@ public:
         std::unique_ptr<KafkaSettings> kafka_settings_,
         const String & collection_name_);
 
+    ~StorageKafka2() override;
+
     std::string getName() const override { return "Kafka"; }
 
     bool noPushingToViews() const override { return true; }
@@ -89,7 +92,7 @@ public:
 
     const auto & getFormatName() const { return format_name; }
 
-    StreamingHandleErrorMode getHandleKafkaErrorMode() const { return kafka_settings->kafka_handle_error_mode; }
+    StreamingHandleErrorMode getHandleKafkaErrorMode() const;
 
 private:
     using TopicPartition = KafkaConsumer2::TopicPartition;
@@ -127,9 +130,9 @@ private:
     // Stream thread
     struct TaskContext
     {
-        BackgroundSchedulePool::TaskHolder holder;
+        BackgroundSchedulePoolTaskHolder holder;
         std::atomic<bool> stream_cancelled{false};
-        explicit TaskContext(BackgroundSchedulePool::TaskHolder && task_) : holder(std::move(task_)) { }
+        explicit TaskContext(BackgroundSchedulePoolTaskHolder && task_) : holder(std::move(task_)) { }
     };
 
     enum class AssignmentChange
@@ -173,7 +176,7 @@ private:
     // Handling replica activation.
     std::atomic<bool> is_active = false;
     zkutil::EphemeralNodeHolderPtr replica_is_active_node;
-    BackgroundSchedulePool::TaskHolder activating_task;
+    BackgroundSchedulePoolTaskHolder activating_task;
     String active_node_identifier;
     UInt64 consecutive_activate_failures = 0;
     bool activate();

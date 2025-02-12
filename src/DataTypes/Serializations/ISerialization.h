@@ -1,10 +1,9 @@
 #pragma once
 
-#include <Common/COW.h>
+#include <Columns/IColumn_fwd.h>
 #include <Core/Types_fwd.h>
 #include <base/demangle.h>
 #include <Common/typeid_cast.h>
-#include <Columns/IColumn.h>
 
 #include <boost/noncopyable.hpp>
 #include <unordered_map>
@@ -92,7 +91,7 @@ public:
     struct ISubcolumnCreator
     {
         virtual DataTypePtr create(const DataTypePtr & prev) const = 0;
-        virtual SerializationPtr create(const SerializationPtr & prev) const = 0;
+        virtual SerializationPtr create(const SerializationPtr & prev_serialization, const DataTypePtr & prev_type) const = 0;
         virtual ColumnPtr create(const ColumnPtr & prev) const = 0;
         virtual ~ISubcolumnCreator() = default;
     };
@@ -276,6 +275,9 @@ public:
 
         bool use_compact_variant_discriminators_serialization = false;
 
+        /// Serialize JSON column as single String column with serialized JSON values.
+        bool write_json_as_string = false;
+
         enum class ObjectAndDynamicStatisticsMode
         {
             NONE,   /// Don't write statistics.
@@ -283,6 +285,9 @@ public:
             SUFFIX, /// Write statistics in suffix.
         };
         ObjectAndDynamicStatisticsMode object_and_dynamic_write_statistics = ObjectAndDynamicStatisticsMode::NONE;
+
+        /// Use old V1 serialization of JSON and Dynamic types. Needed for compatibility.
+        bool use_v1_object_and_dynamic_serialization = false;
     };
 
     struct DeserializeBinaryBulkSettings
@@ -456,6 +461,12 @@ public:
     /// Returns true if subcolumn doesn't actually stores any data in column and doesn't require a separate stream
     /// for writing/reading data. For example, it's a null-map subcolumn of Variant type (it's always constructed from discriminators);.
     static bool isEphemeralSubcolumn(const SubstreamPath & path, size_t prefix_len);
+
+    /// Returns true if stream with specified path corresponds to dynamic subcolumn.
+    static bool isDynamicSubcolumn(const SubstreamPath & path, size_t prefix_len);
+
+    static bool isLowCardinalityDictionarySubcolumn(const SubstreamPath & path);
+    static bool isDynamicOrObjectStructureSubcolumn(const SubstreamPath & path);
 
 protected:
     template <typename State, typename StatePtr>

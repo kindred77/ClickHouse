@@ -4,6 +4,8 @@
 #include <Core/ColumnWithTypeAndName.h>
 #include <Core/ColumnsWithTypeAndName.h>
 #include <Core/NamesAndTypes.h>
+#include <DataTypes/Serializations/SerializationInfo.h>
+#include <base/StringRef.h>
 
 #include <initializer_list>
 #include <list>
@@ -11,6 +13,7 @@
 #include <vector>
 #include <sparsehash/dense_hash_map>
 
+class SipHash;
 
 namespace DB
 {
@@ -67,6 +70,8 @@ public:
     }
 
     const ColumnWithTypeAndName * findByName(const std::string & name, bool case_insensitive = false) const;
+    std::optional<ColumnWithTypeAndName> findSubcolumnByName(const std::string & name) const;
+    std::optional<ColumnWithTypeAndName> findColumnOrSubcolumnByName(const std::string & name) const;
 
     ColumnWithTypeAndName & getByName(const std::string & name, bool case_insensitive = false)
     {
@@ -75,6 +80,8 @@ public:
     }
 
     const ColumnWithTypeAndName & getByName(const std::string & name, bool case_insensitive = false) const;
+    ColumnWithTypeAndName getSubcolumnByName(const std::string & name) const;
+    ColumnWithTypeAndName getColumnOrSubcolumnByName(const std::string & name) const;
 
     Container::iterator begin() { return data.begin(); }
     Container::iterator end() { return data.end(); }
@@ -99,6 +106,7 @@ public:
     NameMap getNamesToIndexesMap() const;
 
     Serializations getSerializations() const;
+    Serializations getSerializations(const SerializationInfoByName & hints) const;
 
     /// Returns number of rows from first column in block, not equal to nullptr. If no columns, returns 0.
     size_t rows() const;
@@ -138,6 +146,9 @@ public:
 
     /** Get empty columns with the same types as in block. */
     MutableColumns cloneEmptyColumns() const;
+
+    /** Get empty columns with the same types as in block and given serializations. */
+    MutableColumns cloneEmptyColumns(const Serializations & serializations) const;
 
     /** Get columns from block for mutation. Columns in block will be nullptr. */
     MutableColumns mutateColumns();

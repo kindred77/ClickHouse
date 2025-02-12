@@ -20,15 +20,17 @@ namespace DB
 /// The key generator ensures that the original directory hierarchy is
 /// preserved, which is required for the MergeTree family.
 
-struct InMemoryPathMap;
+struct InMemoryDirectoryPathMap;
 class CommonPathPrefixKeyGenerator : public IObjectStorageKeysGenerator
 {
 public:
     /// Local to remote path map. Leverages filesystem::path comparator for paths.
 
-    explicit CommonPathPrefixKeyGenerator(String key_prefix_, std::weak_ptr<InMemoryPathMap> path_map_);
+    explicit CommonPathPrefixKeyGenerator(String key_prefix_, std::weak_ptr<InMemoryDirectoryPathMap> path_map_);
 
     ObjectStorageKey generate(const String & path, bool is_directory, const std::optional<String> & key_prefix) const override;
+
+    bool isRandom() const override { return true; }
 
 private:
     /// Longest key prefix and unresolved parts of the source path.
@@ -36,7 +38,7 @@ private:
 
     const String storage_key_prefix;
 
-    std::weak_ptr<InMemoryPathMap> path_map;
+    std::weak_ptr<InMemoryDirectoryPathMap> path_map;
 };
 
 }

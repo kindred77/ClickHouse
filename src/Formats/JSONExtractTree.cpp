@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <Formats/JSONExtractTree.h>
 #include <Formats/SchemaInferenceUtils.h>
 
@@ -22,6 +24,7 @@
 #include <Columns/ColumnVector.h>
 #include <Columns/ColumnsDateTime.h>
 #include <Columns/ColumnObject.h>
+#include <Columns/IColumn.h>
 
 #include <DataTypes/DataTypeArray.h>
 #include <DataTypes/DataTypeDateTime.h>
@@ -131,7 +134,7 @@ bool tryGetNumericValueFromJSONElement(
     switch (element.type())
     {
         case ElementType::DOUBLE:
-            if constexpr (std::is_floating_point_v<NumberType>)
+            if constexpr (is_floating_point<NumberType>)
             {
                 /// We permit inaccurate conversion of double to float.
                 /// Example: double 0.1 from JSON is not representable in float.
@@ -175,7 +178,7 @@ bool tryGetNumericValueFromJSONElement(
                 return false;
 
             auto rb = ReadBufferFromMemory{element.getString()};
-            if constexpr (std::is_floating_point_v<NumberType>)
+            if constexpr (is_floating_point<NumberType>)
             {
                 if (!tryReadFloatText(value, rb) || !rb.eof())
                 {
@@ -362,9 +365,10 @@ public:
 
             auto & col_str = assert_cast<ColumnString &>(column);
             auto & chars = col_str.getChars();
-            WriteBufferFromVector<ColumnString::Chars> buf(chars, AppendModeTag());
-            jsonElementToString<JSONParser>(element, buf, format_settings);
-            buf.finalize();
+            {
+                WriteBufferFromVector<ColumnString::Chars> buf(chars, AppendModeTag());
+                jsonElementToString<JSONParser>(element, buf, format_settings);
+            }
             chars.push_back(0);
             col_str.getOffsets().push_back(chars.size());
         }
@@ -1085,7 +1089,7 @@ public:
         }
 
         auto & col_lc = assert_cast<ColumnLowCardinality &>(column);
-        auto tmp_nested = col_lc.getDictionary().getNestedColumn()->cloneEmpty();
+        auto tmp_nested = removeNullable(col_lc.getDictionary().getNestedColumn()->cloneEmpty())->assumeMutable();
         if (!nested->insertResultToColumn(*tmp_nested, element, insert_settings, format_settings, error))
             return false;
 
@@ -1179,6 +1183,12 @@ public:
         const FormatSettings & format_settings,
         String & error) const override
     {
+        if (element.isNull() && format_settings.null_as_default)
+        {
+            column.insertDefault();
+            return true;
+        }
+
         auto & tuple = assert_cast<ColumnTuple &>(column);
         size_t old_size = column.size();
         bool were_valid_elements = false;
@@ -1298,6 +1308,12 @@ public:
         const FormatSettings & format_settings,
         String & error) const override
     {
+        if (element.isNull() && format_settings.null_as_default)
+        {
+            column.insertDefault();
+            return true;
+        }
+
         if (!element.isObject())
         {
             error = fmt::format("cannot read Map value from JSON element: {}", jsonElementToString<JSONParser>(element, format_settings));
@@ -1362,6 +1378,14 @@ public:
         String & error) const override
     {
         auto & column_variant = assert_cast<ColumnVariant &>(column);
+
+        /// Check if element is NULL.
+        if (element.isNull())
+        {
+            column_variant.insertDefault();
+            return true;
+        }
+
         for (size_t i : order)
         {
             auto & variant = column_variant.getVariantByGlobalDiscriminator(i);
@@ -1389,10 +1413,8 @@ template <typename JSONParser>
 class DynamicNode : public JSONExtractTreeNode<JSONParser>
 {
 public:
-    explicit DynamicNode(
-        size_t max_dynamic_paths_for_object_ = DataTypeObject::DEFAULT_MAX_SEPARATELY_STORED_PATHS,
-        size_t max_dynamic_types_for_object_ = DataTypeDynamic::DEFAULT_MAX_DYNAMIC_TYPES)
-        :  max_dynamic_paths_for_object(max_dynamic_paths_for_object_), max_dynamic_types_for_object(max_dynamic_types_for_object_)
+    explicit DynamicNode(DataTypePtr object_type_ = std::make_shared<DataTypeObject>(DataTypeObject::SchemaFormat::JSON))
+        :  object_type(std::move(object_type_))
     {
     }
 
@@ -1422,7 +1444,8 @@ public:
         auto shared_variant_discr = column_dynamic.getSharedVariantDiscriminator();
         auto insert_settings_with_no_type_conversion = insert_settings;
         insert_settings_with_no_type_conversion.allow_type_conversion = false;
-        for (size_t i = 0; i != variant_info.variant_names.size(); ++i)
+        auto order = SerializationVariant::getVariantsDeserializeTextOrder(assert_cast<const DataTypeVariant &>(*variant_info.variant_type).getVariants());
+        for (size_t i : order)
         {
             if (i != shared_variant_discr)
             {
@@ -1481,7 +1504,7 @@ public:
         auto type = elementToDataTypeImpl(element, format_settings, json_inference_info);
         transformFinalInferredJSONTypeIfNeeded(type, format_settings, &json_inference_info);
         if (format_settings.schema_inference_make_columns_nullable && type->haveSubtypes())
-            type = makeNullableRecursively(type);
+            type = makeNullableRecursively(type, format_settings);
         return type;
     }
 
@@ -1560,14 +1583,11 @@ private:
                 return std::make_shared<DataTypeTuple>(types);
             }
             case ElementType::OBJECT:
-            {
-                return std::make_shared<DataTypeObject>(DataTypeObject::SchemaFormat::JSON, max_dynamic_paths_for_object, max_dynamic_types_for_object);
-            }
+                return object_type;
         }
     }
 
-    size_t max_dynamic_paths_for_object;
-    size_t max_dynamic_types_for_object;
+    DataTypePtr object_type;
 
     /// Avoid building JSONExtractTreeNode for the same data types on each row by using cache.
     mutable std::unordered_map<String, std::unique_ptr<JSONExtractTreeNode<JSONParser>>> json_extract_nodes_cache;
@@ -1581,13 +1601,10 @@ public:
         std::unordered_map<String, std::unique_ptr<JSONExtractTreeNode<JSONParser>>> typed_path_nodes_,
         const std::unordered_set<String> & paths_to_skip_,
         const std::vector<String> & path_regexps_to_skip_,
-        size_t max_dynamic_paths_,
-        size_t max_dynamic_types_)
+        const DataTypePtr & type_of_nested_objects)
         : typed_path_nodes(std::move(typed_path_nodes_))
         , paths_to_skip(paths_to_skip_)
-        , dynamic_node(std::make_unique<DynamicNode<JSONParser>>(
-              max_dynamic_paths_ / DataTypeObject::NESTED_OBJECT_MAX_DYNAMIC_PATHS_REDUCE_FACTOR,
-              max_dynamic_types_ / DataTypeObject::NESTED_OBJECT_MAX_DYNAMIC_TYPES_REDUCE_FACTOR))
+        , dynamic_node(std::make_unique<DynamicNode<JSONParser>>(type_of_nested_objects))
         , dynamic_serialization(std::make_shared<SerializationDynamic>())
     {
         sorted_paths_to_skip.assign(paths_to_skip.begin(), paths_to_skip.end());
@@ -1617,7 +1634,7 @@ public:
         /// Instead we collect all paths and values that should go to shared data, sort them and insert later.
         /// It's not optimal, but it's a price we pay for faster reading of subcolumns.
         std::vector<std::pair<String, String>> paths_and_values_for_shared_data;
-        if (!traverseAndInsert(column_object, element, "", insert_settings, format_settings, paths_and_values_for_shared_data, prev_size, error))
+        if (!traverseAndInsert(column_object, element, "", insert_settings, format_settings, paths_and_values_for_shared_data, prev_size, error, true))
         {
             /// If there was an error, restore previous state.
             SerializationObject::restoreColumnObject(column_object, prev_size);
@@ -1673,7 +1690,8 @@ private:
         const FormatSettings & format_settings,
         std::vector<std::pair<String, String>> & paths_and_values_for_shared_data,
         size_t current_size,
-        String & error) const
+        String & error,
+        bool is_root) const
     {
         if (shouldSkipPath(current_path))
             return true;
@@ -1683,10 +1701,10 @@ private:
             for (auto [key, value] : element.getObject())
             {
                 String path = current_path;
-                if (!path.empty())
+                if (!is_root)
                     path.append(".");
                 path += key;
-                if (!traverseAndInsert(column_object, value, path, insert_settings, format_settings, paths_and_values_for_shared_data, current_size, error))
+                if (!traverseAndInsert(column_object, value, path, insert_settings, format_settings, paths_and_values_for_shared_data, current_size, error, false))
                     return false;
             }
 
@@ -1758,7 +1776,9 @@ private:
 
             paths_and_values_for_shared_data.emplace_back(current_path, "");
             WriteBufferFromString buf(paths_and_values_for_shared_data.back().second);
-            dynamic_serialization->serializeBinary(*tmp_dynamic_column, 0, buf, format_settings);
+            /// Use default format settings for binary serialization. Non-default settings may change
+            /// the binary representation of the values and break the future deserialization.
+            dynamic_serialization->serializeBinary(*tmp_dynamic_column, 0, buf, getDefaultFormatSettings());
         }
 
         return true;
@@ -1783,6 +1803,12 @@ private:
         }
 
         return false;
+    }
+
+    const FormatSettings & getDefaultFormatSettings() const
+    {
+        static const FormatSettings settings;
+        return settings;
     }
 
     std::unordered_map<String, std::unique_ptr<JSONExtractTreeNode<JSONParser>>> typed_path_nodes;
@@ -1953,8 +1979,7 @@ std::unique_ptr<JSONExtractTreeNode<JSONParser>> buildJSONExtractTree(const Data
                         std::move(typed_path_nodes),
                         object_type.getPathsToSkip(),
                         object_type.getPathRegexpsToSkip(),
-                        object_type.getMaxDynamicPaths(),
-                        object_type.getMaxDynamicTypes());
+                        object_type.getTypeOfNestedObjects());
             }
         }
         default:

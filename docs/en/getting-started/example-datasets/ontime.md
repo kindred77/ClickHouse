@@ -1,10 +1,9 @@
 ---
+description: "Dataset containing the on-time performance of airline flights"
 slug: /en/getting-started/example-datasets/ontime
 sidebar_label: OnTime Airline Flight Data
-description: Dataset containing the on-time performance of airline flights
+title: "OnTime"
 ---
-
-# OnTime 
 
 This dataset contains data from Bureau of Transportation Statistics.
 
@@ -386,7 +385,7 @@ ORDER BY c DESC
 LIMIT 10;
 ```
 
-You can also play with the data in Playground, [example](https://play.clickhouse.com/play?user=play#U0VMRUNUIERheU9mV2VlaywgY291bnQoKikgQVMgYwpGUk9NIG9udGltZQpXSEVSRSBZZWFyPj0yMDAwIEFORCBZZWFyPD0yMDA4CkdST1VQIEJZIERheU9mV2VlawpPUkRFUiBCWSBjIERFU0M7Cg==).
+You can also play with the data in Playground, [example](https://sql.clickhouse.com?query_id=M4FSVBVMSHY98NKCQP8N4K).
 
 This performance test was created by Vadim Tkachenko. See:
 

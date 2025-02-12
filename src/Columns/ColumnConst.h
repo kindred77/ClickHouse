@@ -78,6 +78,11 @@ public:
         data->get(0, res);
     }
 
+    std::pair<String, DataTypePtr> getValueNameAndType(size_t) const override
+    {
+        return data->getValueNameAndType(0);
+    }
+
     StringRef getDataAt(size_t) const override
     {
         return data->getDataAt(0);
@@ -264,15 +269,26 @@ public:
         data->getExtremes(min, max);
     }
 
-    void forEachSubcolumn(MutableColumnCallback callback) override
+    void forEachSubcolumn(ColumnCallback callback) const override
     {
         callback(data);
     }
 
-    void forEachSubcolumnRecursively(RecursiveMutableColumnCallback callback) override
+    void forEachSubcolumnRecursively(RecursiveColumnCallback callback) const override
     {
         callback(*data);
         data->forEachSubcolumnRecursively(callback);
+    }
+
+    void forEachMutableSubcolumn(MutableColumnCallback callback) override
+    {
+        callback(data);
+    }
+
+    void forEachMutableSubcolumnRecursively(RecursiveMutableColumnCallback callback) override
+    {
+        callback(*data);
+        data->forEachMutableSubcolumnRecursively(callback);
     }
 
     bool structureEquals(const IColumn & rhs) const override
