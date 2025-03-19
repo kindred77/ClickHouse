@@ -111,8 +111,8 @@ bool Agg::init(PGConnectionPtr conn, PGOid oid)
             agg->aggtransspace = resp[i]["aggtransspace"].as<long>();
             agg->aggmtranstype = resp[i]["aggmtranstype"].as<PGOid>();
             agg->aggmtransspace = resp[i]["aggmtransspace"].as<long>();
-            agg->agginitval = resp[i]["agginitval"].as<std::string>();
-            agg->aggminitval = resp[i]["aggminitval"].as<std::string>();
+            agg->agginitval = resp[i]["agginitval"].is_null() ? "" : resp[i]["agginitval"].as<std::string>();
+            agg->aggminitval = resp[i]["aggminitval"].is_null() ? "" : resp[i]["aggminitval"].as<std::string>();
         }
 
         agg_map.insert({oid, agg});
