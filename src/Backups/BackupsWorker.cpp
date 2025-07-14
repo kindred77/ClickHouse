@@ -21,6 +21,7 @@
 #include <Interpreters/executeDDLQueryOnCluster.h>
 #include <Parsers/ASTBackupQuery.h>
 #include <Parsers/ASTFunction.h>
+#include <Common/DateLUT.h>
 #include <Common/CurrentThread.h>
 #include <Common/Exception.h>
 #include <Common/Macros.h>
@@ -29,10 +30,15 @@
 #include <Common/setThreadName.h>
 #include <Common/scope_guard_safe.h>
 #include <Common/ThreadPool.h>
+#include <Common/thread_local_rng.h>
+#include <Common/formatReadable.h>
+#include <Common/ThrottlerArray.h>
 #include <Core/Settings.h>
 
 #include <boost/range/adaptor/map.hpp>
 
+
+#include <Parsers/ASTAlterQuery.h>
 
 namespace CurrentMetrics
 {
@@ -46,6 +52,11 @@ namespace CurrentMetrics
 
 namespace DB
 {
+
+namespace Setting
+{
+extern const SettingsBool s3_disable_checksum;
+}
 
 namespace ErrorCodes
 {
@@ -121,8 +132,8 @@ namespace
     ReadSettings getReadSettingsForBackup(const ContextPtr & context, const BackupSettings & backup_settings)
     {
         auto read_settings = context->getReadSettings();
-        read_settings.remote_throttler = context->getBackupsThrottler();
-        read_settings.local_throttler = context->getBackupsThrottler();
+        addThrottler(read_settings.remote_throttler, context->getBackupsThrottler());
+        addThrottler(read_settings.local_throttler, context->getBackupsThrottler());
         read_settings.enable_filesystem_cache = backup_settings.read_from_filesystem_cache;
         read_settings.read_from_filesystem_cache_if_exists_otherwise_bypass_cache = backup_settings.read_from_filesystem_cache;
         return read_settings;
@@ -138,8 +149,8 @@ namespace
     ReadSettings getReadSettingsForRestore(const ContextPtr & context)
     {
         auto read_settings = context->getReadSettings();
-        read_settings.remote_throttler = context->getBackupsThrottler();
-        read_settings.local_throttler = context->getBackupsThrottler();
+        addThrottler(read_settings.remote_throttler, context->getBackupsThrottler());
+        addThrottler(read_settings.local_throttler, context->getBackupsThrottler());
         read_settings.enable_filesystem_cache = false;
         read_settings.read_from_filesystem_cache_if_exists_otherwise_bypass_cache = false;
         return read_settings;
@@ -387,6 +398,23 @@ struct BackupsWorker::BackupStarter
         auto process_list_element = backup_context->getProcessListElement();
         if (process_list_element)
             process_list_element_holder = process_list_element->getProcessListEntry();
+
+        // If user has customized backup bandwidth with S3 checksum enabled,
+        // warn for the effective bandwidth mismatch with user's setup
+        if (!query_context->getSettingsRef()[Setting::s3_disable_checksum]
+            && backup_info.backup_engine_name == "S3"
+            && query_context->getBackupsThrottler())
+        {
+            UInt64 queryMaxSpeed = query_context->getBackupsThrottler()->getMaxSpeed();
+            // Note: With S3 checksum enabled, each file is read twice — once for checksum, once for upload.
+            // This effectively halves the usable bandwidth relative to max_backup_bandwidth.
+            LOG_WARNING(
+                log,
+                "S3 checksum is enabled (s3_disable_checksum = 0): each file will be read twice — once for checksum and once for upload. "
+                "This effectively reduces the usable bandwidth to about half of max_backup_bandwidth (currently: {}). "
+                "To mitigate this, either disable checksum (SET s3_disable_checksum = 1) or increase max_backup_bandwidth.",
+                formatReadableSizeWithBinarySuffix(static_cast<double>(queryMaxSpeed), 0));
+        }
 
         backups_worker.addInfo(backup_id,
             backup_name_for_logging,
@@ -862,6 +890,7 @@ BackupPtr BackupsWorker::openBackupForReading(const BackupInfo & backup_info, co
     backup_open_params.base_backup_info = restore_settings.base_backup_info;
     backup_open_params.password = restore_settings.password;
     backup_open_params.allow_s3_native_copy = restore_settings.allow_s3_native_copy;
+    backup_open_params.allow_azure_native_copy = restore_settings.allow_azure_native_copy;
     backup_open_params.use_same_s3_credentials_for_base_backup = restore_settings.use_same_s3_credentials_for_base_backup;
     backup_open_params.use_same_password_for_base_backup = restore_settings.use_same_password_for_base_backup;
     backup_open_params.read_settings = getReadSettingsForRestore(context);
@@ -997,7 +1026,6 @@ BackupsWorker::makeBackupCoordination(bool on_cluster, const BackupSettings & ba
     return std::make_shared<BackupCoordinationOnCluster>(
         *backup_settings.backup_uuid,
         !backup_settings.deduplicate_files,
-        backup_settings.experimental_lightweight_snapshot,
         root_zk_path,
         get_zookeeper,
         keeper_settings,
@@ -1058,7 +1086,7 @@ void BackupsWorker::addInfo(const OperationID & id, const String & name, const S
     info.query_id = query_id;
     info.internal = internal;
     info.status = status;
-    info.start_time = std::chrono::system_clock::now();
+    info.start_time_us = timeInMicroseconds(std::chrono::system_clock::now());
 
     bool is_final_status = isFinalStatus(status);
 
@@ -1070,7 +1098,7 @@ void BackupsWorker::addInfo(const OperationID & id, const String & name, const S
     }
 
     if (is_final_status)
-        info.end_time = info.start_time;
+        info.end_time_us = info.start_time_us;
 
     std::lock_guard lock{infos_mutex};
 
@@ -1119,7 +1147,7 @@ void BackupsWorker::setStatus(const String & id, BackupStatus status, bool throw
     }
 
     if (is_final_status)
-        info.end_time = std::chrono::system_clock::now();
+        info.end_time_us = timeInMicroseconds(std::chrono::system_clock::now());
 
     if (isFailedOrCancelled(status))
     {

@@ -1,9 +1,11 @@
 #include <Storages/Kafka/KafkaSource.h>
 
+#include <Columns/IColumn.h>
 #include <Core/Settings.h>
 #include <Formats/FormatFactory.h>
 #include <IO/EmptyReadBuffer.h>
 #include <Interpreters/Context.h>
+#include <Interpreters/ExpressionActions.h>
 #include <Processors/Executors/StreamingFormatExecutor.h>
 #include <Storages/Kafka/KafkaConsumer.h>
 #include <Common/logger_useful.h>
@@ -62,7 +64,7 @@ KafkaSource::~KafkaSource()
         return;
 
     if (broken)
-        consumer->unsubscribe();
+        consumer->markDirty();
 
     storage.pushConsumer(consumer);
 }
@@ -108,7 +110,7 @@ Chunk KafkaSource::generateImpl()
 
     EmptyReadBuffer empty_buf;
     auto input_format = FormatFactory::instance().getInput(
-        storage.getFormatName(), empty_buf, non_virtual_header, context, max_block_size, std::nullopt, 1);
+        storage.getFormatName(), empty_buf, non_virtual_header, context, max_block_size, std::nullopt, FormatParserGroup::singleThreaded(context->getSettingsRef()));
 
     std::optional<std::string> exception_message;
     size_t total_rows = 0;
@@ -138,7 +140,7 @@ Chunk KafkaSource::generateImpl()
             consumer->currentTopic(),
             consumer->currentPartition(),
             consumer->currentOffset());
-        consumer->setExceptionInfo(e.message());
+        consumer->setExceptionInfo(e.message(), /* with_stacktrace = */ true);
         throw std::move(e);
     };
 

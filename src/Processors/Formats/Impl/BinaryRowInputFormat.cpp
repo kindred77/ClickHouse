@@ -1,3 +1,4 @@
+#include <Columns/IColumn.h>
 #include <IO/ReadBuffer.h>
 #include <IO/ReadHelpers.h>
 #include <Processors/Formats/Impl/BinaryRowInputFormat.h>
@@ -5,6 +6,7 @@
 #include <Formats/registerWithNamesAndTypes.h>
 #include <DataTypes/DataTypeFactory.h>
 #include <DataTypes/DataTypesBinaryEncoding.h>
+#include <Core/Field.h>
 
 namespace DB
 {

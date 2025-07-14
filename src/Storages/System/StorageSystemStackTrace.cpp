@@ -231,10 +231,11 @@ ThreadIdToName getFilteredThreadNames(const ActionsDAG::Node * predicate, Contex
 bool parseHexNumber(std::string_view sv, UInt64 & res)
 {
     errno = 0; /// Functions strto* don't clear errno.
-    char * pos_integer = const_cast<char *>(sv.begin());
-    res = std::strtoull(sv.begin(), &pos_integer, 16);
-    return (pos_integer == sv.begin() + sv.size() && errno != ERANGE);
+    char * pos_integer = const_cast<char *>(sv.data());
+    res = std::strtoull(sv.data(), &pos_integer, 16); /// NOLINT(bugprone-suspicious-stringview-data-usage)
+    return (pos_integer == sv.data() + sv.size() && errno != ERANGE);
 }
+
 bool isSignalBlocked(UInt64 tid, int signal)
 {
     String buffer;
@@ -280,7 +281,7 @@ public:
     StackTraceSource(
         const Names & column_names,
         Block header_,
-        std::optional<ActionsDAG> filter_dag_,
+        std::shared_ptr<const ActionsDAG> filter_dag_,
         ContextPtr context_,
         UInt64 max_block_size_,
         LoggerPtr log_)
@@ -426,7 +427,7 @@ protected:
 private:
     ContextPtr context;
     Block header;
-    const std::optional<ActionsDAG> filter_dag;
+    const std::shared_ptr<const ActionsDAG> filter_dag;
     const ActionsDAG::Node * predicate;
 
     const size_t max_block_size;
@@ -474,7 +475,7 @@ public:
         Pipe pipe(std::make_shared<StackTraceSource>(
             column_names,
             getOutputHeader(),
-            std::move(filter_actions_dag),
+            filter_actions_dag,
             context,
             max_block_size,
             log));
